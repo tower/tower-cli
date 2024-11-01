@@ -1,11 +1,17 @@
-use tower_package::{Package, PackageSpec};
-use tokio::fs::{copy, File};
-use tokio::io::AsyncWriteExt;
-use async_compression::tokio::write::GzipDecoder;
-use tokio_tar::Archive;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+use async_compression::tokio::bufread::GzipDecoder;
 use tmpdir::TmpDir;
+use tokio::{
+    fs,
+    fs::File,
+    io::{BufReader, AsyncReadExt, AsyncWriteExt},
+};
 use tokio_stream::*;
+
+use tokio_tar::Archive;
+use tower_package::{Package, PackageSpec};
 
 #[tokio::test]
 async fn it_creates_package() {
@@ -20,30 +26,90 @@ async fn it_creates_package() {
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
+
     assert_eq!(package.manifest.version, 1);
     assert_eq!(package.manifest.invoke, "main.py");
     assert!(!package.path.as_os_str().is_empty());
 
-    copy(PathBuf::from(&package.path), PathBuf::from("/tmp/package.tar.gz")).await.expect("Failed to copy package to /tmp/package.tar.gz");
+    let files = read_package_files(package).await;
 
+    assert!(files.contains_key("main.py"));
+    assert!(files.contains_key("MANIFEST"));
+}
+
+#[tokio::test]
+async fn it_respects_complex_file_globs() {
+    let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        file_globs: vec![
+            "*.py".to_string(),
+            "**/*.py".to_string(),
+        ],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+
+    assert_eq!(package.manifest.version, 1);
+    assert_eq!(package.manifest.invoke, "main.py");
+    assert!(!package.path.as_os_str().is_empty());
+
+    let files = read_package_files(package).await;
+
+    assert!(files.contains_key("main.py"));
+    assert!(files.contains_key("MANIFEST"));
+    assert!(files.contains_key("pack/__init__.py"));
+}
+
+// read_package_files reads the contents of a given package  and returns a map of the file paths to
+// their contents as a collection of strings. Not useful for anything except for testing purposes.
+async fn read_package_files(package: Package) -> HashMap<String, String> {
     // Now we should crack open the file to make sure that we can find the relevant contents within
     // it.
     let file = File::open(package.path).await.expect("Failed to open package file");
-    let gzip = GzipDecoder::new(file);
+    let buf = BufReader::new(file);
+    let gzip = GzipDecoder::new(buf);
     let mut archive = Archive::new(gzip);
     let mut entries = archive.entries().expect("Failed to get entries from archive");
 
-    let mut filenames = vec![];
+    let mut files = HashMap::new();
 
     while let Some(file) = entries.next().await {
-        let file = file.expect("Failed to get file from archive");
+        let mut file = file.expect("Failed to get file from archive");
+        let contents = read_async_to_string(&mut file).await;
         let path = file.path().expect("Failed to get path from file");
-        filenames.push(path.to_str().expect("Failed to convert path to string").to_string());
+
+        let path = path.to_str().expect("Failed to convert path to string").to_string();
+        files.insert(path, contents);
     }
+    
+    files
 }
 
 async fn create_test_file(tempdir: PathBuf, path: &str, contents: &str) {
     let path = tempdir.join(path);
+
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(&parent).await.expect("Failed to create file directory");
+        }
+    }
+
     let mut file = File::create(&path).await.expect("Failed to create file");
     file.write_all(contents.as_bytes()).await.expect("Failed to write content to file")
 }
+
+async fn read_async_to_string<R>(reader: &mut R) -> String
+where
+    R: AsyncReadExt + Unpin,
+{
+    let mut content = String::new();
+    reader.read_to_string(&mut content).await.expect("Failed to read string from stream");
+    content
+}
+
