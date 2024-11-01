@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::Receiver;
 
+use tower_package::Package;
+
 pub mod local;
 pub mod errors;
 
@@ -32,10 +34,6 @@ type SharedReceiver<T> = Arc<Mutex<Receiver<T>>>;
 
 pub type OutputChannel = SharedReceiver<Output>;
 
-pub struct Bundle {
-    pub path: PathBuf,
-}
-
 pub trait App {
     // start will start the process
     async fn start(opts: StartOptions) -> Result<Self, Error>
@@ -57,8 +55,7 @@ pub struct Running<A: App> {
     app: A,
 
     pub run_id: String,
-    pub code_bundle: Option<Bundle>,
-    pub model_bundle: Option<Bundle>,
+    pub package: Option<Package>,
 }
 
 impl<A: App> Running<A> {
@@ -80,15 +77,13 @@ impl<A: App> AppLauncher<A> {
     pub async fn launch(
         &mut self,
         run_id: &str,
-        code_bundle: Bundle,
-        model_bundle: Bundle,
+        package: Package,
         secrets: HashMap<String, String>,
     ) -> Result<(), Error> {
         let opts = StartOptions {
             secrets,
-            path: code_bundle.path.to_path_buf(),
-            cwd: Some(code_bundle.path.to_path_buf()),
-            model_path: model_bundle.path.to_path_buf(),
+            path: package.path.to_path_buf(),
+            cwd: Some(package.path.to_path_buf()),
         };
 
         // NOTE: This is a really awful hack to force any existing app to drop itself. Not certain
@@ -101,8 +96,7 @@ impl<A: App> AppLauncher<A> {
             self.app = Some(Running {
                 app,
                 run_id: String::from(run_id),
-                code_bundle: None,
-                model_bundle: None,
+                package: None,
             });
 
             Ok(())
@@ -133,12 +127,10 @@ impl<A: App> AppLauncher<A> {
 pub struct StartOptions {
     pub path: PathBuf,
     pub cwd: Option<PathBuf>,
-    pub model_path: PathBuf,
     pub secrets: HashMap<String, String>,
 }
 
 pub struct ExecuteOptions {
     pub path: PathBuf,
     pub cwd: Option<PathBuf>,
-    pub model_path: PathBuf,
 }

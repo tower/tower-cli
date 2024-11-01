@@ -1,9 +1,9 @@
 [package]
 name = "tower_runtime"
-version = "0.1.0"
-authors = ["Brad Heller <brad@tower.dev>"]
-description = "runtime environment for Tower"
-edition = "2021"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 tokio = { workspace = true }
