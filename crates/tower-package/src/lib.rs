@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-use tokio_tar::{EntryType, Builder, Header};
+use tokio::io::AsyncWriteExt;
+use tokio_tar::Builder;
 use async_compression::tokio::write::GzipEncoder;
 use glob::glob;
-use tempdir::TempDir;
+use tmpdir::TmpDir;
 
 mod error;
 pub use error::Error;
@@ -42,6 +43,10 @@ pub struct PackageSpec {
 }
 
 pub struct Package {
+    // tmp_dir is used to keep the package directory around occasionally so the directory doesn't
+    // get deleted out from under the application.
+    pub tmp_dir: Option<TmpDir>,
+
     pub manifest: Manifest, 
 
     // path is where on disk (if anywhere) the pacakge lives.
@@ -51,6 +56,7 @@ pub struct Package {
 impl Package {
    pub fn default() -> Self {
        Self {
+           tmp_dir: None,
            path: PathBuf::new(),
            manifest: Manifest {
                version: CURRENT_PACKAGE_VERSION,
@@ -66,8 +72,8 @@ impl Package {
    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
    // GZip'd.
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
-       let tmp_dir = TempDir::new("tower-package")?;
-       let package_path = tmp_dir.path().join("package.tar");
+       let tmp_dir = TmpDir::new("tower-package").await?;
+       let package_path = tmp_dir.to_path_buf().join("package.tar");
 
        let file = File::create(package_path.clone()).await?;
        let gzip = GzipEncoder::new(file);
@@ -79,8 +85,13 @@ impl Package {
            let path_str = path.to_str().unwrap();
 
            for entry in glob(path_str).unwrap() {
-               let path = entry.unwrap();
-               println!("{:?}", path.display());
+               let physical_path = entry.unwrap();
+
+               // this copy of physical_path is used to appease the borrow checker.
+               let cp = physical_path.clone();
+               let logical_path = cp.strip_prefix(&spec.base_dir).unwrap();
+
+               builder.append_path_with_name(physical_path, logical_path).await?;
            }
        }
 
@@ -89,20 +100,38 @@ impl Package {
            invoke: String::from(spec.invoke),
        };
 
-       let mut header = Header::new_gnu();
-       header.set_entry_type(EntryType::Regular);
-       header.set_path(Path::new("MANIFEST")).unwrap();
+       // the whole manifest needs to be written to a file as a convenient way to avoid having to
+       // manually populate the TAR file headers for this data. maybe in the future, someone will
+       // have the humption to do so here, thus avoiding an unnecessary file write (and the
+       // associated failure modes).
+       let manifest_path = tmp_dir.to_path_buf().join("MANIFEST");
+       write_manifest_to_file(&manifest_path, &manifest).await?;
+       builder.append_path_with_name(manifest_path, "MANIFEST").await?;
 
-       let data = serde_json::to_string(&manifest).unwrap();
+       // consume the builder to close it, then close the underlying gzip stream
+       let mut gzip = builder.into_inner().await?;
+       gzip.shutdown().await?;
 
-       builder.append_data(&mut header, "MANIFEST", data.as_bytes()).await?;
-
-       builder.finish().await?;
-
+       // probably not explicitly required; however, makes the test suite pass so...
+       let mut file = gzip.into_inner();
+       file.shutdown().await?;
 
        Ok(Self {
+           tmp_dir: Some(tmp_dir),
            manifest,
            path: package_path,
        })
    }
+}
+
+async fn write_manifest_to_file(path: &PathBuf, manifest: &Manifest) -> Result<(), Error> {
+   let mut file = File::create(path).await?;
+   let data = serde_json::to_string(&manifest)?;
+   file.write_all(data.as_bytes()).await?;
+
+   // this is required to ensure that everything gets flushed to disk. it's not enough to just let
+   // the file reference get dropped.
+   file.shutdown().await?;
+
+   Ok(())
 }
