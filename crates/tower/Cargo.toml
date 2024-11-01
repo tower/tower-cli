@@ -1,0 +1,12 @@
+[package]
+name = "tower"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+default-run = "tower"
+
+[dependencies]
+tokio = { workspace = true }
+tower_cli = { workspace = true }
+tower_api = { workspace = true }

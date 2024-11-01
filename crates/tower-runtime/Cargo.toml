@@ -1,0 +1,12 @@
+[package]
+name = "tower_runtime"
+version = "0.1.0"
+authors = ["Brad Heller <brad@tower.dev>"]
+description = "runtime environment for Tower"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+log = { workspace = true } 
+snafu = { workspace = true } 
+tower_package = { workspace = true } 
