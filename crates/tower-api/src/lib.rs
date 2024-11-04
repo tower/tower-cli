@@ -25,6 +25,12 @@ struct LoginRequest {
     password: String,
 }
 
+
+#[derive(Serialize, Deserialize)]
+struct ListAppsResponse {
+    apps: Vec<AppSummary>,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
 
 pub struct Client {
@@ -74,8 +80,9 @@ impl Client {
         self.request(Method::POST, "/api/session", Some(body)).await
     }
 
-    pub async fn list_apps(&self) -> Result<Vec<App>> {
-        self.request(Method::GET, "/api/apps", None).await
+    pub async fn list_apps(&self) -> Result<Vec<AppSummary>> {
+        let res = self.request::<ListAppsResponse>(Method::GET, "/api/apps", None).await?;
+        Ok(res.apps)
     }
 
     async fn request<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>

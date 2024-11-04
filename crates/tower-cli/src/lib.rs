@@ -25,6 +25,15 @@ impl App {
         let client = Client::from_config(&config)
             .with_optional_session(self.session);
 
+        // TODO: Should this be configured every time?
+        simple_logger::SimpleLogger::new().env().init().unwrap();
+
+        if config.debug {
+            log::set_max_level(log::LevelFilter::Debug);
+        } else {
+            log::set_max_level(log::LevelFilter::Info);
+        }
+
         match matches.subcommand() {
             Some(("login", _)) => session::do_login(config, client).await,
             Some(("apps", sub_matches)) => {

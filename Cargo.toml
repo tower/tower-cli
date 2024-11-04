@@ -12,6 +12,7 @@ license = "MIT"
 async-compression  = { version = "0.4", features = ["tokio", "gzip"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
+cli-table = "0.4"
 config = { path = "crates/config" }
 dirs = "5"
 glob = "0.3"
@@ -20,6 +21,7 @@ promptly = "0.3"
 reqwest = { version = "0.12", features = ["json"] }
 serde_json = "1.0"
 serde = "1"
+simple_logger = "5"
 snafu = "0.7"
 tmpdir = "1.0"
 tower = { path = "crates/tower" }

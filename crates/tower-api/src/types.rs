@@ -14,3 +14,19 @@ pub struct App{
     pub owner: String,
     pub created_at: DateTime<Utc>,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct Run {
+    pub number: i32,
+    pub app_name: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AppSummary {
+    pub app: App,
+    pub runs: Vec<Run>,
+}
