@@ -1772,7 +1772,7 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "tokio",
  "tower_api",

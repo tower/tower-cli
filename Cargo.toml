@@ -7,6 +7,7 @@ edition = "2021"
 rust-version = "1.77"
 authors = ["Brad Heller <brad@tower.dev>"]
 license = "MIT"
+repository = "https://github.com/tower/tower-cli"
 
 [workspace.dependencies]
 async-compression  = { version = "0.4", features = ["tokio", "gzip"] }
@@ -34,3 +35,8 @@ tokio-pipe = "0.2"
 tokio-stream = { version = "0.1.11", features = ["net"] }
 tokio-tar = "0.3"
 url = { version = "2", features = ["serde"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
