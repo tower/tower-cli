@@ -7,11 +7,13 @@ edition = "2021"
 rust-version = "1.77"
 authors = ["Brad Heller <brad@tower.dev>"]
 license = "MIT"
+repository = "https://github.com/tower/tower-cli"
 
 [workspace.dependencies]
 async-compression  = { version = "0.4", features = ["tokio", "gzip"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
+cli-table = "0.4"
 config = { path = "crates/config" }
 dirs = "5"
 glob = "0.3"
@@ -20,8 +22,9 @@ promptly = "0.3"
 reqwest = { version = "0.12", features = ["json"] }
 serde_json = "1.0"
 serde = "1"
+simple_logger = "5"
 snafu = "0.7"
-tempdir = "0.3"
+tmpdir = "1.0"
 tower = { path = "crates/tower" }
 tower_api = { path = "crates/tower-api" }
 tower_cli = { path = "crates/tower-cli" }
@@ -32,3 +35,8 @@ tokio-pipe = "0.2"
 tokio-stream = { version = "0.1.11", features = ["net"] }
 tokio-tar = "0.3"
 url = { version = "2", features = ["serde"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

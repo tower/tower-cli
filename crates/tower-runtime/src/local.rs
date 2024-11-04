@@ -91,7 +91,6 @@ impl App for LocalApp {
                 .stderr(Stdio::piped())
                 .envs(make_env_vars(&opts.secrets))
                 .kill_on_drop(true)
-                .env("TOWER_MODEL_DIR", opts.model_path)
                 .spawn();
 
             if let Ok(child) = res {
