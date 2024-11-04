@@ -1,4 +1,9 @@
-name: [tower] Test rust
+# This workflow will build and test the Rust code in this repository. There are
+# separate workflows for testing the python portion of the code base.
+#
+# This file is *not* generated from automation and is manually maintained.
+#
+name: "[tower] Test rust"
 
 on:
   pull_request:
