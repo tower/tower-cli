@@ -10,7 +10,7 @@ import sysconfig
 def find_tower_bin() -> str:
     """Return the tower binary path."""
 
-    tower_exe = "tower-cli" + sysconfig.get_config_var("EXE")
+    tower_exe = "tower" + sysconfig.get_config_var("EXE")
 
     scripts_path = os.path.join(sysconfig.get_path("scripts"), tower_exe)
     if os.path.isfile(scripts_path):
