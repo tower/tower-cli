@@ -16,7 +16,7 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Publish jobs to run in CI
-publish-jobs = ["homebrew", "./publish-pypi"]
+publish-jobs = ["./publish-pypi"]
 # Whether to install an updater program
 install-updater = false
 # Whether dist should create a Github Release or use an existing draft
