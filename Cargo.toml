@@ -25,7 +25,6 @@ serde = "1"
 simple_logger = "5"
 snafu = "0.7"
 tmpdir = "1.0"
-tower = { path = "crates/tower" }
 tower_api = { path = "crates/tower-api" }
 tower_cmd = { path = "crates/tower-cmd" }
 tower_package = { path = "crates/tower-package" }
