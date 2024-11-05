@@ -29,6 +29,7 @@ concurrency:
 env:
   PACKAGE_NAME: tower_cli
   MODULE_NAME: tower
+  EXECUTABLE_NAME: tower-cli
   PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -54,7 +55,7 @@ jobs:
       - name: "Test sdist"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-          ${{ env.MODULE_NAME }} --help
+          ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload sdist"
         uses: actions/upload-artifact@v4
@@ -120,8 +121,8 @@ jobs:
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          tower-cli --help
-          python -m tower-cli --help
+          ${{ env.EXECUTABLE_NAME }} --help
+          python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -178,7 +179,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ${{ env.MODULE_NAME }} --help
+          ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
@@ -328,7 +329,7 @@ jobs:
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            tower-cli --help
+            ${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
