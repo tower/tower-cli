@@ -31,5 +31,10 @@ jobs:
           pattern: wheels-*
           path: wheels
           merge-multiple: true
+      - name: "Temporarily rename wheels"
+        run: |
+          for f in wheels/*.whl; do
+            mv $f $(echo $f | sed 's/tower/tower-test/g')
+          done
       - name: Publish to PyPi
         run: uv publish -v wheels/*
