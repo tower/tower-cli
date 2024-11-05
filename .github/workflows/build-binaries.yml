@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PACKAGE_NAME: tower-test
+  PACKAGE_NAME: tower-cli
   MODULE_NAME: tower
   PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
@@ -86,11 +86,11 @@ jobs:
       - name: "Archive binary"
         run: |
           TARGET=x86_64-apple-darwin
-          ARCHIVE_NAME=tower-$TARGET
+          ARCHIVE_NAME=twr-$TARGET
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower $ARCHIVE_NAME/tower
+          cp target/$TARGET/release/twr $ARCHIVE_NAME/twr
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -120,8 +120,8 @@ jobs:
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          tower --help
-          python -m tower --help
+          twr --help
+          python -m twr --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -130,11 +130,11 @@ jobs:
       - name: "Archive binary"
         run: |
           TARGET=aarch64-apple-darwin
-          ARCHIVE_NAME=tower-$TARGET
+          ARCHIVE_NAME=twr-$TARGET
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower $ARCHIVE_NAME/tower
+          cp target/$TARGET/release/twr $ARCHIVE_NAME/twr
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -188,8 +188,8 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-          ARCHIVE_FILE=tower-${{ matrix.platform.target }}.zip
-          7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/tower.exe
+          ARCHIVE_FILE=twr-${{ matrix.platform.target }}.zip
+          7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/twr.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
@@ -252,11 +252,11 @@ jobs:
           set -euo pipefail
 
           TARGET=${{ matrix.target }}
-          ARCHIVE_NAME=tower-$TARGET
+          ARCHIVE_NAME=twr-$TARGET
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower $ARCHIVE_NAME/tower
+          cp target/$TARGET/release/twr $ARCHIVE_NAME/twr
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -328,7 +328,7 @@ jobs:
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            tower --help
+            twr --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -340,11 +340,11 @@ jobs:
           set -euo pipefail
 
           TARGET=${{ matrix.platform.target }}
-          ARCHIVE_NAME=tower-$TARGET
+          ARCHIVE_NAME=twr-$TARGET
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower $ARCHIVE_NAME/tower
+          cp target/$TARGET/release/twr $ARCHIVE_NAME/twr
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -400,11 +400,11 @@ jobs:
           set -euo pipefail
 
           TARGET=${{ matrix.target }}
-          ARCHIVE_NAME=tower-$TARGET
+          ARCHIVE_NAME=twr-$TARGET
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower $ARCHIVE_NAME/tower
+          cp target/$TARGET/release/twr $ARCHIVE_NAME/twr
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -463,11 +463,11 @@ jobs:
           set -euo pipefail
 
           TARGET=${{ matrix.platform.target }}
-          ARCHIVE_NAME=tower-$TARGET
+          ARCHIVE_NAME=twr-$TARGET
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower $ARCHIVE_NAME/tower
+          cp target/$TARGET/release/twr $ARCHIVE_NAME/twr
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"

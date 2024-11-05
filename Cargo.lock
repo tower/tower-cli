@@ -1781,12 +1781,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "tower"
+name = "tower-cli"
 version = "0.1.0"
 dependencies = [
  "tokio",
  "tower_api",
- "tower_cli",
+ "tower_cmd",
 ]
 
 [[package]]
@@ -1810,7 +1810,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tower_cli"
+name = "tower_cmd"
 version = "0.1.0"
 dependencies = [
  "clap",
