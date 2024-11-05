@@ -46,6 +46,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: 'Setup custom dependencies'
+        run: apt install -y libssl-dev
       - name: "Build sdist"
         uses: PyO3/maturin-action@v1
         with:
@@ -215,6 +217,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - name: 'Setup custom dependencies'
+        run: apt install -y libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
@@ -279,6 +283,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: 'Setup custom dependencies'
+        run: apt install -y libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
@@ -342,6 +348,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - name: 'Setup custom dependencies'
+        run: apt install -y libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
@@ -403,6 +411,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: 'Setup custom dependencies'
+        run: apt install -y libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
