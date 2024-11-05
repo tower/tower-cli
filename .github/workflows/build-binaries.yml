@@ -240,7 +240,7 @@ jobs:
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ${{ env.MODULE_NAME }} --help
+          ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
@@ -389,7 +389,7 @@ jobs:
             apk add python3
             python -m venv .venv
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/${{ env.MODULE_NAME }} --help
+            .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
