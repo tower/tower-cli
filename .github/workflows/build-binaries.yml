@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PACKAGE_NAME: tower
+  PACKAGE_NAME: tower-test
   MODULE_NAME: tower
   PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
