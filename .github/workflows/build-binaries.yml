@@ -46,9 +46,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: 'Setup custom dependencies'
-        run: |
-          sudo apt install -y pkg-config libssl-dev
       - name: "Build sdist"
         uses: PyO3/maturin-action@v1
         with:
@@ -218,14 +215,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: 'Setup custom dependencies'
-        run: |
-          sudo apt install -y pkg-config libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          manylinux: auto
           args: --release --locked --out dist
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
@@ -285,14 +278,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: 'Setup custom dependencies'
-        run: |
-          sudo apt install -y pkg-config libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
       - uses: uraimo/run-on-arch-action@v2
@@ -351,9 +340,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: 'Setup custom dependencies'
-        run: |
-          sudo apt install -y pkg-config libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
@@ -415,9 +401,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: 'Setup custom dependencies'
-        run: |
-          sudo apt install -y pkg-config libssl-dev
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
