@@ -1,0 +1,14 @@
+[package]
+name = "tower_cmd"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { workspace = true }
+cli-table = { workspace = true }
+config = { workspace = true }
+log = { workspace = true }
+promptly = { workspace = true }
+simple_logger = { workspace = true }
+tower_api = { workspace = true }
+tower_runtime = { workspace = true }

@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "tower"
+name = "tower-cli"
 version = "0.1.0"
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
@@ -40,7 +40,7 @@ classifiers = [
 
 [tool.maturin]
 bindings = "bin"
-manifest-path = "crates/tower/Cargo.toml"
+manifest-path = "crates/tower-cli/Cargo.toml"
 module-name = "tower"
 python-source = "python"
 strip = true

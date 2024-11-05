@@ -1,4 +1,4 @@
-use tower_cli::App;
+use tower_cmd::App;
 
 #[tokio::main]
 async fn main() {

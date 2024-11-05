@@ -27,7 +27,7 @@ snafu = "0.7"
 tmpdir = "1.0"
 tower = { path = "crates/tower" }
 tower_api = { path = "crates/tower-api" }
-tower_cli = { path = "crates/tower-cli" }
+tower_cmd = { path = "crates/tower-cmd" }
 tower_package = { path = "crates/tower-package" }
 tower_runtime = { path = "crates/tower-runtime" }
 tokio = { version = "1", features = ["full"] }
