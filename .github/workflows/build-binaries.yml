@@ -91,7 +91,7 @@ jobs:
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower-cli $ARCHIVE_NAME/tower-cli
+          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -135,7 +135,7 @@ jobs:
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower-cli $ARCHIVE_NAME/tower-cli
+          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -189,8 +189,8 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-          ARCHIVE_FILE=tower-cli-${{ matrix.platform.target }}.zip
-          7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/tower-cli.exe
+          ARCHIVE_FILE=${{ env.EXECUTABLE_NAME }}-${{ matrix.platform.target }}.zip
+          7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/${{ env.EXECUTABLE_NAME }}.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
@@ -257,7 +257,7 @@ jobs:
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower-cli $ARCHIVE_NAME/tower-cli
+          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -345,7 +345,7 @@ jobs:
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower-cli $ARCHIVE_NAME/tower-cli
+          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -405,7 +405,7 @@ jobs:
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower-cli $ARCHIVE_NAME/tower-cli
+          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -468,7 +468,7 @@ jobs:
           ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
 
           mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/tower-cli $ARCHIVE_NAME/tower-cli
+          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
