@@ -1782,7 +1782,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "config",
@@ -1796,7 +1796,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "tokio",
  "tower-api",
