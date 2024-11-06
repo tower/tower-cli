@@ -80,10 +80,11 @@ impl<A: App> AppLauncher<A> {
         package: Package,
         secrets: HashMap<String, String>,
     ) -> Result<(), Error> {
+        let cwd = package.path.to_path_buf();
         let opts = StartOptions {
             secrets,
-            path: package.path.to_path_buf(),
-            cwd: Some(package.path.to_path_buf()),
+            cwd: Some(cwd),
+            package,
         };
 
         // NOTE: This is a really awful hack to force any existing app to drop itself. Not certain
@@ -125,7 +126,7 @@ impl<A: App> AppLauncher<A> {
 }
 
 pub struct StartOptions {
-    pub path: PathBuf,
+    pub package: Package,
     pub cwd: Option<PathBuf>,
     pub secrets: HashMap<String, String>,
 }
