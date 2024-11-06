@@ -1781,22 +1781,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tower-cli"
-version = "0.1.0"
-dependencies = [
- "tokio",
- "tower_api",
- "tower_cmd",
-]
-
-[[package]]
-name = "tower-service"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
-
-[[package]]
-name = "tower_api"
+name = "tower-api"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -1810,7 +1795,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "tower_cmd"
+name = "tower-cli"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "tower-api",
+ "tower-cmd",
+]
+
+[[package]]
+name = "tower-cmd"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -1819,12 +1813,12 @@ dependencies = [
  "log",
  "promptly",
  "simple_logger",
- "tower_api",
- "tower_runtime",
+ "tower-api",
+ "tower-runtime",
 ]
 
 [[package]]
-name = "tower_package"
+name = "tower-package"
 version = "0.0.0"
 dependencies = [
  "async-compression",
@@ -1839,14 +1833,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "tower_runtime"
+name = "tower-runtime"
 version = "0.0.0"
 dependencies = [
  "log",
  "snafu",
  "tokio",
- "tower_package",
+ "tower-package",
 ]
+
+[[package]]
+name = "tower-service"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tracing"

@@ -1,5 +1,5 @@
 [package]
-name = "tower_runtime"
+name = "tower-runtime"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -9,4 +9,4 @@ license = { workspace = true }
 tokio = { workspace = true }
 log = { workspace = true } 
 snafu = { workspace = true } 
-tower_package = { workspace = true } 
+tower-package = { workspace = true } 
