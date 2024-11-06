@@ -25,8 +25,6 @@ use tokio::{
     process::Child, 
 };
 
-use tower_package::Manifest;
-
 use crate::{
     FD,
     App,
