@@ -7,7 +7,7 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-default-run = "tower-cli"
+default-run = "tower"
 
 [package.metadata.wix]
 upgrade-guid = "327A8111-21DA-4EEB-8BD2-F24C437C071A"
@@ -19,3 +19,7 @@ eula = false
 tokio = { workspace = true }
 tower-cmd = { workspace = true }
 tower-api = { workspace = true }
+
+[[bin]]
+name = "tower"
+path = "src/main.rs"
