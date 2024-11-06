@@ -17,5 +17,5 @@ eula = false
 
 [dependencies]
 tokio = { workspace = true }
-tower_cmd = { workspace = true }
-tower_api = { workspace = true }
+tower-cmd = { workspace = true }
+tower-api = { workspace = true }

@@ -25,10 +25,10 @@ serde = "1"
 simple_logger = "5"
 snafu = "0.7"
 tmpdir = "1.0"
-tower_api = { path = "crates/tower-api" }
-tower_cmd = { path = "crates/tower-cmd" }
-tower_package = { path = "crates/tower-package" }
-tower_runtime = { path = "crates/tower-runtime" }
+tower-api = { path = "crates/tower-api" }
+tower-cmd = { path = "crates/tower-cmd" }
+tower-package = { path = "crates/tower-package" }
+tower-runtime = { path = "crates/tower-runtime" }
 tokio = { version = "1", features = ["full"] }
 tokio-pipe = "0.2"
 tokio-stream = { version = "0.1.11", features = ["net"] }
