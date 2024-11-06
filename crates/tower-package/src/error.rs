@@ -4,6 +4,9 @@ use snafu::prelude::*;
 pub enum Error {
     #[snafu(display("No manifest found"))]
     NoManifest,
+
+    #[snafu(display("Invalid manifest"))]
+    InvalidManifest,
 }
 
 impl From<std::io::Error> for Error {
@@ -14,6 +17,6 @@ impl From<std::io::Error> for Error {
 
 impl From<serde_json::Error> for Error {
     fn from(_: serde_json::Error) -> Self {
-        Error::NoManifest
+        Error::InvalidManifest
     }
 }
