@@ -122,9 +122,9 @@
                         <Component Id='binary0' Guid='*'>
                             <File
                                 Id='exe0'
-                                Name='tower-cli.exe'
+                                Name='tower.exe'
                                 DiskId='1'
-                                Source='$(var.CargoTargetBinDir)\tower-cli.exe'
+                                Source='$(var.CargoTargetBinDir)\tower.exe'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
