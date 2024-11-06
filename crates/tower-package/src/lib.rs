@@ -20,7 +20,7 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub async fn from_file(path: &Path) -> Result<Self, Error> {
+    pub async fn from_path(path: &Path) -> Result<Self, Error> {
         let mut file = File::open(path).await?;
         let mut contents = String::new();
         file.read_to_string(&mut contents).await?;
@@ -62,6 +62,17 @@ impl Package {
                version: CURRENT_PACKAGE_VERSION,
                invoke: "".to_string(),
            },
+       }
+   }
+
+   pub async fn from_path(path: PathBuf) -> Self {
+       let manifest_path = path.join("MANIFEST");
+       let manifest = Manifest::from_path(&manifest_path).await.unwrap();
+
+       Self {
+           tmp_dir: None,
+           path,
+           manifest,
        }
    }
 

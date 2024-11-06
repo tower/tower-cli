@@ -52,9 +52,6 @@ impl Default for LocalApp {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        log::info!("LocalApp: starting application");
-        let res = Manifest::from_file(&opts.path.join("MANIFEST")).await;
-
         // set for later on.
         let working_dir = if let Some(dir) = opts.cwd {
             dir 
@@ -62,55 +59,50 @@ impl App for LocalApp {
             current_dir().unwrap()
         };
 
-        if let Ok(manifest) = res {
-            if Path::new(&opts.path.join("requirements.txt")).exists() {
-                log::info!("requirements.txt file found. installing dependencies");
+        if Path::new(&opts.package.path.join("requirements.txt")).exists() {
+            log::info!("requirements.txt file found. installing dependencies");
 
-                let res = Command::new("/usr/local/bin/pip")
-                    .current_dir(&working_dir)
-                    .arg("install")
-                    .arg("-r")
-                    .arg(opts.path.join("requirements.txt"))
-                    .kill_on_drop(true)
-                    .spawn();
-
-                if let Ok(mut child) = res {
-                    // Wait for the child to complete entirely.
-                    child.wait().await.expect("child failed to exit");
-                }
-            } else {
-                log::info!("missing requirements.txt file found. no dependencies to install");
-            }
-
-            let res = Command::new("/usr/local/bin/python")
+            let res = Command::new("/usr/local/bin/pip")
                 .current_dir(&working_dir)
-                .arg("-u")
-                .arg(opts.path.join(manifest.invoke))
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .envs(make_env_vars(&opts.secrets))
+                .arg("install")
+                .arg("-r")
+                .arg(opts.package.path.join("requirements.txt"))
                 .kill_on_drop(true)
                 .spawn();
 
-            if let Ok(child) = res {
-                let child = Arc::new(Mutex::new(child));
-                let (sx, rx) = oneshot::channel::<i32>();
-
-                tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
-
-                Ok(Self {
-                    child: Some(child),
-                    waiter: Some(rx),
-                    status: None,
-                })
-            } else {
-                log::error!("failed to spawn process: {}", res.err().unwrap());
-                Err(Error::SpawnFailed)
+            if let Ok(mut child) = res {
+                // Wait for the child to complete entirely.
+                child.wait().await.expect("child failed to exit");
             }
         } else {
-            log::error!("failed to get manifest: {:?}", res.err());
-            Err(Error::MissingManifest)
+            log::info!("missing requirements.txt file found. no dependencies to install");
+        }
+
+        let res = Command::new("/usr/local/bin/python")
+            .current_dir(&working_dir)
+            .arg("-u")
+            .arg(opts.package.path.join(opts.package.manifest.invoke))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .envs(make_env_vars(&opts.secrets))
+            .kill_on_drop(true)
+            .spawn();
+
+        if let Ok(child) = res {
+            let child = Arc::new(Mutex::new(child));
+            let (sx, rx) = oneshot::channel::<i32>();
+
+            tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
+
+            Ok(Self {
+                child: Some(child),
+                waiter: Some(rx),
+                status: None,
+            })
+        } else {
+            log::error!("failed to spawn process: {}", res.err().unwrap());
+            Err(Error::SpawnFailed)
         }
     }
 
