@@ -15,7 +15,7 @@ const CURRENT_PACKAGE_VERSION: i32 = 1;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Manifest {
-    pub version: i32,
+    pub version: Option<i32>,
     pub invoke: String,
 }
 
@@ -59,7 +59,7 @@ impl Package {
            tmp_dir: None,
            path: PathBuf::new(),
            manifest: Manifest {
-               version: CURRENT_PACKAGE_VERSION,
+               version: Some(CURRENT_PACKAGE_VERSION),
                invoke: "".to_string(),
            },
        }
@@ -107,7 +107,7 @@ impl Package {
        }
 
        let manifest = Manifest {
-           version: CURRENT_PACKAGE_VERSION,
+           version: Some(CURRENT_PACKAGE_VERSION),
            invoke: String::from(spec.invoke),
        };
 
