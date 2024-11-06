@@ -452,7 +452,7 @@ jobs:
           run: |
             python -m venv .venv
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/${{ env.MODULE_NAME }} --help
+            .venv/bin/${{ env.EXECEUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
