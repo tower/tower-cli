@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::future::Future;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -36,47 +37,28 @@ pub type OutputChannel = SharedReceiver<Output>;
 
 pub trait App {
     // start will start the process
-    async fn start(opts: StartOptions) -> Result<Self, Error>
+    fn start(opts: StartOptions) -> impl Future<Output = Result<Self, Error>> + Send
         where Self: Sized;
 
     // terminate will terminate the subprocess
-    async fn terminate(&mut self) -> Result<(), Error>;
+    fn terminate(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 
     // status checks the status of an app 
-    async fn status(&mut self) -> Result<Status, Error>;
+    fn status(&mut self) -> impl Future<Output = Result<Status, Error>> + Send;
 
     // output returns a reader that contains a combination of the stdout and stderr messages from
     // the child process
-    async fn output(&self) -> Result<OutputChannel, Error>;
-}
-
-pub struct Running<A: App> {
-    // app is the actual underlying app that's currently running.
-    app: A,
-
-    pub run_id: String,
-    pub package: Option<Package>,
-}
-
-impl<A: App> Running<A> {
-    pub async fn output(&self) -> Result<OutputChannel, Error> {
-        self.app.output().await
-    }
-
-    pub async fn status(&mut self) -> Result<Status, Error> {
-        self.app.status().await
-    }
+    fn output(&self) -> impl Future<Output = Result<OutputChannel, Error>> + Send;
 }
 
 #[derive(Default)]
 pub struct AppLauncher<A: App> {
-    pub app: Option<Running<A>>,
+    pub app: Option<A>,
 }
 
 impl<A: App> AppLauncher<A> {
     pub async fn launch(
         &mut self,
-        run_id: &str,
         package: Package,
         secrets: HashMap<String, String>,
     ) -> Result<(), Error> {
@@ -94,12 +76,7 @@ impl<A: App> AppLauncher<A> {
         let res = A::start(opts).await;
 
         if let Ok(app) = res {
-            self.app = Some(Running {
-                app,
-                run_id: String::from(run_id),
-                package: None,
-            });
-
+            self.app = Some(app);
             Ok(())
         } else {
             self.app = None;
@@ -109,8 +86,6 @@ impl<A: App> AppLauncher<A> {
 
     pub async fn terminate(&mut self) -> Result<(), Error> {
         if let Some(app) = &mut self.app {
-            let app = &mut app.app;
-
             if let Err(err) = app.terminate().await {
                 log::debug!("failed to terminate app: {}", err);
                 Err(err)
