@@ -82,8 +82,8 @@ impl<A: App> AppLauncher<A> {
     ) -> Result<(), Error> {
         let cwd = package.path.to_path_buf();
         let opts = StartOptions {
-            secrets,
             cwd: Some(cwd),
+            secrets,
             package,
         };
 
