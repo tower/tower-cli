@@ -23,10 +23,12 @@ glob = "0.3"
 log = "0.4"
 promptly = "0.3"
 reqwest = { version = "0.12", features = ["json", "native-tls-vendored"] }
+rpassword = "7"
 serde_json = "1.0"
 serde = "1"
 simple_logger = "5"
 snafu = "0.7"
+spinners = "4"
 tmpdir = "1.0"
 tower-api = { path = "crates/tower-api" }
 tower-cmd = { path = "crates/tower-cmd" }

@@ -3,6 +3,8 @@ use colored::Colorize;
 use cli_table::{print_stdout, Table};
 pub use cli_table::{Cell, format::Justify};
 
+const BANNER_TEXT: &str = include_str!("./banner.txt");
+
 pub fn success(msg: &str) {
     let line = format!("{} {}\n", "Success!".green(), msg);
     io::stdout().write_all(line.as_bytes()).unwrap();
@@ -44,4 +46,37 @@ pub fn list(items: Vec<String>) {
         let line = format!("{}\n", line);
         io::stdout().write_all(line.as_bytes()).unwrap();
     }
+}
+
+pub fn banner() {
+    io::stdout().write_all(BANNER_TEXT.as_bytes()).unwrap();
+}
+
+pub struct Spinner {
+   spinner: spinners::Spinner, 
+}
+
+impl Spinner {
+    pub fn new(msg: String) -> Spinner {
+        let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg);
+        Spinner { spinner }
+    }
+
+    pub fn success(mut self, msg: &str) {
+        let sym = "✔".bold().green().to_string();
+        self.spinner.stop_and_persist(&sym, msg.into());
+    }
+
+    pub fn failure(mut self, msg: &str) {
+        let sym = "✘".bold().red().to_string();
+        self.spinner.stop_and_persist(&sym, msg.into());
+    }
+}
+
+pub fn spinner(msg: &str) -> Spinner {
+    Spinner::new(msg.into())
+}
+
+pub fn newline() {
+    io::stdout().write_all("\n".as_bytes()).unwrap();
 }

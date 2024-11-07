@@ -10,18 +10,27 @@ pub fn login_cmd() -> Command {
 }
 
 pub async fn do_login(_config: Config, client: Client) {
+    output::banner();
     let email: String = prompt("Email").unwrap();
-    let password: String = prompt("Password").unwrap();
+    let password: String = rpassword::prompt_password("Password: ").unwrap();
+    let spinner = output::spinner("Logging in...");
 
     match client.login(&email, &password).await {
         Ok(session) => {
+            spinner.success("Logged in.");
+            output::newline();
+
             if let Err(err) = session.save() {
                 output::config_error(err);
             } else {
-                output::success(format!("Hello, {}!", session.user.email).as_str());
+                let line = format!("Hello, {}!", session.user.email);
+                output::success(&line);
             }
         },
         Err(err) => {
+            spinner.failure("Login failed.");
+            output::newline();
+
             output::tower_error(err);
         }
     }

@@ -10,6 +10,8 @@ colored = { workspace = true }
 config = { workspace = true }
 log = { workspace = true }
 promptly = { workspace = true }
+rpassword = { workspace = true }
 simple_logger = { workspace = true }
+spinners = { workspace = true }
 tower-api = { workspace = true }
 tower-runtime = { workspace = true }
