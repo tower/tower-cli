@@ -25,6 +25,11 @@ fn find_or_create_config_dir() -> Result<PathBuf, Error> {
     let home = dirs::home_dir().ok_or(Error::NoHomeDir)?;
     let config_dir = home.join(".config").join("tower");
 
+    // if this does exist, but it's a file, let's clean up. this will upgrade legacy users.
+    if config_dir.is_file() {
+        fs::remove_file(&config_dir)?;
+    }
+
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir)?;
     }
