@@ -1809,6 +1809,7 @@ version = "0.1.1"
 dependencies = [
  "clap",
  "cli-table",
+ "colored",
  "config",
  "log",
  "promptly",

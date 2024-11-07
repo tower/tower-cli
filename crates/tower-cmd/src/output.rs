@@ -1,26 +1,33 @@
+use std::io::{self, Write};
+use colored::Colorize;
 use cli_table::{print_stdout, Table};
 pub use cli_table::{Cell, format::Justify};
 
 pub fn success(msg: &str) {
-    println!("> {}", msg)
+    let line = format!("{} {}\n", "Success!".green(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
 pub fn config_error(err: config::Error) {
-    match err {
+    let msg = match err {
         config::Error::ConfigDirNotFound => {
-            println!("> Config error: No home directory found")
+            "No home directory found"
         },
         config::Error::NoHomeDir => {
-            println!("> Config error: No home directory found")
+            "No home directory found"
         },
         config::Error::NoSession => {
-            println!("> Config error: No session found")
+            "No session"
         }
-    }
+    };
+
+    let line = format!("{} {}\n", "Config error:".red(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
 pub fn tower_error(err: tower_api::TowerError) {
-    println!("> Error: {}", err.description)
+    let line = format!("{} {}\n", "Error:".red(), err.description.friendly);
+    io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
 pub fn table(headers: Vec<String>, data: Vec<Vec<String>>) {
@@ -28,4 +35,13 @@ pub fn table(headers: Vec<String>, data: Vec<Vec<String>>) {
         .title(headers);
         
     print_stdout(table).unwrap();
+}
+
+pub fn list(items: Vec<String>) {
+    for item in items {
+        let line = format!(" * {}\n", item);
+        let line = line.replace("\n", "\n   ");
+        let line = format!("{}\n", line);
+        io::stdout().write_all(line.as_bytes()).unwrap();
+    }
 }

@@ -1,3 +1,4 @@
+use colored::Colorize;
 use clap::Command;
 use config::Config;
 use tower_api::Client;
@@ -27,12 +28,18 @@ pub async fn do_list_apps(_config: Config, client: Client) {
 
     match res {
         Ok(apps) => {
-            let headers = vec!["Name".to_string(), "Description".to_string()];
-            let data = apps.iter().map(|sum| {
-                vec![sum.app.name.clone(), sum.app.short_description.clone()]
+            let items = apps.iter().map(|sum| {
+                let desc = sum.app.short_description.clone();
+                let desc = if desc.is_empty() {
+                    "No description".to_string().white().italic()
+                } else { 
+                    desc.normal().clear()
+                };
+
+                format!("{}\n{}", sum.app.name.bold().green(), desc)
             }).collect();
 
-            output::table(headers, data);
+            output::list(items);
         },
         Err(err) => {
             output::tower_error(err);

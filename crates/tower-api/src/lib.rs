@@ -107,7 +107,9 @@ impl Client {
             StatusCode::OK | StatusCode::CREATED => {
                 res.json::<T>().await.map_err(Into::into)
             }
-            _ => Err(res.json::<TowerError>().await?),
+            _ => {
+                Err(res.json::<TowerError>().await?)
+            }
         }
     }
 

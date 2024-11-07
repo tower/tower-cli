@@ -2,37 +2,66 @@ use serde::{Deserialize, Serialize};
 use reqwest::Error;
 
 #[derive(Serialize, Deserialize)]
+pub struct DetailedString {
+    pub friendly: String,
+    pub technical: String,
+}
+
+impl DetailedString {
+    pub fn new(friendly: &str, technical: &str) -> Self {
+        Self {
+            friendly: friendly.to_string(),
+            technical: technical.to_string(),
+        }
+    }
+
+    pub fn from_string(s: &str) -> Self {
+        Self {
+            friendly: s.to_string(),
+            technical: s.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct TowerError {
     pub code: String,
     pub domain: String,
-    pub description: String,
+    pub description: DetailedString,
+    pub formatted: DetailedString,
 }
 
 impl From<Error> for TowerError {
     fn from(err: Error) -> Self {
         if err.is_redirect() {
             Self {
-                code: "tower_cli_redirect_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "The Tower API is redirecting your request in a way that Tower CLI cannot handle".to_string(),
+                code: "tower_api_client_redirect_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("The Tower API is redirecting your request in a way that Tower CLI cannot handle"),
+                formatted: DetailedString::from_string("The Tower API is redirecting your request in a way that Tower CLI cannot handle"),
             }
         } else if err.is_status() {
+            let line = format!("An unexpected status code (status code: {}) was returned from the Tower API", err.status().unwrap());
+
             Self {
-                code: "tower_cli_status_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: format!("An unexpected status code (status code: {}) was returned from the Tower API", err.status().unwrap()),
+                code: "tower_api_client_status_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string(&line),
+                formatted: DetailedString::from_string(&line),
             }
         } else if err.is_connect() {
             Self {
-                code: "tower_cli_connect_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "A connection to the Tower API could not be established".to_string(),
+                code: "tower_api_client_connect_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("A connection to the Tower API could not be established"),
+                formatted: DetailedString::from_string("A connection to the Tower API could not be established"),
             }
         } else if err.is_body() {
             Self {
-                code: "tower_cli_body_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "There was something wrong with the body of the response from the Tower API".to_string(),
+                code: "tower_api_client_body_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("There was something wrong with the body of the response from the Tower API"),
+                formatted: DetailedString::from_string("There was something wrong with the body of the response from the Tower API"),
             }
         } else if err.is_decode() {
             log::debug!("failed to decode the body: {:?}", err);
@@ -40,29 +69,33 @@ impl From<Error> for TowerError {
             // TODO: This means there was something critically wrong with how we're using the API.
             // Perhaps this should be a more serious error?
             Self {
-                code: "tower_cli_decode_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "There was an error decoding the response from the Tower API".to_string(),
+                code: "tower_api_client_decode_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("There was an error decoding the response from the Tower API"),
+                formatted: DetailedString::from_string("There was an error decoding the response from the Tower API"),
             }
         } else if err.is_builder() {
             Self {
-                code: "tower_cli_builder_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "There was an unexpected internal error in the Tower CLI request builder".to_string(),
+                code: "tower_api_client_builder_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("There was an unexpected internal error in the Tower CLI request builder"),
+                formatted: DetailedString::from_string("There was an unexpected internal error in the Tower CLI request builder"),
             }
         } else if err.is_timeout() {
             Self {
-                code: "tower_cli_timeout_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "A request to the Tower API timed out".to_string(),
+                code: "tower_api_client_timeout_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("A request to the Tower API timed out"),
+                formatted: DetailedString::from_string("A request to the Tower API timed out"),
             }
         } else {
             log::debug!("Unexpected error: {:?}", err);
 
             Self {
-                code: "tower_cli_error".to_string(),
-                domain: "tower_cli".to_string(),
-                description: "An unexpected or unknown error occured!".to_string(),
+                code: "tower_api_client_error".to_string(),
+                domain: "tower_api_client".to_string(),
+                description: DetailedString::from_string("An unexpected or unknown error occured!"),
+                formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
             }   
         }
     }
