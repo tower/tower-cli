@@ -33,6 +33,9 @@ pub struct AppSummary {
     pub runs: Vec<Run>,
 }
 
+/// parse_nullable_sequence is a helper function that deserializes a sequence of items that may be
+/// null in the underlying data. This is useful for parsing content coming from the API that may or
+/// may not be null if the resultant data is empty.
 fn parse_nullable_sequence<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,

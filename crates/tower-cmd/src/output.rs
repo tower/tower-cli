@@ -73,10 +73,20 @@ impl Spinner {
     }
 }
 
+/// spinner starts and returns a Spinner object. This is useful for long running tasks where you
+/// want to demonstrate there's something happening.
 pub fn spinner(msg: &str) -> Spinner {
     Spinner::new(msg.into())
 }
 
+/// newline just outputs a newline. This is useful when you have a very specific formatting you
+/// want to maintain and you don't want to use println!.
 pub fn newline() {
     io::stdout().write_all("\n".as_bytes()).unwrap();
+}
+
+pub fn die(msg: &str) {
+    let line = format!("{} {}\n", "Error:".red(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+    std::process::exit(1);
 }

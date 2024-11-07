@@ -25,13 +25,15 @@ pub fn apps_cmd() -> Command {
                     Arg::new("description")
                         .long("description")
                         .value_parser(value_parser!(String))
+                        .default_value("")
                         .action(clap::ArgAction::Set)
                 )
-                .about("Create a new app")
+                .about("Create a new app in Tower")
         )
         .subcommand(
             Command::new("delete")
-                .about("Delete an app")
+                .allow_external_subcommands(true)
+                .about("Delete an app in Tower")
         )
 }
 
@@ -60,8 +62,13 @@ pub async fn do_list_apps(_config: Config, client: Client) {
 }
 
 pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap();
+    let name = args.get_one::<String>("name").unwrap_or_else(|| {
+        output::die("App name (--name) is required");
+        std::process::exit(1);
+    });
+
     let description = args.get_one::<String>("description").unwrap();
+
     let spinner = output::spinner("Creating app");
 
     match client.create_app(&name, &description).await {
@@ -79,6 +86,25 @@ pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
     }
 }
 
-pub async fn do_delete_app(_config: Config, _client: Client) {
-    todo!()
+pub async fn do_delete_app(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
+    let opts = cmd.unwrap_or_else(|| {
+        output::die("App name (e.g. tower apps delete <name>) is required");
+        std::process::exit(1);
+    });
+
+    let spinner = output::spinner("Deleting app...");
+
+    match client.delete_app(&opts.0).await {
+        Ok(_app) => {
+            spinner.success("Done!");
+
+            let line = format!("App \"{}\" was deleted", &opts.0);
+            output::success(&line);
+        },
+        Err(err) => {
+            spinner.failure("App deletion failed.");
+
+            output::tower_error(err);
+        }
+    }
 }

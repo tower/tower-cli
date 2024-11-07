@@ -41,6 +41,11 @@ struct CreateAppResponse {
     app: App,
 }
 
+#[derive(Serialize, Deserialize)]
+struct DeleteAppResponse {
+    app: App,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
 
 pub struct Client {
@@ -93,6 +98,12 @@ impl Client {
     pub async fn list_apps(&self) -> Result<Vec<AppSummary>> {
         let res = self.request::<ListAppsResponse>(Method::GET, "/api/apps", None).await?;
         Ok(res.apps)
+    }
+
+    pub async fn delete_app(&self, name: &str) -> Result<App> {
+        let path = format!("/api/apps/{}", name);
+        let res = self.request::<DeleteAppResponse>(Method::DELETE, &path, None).await?;
+        Ok(res.app)
     }
 
     pub async fn create_app(&self, name: &str, description: &str) -> Result<App> {
