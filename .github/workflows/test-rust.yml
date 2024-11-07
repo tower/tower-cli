@@ -8,6 +8,8 @@ name: "[tower] Test rust"
 on:
   pull_request:
   push:
+    branches:
+      - '*'
     tags-ignore:
       - '**'
 
