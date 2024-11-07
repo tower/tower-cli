@@ -25,10 +25,20 @@ struct LoginRequest {
     password: String,
 }
 
-
 #[derive(Serialize, Deserialize)]
 struct ListAppsResponse {
     apps: Vec<AppSummary>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CreateAppRequest {
+    name: String,
+    short_description: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CreateAppResponse {
+    app: App,
 }
 
 pub type Result<T> = std::result::Result<T, TowerError>;
@@ -83,6 +93,17 @@ impl Client {
     pub async fn list_apps(&self) -> Result<Vec<AppSummary>> {
         let res = self.request::<ListAppsResponse>(Method::GET, "/api/apps", None).await?;
         Ok(res.apps)
+    }
+
+    pub async fn create_app(&self, name: &str, description: &str) -> Result<App> {
+        let data = CreateAppRequest {
+            name: String::from(name),
+            short_description: String::from(description),
+        };
+
+        let body = serde_json::to_value(data).unwrap();
+        let res = self.request::<CreateAppResponse>(Method::POST, "/api/apps", Some(body)).await?;
+        Ok(res.app)
     }
 
     async fn request<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>

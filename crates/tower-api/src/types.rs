@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{self, Serialize, Deserialize, Deserializer};
 pub use chrono::{DateTime, Utc};
 
 pub use config::{
@@ -28,5 +28,16 @@ pub struct Run {
 #[derive(Serialize, Deserialize)]
 pub struct AppSummary {
     pub app: App,
+
+    #[serde(deserialize_with="parse_nullable_sequence")]
     pub runs: Vec<Run>,
+}
+
+fn parse_nullable_sequence<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_else(Vec::new))
 }

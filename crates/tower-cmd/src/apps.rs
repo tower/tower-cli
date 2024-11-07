@@ -1,5 +1,5 @@
 use colored::Colorize;
-use clap::Command;
+use clap::{value_parser, Arg, ArgMatches, Command};
 use config::Config;
 use tower_api::Client;
 
@@ -15,6 +15,18 @@ pub fn apps_cmd() -> Command {
         )
         .subcommand(
             Command::new("create")
+                .arg(
+                    Arg::new("name")
+                        .long("name")
+                        .value_parser(value_parser!(String))
+                        .action(clap::ArgAction::Set)
+                )
+                .arg(
+                    Arg::new("description")
+                        .long("description")
+                        .value_parser(value_parser!(String))
+                        .action(clap::ArgAction::Set)
+                )
                 .about("Create a new app")
         )
         .subcommand(
@@ -31,7 +43,7 @@ pub async fn do_list_apps(_config: Config, client: Client) {
             let items = apps.iter().map(|sum| {
                 let desc = sum.app.short_description.clone();
                 let desc = if desc.is_empty() {
-                    "No description".to_string().white().italic()
+                    "No description".white().dimmed().italic()
                 } else { 
                     desc.normal().clear()
                 };
@@ -47,8 +59,24 @@ pub async fn do_list_apps(_config: Config, client: Client) {
     }
 }
 
-pub async fn do_create_app(_config: Config, _client: Client) {
-    todo!()
+pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
+    let name = args.get_one::<String>("name").unwrap();
+    let description = args.get_one::<String>("description").unwrap();
+    let spinner = output::spinner("Creating app");
+
+    match client.create_app(&name, &description).await {
+        Ok(_app) => {
+            spinner.success("Done!");
+
+            let line = format!("App \"{}\" created", name);
+            output::success(&line);
+        },
+        Err(err) => {
+            spinner.failure("App creation failed.");
+
+            output::tower_error(err);
+        }
+    }
 }
 
 pub async fn do_delete_app(_config: Config, _client: Client) {

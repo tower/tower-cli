@@ -41,7 +41,7 @@ impl App {
 
                 match apps_command {
                     Some(("list", _)) => apps::do_list_apps(config, client).await,
-                    Some(("create", _)) => apps::do_create_app(config, client).await,
+                    Some(("create", args)) => apps::do_create_app(config, client, args).await,
                     Some(("delete", _)) => apps::do_delete_app(config, client).await,
                     _ => unreachable!()
                 }
