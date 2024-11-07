@@ -33,6 +33,13 @@ pub struct AppSummary {
     pub runs: Vec<Run>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Secret {
+    pub name: String,
+    pub preview: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// parse_nullable_sequence is a helper function that deserializes a sequence of items that may be
 /// null in the underlying data. This is useful for parsing content coming from the API that may or
 /// may not be null if the resultant data is empty.

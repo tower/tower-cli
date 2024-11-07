@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 use colored::Colorize;
-use cli_table::{print_stdout, Table};
+use cli_table::{print_stdout, Table, format::{Border, Separator, HorizontalLine}};
 pub use cli_table::{Cell, format::Justify};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
@@ -33,7 +33,13 @@ pub fn tower_error(err: tower_api::TowerError) {
 }
 
 pub fn table(headers: Vec<String>, data: Vec<Vec<String>>) {
+    let separator = Separator::builder()
+        .title(Some(HorizontalLine::default()))
+        .build();
+
     let table = data.table()
+        .border(Border::builder().build())
+        .separator(separator)
         .title(headers);
         
     print_stdout(table).unwrap();

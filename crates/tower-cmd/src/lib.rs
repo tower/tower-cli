@@ -3,6 +3,7 @@ use config::{Config, Session};
 use tower_api::Client;
 
 mod apps;
+mod secrets;
 mod session;
 pub mod output;
 
@@ -46,6 +47,16 @@ impl App {
                     _ => unreachable!()
                 }
             },
+            Some(("secrets", sub_matches)) => {
+                let apps_command = sub_matches.subcommand();
+
+                match apps_command {
+                    Some(("list", _)) => secrets::do_list_secrets(config, client).await,
+                    Some(("create", args)) => secrets::do_create_secret(config, client, args).await,
+                    Some(("delete", args)) => secrets::do_delete_secret(config, client, args.subcommand()).await,
+                    _ => unreachable!()
+                }
+            },
             _ => unreachable!()
         }
     }
@@ -68,6 +79,7 @@ fn root_cmd() -> Command {
         .subcommand_required(true)
         .arg_required_else_help(true)
         .allow_external_subcommands(true)
-        .subcommand(apps::apps_cmd())
         .subcommand(session::login_cmd())
+        .subcommand(apps::apps_cmd())
+        .subcommand(secrets::secrets_cmd())
 }

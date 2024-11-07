@@ -46,6 +46,21 @@ struct DeleteAppResponse {
     app: App,
 }
 
+#[derive(Serialize, Deserialize)]
+struct ListSecretsResponse {
+    secrets: Vec<Secret>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct DeleteSecretRequest {
+    name: String
+}
+
+#[derive(Serialize, Deserialize)]
+struct DeleteSecretResponse {
+    secret: Secret,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
 
 pub struct Client {
@@ -115,6 +130,21 @@ impl Client {
         let body = serde_json::to_value(data).unwrap();
         let res = self.request::<CreateAppResponse>(Method::POST, "/api/apps", Some(body)).await?;
         Ok(res.app)
+    }
+
+    pub async fn list_secrets(&self) -> Result<Vec<Secret>> {
+        let res = self.request::<ListSecretsResponse>(Method::GET, "/api/secrets", None).await?;
+        Ok(res.secrets)
+    }
+
+    pub async fn delete_secret(&self, name: &str) -> Result<Secret> {
+        let data = DeleteSecretRequest {
+            name: String::from(name),
+        };
+
+        let body = serde_json::to_value(data).unwrap();
+        let res = self.request::<DeleteSecretResponse>(Method::DELETE, "/api/secrets", Some(body)).await?;
+        Ok(res.secret)
     }
 
     async fn request<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>
