@@ -13,19 +13,24 @@ repository = "https://github.com/tower/tower-cli"
 
 [workspace.dependencies]
 async-compression  = { version = "0.4", features = ["tokio", "gzip"] }
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
 cli-table = "0.4"
 colored = "2"
 config = { path = "crates/config" }
+crypto = { path = "crates/crpyto" }
 dirs = "5"
 glob = "0.3"
 log = "0.4"
 promptly = "0.3"
+rand = "0.8"
 reqwest = { version = "0.12", features = ["json", "native-tls-vendored"] }
 rpassword = "7"
+rsa = "0.9"
 serde_json = "1.0"
 serde = "1"
+sha2 = "0.10"
 simple_logger = "5"
 snafu = "0.7"
 spinners = "4"

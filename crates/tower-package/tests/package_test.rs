@@ -27,7 +27,7 @@ async fn it_creates_package() {
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, 1);
+    assert_eq!(package.manifest.version, Some(1));
     assert_eq!(package.manifest.invoke, "main.py");
     assert!(!package.path.as_os_str().is_empty());
 
@@ -55,7 +55,7 @@ async fn it_respects_complex_file_globs() {
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, 1);
+    assert_eq!(package.manifest.version, Some(1));
     assert_eq!(package.manifest.invoke, "main.py");
     assert!(!package.path.as_os_str().is_empty());
 
