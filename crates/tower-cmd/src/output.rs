@@ -53,23 +53,26 @@ pub fn banner() {
 }
 
 pub struct Spinner {
+    msg: String,
    spinner: spinners::Spinner, 
 }
 
 impl Spinner {
     pub fn new(msg: String) -> Spinner {
-        let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg);
-        Spinner { spinner }
+        let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
+        Spinner { spinner, msg }
     }
 
-    pub fn success(mut self, msg: &str) {
+    pub fn success(mut self) {
         let sym = "✔".bold().green().to_string();
-        self.spinner.stop_and_persist(&sym, msg.into());
+        self.spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
+        newline();
     }
 
-    pub fn failure(mut self, msg: &str) {
+    pub fn failure(mut self) {
         let sym = "✘".bold().red().to_string();
-        self.spinner.stop_and_persist(&sym, msg.into());
+        self.spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
+        newline();
     }
 }
 

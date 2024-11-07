@@ -17,8 +17,7 @@ pub async fn do_login(_config: Config, client: Client) {
 
     match client.login(&email, &password).await {
         Ok(session) => {
-            spinner.success("Logged in.");
-            output::newline();
+            spinner.success();
 
             if let Err(err) = session.save() {
                 output::config_error(err);
@@ -28,8 +27,7 @@ pub async fn do_login(_config: Config, client: Client) {
             }
         },
         Err(err) => {
-            spinner.failure("Login failed.");
-            output::newline();
+            spinner.failure();
 
             output::tower_error(err);
         }

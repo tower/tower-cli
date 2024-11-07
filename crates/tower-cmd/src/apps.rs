@@ -73,13 +73,13 @@ pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
 
     match client.create_app(&name, &description).await {
         Ok(_app) => {
-            spinner.success("Done!");
+            spinner.success();
 
-            let line = format!("App \"{}\" created", name);
+            let line = format!("App \"{}\" was created", name);
             output::success(&line);
         },
         Err(err) => {
-            spinner.failure("App creation failed.");
+            spinner.failure();
 
             output::tower_error(err);
         }
@@ -96,13 +96,13 @@ pub async fn do_delete_app(_config: Config, client: Client, cmd: Option<(&str, &
 
     match client.delete_app(&opts.0).await {
         Ok(_app) => {
-            spinner.success("Done!");
+            spinner.success();
 
             let line = format!("App \"{}\" was deleted", &opts.0);
             output::success(&line);
         },
         Err(err) => {
-            spinner.failure("App deletion failed.");
+            spinner.failure();
 
             output::tower_error(err);
         }
