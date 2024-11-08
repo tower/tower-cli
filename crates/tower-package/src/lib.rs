@@ -100,9 +100,13 @@ impl Package {
        let package_path = tmp_dir.to_path_buf().join("package.tar");
 
        let file = File::create(package_path.clone()).await?;
-       let gzip = GzipEncoder::new(file);
+       let mut builder = Builder::new(file);
 
-       let mut builder = Builder::new(gzip);
+       // TODO: When we want to enable gzip compression, we can uncomment the following lines.
+       // We'll also need to uncommend the stuff below about finishing compression.
+       //let gzip = GzipEncoder::new(file);
+
+       //let mut builder = Builder::new(gzip);
 
        for file_glob in spec.file_globs {
            let path = spec.base_dir.join(file_glob);
@@ -133,12 +137,17 @@ impl Package {
        builder.append_path_with_name(manifest_path, "MANIFEST").await?;
 
        // consume the builder to close it, then close the underlying gzip stream
-       let mut gzip = builder.into_inner().await?;
-       gzip.shutdown().await?;
-
-       // probably not explicitly required; however, makes the test suite pass so...
-       let mut file = gzip.into_inner();
+       let mut file = builder.into_inner().await?;
        file.shutdown().await?;
+
+       // TODO: When we want to enable gzip compression, we can uncomment the following lines.
+       // We'll need to delete the lines above here.
+       //let mut gzip = builder.into_inner().await?;
+       //gzip.shutdown().await?;
+
+       //// probably not explicitly required; however, makes the test suite pass so...
+       //let mut file = gzip.into_inner();
+       //file.shutdown().await?;
 
        Ok(Self {
            tmp_dir: Some(tmp_dir),
