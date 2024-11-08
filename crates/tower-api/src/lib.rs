@@ -257,8 +257,14 @@ impl Client {
         let reader_stream = ReaderStream::new(file);
         let progress_stream = ProgressStream::new(reader_stream, file_size, progress_cb).await?;
 
+        // headers that tell the server how to decode this type of file (where relevant)
+        let headers = HashMap::from([
+            ("Content-Type".to_string(), "application/tar".to_string()),
+            ("Content-Encoding".to_string(), "gzip".to_string()),
+        ]);
+
         let res = self
-            .request_stream::<_, UploadCodeResponse>(Method::POST, &path, progress_stream, None)
+            .request_stream::<_, UploadCodeResponse>(Method::POST, &path, progress_stream, Some(headers))
             .await?;
 
         Ok(res.code)
