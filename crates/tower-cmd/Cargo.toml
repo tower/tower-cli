@@ -9,6 +9,7 @@ cli-table = { workspace = true }
 colored = { workspace = true }
 config = { workspace = true }
 crypto = { workspace = true }
+indicatif = { workspace = true }
 log = { workspace = true }
 promptly = { workspace = true }
 rpassword = { workspace = true }

@@ -2,6 +2,7 @@ use config::{Config, Towerfile};
 use clap::{Command, ArgMatches};
 use tower_api::Client;
 use tower_package::{Package, PackageSpec};
+use std::sync::{Arc, Mutex};
 
 use crate::output;
 
@@ -31,8 +32,27 @@ pub async fn do_deploy(_config: Config, client: Client, cmd: Option<(&str, &ArgM
             match Package::build(spec).await {
                 Ok(package) => {
                     spinner.success();
+
+                    let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
+
+                    let callback = Box::new({
+                        let progress_bar = Arc::clone(&progress_bar);
+                        move |progress, total| {
+                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
+                            progress_bar.set_length(total);
+                            progress_bar.set_position(progress);
+                        }
+                    });
                     
-                    let res = client.upload_code(&towerfile.app.name, package).await;
+                    if let Err(err) = client.upload_code(&towerfile.app.name, package, Some(callback)).await {
+                        let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
+                        progress_bar.finish();
+                        output::tower_error(err);
+                    } else {
+                        let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
+                        progress_bar.finish();
+                        output::success("Successfully deployed your code to Tower!");
+                    }
                 },
                 Err(err) => {
                     spinner.failure();

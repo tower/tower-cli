@@ -119,3 +119,37 @@ pub fn die(msg: &str) -> ! {
     io::stdout().write_all(line.as_bytes()).unwrap();
     std::process::exit(1);
 }
+
+pub struct ProgressBar {
+    inner: indicatif::ProgressBar,
+}
+
+impl ProgressBar {
+    pub fn new(msg: String) -> ProgressBar {
+        let style = indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} {msg} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .expect("Failed to setup progress bar somehow");
+
+        let pb = indicatif::ProgressBar::new(0);
+        pb.set_style(style);
+        pb.set_message(msg);
+
+        ProgressBar { inner: pb }
+    }
+    
+    pub fn finish(&self) {
+        self.inner.finish();
+    }
+
+    pub fn set_length(&self, max: u64) {
+        self.inner.set_length(max);
+    }
+
+    pub fn set_position(&self, pos: u64) {
+        self.inner.set_position(pos);
+    }
+}
+
+pub fn progress_bar(msg: &str) -> ProgressBar {
+    ProgressBar::new(msg.to_string())
+}

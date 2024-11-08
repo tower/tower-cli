@@ -24,6 +24,7 @@ crypto = { path = "crates/crypto" }
 dirs = "5"
 futures-util = "0.3"
 glob = "0.3"
+indicatif = "0.17"
 log = "0.4"
 pem = "3"
 promptly = "0.3"
