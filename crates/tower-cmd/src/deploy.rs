@@ -47,10 +47,14 @@ pub async fn do_deploy(_config: Config, client: Client, cmd: Option<(&str, &ArgM
                     if let Err(err) = client.upload_code(&towerfile.app.name, package, Some(callback)).await {
                         let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
                         progress_bar.finish();
+
+                        output::newline();
                         output::tower_error(err);
                     } else {
                         let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
                         progress_bar.finish();
+
+                        output::newline();
                         output::success("Successfully deployed your code to Tower!");
                     }
                 },
