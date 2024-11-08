@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "crypto"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "base64",
  "pem",
@@ -2180,7 +2180,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "bytes",
  "chrono",
@@ -2202,7 +2202,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cli"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "tokio",
  "tower-api",
@@ -2211,7 +2211,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "clap",
  "cli-table",
