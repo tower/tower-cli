@@ -13,6 +13,9 @@ pub enum Error {
 
     #[snafu(display("Invalid Towerfile"))]
     InvalidTowerfile,
+
+    #[snafu(display("No Towerfile was found in this directory"))]
+    MissingTowerfile,
 }
 
 impl From<std::io::Error> for Error {

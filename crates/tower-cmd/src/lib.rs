@@ -5,6 +5,7 @@ use tower_api::Client;
 mod apps;
 mod secrets;
 mod session;
+mod deploy;
 pub mod output;
 
 pub struct App {
@@ -57,6 +58,9 @@ impl App {
                     _ => unreachable!()
                 }
             },
+            Some(("deploy", args)) => {
+                deploy::do_deploy(config, client, args.subcommand()).await
+            }
             _ => unreachable!()
         }
     }
@@ -82,4 +86,5 @@ fn root_cmd() -> Command {
         .subcommand(session::login_cmd())
         .subcommand(apps::apps_cmd())
         .subcommand(secrets::secrets_cmd())
+        .subcommand(deploy::deploy_cmd())
 }

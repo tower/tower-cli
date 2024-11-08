@@ -100,7 +100,6 @@ impl From<reqwest::Error> for TowerError {
     }
 }
 
-
 impl From<pem::PemError> for TowerError {
     fn from(err: pem::PemError) -> Self {
         log::debug!("Error decoding PEM: {:?}", err);
@@ -114,10 +113,35 @@ impl From<pem::PemError> for TowerError {
     }
 }
 
-
 impl From<rsa::pkcs1::Error> for TowerError {
     fn from(err: rsa::pkcs1::Error) -> Self {
         log::debug!("Error parsing RSA public key: {:?}", err);
+
+        Self {
+            code: "tower_api_client_error".to_string(),
+            domain: "tower_api_client".to_string(),
+            description: DetailedString::from_string("An unexpected or unknown error occured!"),
+            formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+        }   
+    }
+}
+
+impl From<serde_json::Error> for TowerError {
+    fn from(err: serde_json::Error) -> Self {
+        log::debug!("error decoding JSON: {:?}", err);
+
+        Self {
+            code: "tower_api_client_error".to_string(),
+            domain: "tower_api_client".to_string(),
+            description: DetailedString::from_string("An unexpected or unknown error occured!"),
+            formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+        }   
+    }
+}
+
+impl From<std::io::Error> for TowerError {
+    fn from(err: std::io::Error) -> Self {
+        log::debug!("error reading a file: {:?}", err);
 
         Self {
             code: "tower_api_client_error".to_string(),

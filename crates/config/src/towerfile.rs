@@ -1,5 +1,6 @@
 use crate::Error;
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct App {
@@ -29,6 +30,35 @@ impl Towerfile {
     pub fn from_toml(toml: &str) -> Result<Self, Error> {
         let towerfile: Towerfile = toml::from_str(toml)?;
         Ok(towerfile)
+    }
+
+    pub fn from_path(path: PathBuf) -> Result<Self, Error> {
+        Self::from_toml(&std::fs::read_to_string(path)?)
+    }
+
+    pub fn from_local_file() -> Result<Self, Error> {
+        let dir = std::env::current_dir()?;
+        let path = dir.join("Towerfile");
+
+        if !path.exists() {
+            Err(Error::MissingTowerfile)
+        } else {
+            Self::from_path(path)
+        }
+    }
+
+    /// from_dir_str reads a Towerfile from a directory represented by a string. This is useful in
+    /// the context of the `tower` CLI, where the user may specify a directory to read the
+    /// Towerfile on the command line as an argument or whatever.
+    pub fn from_dir_str(dir: &str) -> Result<Self, Error> {
+        let dir = PathBuf::from(dir);
+        let path = dir.join("Towerfile");
+
+        if !path.exists() {
+            Err(Error::MissingTowerfile)
+        } else {
+            Self::from_path(path)
+        }
     }
 }
 

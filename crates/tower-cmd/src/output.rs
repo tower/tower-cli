@@ -10,6 +10,20 @@ pub fn success(msg: &str) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
+pub fn package_error(err: tower_package::Error) {
+    let msg = match err {
+        tower_package::Error::NoManifest => {
+            "No manifeset was found".to_string()
+        },
+        tower_package::Error::InvalidManifest => {
+            "Invalid manifest was found or created".to_string()
+        },
+    };
+
+    let line = format!("{} {}\n", "Package error:".red(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
 pub fn config_error(err: config::Error) {
     let msg = match err {
         config::Error::ConfigDirNotFound => {
@@ -22,8 +36,11 @@ pub fn config_error(err: config::Error) {
             "No session"
         },
         config::Error::InvalidTowerfile => {
-            "Invalid Towerfile"
+            "Couldn't read the Towerfile in this directory"
         },
+        config::Error::MissingTowerfile => {
+            "No Towerfile was found in the current directory"
+        }
     };
 
     let line = format!("{} {}\n", "Config error:".red(), msg);

@@ -4,9 +4,11 @@ version = { workspace = true }
 edition = "2021"
 
 [dependencies]
+bytes = { workspace = true }
 chrono = { workspace = true } 
 config = { workspace = true } 
 crypto = { workspace = true } 
+futures-util = { workspace = true }
 log = { workspace = true }
 pem = { workspace = true }
 reqwest = { workspace = true }
@@ -14,4 +16,7 @@ rsa = {	workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+tower-package = { workspace = true }
 url = { workspace = true }
