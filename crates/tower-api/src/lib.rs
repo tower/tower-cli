@@ -30,6 +30,7 @@ pub use error::TowerError;
 pub use types::*;
 
 use progress_stream::ProgressStream;
+pub use progress_stream::ProgressCallback;
 
 #[derive(Serialize, Deserialize)]
 struct LoginRequest {
@@ -242,8 +243,9 @@ impl Client {
         Ok(decrypted_secrets)
     }
 
-    pub async fn upload_code(&self, name: &str, package: Package) -> Result<Code> {
+    pub async fn upload_code(&self, name: &str, package: Package, progress_cb: Option<ProgressCallback>) -> Result<Code> {
         let path = format!("/api/apps/{}/code", name);
+        let progress_cb = progress_cb.unwrap_or(Box::new(|_, _| {}));
 
         // get al the metadata about the file as well as a handle to the underlying data
         let file = File::open(package.path).await?;
@@ -252,7 +254,7 @@ impl Client {
 
         // wrap everything in a stream so that we can stream it to the server accordingly
         let reader_stream = ReaderStream::new(file);
-        let progress_stream = ProgressStream::new(reader_stream, file_size).await?;
+        let progress_stream = ProgressStream::new(reader_stream, file_size, progress_cb).await?;
 
         let res = self
             .request_stream::<_, UploadCodeResponse>(Method::POST, &path, progress_stream)
