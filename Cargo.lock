@@ -1213,6 +1213,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
+dependencies = [
+ "base64",
+ "serde",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2063,7 +2073,9 @@ dependencies = [
  "chrono",
  "config",
  "log",
+ "pem",
  "reqwest",
+ "rsa",
  "serde",
  "serde_json",
  "tokio",
@@ -2087,6 +2099,7 @@ dependencies = [
  "cli-table",
  "colored",
  "config",
+ "crypto",
  "log",
  "promptly",
  "rpassword",

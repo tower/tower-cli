@@ -94,7 +94,7 @@ pub fn newline() {
     io::stdout().write_all("\n".as_bytes()).unwrap();
 }
 
-pub fn die(msg: &str) {
+pub fn die(msg: &str) -> ! {
     let line = format!("{} {}\n", "Error:".red(), msg);
     io::stdout().write_all(line.as_bytes()).unwrap();
     std::process::exit(1);

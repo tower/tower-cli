@@ -8,6 +8,10 @@ use reqwest::{
 use serde_json::Value;
 use std::convert::From;
 use config::Config;
+use rsa::{
+    RsaPublicKey,
+    pkcs1::DecodeRsaPublicKey,
+};
 
 mod types;
 mod error;
@@ -58,6 +62,24 @@ struct DeleteSecretRequest {
 
 #[derive(Serialize, Deserialize)]
 struct DeleteSecretResponse {
+    secret: Secret,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SecretsKeyResponse {
+    /// public_key is a PEM-encoded RSA public key that can be used to encrypt secrets.
+    public_key: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CreateSecretRequest {
+    name: String,
+    encrypted_value: String,
+    preview: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CreateSecretResponse {
     secret: Secret,
 }
 
@@ -144,6 +166,25 @@ impl Client {
 
         let body = serde_json::to_value(data).unwrap();
         let res = self.request::<DeleteSecretResponse>(Method::DELETE, "/api/secrets", Some(body)).await?;
+        Ok(res.secret)
+    }
+
+    pub async fn secrets_key(&self) -> Result<RsaPublicKey> {
+        let res = self.request::<SecretsKeyResponse>(Method::GET, "/api/secrets/key", None).await?;
+        let decoded = pem::parse(res.public_key)?;
+        let public_key = RsaPublicKey::from_pkcs1_der(&decoded.contents())?;
+        Ok(public_key)
+    }
+
+    pub async fn create_secret(&self, name: &str, encrypted_value: &str, preview: &str) -> Result<Secret> {
+        let data = CreateSecretRequest {
+            name: String::from(name),
+            encrypted_value: String::from(encrypted_value),
+            preview: String::from(preview),
+        };
+
+        let body = serde_json::to_value(data).unwrap();
+        let res = self.request::<CreateSecretResponse>(Method::POST, "/api/secrets", Some(body)).await?;
         Ok(res.secret)
     }
 

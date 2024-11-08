@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use reqwest::Error;
 
 #[derive(Serialize, Deserialize)]
 pub struct DetailedString {
@@ -31,8 +30,8 @@ pub struct TowerError {
     pub formatted: DetailedString,
 }
 
-impl From<Error> for TowerError {
-    fn from(err: Error) -> Self {
+impl From<reqwest::Error> for TowerError {
+    fn from(err: reqwest::Error) -> Self {
         if err.is_redirect() {
             Self {
                 code: "tower_api_client_redirect_error".to_string(),
@@ -98,5 +97,33 @@ impl From<Error> for TowerError {
                 formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
             }   
         }
+    }
+}
+
+
+impl From<pem::PemError> for TowerError {
+    fn from(err: pem::PemError) -> Self {
+        log::debug!("Error decoding PEM: {:?}", err);
+
+        Self {
+            code: "tower_api_client_error".to_string(),
+            domain: "tower_api_client".to_string(),
+            description: DetailedString::from_string("An unexpected or unknown error occured!"),
+            formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+        }   
+    }
+}
+
+
+impl From<rsa::pkcs1::Error> for TowerError {
+    fn from(err: rsa::pkcs1::Error) -> Self {
+        log::debug!("Error parsing RSA public key: {:?}", err);
+
+        Self {
+            code: "tower_api_client_error".to_string(),
+            domain: "tower_api_client".to_string(),
+            description: DetailedString::from_string("An unexpected or unknown error occured!"),
+            formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+        }   
     }
 }
