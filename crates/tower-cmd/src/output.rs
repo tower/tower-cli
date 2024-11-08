@@ -20,7 +20,10 @@ pub fn config_error(err: config::Error) {
         },
         config::Error::NoSession => {
             "No session"
-        }
+        },
+        config::Error::InvalidTowerfile => {
+            "Invalid Towerfile"
+        },
     };
 
     let line = format!("{} {}\n", "Config error:".red(), msg);
