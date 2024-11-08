@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use config::Towerfile;
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::io::AsyncWriteExt;
 use tokio_tar::Builder;
 use async_compression::tokio::write::GzipEncoder;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use glob::glob;
 use tmpdir::TmpDir;
 
@@ -40,6 +43,18 @@ pub struct PackageSpec {
 
     // file_globs is a list of globs that match the files in the package.
     pub file_globs: Vec<String>,
+}
+
+impl PackageSpec {
+    pub fn from_towerfile(towerfile: &Towerfile) -> Self {
+        let base_dir = std::env::current_dir().unwrap();
+
+        Self {
+            base_dir,
+            invoke: towerfile.app.script.clone(),
+            file_globs: towerfile.app.source.clone(),
+        }  
+    }
 }
 
 pub struct Package {

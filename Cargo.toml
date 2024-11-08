@@ -14,6 +14,7 @@ repository = "https://github.com/tower/tower-cli"
 [workspace.dependencies]
 async-compression  = { version = "0.4", features = ["tokio", "gzip"] }
 base64 = "0.22"
+bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
 cli-table = "0.4"
@@ -21,12 +22,13 @@ colored = "2"
 config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
 dirs = "5"
+futures-util = "0.3"
 glob = "0.3"
 log = "0.4"
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
-reqwest = { version = "0.12", features = ["json", "native-tls-vendored"] }
+reqwest = { version = "0.12", features = ["json", "native-tls-vendored", "stream"] }
 rpassword = "7"
 rsa = "0.9"
 serde_json = "1.0"
@@ -41,6 +43,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-pipe = "0.2"
 tokio-stream = { version = "0.1.11", features = ["net"] }
 tokio-tar = "0.3"
+tokio-util = "0.7"
 tower-api = { path = "crates/tower-api" }
 tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }

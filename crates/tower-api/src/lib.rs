@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 use reqwest::{
+    Body,
     Client as ReqwestClient,
     StatusCode,
     Method,
@@ -12,9 +13,14 @@ use rsa::{
     RsaPublicKey,
     pkcs1::DecodeRsaPublicKey,
 };
+use tokio::fs::File;
+use futures_util::stream::Stream;
+use tokio_util::io::ReaderStream;
+use tower_package::Package;
 
 mod types;
 mod error;
+mod progress_stream;
 
 // TowerError is the main error type of Tower errors. We export it here for convenience to crate
 // users.
@@ -22,6 +28,8 @@ pub use error::TowerError;
 
 // All types get exported to make our lives easier, too.
 pub use types::*;
+
+use progress_stream::ProgressStream;
 
 #[derive(Serialize, Deserialize)]
 struct LoginRequest {
@@ -94,7 +102,14 @@ struct ExportSecretsResponse {
     secrets: Vec<EncryptedSecret>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct UploadCodeResponse {
+    code: Code,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
+
+type StreamResult<T> = std::result::Result<T, std::io::Error>;
 
 pub struct Client {
     // domain is the URL that we use to connect to the client.
@@ -140,17 +155,17 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        self.request(Method::POST, "/api/session", Some(body)).await
+        self.request_object(Method::POST, "/api/session", Some(body)).await
     }
 
     pub async fn list_apps(&self) -> Result<Vec<AppSummary>> {
-        let res = self.request::<ListAppsResponse>(Method::GET, "/api/apps", None).await?;
+        let res = self.request_object::<ListAppsResponse>(Method::GET, "/api/apps", None).await?;
         Ok(res.apps)
     }
 
     pub async fn delete_app(&self, name: &str) -> Result<App> {
         let path = format!("/api/apps/{}", name);
-        let res = self.request::<DeleteAppResponse>(Method::DELETE, &path, None).await?;
+        let res = self.request_object::<DeleteAppResponse>(Method::DELETE, &path, None).await?;
         Ok(res.app)
     }
 
@@ -161,12 +176,12 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        let res = self.request::<CreateAppResponse>(Method::POST, "/api/apps", Some(body)).await?;
+        let res = self.request_object::<CreateAppResponse>(Method::POST, "/api/apps", Some(body)).await?;
         Ok(res.app)
     }
 
     pub async fn list_secrets(&self) -> Result<Vec<Secret>> {
-        let res = self.request::<ListSecretsResponse>(Method::GET, "/api/secrets", None).await?;
+        let res = self.request_object::<ListSecretsResponse>(Method::GET, "/api/secrets", None).await?;
         Ok(res.secrets)
     }
 
@@ -176,12 +191,12 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        let res = self.request::<DeleteSecretResponse>(Method::DELETE, "/api/secrets", Some(body)).await?;
+        let res = self.request_object::<DeleteSecretResponse>(Method::DELETE, "/api/secrets", Some(body)).await?;
         Ok(res.secret)
     }
 
     pub async fn secrets_key(&self) -> Result<RsaPublicKey> {
-        let res = self.request::<SecretsKeyResponse>(Method::GET, "/api/secrets/key", None).await?;
+        let res = self.request_object::<SecretsKeyResponse>(Method::GET, "/api/secrets/key", None).await?;
         let decoded = pem::parse(res.public_key)?;
         let public_key = RsaPublicKey::from_pkcs1_der(&decoded.contents())?;
         Ok(public_key)
@@ -195,7 +210,7 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        let res = self.request::<CreateSecretResponse>(Method::POST, "/api/secrets", Some(body)).await?;
+        let res = self.request_object::<CreateSecretResponse>(Method::POST, "/api/secrets", Some(body)).await?;
         Ok(res.secret)
     }
 
@@ -206,48 +221,92 @@ impl Client {
             public_key: crypto::serialize_public_key(public_key),
         };
 
-        let body = serde_json::to_value(data).unwrap();
-        let res = self.request::<ExportSecretsResponse>(Method::POST, "/api/secrets/export", Some(body)).await?;
+        let body = serde_json::to_value(data).expect("Failed to serialize data");
+        let res = self
+            .request_object::<ExportSecretsResponse>(Method::POST, "/api/secrets/export", Some(body))
+            .await?;
 
-        let secrets = res.secrets.iter().map(|secret| {
-            let encrypted_value = secret.encrypted_value.clone();
-            let decrypted = crypto::decrypt(private_key.clone(), encrypted_value);
+        // Decrypt each secret and map it to an ExportedSecret struct
+        let decrypted_secrets: Vec<ExportedSecret> = res.secrets
+            .iter()
+            .map(|secret| {
+                let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.clone());
+                ExportedSecret {
+                    name: secret.name.clone(),
+                    value: decrypted_value,
+                    created_at: secret.created_at,
+                }
+            })
+            .collect();
 
-            ExportedSecret {
-                name: secret.name.clone(),
-                value: decrypted,
-                created_at: secret.created_at,
-            }
-        }).collect();
-
-        Ok(secrets)
+        Ok(decrypted_secrets)
     }
 
-    async fn request<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>
+    pub async fn upload_code(&self, name: &str, package: Package) -> Result<Code> {
+        let path = format!("/api/apps/{}/code", name);
+
+        // get al the metadata about the file as well as a handle to the underlying data
+        let file = File::open(package.path).await?;
+        let metadata = file.metadata().await?;
+        let file_size = metadata.len();
+
+        // wrap everything in a stream so that we can stream it to the server accordingly
+        let reader_stream = ReaderStream::new(file);
+        let progress_stream = ProgressStream::new(reader_stream, file_size).await?;
+
+        let res = self
+            .request_stream::<_, UploadCodeResponse>(Method::POST, &path, progress_stream)
+            .await?;
+
+        Ok(res.code)
+    }
+
+    async fn request_stream<R, T>(&self, method: Method, path: &str, body: R) -> Result<T>
+    where
+        R: Stream<Item = StreamResult<bytes::Bytes>> + Send + Sync + 'static,
+        T: for<'de> Deserialize<'de>,
+    {
+        let body = Body::wrap_stream(body);
+
+        self.request(method, path, body).await
+    }
+
+    async fn request_object<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        let body = if let Some(obj) = body {
+            Body::from(serde_json::to_vec(&obj)?)
+        } else {
+            // empty body
+            Body::from(Vec::new())
+        };
+
+        self.request(method, path, body).await
+    }
+
+    async fn request<T>(
+        &self,
+        method: Method,
+        path: &str,
+        body: Body,
+    ) -> Result<T>
     where
         T: for<'de> Deserialize<'de>,
     {
         let client = ReqwestClient::new();
         let url = self.url_from_path(path);
-        let mut req = client.request(method, url);
-
-        if let Some(obj) = body {
-            req = req.json(&obj);
-        }
+        let mut req = client.request(method, url).body(body);
 
         if let Some(sess) = &self.session {
-            req = req.header("Authorization", format!("Bearer {}", sess.token.jwt))
+            req = req.header("Authorization", format!("Bearer {}", sess.token.jwt));
         }
 
         let res = req.send().await?;
 
         match res.status() {
-            StatusCode::OK | StatusCode::CREATED => {
-                res.json::<T>().await.map_err(Into::into)
-            }
-            _ => {
-                Err(res.json::<TowerError>().await?)
-            }
+            StatusCode::OK | StatusCode::CREATED => res.json::<T>().await.map_err(Into::into),
+            _ => Err(res.json::<TowerError>().await?),
         }
     }
 

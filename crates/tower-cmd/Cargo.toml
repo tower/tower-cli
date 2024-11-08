@@ -15,4 +15,5 @@ rpassword = { workspace = true }
 simple_logger = { workspace = true }
 spinners = { workspace = true }
 tower-api = { workspace = true }
+tower-package = { workspace = true }
 tower-runtime = { workspace = true }
