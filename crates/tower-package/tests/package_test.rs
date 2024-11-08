@@ -73,8 +73,10 @@ async fn read_package_files(package: Package) -> HashMap<String, String> {
     // it.
     let file = File::open(package.path).await.expect("Failed to open package file");
     let buf = BufReader::new(file);
-    let gzip = GzipDecoder::new(buf);
-    let mut archive = Archive::new(gzip);
+    // TODO: Re-enable this when we reintroduce gzip compression
+    //let gzip = GzipDecoder::new(buf);
+    //let mut archive = Archive::new(gzip);
+    let mut archive = Archive::new(buf);
     let mut entries = archive.entries().expect("Failed to get entries from archive");
 
     let mut files = HashMap::new();
