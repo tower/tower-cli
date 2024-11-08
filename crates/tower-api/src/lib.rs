@@ -260,7 +260,7 @@ impl Client {
         // headers that tell the server how to decode this type of file (where relevant)
         let headers = HashMap::from([
             ("Content-Type".to_string(), "application/tar".to_string()),
-            ("Content-Encoding".to_string(), "gzip".to_string()),
+            //("Content-Encoding".to_string(), "gzip".to_string()),
         ]);
 
         let res = self
