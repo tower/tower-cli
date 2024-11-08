@@ -2,12 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use config::Towerfile;
 use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_tar::Builder;
 use async_compression::tokio::write::GzipEncoder;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use glob::glob;
 use tmpdir::TmpDir;
 
