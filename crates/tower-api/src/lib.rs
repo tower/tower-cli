@@ -13,6 +13,7 @@ use rsa::{
     RsaPublicKey,
     pkcs1::DecodeRsaPublicKey,
 };
+use std::collections::HashMap;
 use tokio::fs::File;
 use futures_util::stream::Stream;
 use tokio_util::io::ReaderStream;
@@ -156,17 +157,17 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        self.request_object(Method::POST, "/api/session", Some(body)).await
+        self.request_object(Method::POST, "/api/session", Some(body), None).await
     }
 
     pub async fn list_apps(&self) -> Result<Vec<AppSummary>> {
-        let res = self.request_object::<ListAppsResponse>(Method::GET, "/api/apps", None).await?;
+        let res = self.request_object::<ListAppsResponse>(Method::GET, "/api/apps", None, None).await?;
         Ok(res.apps)
     }
 
     pub async fn delete_app(&self, name: &str) -> Result<App> {
         let path = format!("/api/apps/{}", name);
-        let res = self.request_object::<DeleteAppResponse>(Method::DELETE, &path, None).await?;
+        let res = self.request_object::<DeleteAppResponse>(Method::DELETE, &path, None, None).await?;
         Ok(res.app)
     }
 
@@ -177,12 +178,12 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        let res = self.request_object::<CreateAppResponse>(Method::POST, "/api/apps", Some(body)).await?;
+        let res = self.request_object::<CreateAppResponse>(Method::POST, "/api/apps", Some(body), None).await?;
         Ok(res.app)
     }
 
     pub async fn list_secrets(&self) -> Result<Vec<Secret>> {
-        let res = self.request_object::<ListSecretsResponse>(Method::GET, "/api/secrets", None).await?;
+        let res = self.request_object::<ListSecretsResponse>(Method::GET, "/api/secrets", None, None).await?;
         Ok(res.secrets)
     }
 
@@ -192,12 +193,12 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        let res = self.request_object::<DeleteSecretResponse>(Method::DELETE, "/api/secrets", Some(body)).await?;
+        let res = self.request_object::<DeleteSecretResponse>(Method::DELETE, "/api/secrets", Some(body), None).await?;
         Ok(res.secret)
     }
 
     pub async fn secrets_key(&self) -> Result<RsaPublicKey> {
-        let res = self.request_object::<SecretsKeyResponse>(Method::GET, "/api/secrets/key", None).await?;
+        let res = self.request_object::<SecretsKeyResponse>(Method::GET, "/api/secrets/key", None, None).await?;
         let decoded = pem::parse(res.public_key)?;
         let public_key = RsaPublicKey::from_pkcs1_der(&decoded.contents())?;
         Ok(public_key)
@@ -211,7 +212,7 @@ impl Client {
         };
 
         let body = serde_json::to_value(data).unwrap();
-        let res = self.request_object::<CreateSecretResponse>(Method::POST, "/api/secrets", Some(body)).await?;
+        let res = self.request_object::<CreateSecretResponse>(Method::POST, "/api/secrets", Some(body), None).await?;
         Ok(res.secret)
     }
 
@@ -224,7 +225,7 @@ impl Client {
 
         let body = serde_json::to_value(data).expect("Failed to serialize data");
         let res = self
-            .request_object::<ExportSecretsResponse>(Method::POST, "/api/secrets/export", Some(body))
+            .request_object::<ExportSecretsResponse>(Method::POST, "/api/secrets/export", Some(body), None)
             .await?;
 
         // Decrypt each secret and map it to an ExportedSecret struct
@@ -257,23 +258,35 @@ impl Client {
         let progress_stream = ProgressStream::new(reader_stream, file_size, progress_cb).await?;
 
         let res = self
-            .request_stream::<_, UploadCodeResponse>(Method::POST, &path, progress_stream)
+            .request_stream::<_, UploadCodeResponse>(Method::POST, &path, progress_stream, None)
             .await?;
 
         Ok(res.code)
     }
 
-    async fn request_stream<R, T>(&self, method: Method, path: &str, body: R) -> Result<T>
+    async fn request_stream<R, T>(
+        &self,
+        method: Method,
+        path: &str,
+        body: R,
+        headers: Option<HashMap<String, String>>
+    ) -> Result<T>
     where
         R: Stream<Item = StreamResult<bytes::Bytes>> + Send + Sync + 'static,
         T: for<'de> Deserialize<'de>,
     {
         let body = Body::wrap_stream(body);
 
-        self.request(method, path, body).await
+        self.request(method, path, body, headers).await
     }
 
-    async fn request_object<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>
+    async fn request_object<T>(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<Value>,
+        headers: Option<HashMap<String, String>>
+    ) -> Result<T>
     where
         T: for<'de> Deserialize<'de>,
     {
@@ -284,7 +297,7 @@ impl Client {
             Body::from(Vec::new())
         };
 
-        self.request(method, path, body).await
+        self.request(method, path, body, headers).await
     }
 
     async fn request<T>(
@@ -292,6 +305,7 @@ impl Client {
         method: Method,
         path: &str,
         body: Body,
+        headers: Option<HashMap<String, String>>,
     ) -> Result<T>
     where
         T: for<'de> Deserialize<'de>,
@@ -299,6 +313,12 @@ impl Client {
         let client = ReqwestClient::new();
         let url = self.url_from_path(path);
         let mut req = client.request(method, url).body(body);
+
+        if let Some(headers) = headers {
+            for (key, value) in headers {
+                req = req.header(key, value);
+            }
+        }
 
         if let Some(sess) = &self.session {
             req = req.header("Authorization", format!("Bearer {}", sess.token.jwt));
