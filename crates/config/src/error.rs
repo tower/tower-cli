@@ -10,6 +10,9 @@ pub enum Error {
 
     #[snafu(display("No session file found"))]
     NoSession,
+
+    #[snafu(display("Invalid Towerfile"))]
+    InvalidTowerfile,
 }
 
 impl From<std::io::Error> for Error {
@@ -21,5 +24,11 @@ impl From<std::io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(_: serde_json::Error) -> Self {
         Error::NoSession
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(_: toml::de::Error) -> Self {
+        Error::InvalidTowerfile
     }
 }

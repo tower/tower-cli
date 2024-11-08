@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 
 mod error;
 mod session;
+mod towerfile;
 
 pub use session::{User, Token, Session};
 pub use error::Error;
+pub use towerfile::Towerfile;
 
 const DEFAULT_TOWER_URL: &str = "https://services.tower.dev";
 
