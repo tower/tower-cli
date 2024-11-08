@@ -12,6 +12,11 @@ pub fn secrets_cmd() -> Command {
         .arg_required_else_help(true)
         .subcommand(
             Command::new("list")
+                .arg(
+                    Arg::new("show")
+                        .long("show")
+                        .action(clap::ArgAction::SetTrue)
+                )
                 .about("List all of your secrets")
         )
         .subcommand(
@@ -37,29 +42,44 @@ pub fn secrets_cmd() -> Command {
         )
 }
 
-pub async fn do_list_secrets(_config: Config, client: Client) {
-    let res = client.list_secrets().await;
+pub async fn do_list_secrets(_config: Config, client: Client, args: &ArgMatches) {
+    let show = args.get_one::<bool>("show").unwrap_or(&false);
 
-    match res {
-        Ok(secrets) => {
-            let headers = vec![
-                "Secret".bold().yellow().to_string(),
-                "Preview".bold().yellow().to_string(),
-            ];
-
-            let data = secrets.iter().map(|sum| {
+    let (headers, data) = if *show {
+        match client.export_secrets().await {
+            Ok(secrets) => (
                 vec![
-                    sum.name.clone(),
-                    sum.preview.dimmed().to_string(),
-                ]
-            }).collect();
-
-            output::table(headers, data);
-        },
-        Err(err) => {
-            output::tower_error(err);
+                    "Secret".bold().yellow().to_string(),
+                    "Value".bold().yellow().to_string(),
+                ],
+                secrets.iter().map(|sum| {
+                    vec![
+                        sum.name.clone(),
+                        sum.value.dimmed().to_string(),
+                    ]
+                }).collect(),
+            ),
+            Err(err) => return output::tower_error(err),
         }
-    }
+    } else {
+        match client.list_secrets().await {
+            Ok(secrets) => (
+                vec![
+                    "Secret".bold().yellow().to_string(),
+                    "Preview".bold().yellow().to_string(),
+                ],
+                secrets.iter().map(|sum| {
+                    vec![
+                        sum.name.clone(),
+                        sum.preview.dimmed().to_string(),
+                    ]
+                }).collect(),
+            ),
+            Err(err) => return output::tower_error(err),
+        }
+    };
+
+    output::table(headers, data);
 }
 
 pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches) {

@@ -4,6 +4,7 @@ use base64::prelude::*;
 use rsa::{
     RsaPrivateKey, RsaPublicKey, Oaep,
     traits::PublicKeyParts,
+    pkcs1::EncodeRsaPublicKey,
 };
 
 /// encrypt manages the process of encrypting long messages using the RSA algorithm and OAEP
@@ -43,17 +44,29 @@ pub fn decrypt(key: RsaPrivateKey, ciphertext: String) -> String {
     String::from_utf8(res).unwrap()
 }
 
+/// generate_key_pair creates a new 2048-bit public and private key for use in
+/// encrypting/decrypting payloads destined for the Tower service.
+pub fn generate_key_pair() -> (RsaPrivateKey, RsaPublicKey) {
+    let bits = 2048;
+    let private_key = RsaPrivateKey::new(&mut OsRng, bits).unwrap();
+    let public_key = RsaPublicKey::from(&private_key);
+    (private_key, public_key)
+}
+
+/// serialize_public_key takes an RSA public key and serializes it into a PEM-encoded string.
+pub fn serialize_public_key(key: RsaPublicKey) -> String {
+    key.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use rsa::{RsaPrivateKey, RsaPublicKey};
     use rand::{distributions::Alphanumeric, Rng};
+    use rsa::pkcs1::DecodeRsaPublicKey;
 
     #[test]
     fn test_encrypt_decrypt() {
-        let bits = 2048;
-        let private_key = RsaPrivateKey::new(&mut OsRng, bits).unwrap();
-        let public_key = RsaPublicKey::from(&private_key);
+        let  (private_key, public_key) = generate_key_pair();
 
         let plaintext = "Hello, World!".to_string();
         let ciphertext = encrypt(public_key, plaintext.clone());
@@ -64,9 +77,7 @@ mod test {
 
     #[test]
     fn test_encrypt_decrypt_long_messages() {
-        let bits = 2048;
-        let private_key = RsaPrivateKey::new(&mut OsRng, bits).unwrap();
-        let public_key = RsaPublicKey::from(&private_key);
+        let  (private_key, public_key) = generate_key_pair();
 
         let plaintext: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -78,5 +89,14 @@ mod test {
         let decrypted = decrypt(private_key, ciphertext);
 
         assert_eq!(plaintext, decrypted);
+    }
+
+    #[test]
+    fn test_serialize_public_key() {
+        let  (_private_key, public_key) = generate_key_pair();
+        let serialized = serialize_public_key(public_key.clone());
+        let deserialized = RsaPublicKey::from_pkcs1_pem(&serialized).unwrap();
+
+        assert_eq!(public_key, deserialized);
     }
 }

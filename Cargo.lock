@@ -354,6 +354,7 @@ name = "crypto"
 version = "0.1.2"
 dependencies = [
  "base64",
+ "pem",
  "rand",
  "rsa",
  "sha2",
@@ -2072,6 +2073,7 @@ version = "0.1.2"
 dependencies = [
  "chrono",
  "config",
+ "crypto",
  "log",
  "pem",
  "reqwest",

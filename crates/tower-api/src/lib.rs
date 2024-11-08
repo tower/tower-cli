@@ -83,6 +83,17 @@ struct CreateSecretResponse {
     secret: Secret,
 }
 
+#[derive(Serialize, Deserialize)]
+struct ExportSecretsRequest {
+    public_key: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ExportSecretsResponse {
+    #[serde(deserialize_with="parse_nullable_sequence")]
+    secrets: Vec<EncryptedSecret>,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
 
 pub struct Client {
@@ -186,6 +197,30 @@ impl Client {
         let body = serde_json::to_value(data).unwrap();
         let res = self.request::<CreateSecretResponse>(Method::POST, "/api/secrets", Some(body)).await?;
         Ok(res.secret)
+    }
+
+    pub async fn export_secrets(&self) -> Result<Vec<ExportedSecret>> {
+        let (private_key, public_key) = crypto::generate_key_pair();
+
+        let data = ExportSecretsRequest {
+            public_key: crypto::serialize_public_key(public_key),
+        };
+
+        let body = serde_json::to_value(data).unwrap();
+        let res = self.request::<ExportSecretsResponse>(Method::POST, "/api/secrets/export", Some(body)).await?;
+
+        let secrets = res.secrets.iter().map(|secret| {
+            let encrypted_value = secret.encrypted_value.clone();
+            let decrypted = crypto::decrypt(private_key.clone(), encrypted_value);
+
+            ExportedSecret {
+                name: secret.name.clone(),
+                value: decrypted,
+                created_at: secret.created_at,
+            }
+        }).collect();
+
+        Ok(secrets)
     }
 
     async fn request<T>(&self, method: Method, path: &str, body: Option<Value>) -> Result<T>

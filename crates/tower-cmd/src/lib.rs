@@ -51,7 +51,7 @@ impl App {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => secrets::do_list_secrets(config, client).await,
+                    Some(("list", args)) => secrets::do_list_secrets(config, client, args).await,
                     Some(("create", args)) => secrets::do_create_secret(config, client, args).await,
                     Some(("delete", args)) => secrets::do_delete_secret(config, client, args.subcommand()).await,
                     _ => unreachable!()

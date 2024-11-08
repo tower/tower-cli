@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 chrono = { workspace = true } 
 config = { workspace = true } 
+crypto = { workspace = true } 
 log = { workspace = true }
 pem = { workspace = true }
 reqwest = { workspace = true }

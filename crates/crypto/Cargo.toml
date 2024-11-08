@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 base64 = { workspace = true }
+pem = { workspace = true }
 rand = { workspace = true }
 rsa = { workspace = true }
 sha2 = { workspace = true }

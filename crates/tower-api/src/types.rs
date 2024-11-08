@@ -40,10 +40,24 @@ pub struct Secret {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct EncryptedSecret {
+    pub name: String,
+    pub encrypted_value: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportedSecret {
+    pub name: String,
+    pub value: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// parse_nullable_sequence is a helper function that deserializes a sequence of items that may be
 /// null in the underlying data. This is useful for parsing content coming from the API that may or
 /// may not be null if the resultant data is empty.
-fn parse_nullable_sequence<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+pub fn parse_nullable_sequence<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
