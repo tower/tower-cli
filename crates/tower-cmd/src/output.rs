@@ -27,19 +27,22 @@ pub fn package_error(err: tower_package::Error) {
 pub fn config_error(err: config::Error) {
     let msg = match err {
         config::Error::ConfigDirNotFound => {
-            "No home directory found"
+            "No home directory found".to_string()
         },
         config::Error::NoHomeDir => {
-            "No home directory found"
+            "No home directory found".to_string()
         },
         config::Error::NoSession => {
-            "No session"
+            "No session".to_string()
         },
         config::Error::InvalidTowerfile => {
-            "Couldn't read the Towerfile in this directory"
+            "Couldn't read the Towerfile in this directory".to_string()
         },
         config::Error::MissingTowerfile => {
-            "No Towerfile was found in the current directory"
+            "No Towerfile was found in the current directory".to_string()
+        },
+        config::Error::MissingRequiredAppField { ref field } => {
+            format!("Missing required app field `{}` in Towerfile", field)
         }
     };
 

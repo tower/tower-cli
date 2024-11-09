@@ -16,6 +16,9 @@ pub enum Error {
 
     #[snafu(display("No Towerfile was found in this directory"))]
     MissingTowerfile,
+
+    #[snafu(display("Missing required app field `{}` in Towerfile", field))]
+    MissingRequiredAppField { field: String },
 }
 
 impl From<std::io::Error> for Error {

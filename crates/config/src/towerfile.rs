@@ -4,9 +4,16 @@ use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct App {
+    #[serde(default)]
     pub name: String,
+
+    #[serde(default)]
     pub script: String,
+
+    #[serde(default)]
     pub source: Vec<String>,
+
+    #[serde(default)]
     pub schedule: String,
 }
 
@@ -29,7 +36,12 @@ impl Towerfile {
 
     pub fn from_toml(toml: &str) -> Result<Self, Error> {
         let towerfile: Towerfile = toml::from_str(toml)?;
-        Ok(towerfile)
+
+        if towerfile.app.name.is_empty() {
+            return Err(Error::MissingRequiredAppField{ field: "name".to_string() });
+        } else {
+            Ok(towerfile)
+        }
     }
 
     pub fn from_path(path: PathBuf) -> Result<Self, Error> {
@@ -78,5 +90,33 @@ mod test {
         assert_eq!(towerfile.app.script, "./script.py");
         assert_eq!(towerfile.app.source, vec!["*.py"]);
         assert_eq!(towerfile.app.schedule, "0 0 * * *");
+    }
+
+    #[test]
+    fn test_towerfile_with_missing_fields_from_toml() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            source = ["*.py"]
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.name, "test");
+        assert_eq!(towerfile.app.script, "./script.py");
+        assert_eq!(towerfile.app.source, vec!["*.py"]);
+        assert_eq!(towerfile.app.schedule, "");
+    }
+
+    #[test]
+    fn test_towerfile_missing_name_field() {
+        let toml = r#"
+            [app]
+            script = "./script.py"
+            source = ["*.py"]
+        "#;
+
+        let err = crate::Towerfile::from_toml(toml).err().unwrap();
+        assert_eq!(err.to_string(), "Missing required app field `name` in Towerfile");
     }
 }
