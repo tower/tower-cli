@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
+};
 use config::Towerfile;
-use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::io::AsyncWriteExt;
 use tokio_tar::Builder;
-use async_compression::tokio::write::GzipEncoder;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use glob::glob;
 use tmpdir::TmpDir;
+
+// TODO: Reintroduce once optional gzip compression is allowed for packaging.
+// use async_compression::tokio::write::GzipEncoder;
 
 mod error;
 pub use error::Error;
