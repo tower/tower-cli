@@ -151,3 +151,9 @@ impl From<std::io::Error> for TowerError {
         }   
     }
 }
+
+impl std::fmt::Display for TowerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+        write!(f, "TowerError (code: {}) {}", self.code, self.description.technical)
+    }
+}

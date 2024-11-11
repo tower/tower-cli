@@ -59,21 +59,25 @@ impl PackageSpec {
 }
 
 pub struct Package {
+    pub manifest: Manifest, 
+
     // tmp_dir is used to keep the package directory around occasionally so the directory doesn't
     // get deleted out from under the application.
     pub tmp_dir: Option<TmpDir>,
 
-    pub manifest: Manifest, 
+    // package_file_path is path to the packed file on disk.
+    pub package_file_path: Option<PathBuf>,
 
-    // path is where on disk (if anywhere) the pacakge lives.
-    pub path: PathBuf,
+    // unpacked_path is the path to the unpackaged package on disk.
+    pub unpacked_path: Option<PathBuf>,
 }
 
 impl Package {
    pub fn default() -> Self {
        Self {
            tmp_dir: None,
-           path: PathBuf::new(),
+           package_file_path: None,
+           unpacked_path: None,
            manifest: Manifest {
                version: Some(CURRENT_PACKAGE_VERSION),
                invoke: "".to_string(),
@@ -81,13 +85,14 @@ impl Package {
        }
    }
 
-   pub async fn from_path(path: PathBuf) -> Self {
+   pub async fn from_unpacked_path(path: PathBuf) -> Self {
        let manifest_path = path.join("MANIFEST");
        let manifest = Manifest::from_path(&manifest_path).await.unwrap();
 
        Self {
            tmp_dir: None,
-           path,
+           package_file_path: None,
+           unpacked_path: Some(path),
            manifest,
        }
    }
@@ -151,11 +156,13 @@ impl Package {
        //// probably not explicitly required; however, makes the test suite pass so...
        //let mut file = gzip.into_inner();
        //file.shutdown().await?;
+       let unpacked_path = Some(tmp_dir.to_path_buf());
 
        Ok(Self {
-           tmp_dir: Some(tmp_dir),
            manifest,
-           path: package_path,
+           unpacked_path,
+           tmp_dir: Some(tmp_dir),
+           package_file_path: Some(package_path),
        })
    }
 }

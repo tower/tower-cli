@@ -6,6 +6,7 @@ mod apps;
 mod secrets;
 mod session;
 mod deploy;
+mod run;
 pub mod output;
 
 pub struct App {
@@ -60,6 +61,9 @@ impl App {
             },
             Some(("deploy", args)) => {
                 deploy::do_deploy(config, client, args.subcommand()).await
+            },
+            Some(("run", args)) => {
+                run::do_run(config, client, args, args.subcommand()).await
             }
             _ => unreachable!()
         }
@@ -87,4 +91,5 @@ fn root_cmd() -> Command {
         .subcommand(apps::apps_cmd())
         .subcommand(secrets::secrets_cmd())
         .subcommand(deploy::deploy_cmd())
+        .subcommand(run::run_cmd())
 }

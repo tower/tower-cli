@@ -45,18 +45,15 @@ impl Towerfile {
     }
 
     pub fn from_path(path: PathBuf) -> Result<Self, Error> {
+        if !path.exists() {
+            return Err(Error::MissingTowerfile);
+        }
+
         Self::from_toml(&std::fs::read_to_string(path)?)
     }
 
     pub fn from_local_file() -> Result<Self, Error> {
-        let dir = std::env::current_dir()?;
-        let path = dir.join("Towerfile");
-
-        if !path.exists() {
-            Err(Error::MissingTowerfile)
-        } else {
-            Self::from_path(path)
-        }
+        Self::from_dir_str(".")
     }
 
     /// from_dir_str reads a Towerfile from a directory represented by a string. This is useful in

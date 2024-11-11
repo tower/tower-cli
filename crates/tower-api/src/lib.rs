@@ -109,6 +109,11 @@ struct UploadCodeResponse {
     code: Code,
 }
 
+#[derive(Serialize, Deserialize)]
+struct AppRunResponse {
+    run: Run,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
 
 type StreamResult<T> = std::result::Result<T, std::io::Error>;
@@ -249,7 +254,7 @@ impl Client {
         let progress_cb = progress_cb.unwrap_or(Box::new(|_, _| {}));
 
         // get al the metadata about the file as well as a handle to the underlying data
-        let file = File::open(package.path).await?;
+        let file = File::open(package.package_file_path.unwrap()).await?;
         let metadata = file.metadata().await?;
         let file_size = metadata.len();
 
@@ -268,6 +273,12 @@ impl Client {
             .await?;
 
         Ok(res.code)
+    }
+
+    pub async fn run_app(&self, name: &str) -> Result<Run> {
+        let path = format!("/api/apps/{}/runs", name);
+        let res = self.request_object::<AppRunResponse>(Method::POST, &path, None, None).await?;
+        Ok(res.run)
     }
 
     async fn request_stream<R, T>(

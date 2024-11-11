@@ -83,7 +83,7 @@ pub fn banner() {
 
 pub struct Spinner {
     msg: String,
-   spinner: spinners::Spinner, 
+    spinner: spinners::Spinner, 
 }
 
 impl Spinner {
@@ -95,13 +95,11 @@ impl Spinner {
     pub fn success(mut self) {
         let sym = "✔".bold().green().to_string();
         self.spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
-        newline();
     }
 
     pub fn failure(mut self) {
         let sym = "✘".bold().red().to_string();
         self.spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
-        newline();
     }
 }
 
