@@ -2224,6 +2224,7 @@ dependencies = [
  "rpassword",
  "simple_logger",
  "spinners",
+ "tokio",
  "tower-api",
  "tower-package",
  "tower-runtime",

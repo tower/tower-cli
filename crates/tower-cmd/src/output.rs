@@ -50,6 +50,11 @@ pub fn config_error(err: config::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
+pub fn runtime_error(err: tower_runtime::errors::Error) {
+    let line = format!("{} {}\n", "Runtime Error:".red(), err.to_string());
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
 pub fn tower_error(err: tower_api::TowerError) {
     let line = format!("{} {}\n", "Error:".red(), err.description.friendly);
     io::stdout().write_all(line.as_bytes()).unwrap();

@@ -4,7 +4,7 @@ use config::{Config, Towerfile};
 use clap::{Arg, Command, ArgMatches};
 use tower_api::Client;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{AppLauncher, local::LocalApp};
+use tower_runtime::{AppLauncher, App, local::LocalApp};
 
 use crate::output;
 
@@ -86,7 +86,57 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
     };
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    let _ = launcher.launch(package, secrets).await;
+    match launcher.launch(package, secrets).await {
+        Ok(_) => {
+            let mut app = launcher.app.unwrap();
+            log::debug!("app launched successfully");
+
+            let line = format!("App `{}` has been launched", towerfile.app.name);
+            output::success(&line);
+
+            let output = app.output().await.unwrap();
+
+            let p1 = tokio::spawn(async move {
+                loop {
+                    let res = output.lock().await.recv().await;
+
+                    match res {
+                        None => break,
+                        Some(line) => log::info!("{}", line.line),
+                    }
+                }
+            });
+
+            let p2 = tokio::spawn(async move {
+                loop{
+                    let res= app.status().await;
+
+                    if let Ok(status) = res {
+                        match status {
+                            tower_runtime::Status::Exited => {
+                                log::info!("app exited");
+                                break;
+                            },
+                            tower_runtime::Status::Crashed => {
+                                log::info!("app crashed");
+                                break;
+                            },
+                            _ => {
+                                // continue
+                            }
+                        }
+                    } else {
+                        // continue
+                    }
+                }
+            });
+
+            tokio::join!(p1, p2);
+        },
+        Err(err) => {
+            output::runtime_error(err);
+        }
+    }
 }
 
 async fn do_run_remote(_config: Config, client: Client, path: PathBuf) {
