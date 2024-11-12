@@ -304,9 +304,11 @@ version = "0.0.0"
 dependencies = [
  "clap",
  "dirs",
+ "log",
  "serde",
  "serde_json",
  "snafu",
+ "testutils",
  "toml",
 ]
 
@@ -1977,6 +1979,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "testutils"
+version = "0.1.4"
+
+[[package]]
 name = "thiserror"
 version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2224,6 +2230,7 @@ dependencies = [
  "rpassword",
  "simple_logger",
  "spinners",
+ "tokio",
  "tower-api",
  "tower-package",
  "tower-runtime",
@@ -2236,6 +2243,7 @@ dependencies = [
  "async-compression",
  "config",
  "glob",
+ "log",
  "serde",
  "serde_json",
  "snafu",
@@ -2249,6 +2257,7 @@ dependencies = [
 name = "tower-runtime"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "log",
  "snafu",
  "tokio",

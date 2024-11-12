@@ -1,0 +1,4 @@
+[package]
+name = "testutils"
+version = { workspace = true }
+edition = "2021"

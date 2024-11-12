@@ -1,12 +1,23 @@
 use std::io::{self, Write};
 use colored::Colorize;
 use cli_table::{print_stdout, Table, format::{Border, Separator, HorizontalLine}};
+use tower_runtime::Output;
 pub use cli_table::{Cell, format::Justify};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
 pub fn success(msg: &str) {
     let line = format!("{} {}\n", "Success!".green(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
+pub fn failure(msg: &str) {
+    let line = format!("{} {}\n", "Failure!".red(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
+pub fn log_line(msg: &Output) {
+    let line = format!("{} {} {}\n", msg.time.to_string().green().bold(), "|".green().bold(), msg.line);
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
@@ -50,6 +61,11 @@ pub fn config_error(err: config::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
+pub fn runtime_error(err: tower_runtime::errors::Error) {
+    let line = format!("{} {}\n", "Runtime Error:".red(), err.to_string());
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
 pub fn tower_error(err: tower_api::TowerError) {
     let line = format!("{} {}\n", "Error:".red(), err.description.friendly);
     io::stdout().write_all(line.as_bytes()).unwrap();
@@ -83,7 +99,7 @@ pub fn banner() {
 
 pub struct Spinner {
     msg: String,
-   spinner: spinners::Spinner, 
+    spinner: spinners::Spinner, 
 }
 
 impl Spinner {
@@ -95,13 +111,11 @@ impl Spinner {
     pub fn success(mut self) {
         let sym = "✔".bold().green().to_string();
         self.spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
-        newline();
     }
 
     pub fn failure(mut self) {
         let sym = "✘".bold().red().to_string();
         self.spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
-        newline();
     }
 }
 

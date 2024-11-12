@@ -1,5 +1,6 @@
-use std::path::Path;
-use std::env::current_dir;
+use std::path::{Path, PathBuf};
+use std::os::unix::fs::PermissionsExt;
+use std::env::{self, current_dir};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -18,12 +19,15 @@ use tokio::{
 };
 
 use tokio::{
+    fs,
     io::{AsyncRead, BufReader, AsyncBufReadExt},
     time::{timeout, Duration},
     sync::Mutex,
     sync::mpsc::Sender,
     process::Child, 
 };
+
+use tower_package::Package;
 
 use crate::{
     FD,
@@ -33,6 +37,12 @@ use crate::{
 };
 
 pub struct LocalApp {
+    // LocalApp needs to take ownership of the package as a way of taking responsibility for it's
+    // lifetime and, most importantly, it's contents. The compiler complains that we never actually
+    // use this struct member, so we allow the dead_code attribute to silence the warning.
+    #[allow(dead_code)]
+    package: Option<Package>,
+
     child: Option<Arc<Mutex<Child>>>,
     status: Option<Status>,
     waiter: Option<oneshot::Receiver<i32>>,
@@ -41,6 +51,7 @@ pub struct LocalApp {
 impl Default for LocalApp {
     fn default() -> Self {
         Self {
+            package: None,
             child: None,
             status: None,
             waiter: None,
@@ -48,8 +59,56 @@ impl Default for LocalApp {
     }
 }
 
+// Helper function to check if a file is executable
+async fn is_executable(path: &PathBuf) -> bool {
+    fs::metadata(path)
+        .await
+        .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+async fn find_executable_in_path(executable_name: &str) -> Option<PathBuf> {
+    // Get the PATH environment variable and split it into directories
+    if let Ok(paths) = env::var("PATH") {
+        for path in env::split_paths(&paths) {
+            let executable_path = path.join(executable_name);
+
+            // Check if the path is a file and is executable
+            if executable_path.is_file() && is_executable(&executable_path).await {
+                return Some(executable_path);
+            }
+        }
+    }
+    None
+}
+
+async fn find_pip() -> Result<PathBuf, Error> {
+    if let Some(path) = find_executable_in_path("pip").await {
+        Ok(path)
+    } else {
+        Err(Error::MissingPip)
+    }
+}
+
+async fn find_python() -> Result<PathBuf, Error> {
+    if let Some(path) = find_executable_in_path("python").await {
+        Ok(path)
+    } else {
+        Err(Error::MissingPython)
+    }
+}
+
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
+        let package = opts.package;
+        let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
+
+        let pip_path = find_pip().await?;
+        log::debug!("using pip at {:?}", pip_path);
+
+        let python_path = find_python().await?;
+        log::debug!("using python at {:?}", python_path);
+
         // set for later on.
         let working_dir = if let Some(dir) = opts.cwd {
             dir 
@@ -57,14 +116,14 @@ impl App for LocalApp {
             current_dir().unwrap()
         };
 
-        if Path::new(&opts.package.path.join("requirements.txt")).exists() {
-            log::info!("requirements.txt file found. installing dependencies");
+        if Path::new(&package_path.join("requirements.txt")).exists() {
+            log::debug!("requirements.txt file found. installing dependencies");
 
-            let res = Command::new("/usr/local/bin/pip")
+            let res = Command::new(pip_path)
                 .current_dir(&working_dir)
                 .arg("install")
                 .arg("-r")
-                .arg(opts.package.path.join("requirements.txt"))
+                .arg(package_path.join("requirements.txt"))
                 .kill_on_drop(true)
                 .spawn();
 
@@ -73,13 +132,16 @@ impl App for LocalApp {
                 child.wait().await.expect("child failed to exit");
             }
         } else {
-            log::info!("missing requirements.txt file found. no dependencies to install");
+            log::debug!("missing requirements.txt file found. no dependencies to install");
         }
 
-        let res = Command::new("/usr/local/bin/python")
+        log::debug!(" - working directory: {:?}", &working_dir);
+        log::debug!(" - python script {}", package.manifest.invoke);
+
+        let res = Command::new(python_path)
             .current_dir(&working_dir)
             .arg("-u")
-            .arg(opts.package.path.join(opts.package.manifest.invoke))
+            .arg(package_path.join(package.manifest.invoke.clone()))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -94,6 +156,7 @@ impl App for LocalApp {
             tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
 
             Ok(Self {
+                package: Some(package),
                 child: Some(child),
                 waiter: Some(rx),
                 status: None,
@@ -215,7 +278,11 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, output: Sender<Output>, inpu
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
-        let _ = output.send(Output{ fd, line }).await;
+        let _ = output.send(Output{ 
+            fd,
+            line,
+            time: chrono::Utc::now(),
+        }).await;
     }
 }
 

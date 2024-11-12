@@ -43,4 +43,10 @@ pub enum Error {
 
     #[snafu(display("request failed"))]
     RequestFailed,
+
+    #[snafu(display("pip could not be found"))]
+    MissingPip,
+
+    #[snafu(display("python could not be found"))]
+    MissingPython,
 }

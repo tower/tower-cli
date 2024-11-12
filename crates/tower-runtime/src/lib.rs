@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::Receiver;
+use chrono::{DateTime, Utc};
 
 use tower_package::Package;
 
@@ -19,6 +20,7 @@ pub enum FD {
 }
 
 pub struct Output {
+    pub time: DateTime<Utc>,
     pub fd: FD,
     pub line: String,
 }
@@ -62,7 +64,8 @@ impl<A: App> AppLauncher<A> {
         package: Package,
         secrets: HashMap<String, String>,
     ) -> Result<(), Error> {
-        let cwd = package.path.to_path_buf();
+        let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
+
         let opts = StartOptions {
             cwd: Some(cwd),
             secrets,

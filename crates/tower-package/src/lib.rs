@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
+};
 use config::Towerfile;
-use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::io::AsyncWriteExt;
-use tokio_tar::Builder;
-use async_compression::tokio::write::GzipEncoder;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use tokio_tar::{Archive, Builder};
 use glob::glob;
 use tmpdir::TmpDir;
+
+// TODO: Reintroduce once optional gzip compression is allowed for packaging.
+// use async_compression::tokio::write::GzipEncoder;
 
 mod error;
 pub use error::Error;
@@ -47,7 +48,7 @@ pub struct PackageSpec {
 
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
-        let base_dir = std::env::current_dir().unwrap();
+        let base_dir = towerfile.base_dir.clone();
 
         Self {
             base_dir,
@@ -58,21 +59,25 @@ impl PackageSpec {
 }
 
 pub struct Package {
+    pub manifest: Manifest, 
+
     // tmp_dir is used to keep the package directory around occasionally so the directory doesn't
     // get deleted out from under the application.
     pub tmp_dir: Option<TmpDir>,
 
-    pub manifest: Manifest, 
+    // package_file_path is path to the packed file on disk.
+    pub package_file_path: Option<PathBuf>,
 
-    // path is where on disk (if anywhere) the pacakge lives.
-    pub path: PathBuf,
+    // unpacked_path is the path to the unpackaged package on disk.
+    pub unpacked_path: Option<PathBuf>,
 }
 
 impl Package {
    pub fn default() -> Self {
        Self {
            tmp_dir: None,
-           path: PathBuf::new(),
+           package_file_path: None,
+           unpacked_path: None,
            manifest: Manifest {
                version: Some(CURRENT_PACKAGE_VERSION),
                invoke: "".to_string(),
@@ -80,13 +85,14 @@ impl Package {
        }
    }
 
-   pub async fn from_path(path: PathBuf) -> Self {
+   pub async fn from_unpacked_path(path: PathBuf) -> Self {
        let manifest_path = path.join("MANIFEST");
        let manifest = Manifest::from_path(&manifest_path).await.unwrap();
 
        Self {
            tmp_dir: None,
-           path,
+           package_file_path: None,
+           unpacked_path: Some(path),
            manifest,
        }
    }
@@ -100,6 +106,7 @@ impl Package {
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
+       log::debug!("building package at: {:?}", package_path);
 
        let file = File::create(package_path.clone()).await?;
        let mut builder = Builder::new(file);
@@ -113,9 +120,12 @@ impl Package {
        for file_glob in spec.file_globs {
            let path = spec.base_dir.join(file_glob);
            let path_str = path.to_str().unwrap();
+           log::debug!("resolving glob pattern: {}", path_str);
 
            for entry in glob(path_str).unwrap() {
                let physical_path = entry.unwrap();
+
+               log::debug!(" - adding file: {:?}", physical_path);
 
                // this copy of physical_path is used to appease the borrow checker.
                let cp = physical_path.clone();
@@ -152,10 +162,33 @@ impl Package {
        //file.shutdown().await?;
 
        Ok(Self {
-           tmp_dir: Some(tmp_dir),
            manifest,
-           path: package_path,
+           unpacked_path: None,
+           tmp_dir: Some(tmp_dir),
+           package_file_path: Some(package_path),
        })
+   }
+
+   /// unpack is the primary interface in to unpacking a package. It will allocate a temporary
+   /// directory if one isn't already allocated and unpack the package contents into that location.
+   pub async fn unpack(&mut self) -> Result<(), Error> {
+       // If there's already a tmp_dir allocated to this package, then we'll use that. Otherwise,
+       // we allocate one and store it on this package for later use.
+       let path = if let Some(tmp_dir) = self.tmp_dir.as_ref() {
+           tmp_dir.to_path_buf()
+       } else {
+           let tmp_dir = TmpDir::new("tower-package").await?;
+           let path = tmp_dir.to_path_buf();
+           self.tmp_dir = Some(tmp_dir);
+           path
+       };
+
+       let file = File::open(self.package_file_path.clone().unwrap()).await?;
+       let mut archive = Archive::new(file);
+
+       archive.unpack(path.clone()).await?;
+       self.unpacked_path = Some(path);
+       Ok(())
    }
 }
 

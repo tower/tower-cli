@@ -13,16 +13,8 @@ pub fn deploy_cmd() -> Command {
 }
 
 pub async fn do_deploy(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
-    // dir is the directory that we'll build this package from.
-    let dir = if let Some(cmd) = cmd {
-        if cmd.0.is_empty() {
-            "."
-        } else {
-            cmd.0
-        }
-    } else {
-        "."
-    }; 
+    // Determine the directory to build the package from
+    let dir = cmd.map_or(".", |cmd| if cmd.0.is_empty() { "." } else { cmd.0 });
 
     match Towerfile::from_dir_str(dir) {
         Ok(towerfile) => {
@@ -44,18 +36,24 @@ pub async fn do_deploy(_config: Config, client: Client, cmd: Option<(&str, &ArgM
                         }
                     });
                     
-                    if let Err(err) = client.upload_code(&towerfile.app.name, package, Some(callback)).await {
-                        let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
-                        progress_bar.finish();
+                    match client.upload_code(&towerfile.app.name, package, Some(callback)).await {
+                        Err(err) => {
 
-                        output::newline();
-                        output::tower_error(err);
-                    } else {
-                        let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
-                        progress_bar.finish();
+                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
+                            progress_bar.finish();
 
-                        output::newline();
-                        output::success("Successfully deployed your code to Tower!");
+                            output::newline();
+                            output::tower_error(err);
+                        }
+                        Ok(code) => {
+                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
+                            progress_bar.finish();
+
+                            output::newline();
+
+                            let line = format!("Version `{}` of your code has been deployed to Tower!", code.version);
+                            output::success(&line);
+                        }
                     }
                 },
                 Err(err) => {
