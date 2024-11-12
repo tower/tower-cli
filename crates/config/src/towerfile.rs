@@ -138,6 +138,10 @@ mod test {
 
     #[test]
     fn test_returns_error_when_missing_local_towerfile() {
+        // this is a bit of a hack to make sure any local Towerfile is indeed gone. Leaks from
+        // other tests occassionally.
+        std::fs::remove_file("Towerfile").ok();
+
         // First test case tests for failure mode: There is no local file. A MissingTowerfile error
         // should be returned
         let res = crate::Towerfile::from_local_file();
