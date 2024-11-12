@@ -104,6 +104,10 @@ impl Package {
    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
    // GZip'd.
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
+       // We expand the base_dir because handling the paths as absolute paths is easier than
+       // handling them as relative paths.
+       let base_dir = spec.base_dir.canonicalize().unwrap();
+
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
        log::debug!("building package at: {:?}", package_path);
@@ -118,18 +122,20 @@ impl Package {
        //let mut builder = Builder::new(gzip);
 
        for file_glob in spec.file_globs {
-           let path = spec.base_dir.join(file_glob);
+           let path = base_dir.join(file_glob);
            let path_str = path.to_str().unwrap();
            log::debug!("resolving glob pattern: {}", path_str);
 
            for entry in glob(path_str).unwrap() {
-               let physical_path = entry.unwrap();
+               let physical_path = entry.unwrap()
+                   .canonicalize()
+                   .unwrap();
 
                log::debug!(" - adding file: {:?}", physical_path);
 
-               // this copy of physical_path is used to appease the borrow checker.
+               // turn this back in to a path that is relative to the TAR file root
                let cp = physical_path.clone();
-               let logical_path = cp.strip_prefix(&spec.base_dir).unwrap();
+               let logical_path = cp.strip_prefix(&base_dir).unwrap();
 
                builder.append_path_with_name(physical_path, logical_path).await?;
            }
