@@ -14,6 +14,10 @@ use tower_package::{Package, PackageSpec};
 
 #[tokio::test]
 async fn it_creates_package() {
+    // We enable env_logger here as a way of debugging this test. There might be a way of doing
+    // this globally...but I don't know what it is.
+    let _ = env_logger::try_init();
+
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "requirements.txt", "requests==2.25.1").await;

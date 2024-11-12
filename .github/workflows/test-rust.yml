@@ -48,6 +48,8 @@ jobs:
         if: github.ref_name != 'main'
         run: >
           cargo test --all-features
+        env:
+          RUST_LOG: debug
 
 #  integration-test:
 #    runs-on: ${{ matrix.os }}

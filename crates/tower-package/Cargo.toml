@@ -17,3 +17,6 @@ tmpdir = { workspace = true }
 tokio = { workspace = true } 
 tokio-tar = { workspace = true }
 tokio-stream = { workspace = true }
+
+[dev-dependencies]
+env_logger = { workspace = true }
