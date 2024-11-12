@@ -9,3 +9,4 @@ pem = { workspace = true }
 rand = { workspace = true }
 rsa = { workspace = true }
 sha2 = { workspace = true }
+testutils = { workspace = true }

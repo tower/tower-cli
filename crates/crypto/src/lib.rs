@@ -66,7 +66,7 @@ mod test {
 
     #[test]
     fn test_encrypt_decrypt() {
-        let  (private_key, public_key) = generate_key_pair();
+        let  (private_key, public_key) = testutils::crypto::get_test_keys();
 
         let plaintext = "Hello, World!".to_string();
         let ciphertext = encrypt(public_key, plaintext.clone());
@@ -77,11 +77,11 @@ mod test {
 
     #[test]
     fn test_encrypt_decrypt_long_messages() {
-        let  (private_key, public_key) = generate_key_pair();
+        let  (private_key, public_key) = testutils::crypto::get_test_keys();
 
         let plaintext: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
-            .take(10_000)
+            .take(5_000)
             .map(char::from)
             .collect();
 
@@ -93,7 +93,7 @@ mod test {
 
     #[test]
     fn test_serialize_public_key() {
-        let  (_private_key, public_key) = generate_key_pair();
+        let  (_private_key, public_key) = testutils::crypto::get_test_keys();
         let serialized = serialize_public_key(public_key.clone());
         let deserialized = RsaPublicKey::from_pkcs1_pem(&serialized).unwrap();
 

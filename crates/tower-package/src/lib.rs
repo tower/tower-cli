@@ -104,6 +104,10 @@ impl Package {
    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
    // GZip'd.
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
+       // We expand the base_dir because handling the paths as absolute paths is easier than
+       // handling them as relative paths.
+       let base_dir = spec.base_dir.canonicalize().unwrap();
+
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
        log::debug!("building package at: {:?}", package_path);
@@ -118,18 +122,20 @@ impl Package {
        //let mut builder = Builder::new(gzip);
 
        for file_glob in spec.file_globs {
-           let path = spec.base_dir.join(file_glob);
-           let path_str = path.to_str().unwrap();
+           let path = base_dir.join(file_glob);
+           let path_str = extract_glob_path(path);
            log::debug!("resolving glob pattern: {}", path_str);
 
-           for entry in glob(path_str).unwrap() {
-               let physical_path = entry.unwrap();
+           for entry in glob(&path_str).unwrap() {
+               let physical_path = entry.unwrap()
+                   .canonicalize()
+                   .unwrap();
 
                log::debug!(" - adding file: {:?}", physical_path);
 
-               // this copy of physical_path is used to appease the borrow checker.
+               // turn this back in to a path that is relative to the TAR file root
                let cp = physical_path.clone();
-               let logical_path = cp.strip_prefix(&spec.base_dir).unwrap();
+               let logical_path = cp.strip_prefix(&base_dir).unwrap();
 
                builder.append_path_with_name(physical_path, logical_path).await?;
            }
@@ -193,13 +199,31 @@ impl Package {
 }
 
 async fn write_manifest_to_file(path: &PathBuf, manifest: &Manifest) -> Result<(), Error> {
-   let mut file = File::create(path).await?;
-   let data = serde_json::to_string(&manifest)?;
-   file.write_all(data.as_bytes()).await?;
+    let mut file = File::create(path).await?;
+    let data = serde_json::to_string(&manifest)?;
+    file.write_all(data.as_bytes()).await?;
 
-   // this is required to ensure that everything gets flushed to disk. it's not enough to just let
-   // the file reference get dropped.
-   file.shutdown().await?;
+    // this is required to ensure that everything gets flushed to disk. it's not enough to just let
+    // the file reference get dropped.
+    file.shutdown().await?;
 
-   Ok(())
+    Ok(())
+}
+
+fn extract_glob_path(path: PathBuf) -> String {
+    let str = path.to_str().unwrap();
+
+    #[cfg(windows)]
+    {
+        // This is a nasty hack to get around a limitation in the `glob` crate on Windows. There's
+        // a (documented) bug that prevents it from globbing on canonicalized paths.
+        //
+        // See https://github.com/rust-lang/glob/issues/132
+        str.strip_prefix(r"\\?\").ok_or(str).unwrap().to_string()
+    }
+
+    #[cfg(not(windows))]
+    {
+        str.to_string()
+    }
 }

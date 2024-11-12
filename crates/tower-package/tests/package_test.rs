@@ -14,6 +14,10 @@ use tower_package::{Package, PackageSpec};
 
 #[tokio::test]
 async fn it_creates_package() {
+    // We enable env_logger here as a way of debugging this test. There might be a way of doing
+    // this globally...but I don't know what it is.
+    let _ = env_logger::try_init();
+
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "requirements.txt", "requests==2.25.1").await;
@@ -34,12 +38,16 @@ async fn it_creates_package() {
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("main.py"));
-    assert!(files.contains_key("MANIFEST"));
+    assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
 }
 
 #[tokio::test]
 async fn it_respects_complex_file_globs() {
+    // We enable env_logger here as a way of debugging this test. There might be a way of doing
+    // this globally...but I don't know what it is.
+    let _ = env_logger::try_init();
+
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
@@ -64,9 +72,9 @@ async fn it_respects_complex_file_globs() {
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("main.py"));
-    assert!(files.contains_key("MANIFEST"));
-    assert!(files.contains_key("pack/__init__.py"));
+    assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
+    assert!(files.contains_key("pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
 }
 
 // read_package_files reads the contents of a given package  and returns a map of the file paths to
@@ -106,6 +114,7 @@ async fn create_test_file(tempdir: PathBuf, path: &str, contents: &str) {
         }
     }
 
+    log::debug!("creating test file at: {:?} with content {:?}", path, contents);
     let mut file = File::create(&path).await.expect("Failed to create file");
     file.write_all(contents.as_bytes()).await.expect("Failed to write content to file")
 }
