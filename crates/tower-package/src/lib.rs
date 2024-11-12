@@ -199,13 +199,13 @@ impl Package {
 }
 
 async fn write_manifest_to_file(path: &PathBuf, manifest: &Manifest) -> Result<(), Error> {
-   let mut file = File::create(path).await?;
-   let data = serde_json::to_string(&manifest)?;
-   file.write_all(data.as_bytes()).await?;
+    let mut file = File::create(path).await?;
+    let data = serde_json::to_string(&manifest)?;
+    file.write_all(data.as_bytes()).await?;
 
-   // this is required to ensure that everything gets flushed to disk. it's not enough to just let
-   // the file reference get dropped.
-   file.shutdown().await?;
+    // this is required to ensure that everything gets flushed to disk. it's not enough to just let
+    // the file reference get dropped.
+    file.shutdown().await?;
 
-   Ok(())
+    Ok(())
 }
