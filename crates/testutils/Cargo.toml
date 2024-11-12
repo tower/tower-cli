@@ -2,3 +2,7 @@
 name = "testutils"
 version = { workspace = true }
 edition = "2021"
+
+[dependencies]
+pem = { workspace = true }
+rsa = { workspace = true }
