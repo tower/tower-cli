@@ -34,8 +34,8 @@ async fn it_creates_package() {
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("main.py"));
-    assert!(files.contains_key("MANIFEST"));
+    assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
 }
 
 #[tokio::test]
@@ -64,9 +64,9 @@ async fn it_respects_complex_file_globs() {
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("main.py"));
-    assert!(files.contains_key("MANIFEST"));
-    assert!(files.contains_key("pack/__init__.py"));
+    assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
+    assert!(files.contains_key("pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
 }
 
 // read_package_files reads the contents of a given package  and returns a map of the file paths to

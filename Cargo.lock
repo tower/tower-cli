@@ -374,6 +374,7 @@ dependencies = [
  "rand",
  "rsa",
  "sha2",
+ "testutils",
 ]
 
 [[package]]
@@ -1981,6 +1982,10 @@ dependencies = [
 [[package]]
 name = "testutils"
 version = "0.1.4"
+dependencies = [
+ "pem",
+ "rsa",
+]
 
 [[package]]
 name = "thiserror"
