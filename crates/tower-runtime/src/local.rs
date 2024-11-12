@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
-use std::os::unix::fs::PermissionsExt;
 use std::env::{self, current_dir};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use crate::{
     Status,
@@ -61,10 +63,22 @@ impl Default for LocalApp {
 
 // Helper function to check if a file is executable
 async fn is_executable(path: &PathBuf) -> bool {
-    fs::metadata(path)
-        .await
-        .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
+    let metadata = match fs::metadata(path).await {
+        Ok(metadata) => metadata,
+        Err(_) => return false,
+    };
+
+    #[cfg(unix)]
+    {
+        metadata.permissions().mode() & 0o111 != 0
+    }
+
+    #[cfg(not(unix))]
+    {
+        // We don't have a good way of sorting out if a file is executable or not on Windows or
+        // other platforms so for now we just assume if it is indeed a file, we're good to go.
+        metadata.is_file()
+    }
 }
 
 async fn find_executable_in_path(executable_name: &str) -> Option<PathBuf> {
@@ -101,7 +115,10 @@ async fn find_python() -> Result<PathBuf, Error> {
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         let package = opts.package;
-        let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
+        let package_path = package.unpacked_path
+            .clone()
+            .unwrap()
+            .to_path_buf();
 
         let pip_path = find_pip().await?;
         log::debug!("using pip at {:?}", pip_path);

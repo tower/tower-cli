@@ -187,12 +187,14 @@ mod test {
             source = ["*.py"]
         "#;
 
-        let mut tempfile = TestFile::new("/tmp/Towerfile").expect("Failed to create temporary file");
+        let temp_dir = std::env::temp_dir();
+        let towerfile_path= temp_dir.join("Towerfile");
+        let mut tempfile = TestFile::new(towerfile_path.clone()).unwrap();
         let file = tempfile.file();
         file.write_all(toml.as_bytes()).unwrap();
 
-        let towerfile = crate::Towerfile::from_path(PathBuf::from("/tmp/Towerfile")).expect("Failed to parse Towerfile");
-        assert_eq!(towerfile.base_dir, PathBuf::from("/tmp"));
+        let towerfile = crate::Towerfile::from_path(towerfile_path.clone()).unwrap();
+        assert_eq!(towerfile.base_dir, temp_dir);
 
         // explicitly drop this file so it's cleaned up when other test cases run.
         drop(tempfile);
