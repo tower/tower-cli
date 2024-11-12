@@ -4,7 +4,7 @@ use config::{Config, Towerfile};
 use clap::{Arg, Command, ArgMatches};
 use tower_api::Client;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{AppLauncher, App, local::LocalApp};
+use tower_runtime::{AppLauncher, App, OutputChannel, local::LocalApp};
 
 use crate::output;
 
@@ -20,154 +20,83 @@ pub fn run_cmd() -> Command {
         .about("Run your code in Tower or locally")
 }
 
-fn get_run_parameters(args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Result<(bool, PathBuf), config::Error> {
-    let local = args.get_one::<bool>("local").unwrap();
+/// do_run is the primary entrypoint into running apps both locally and remotely in Tower. It will
+/// use the configuration to determine the requested way of running a Tower app.
+pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
+    let res = get_run_parameters(args, cmd);
 
-    if let Some(cmd) = cmd {
-        let path = cmd.0.to_string();
+    match res {
+        Ok((local, path)) => {
+            log::debug!("Running app at {}, local: {}", path.to_str().unwrap(), local);
 
-        if path.is_empty() {
-            Ok((*local, PathBuf::from(".")))
-        } else {
-            Ok((*local, PathBuf::from(path)))
+            if local {
+                do_run_local(config, client, path).await;
+            } else {
+                do_run_remote(config, client, path).await;
+            }
+        },
+        Err(err) => {
+            output::config_error(err);
         }
-    } else {
-        Ok((*local, PathBuf::from(".")))
     }
 }
 
+/// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
+/// the package, and launch the app. The relevant package is cleaned up after execution is
+/// complete.
 async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
-    let spinner = output::spinner("Getting secrets...");
+    // Load all the secrets from the server
+    let secrets = get_secrets(&client).await;
 
-    // Export all the secrets that will be used.
-    let secrets = match client.export_secrets().await{
-        Ok(secrets) => {
-            spinner.success();
+    // Load the Towerfile
+    let towerfile_path = path.join("Towerfile");
+    let towerfile = load_towerfile(&towerfile_path);
 
-            // turn the secrets into something that's usable by the AppLauncher implementation that
-            // we have around here
-            secrets.into_iter().map(|sec| {
-                (sec.name, sec.value)
-            }).collect::<HashMap<_, _>>()
-        },
-        Err(err) => {
-            spinner.failure();
-            log::debug!("failed to export secrest for local execution: {}", err);
+    // Build the package
+    let mut package = build_package(&towerfile).await;
 
-            output::tower_error(err);
-            std::process::exit(1);
-        }
-    };
-
-    // Get the local towerfile.
-    let path = path.join("Towerfile");
-    let towerfile = Towerfile::from_path(path.to_path_buf()).unwrap_or_else(|err| {
-        log::debug!("failed to load Towerfile from path `{:?}`: {}", path.to_path_buf(), err);
-
-        output::config_error(err);
-        std::process::exit(1);
-    });
-
-    // Build the package for execution.
-    let spinner = output::spinner("Building package...");
-    let package_spec = PackageSpec::from_towerfile(&towerfile);
-    let mut package = match Package::build(package_spec).await {
-        Ok(package) => {
-            spinner.success();
-            package
-        },
-        Err(err) => {
-            spinner.failure();
-            log::debug!("failed to build package from path `{:?}`: {}", path.to_path_buf(), err);
-
-            output::package_error(err);
-            std::process::exit(1);
-        }
-    };
-
-    // Now we should unpack the package.
+    // Unpack the package
     if let Err(err) = package.unpack().await {
-        log::debug!("failed to unpack package: {}", err);
-
+        log::debug!("Failed to unpack package: {}", err);
         output::package_error(err);
         std::process::exit(1);
     }
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    match launcher.launch(package, secrets).await {
-        Ok(_) => {
-            let mut app = launcher.app.unwrap();
-            log::debug!("app launched successfully");
-
-            let line = format!("App `{}` has been launched", towerfile.app.name);
-            output::success(&line);
-
-            let output = app.output().await.unwrap();
-
-            let p1 = tokio::spawn(async move {
-                loop {
-                    let res = output.lock().await.recv().await;
-
-                    match res {
-                        None => break,
-                        Some(line) => {
-                            // TODO: Theoretically, these lines could arrive out of order. We
-                            // probably want to sequence them somehow?
-                            output::log_line(&line);
-                        },
-                    }
-                }
-            });
-
-            let p2 = tokio::spawn(async move {
-                loop{
-                    let res= app.status().await;
-
-                    if let Ok(status) = res {
-                        match status {
-                            tower_runtime::Status::Exited => {
-                                output::success("Your app exited cleanly.");
-                                break;
-                            },
-                            tower_runtime::Status::Crashed => {
-                                output::failure("Your app crashed!");
-                                break;
-                            },
-                            _ => {
-                                // continue
-                            }
-                        }
-                    } else {
-                        // continue
-                    }
-                }
-            });
-
-            log::debug!("launched apps, waiting for them to complete");
-
-            // NOTE: We keep the result here and unwrap them to propgate any panics in the spawned
-            // threads.
-            let res = tokio::join!(p1, p2);
-            res.0.unwrap();
-            res.1.unwrap();
-
-            // aaaand we're done.
-            log::debug!("app terminated, shutting down");
-        },
-        Err(err) => {
-            output::runtime_error(err);
-        }
+    if let Err(err) = launcher.launch(package, secrets).await {
+        output::runtime_error(err);
+        return;
     }
+
+    log::debug!("App launched successfully");
+    output::success(&format!("App `{}` has been launched", towerfile.app.name));
+
+    // Monitor app output and status concurrently
+    let app = launcher.app.unwrap();
+    let output = app.output().await.unwrap();
+
+    let output_task = tokio::spawn(monitor_output(output));
+    let status_task = tokio::spawn(monitor_status(app));
+
+    log::debug!("Waiting for app tasks to complete");
+    let (res1, res2) = tokio::join!(output_task, status_task);
+
+    // We have to unwrap both of these as a method for propogating any panics htat happened
+    // internally.
+    res1.unwrap();
+    res2.unwrap();
+
+    log::debug!("App terminated, shutting down");
 }
 
+/// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
+/// supplied directory (locally or remotely) to sort out what application to run exactly.
 async fn do_run_remote(_config: Config, client: Client, path: PathBuf) {
     let spinner = output::spinner("Scheduling run...");
 
-    let path = path.join("Towerfile");
-    let towerfile = Towerfile::from_path(path).unwrap_or_else(|err| {
-        output::config_error(err);
-        std::process::exit(1);
-    });
+    // Load the Towerfile
+    let towerfile_path = path.join("Towerfile");
+    let towerfile = load_towerfile(&towerfile_path);
 
     let res = client.run_app(&towerfile.app.name).await;
 
@@ -186,21 +115,102 @@ async fn do_run_remote(_config: Config, client: Client, path: PathBuf) {
     }
 }
 
-pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
-    let res = get_run_parameters(args, cmd);
+/// get_run_parameters takes care of all the hariy bits around digging about in the `clap`
+/// internals to figure out what the user is requesting. In the end, it determines if we are meant
+/// to do a local run or a remote run, and it determines the path to the relevant Towerfile that
+/// should be loaded.
+fn get_run_parameters(args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Result<(bool, PathBuf), config::Error> {
+    let local = args.get_one::<bool>("local").unwrap();
 
-    match res {
-        Ok((local, path)) => {
-            log::debug!("Running app at {}, local: {}", path.to_str().unwrap(), local);
+    if let Some(cmd) = cmd {
+        let path = cmd.0.to_string();
 
-            if local {
-                do_run_local(config, client, path).await;
-            } else {
-                do_run_remote(config, client, path).await;
-            }
+        if path.is_empty() {
+            Ok((*local, PathBuf::from(".")))
+        } else {
+            Ok((*local, PathBuf::from(path)))
+        }
+    } else {
+        Ok((*local, PathBuf::from(".")))
+    }
+}
+
+/// get_secrets manages the process of getting secrets from the Tower server in a way that can be
+/// used by the local runtime during local app execution.
+async fn get_secrets(client: &Client) -> HashMap<String, String> {
+    let spinner = output::spinner("Getting secrets...");
+    match client.export_secrets().await {
+        Ok(secrets) => {
+            spinner.success();
+            secrets.into_iter().map(|sec| (sec.name, sec.value)).collect()
         },
         Err(err) => {
-            output::config_error(err);
+            spinner.failure();
+            log::debug!("Failed to export secrets for local execution: {}", err);
+            output::tower_error(err);
+            std::process::exit(1);
+        }
+    }
+}
+
+/// load_towerfile manages the process of loading a Towerfile from a given path in an interactive
+/// way. That means it will not return if the Towerfile can't be loaded and instead will publish an
+/// error.
+fn load_towerfile(path: &PathBuf) -> Towerfile {
+    Towerfile::from_path(path.clone()).unwrap_or_else(|err| {
+        log::debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
+        output::config_error(err);
+        std::process::exit(1);
+    })
+}
+
+/// build_package manages the process of building a package in an interactive way for local app
+/// execution. If the pacakge fails to build for wahatever reason, the app will exit.
+async fn build_package(towerfile: &Towerfile) -> Package { 
+    let spinner = output::spinner("Building package...");
+    let package_spec = PackageSpec::from_towerfile(towerfile);
+    match Package::build(package_spec).await {
+        Ok(package) => {
+            spinner.success();
+            package
+        },
+        Err(err) => {
+            spinner.failure();
+            log::debug!("Failed to build package: {}", err);
+            output::package_error(err);
+            std::process::exit(1);
+        }
+    }
+}
+
+/// monitor_output is a helper function that will monitor the output of a given output channel and
+/// plops it down on stdout.
+async fn monitor_output(output: OutputChannel) {
+    loop {
+        if let Some(line) = output.lock().await.recv().await {
+            output::log_line(&line);
+        } else {
+            break;
+        }
+    }
+}
+
+/// monitor_status is a helper function that will monitor the status of a given app and waits for
+/// it to progress to a terminal state.
+async fn monitor_status(mut app: LocalApp) {
+    loop {
+        if let Ok(status) = app.status().await {
+            match status {
+                tower_runtime::Status::Exited => {
+                    output::success("Your app exited cleanly.");
+                    break;
+                }
+                tower_runtime::Status::Crashed => {
+                    output::failure("Your app crashed!");
+                    break;
+                }
+                _ => continue,
+            }
         }
     }
 }
