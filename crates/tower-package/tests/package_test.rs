@@ -114,7 +114,7 @@ async fn create_test_file(tempdir: PathBuf, path: &str, contents: &str) {
         }
     }
 
-    log::debug!("creating test file at: {:?} with contenxt {:?}", path, contents);
+    log::debug!("creating test file at: {:?} with content {:?}", path, contents);
     let mut file = File::create(&path).await.expect("Failed to create file");
     file.write_all(contents.as_bytes()).await.expect("Failed to write content to file")
 }

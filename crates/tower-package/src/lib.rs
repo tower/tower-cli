@@ -123,10 +123,10 @@ impl Package {
 
        for file_glob in spec.file_globs {
            let path = base_dir.join(file_glob);
-           let path_str = path.to_str().unwrap();
+           let path_str = extract_glob_path(path);
            log::debug!("resolving glob pattern: {}", path_str);
 
-           for entry in glob(path_str).unwrap() {
+           for entry in glob(&path_str).unwrap() {
                let physical_path = entry.unwrap()
                    .canonicalize()
                    .unwrap();
@@ -208,4 +208,22 @@ async fn write_manifest_to_file(path: &PathBuf, manifest: &Manifest) -> Result<(
     file.shutdown().await?;
 
     Ok(())
+}
+
+fn extract_glob_path(path: PathBuf) -> String {
+    let str = path.to_str().unwrap();
+
+    #[cfg(windows)]
+    {
+        // This is a nasty hack to get around a limitation in the `glob` crate on Windows. There's
+        // a (documented) bug that prevents it from globbing on canonicalized paths.
+        //
+        // See https://github.com/rust-lang/glob/issues/132
+        str.strip_prefix(r"\\?\").ok_or(str).unwrap().to_string()
+    }
+
+    #[cfg(not(windows))]
+    {
+        str.to_string()
+    }
 }
