@@ -41,6 +41,7 @@ struct LoginRequest {
 
 #[derive(Serialize, Deserialize)]
 struct ListAppsResponse {
+    #[serde(deserialize_with="parse_nullable_sequence")]
     apps: Vec<AppSummary>,
 }
 
