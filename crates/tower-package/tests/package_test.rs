@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use async_compression::tokio::bufread::GzipDecoder;
 use tmpdir::TmpDir;
 use tokio::{
     fs,
@@ -29,7 +28,9 @@ async fn it_creates_package() {
 
     assert_eq!(package.manifest.version, Some(1));
     assert_eq!(package.manifest.invoke, "main.py");
-    assert!(!package.path.as_os_str().is_empty());
+
+    let package_file_path = package.package_file_path.clone().unwrap();
+    assert!(!package_file_path.as_os_str().is_empty());
 
     let files = read_package_files(package).await;
 
@@ -57,7 +58,9 @@ async fn it_respects_complex_file_globs() {
 
     assert_eq!(package.manifest.version, Some(1));
     assert_eq!(package.manifest.invoke, "main.py");
-    assert!(!package.path.as_os_str().is_empty());
+
+    let package_file_path = package.package_file_path.clone().unwrap();
+    assert!(!package_file_path.as_os_str().is_empty());
 
     let files = read_package_files(package).await;
 
@@ -71,7 +74,8 @@ async fn it_respects_complex_file_globs() {
 async fn read_package_files(package: Package) -> HashMap<String, String> {
     // Now we should crack open the file to make sure that we can find the relevant contents within
     // it.
-    let file = File::open(package.path).await.expect("Failed to open package file");
+    let package_file_path = package.package_file_path.expect("Failed to get package file path");
+    let file = File::open(package_file_path).await.expect("Failed to open package file");
     let buf = BufReader::new(file);
     // TODO: Re-enable this when we reintroduce gzip compression
     //let gzip = GzipDecoder::new(buf);

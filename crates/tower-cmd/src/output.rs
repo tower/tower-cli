@@ -1,12 +1,23 @@
 use std::io::{self, Write};
 use colored::Colorize;
 use cli_table::{print_stdout, Table, format::{Border, Separator, HorizontalLine}};
+use tower_runtime::Output;
 pub use cli_table::{Cell, format::Justify};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
 pub fn success(msg: &str) {
     let line = format!("{} {}\n", "Success!".green(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
+pub fn failure(msg: &str) {
+    let line = format!("{} {}\n", "Failure!".red(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
+pub fn log_line(msg: &Output) {
+    let line = format!("{} {} {}\n", msg.time.to_string().green().bold(), "|".green().bold(), msg.line);
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 

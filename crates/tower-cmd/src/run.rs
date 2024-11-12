@@ -71,7 +71,7 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
     // Build the package for execution.
     let spinner = output::spinner("Building package...");
     let package_spec = PackageSpec::from_towerfile(&towerfile);
-    let package = match Package::build(package_spec).await {
+    let mut package = match Package::build(package_spec).await {
         Ok(package) => {
             spinner.success();
             package
@@ -84,6 +84,14 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
             std::process::exit(1);
         }
     };
+
+    // Now we should unpack the package.
+    if let Err(err) = package.unpack().await {
+        log::debug!("failed to unpack package: {}", err);
+
+        output::package_error(err);
+        std::process::exit(1);
+    }
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     match launcher.launch(package, secrets).await {
@@ -102,7 +110,11 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
 
                     match res {
                         None => break,
-                        Some(line) => log::info!("{}", line.line),
+                        Some(line) => {
+                            // TODO: Theoretically, these lines could arrive out of order. We
+                            // probably want to sequence them somehow?
+                            output::log_line(&line);
+                        },
                     }
                 }
             });
@@ -114,11 +126,11 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
                     if let Ok(status) = res {
                         match status {
                             tower_runtime::Status::Exited => {
-                                log::info!("app exited");
+                                output::success("Your app exited cleanly.");
                                 break;
                             },
                             tower_runtime::Status::Crashed => {
-                                log::info!("app crashed");
+                                output::failure("Your app crashed!");
                                 break;
                             },
                             _ => {
@@ -131,7 +143,16 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
                 }
             });
 
-            tokio::join!(p1, p2);
+            log::debug!("launched apps, waiting for them to complete");
+
+            // NOTE: We keep the result here and unwrap them to propgate any panics in the spawned
+            // threads.
+            let res = tokio::join!(p1, p2);
+            res.0.unwrap();
+            res.1.unwrap();
+
+            // aaaand we're done.
+            log::debug!("app terminated, shutting down");
         },
         Err(err) => {
             output::runtime_error(err);

@@ -6,6 +6,7 @@ rust-version = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+chrono = { workspace = true }
 tokio = { workspace = true }
 log = { workspace = true } 
 snafu = { workspace = true } 

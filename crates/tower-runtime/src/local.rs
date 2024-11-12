@@ -27,6 +27,8 @@ use tokio::{
     process::Child, 
 };
 
+use tower_package::Package;
+
 use crate::{
     FD,
     App,
@@ -35,6 +37,12 @@ use crate::{
 };
 
 pub struct LocalApp {
+    // LocalApp needs to take ownership of the package as a way of taking responsibility for it's
+    // lifetime and, most importantly, it's contents. The compiler complains that we never actually
+    // use this struct member, so we allow the dead_code attribute to silence the warning.
+    #[allow(dead_code)]
+    package: Option<Package>,
+
     child: Option<Arc<Mutex<Child>>>,
     status: Option<Status>,
     waiter: Option<oneshot::Receiver<i32>>,
@@ -43,6 +51,7 @@ pub struct LocalApp {
 impl Default for LocalApp {
     fn default() -> Self {
         Self {
+            package: None,
             child: None,
             status: None,
             waiter: None,
@@ -91,7 +100,8 @@ async fn find_python() -> Result<PathBuf, Error> {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        let package_path = opts.package.unpacked_path.clone().unwrap().to_path_buf();
+        let package = opts.package;
+        let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
 
         let pip_path = find_pip().await?;
         log::debug!("using pip at {:?}", pip_path);
@@ -126,12 +136,12 @@ impl App for LocalApp {
         }
 
         log::debug!(" - working directory: {:?}", &working_dir);
-        log::debug!(" - python script {}", opts.package.manifest.invoke);
+        log::debug!(" - python script {}", package.manifest.invoke);
 
         let res = Command::new(python_path)
             .current_dir(&working_dir)
             .arg("-u")
-            .arg(package_path.join(opts.package.manifest.invoke))
+            .arg(package_path.join(package.manifest.invoke.clone()))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -146,6 +156,7 @@ impl App for LocalApp {
             tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
 
             Ok(Self {
+                package: Some(package),
                 child: Some(child),
                 waiter: Some(rx),
                 status: None,
@@ -267,7 +278,11 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, output: Sender<Output>, inpu
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
-        let _ = output.send(Output{ fd, line }).await;
+        let _ = output.send(Output{ 
+            fd,
+            line,
+            time: chrono::Utc::now(),
+        }).await;
     }
 }
 

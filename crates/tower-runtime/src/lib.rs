@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::Receiver;
+use chrono::{DateTime, Utc};
 
 use tower_package::Package;
 
@@ -19,6 +20,7 @@ pub enum FD {
 }
 
 pub struct Output {
+    pub time: DateTime<Utc>,
     pub fd: FD,
     pub line: String,
 }

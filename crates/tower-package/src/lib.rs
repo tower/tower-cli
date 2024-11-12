@@ -5,7 +5,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 use config::Towerfile;
-use tokio_tar::Builder;
+use tokio_tar::{Archive, Builder};
 use glob::glob;
 use tmpdir::TmpDir;
 
@@ -48,7 +48,7 @@ pub struct PackageSpec {
 
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
-        let base_dir = std::env::current_dir().unwrap();
+        let base_dir = towerfile.base_dir.clone();
 
         Self {
             base_dir,
@@ -106,6 +106,7 @@ impl Package {
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
+       log::debug!("building package at: {:?}", package_path);
 
        let file = File::create(package_path.clone()).await?;
        let mut builder = Builder::new(file);
@@ -119,9 +120,12 @@ impl Package {
        for file_glob in spec.file_globs {
            let path = spec.base_dir.join(file_glob);
            let path_str = path.to_str().unwrap();
+           log::debug!("resolving glob pattern: {}", path_str);
 
            for entry in glob(path_str).unwrap() {
                let physical_path = entry.unwrap();
+
+               log::debug!(" - adding file: {:?}", physical_path);
 
                // this copy of physical_path is used to appease the borrow checker.
                let cp = physical_path.clone();
@@ -156,14 +160,35 @@ impl Package {
        //// probably not explicitly required; however, makes the test suite pass so...
        //let mut file = gzip.into_inner();
        //file.shutdown().await?;
-       let unpacked_path = Some(tmp_dir.to_path_buf());
 
        Ok(Self {
            manifest,
-           unpacked_path,
+           unpacked_path: None,
            tmp_dir: Some(tmp_dir),
            package_file_path: Some(package_path),
        })
+   }
+
+   /// unpack is the primary interface in to unpacking a package. It will allocate a temporary
+   /// directory if one isn't already allocated and unpack the package contents into that location.
+   pub async fn unpack(&mut self) -> Result<(), Error> {
+       // If there's already a tmp_dir allocated to this package, then we'll use that. Otherwise,
+       // we allocate one and store it on this package for later use.
+       let path = if let Some(tmp_dir) = self.tmp_dir.as_ref() {
+           tmp_dir.to_path_buf()
+       } else {
+           let tmp_dir = TmpDir::new("tower-package").await?;
+           let path = tmp_dir.to_path_buf();
+           self.tmp_dir = Some(tmp_dir);
+           path
+       };
+
+       let file = File::open(self.package_file_path.clone().unwrap()).await?;
+       let mut archive = Archive::new(file);
+
+       archive.unpack(path.clone()).await?;
+       self.unpacked_path = Some(path);
+       Ok(())
    }
 }
 

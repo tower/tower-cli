@@ -38,6 +38,7 @@ sha2 = "0.10"
 simple_logger = "5"
 snafu = "0.7"
 spinners = "4"
+testutils = { path = "crates/testutils" }
 tmpdir = "1.0"
 toml = "0.8"
 tokio = { version = "1", features = ["full"] }
