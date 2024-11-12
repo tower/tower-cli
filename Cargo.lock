@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "crypto"
-version = "0.1.7"
+version = "0.1.6"
 dependencies = [
  "base64",
  "pem",
@@ -1980,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.1.7"
+version = "0.1.4"
 
 [[package]]
 name = "thiserror"
@@ -2186,7 +2186,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.1.7"
+version = "0.1.6"
 dependencies = [
  "bytes",
  "chrono",
@@ -2208,7 +2208,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cli"
-version = "0.1.7"
+version = "0.1.6"
 dependencies = [
  "tokio",
  "tower-api",
@@ -2217,7 +2217,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.1.7"
+version = "0.1.6"
 dependencies = [
  "clap",
  "cli-table",
