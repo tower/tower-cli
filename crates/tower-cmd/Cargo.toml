@@ -4,6 +4,7 @@ version = { workspace = true }
 edition = "2021"
 
 [dependencies]
+chrono = { workspace = true }
 clap = { workspace = true }
 cli-table = { workspace = true }
 colored = { workspace = true }
