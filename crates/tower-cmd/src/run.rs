@@ -188,7 +188,9 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 async fn monitor_output(output: OutputChannel) {
     loop {
         if let Some(line) = output.lock().await.recv().await {
-            output::log_line(&line);
+            let ts = &line.time;
+            let msg = &line.line;
+            output::log_line(ts, msg, output::LogLineType::Local);
         } else {
             break;
         }

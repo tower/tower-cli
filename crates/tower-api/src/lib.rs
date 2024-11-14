@@ -115,6 +115,14 @@ struct AppRunResponse {
     run: Run,
 }
 
+#[derive(Serialize, Deserialize)]
+struct GetAppResponse {
+    app: App,
+
+    #[serde(deserialize_with="parse_nullable_sequence")]
+    runs: Vec<Run>,
+}
+
 pub type Result<T> = std::result::Result<T, TowerError>;
 
 type StreamResult<T> = std::result::Result<T, std::io::Error>;
@@ -169,6 +177,12 @@ impl Client {
     pub async fn list_apps(&self) -> Result<Vec<AppSummary>> {
         let res = self.request_object::<ListAppsResponse>(Method::GET, "/api/apps", None, None).await?;
         Ok(res.apps)
+    }
+
+    pub async fn get_app(&self, name: &str) -> Result<(App, Vec<Run>)> {
+        let path = format!("/api/apps/{}", name);
+        let res = self.request_object::<GetAppResponse>(Method::GET, &path, None, None).await?;
+        Ok((res.app, res.runs))
     }
 
     pub async fn delete_app(&self, name: &str) -> Result<App> {
@@ -282,6 +296,14 @@ impl Client {
         Ok(res.run)
     }
 
+    pub async fn get_run_logs(&self, name: &str, num: &str) -> Result<Vec<LogLine>> {
+        let path = format!("/api/apps/{}/runs/{}/logs", name, num);
+        let empty_body = Body::from(Vec::new());
+        let res = self.do_request(Method::GET, &path, empty_body, None).await?;
+        let body = res.text().await.unwrap();
+        Ok(LogLine::from_str(&body))
+    }
+
     async fn request_stream<R, T>(
         &self,
         method: Method,
@@ -328,6 +350,18 @@ impl Client {
     where
         T: for<'de> Deserialize<'de>,
     {
+        let res =  self.do_request(method, path, body, headers).await?;
+        res.json::<T>().await.map_err(Into::into)
+    }
+
+    async fn do_request(
+        &self,
+        method: Method,
+        path: &str,
+        body: Body,
+        headers: Option<HashMap<String, String>>,
+    ) -> Result<reqwest::Response>
+    {
         let client = ReqwestClient::new();
         let url = self.url_from_path(path);
         let mut req = client.request(method, url).body(body);
@@ -345,7 +379,7 @@ impl Client {
         let res = req.send().await?;
 
         match res.status() {
-            StatusCode::OK | StatusCode::CREATED => res.json::<T>().await.map_err(Into::into),
+            StatusCode::OK | StatusCode::CREATED => Ok(res),
             _ => Err(res.json::<TowerError>().await?),
         }
     }

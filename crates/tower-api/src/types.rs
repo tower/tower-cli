@@ -60,6 +60,20 @@ pub struct Code {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct LogLine {
+    pub timestamp: DateTime<Utc>,
+    pub message: String,
+}
+
+impl LogLine {
+    pub fn from_str(body: &str) -> Vec<LogLine> {
+        body.lines().map(|line| {
+            serde_json::from_str(line).unwrap()
+        }).collect()
+    }
+}
+
 /// parse_nullable_sequence is a helper function that deserializes a sequence of items that may be
 /// null in the underlying data. This is useful for parsing content coming from the API that may or
 /// may not be null if the resultant data is empty.

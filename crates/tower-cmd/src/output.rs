@@ -1,24 +1,41 @@
 use std::io::{self, Write};
 use colored::Colorize;
 use cli_table::{print_stdout, Table, format::{Border, Separator, HorizontalLine}};
-use tower_runtime::Output;
 pub use cli_table::{Cell, format::Justify};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
 pub fn success(msg: &str) {
     let line = format!("{} {}\n", "Success!".green(), msg);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
 }
 
 pub fn failure(msg: &str) {
     let line = format!("{} {}\n", "Failure!".red(), msg);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
 }
 
-pub fn log_line(msg: &Output) {
-    let line = format!("{} {} {}\n", msg.time.to_string().green().bold(), "|".green().bold(), msg.line);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+pub enum LogLineType {
+    Remote,
+    Local,
+}
+
+fn format_timestamp(timesetamp: &chrono::DateTime<chrono::Utc>, t: LogLineType) -> String {
+    let timestamp = timesetamp.format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+        .bold();
+
+    let sep = "|".bold();
+
+    match t {
+        LogLineType::Remote => format!("{} {}", timestamp.yellow(), sep.yellow()),
+        LogLineType::Local => format!("{} {}", timestamp.green(), sep.green()),
+    }
+}
+
+pub fn log_line(timestamp: &chrono::DateTime<chrono::Utc>, message: &str, t: LogLineType) {
+    let line = format!("{} {}\n", format_timestamp(timestamp, t), message);
+    write(&line);
 }
 
 pub fn package_error(err: tower_package::Error) {
@@ -32,7 +49,17 @@ pub fn package_error(err: tower_package::Error) {
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
+}
+
+pub fn paragraph(msg: &str) -> String {
+    msg.chars()
+        .collect::<Vec<char>>()
+        .chunks(78)
+        .map(|c| c.iter().collect::<String>())
+        .map(|li| format!("  {}", li))
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 pub fn config_error(err: config::Error) {
@@ -58,7 +85,11 @@ pub fn config_error(err: config::Error) {
     };
 
     let line = format!("{} {}\n", "Config error:".red(), msg);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
+}
+
+pub fn write(msg: &str) {
+    io::stdout().write_all(msg.as_bytes()).unwrap();
 }
 
 pub fn runtime_error(err: tower_runtime::errors::Error) {
@@ -94,7 +125,7 @@ pub fn list(items: Vec<String>) {
 }
 
 pub fn banner() {
-    io::stdout().write_all(BANNER_TEXT.as_bytes()).unwrap();
+    write(&BANNER_TEXT);
 }
 
 pub struct Spinner {
