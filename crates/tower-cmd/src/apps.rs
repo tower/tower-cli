@@ -107,8 +107,27 @@ pub async fn do_show_app(_config: Config, client: Client, cmd: Option<(&str, &Ar
 
             let rows = runs.iter().map(|run| {
                 let status = run.status.clone();
-                let start_time = run.started_at.unwrap().to_string();
-                let elapsed_time = "".to_string();
+
+                // this indicates when the run was scheduled.
+                let start_time = if let Some(t) = run.started_at {
+                    t.format("%Y-%m-%d %H:%M:%S").to_string()
+                } else {
+                    let ts = run.scheduled_at.format("%Y-%m-%d %H:%M:%S").to_string();
+                    format!("Scheduled at {}", ts)
+                };
+
+                let elapsed_time = if let Some(t) = run.ended_at {
+                    let elapsed = t.signed_duration_since(run.started_at.unwrap()).num_seconds();
+                    format!("{}s", elapsed)
+                } else if let Some(t) = run.started_at {
+                    let now = chrono::Utc::now();
+                    let elapsed = now.signed_duration_since(t).num_seconds();
+                    format!("Running for {}s", elapsed)
+                } else {
+                    let now = chrono::Utc::now();
+                    let elapsed = now.signed_duration_since(run.scheduled_at).num_seconds();
+                    format!("{}s ago", elapsed)
+                };
 
                 vec![
                     run.number.to_string(),

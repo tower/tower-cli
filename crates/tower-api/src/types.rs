@@ -21,6 +21,7 @@ pub struct Run {
     pub app_name: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
+    pub scheduled_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub ended_at: Option<DateTime<Utc>>,
 }
