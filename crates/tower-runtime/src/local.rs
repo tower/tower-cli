@@ -29,7 +29,7 @@ use tokio::{
     process::Child, 
 };
 
-use tower_package::Package;
+use tower_package::{Manifest, Package};
 
 use crate::{
     FD,
@@ -112,6 +112,15 @@ async fn find_python() -> Result<PathBuf, Error> {
     }
 }
 
+async fn find_bash() -> Result<PathBuf, Error> {
+    if let Some(path) = find_executable_in_path("bash").await {
+        Ok(path)
+    } else {
+        Err(Error::MissingBash)
+    }
+}
+
+
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         let package = opts.package;
@@ -153,18 +162,18 @@ impl App for LocalApp {
         }
 
         log::debug!(" - working directory: {:?}", &working_dir);
-        log::debug!(" - python script {}", package.manifest.invoke);
 
-        let res = Command::new(python_path)
-            .current_dir(&working_dir)
-            .arg("-u")
-            .arg(package_path.join(package.manifest.invoke.clone()))
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .envs(make_env_vars(&opts.secrets))
-            .kill_on_drop(true)
-            .spawn();
+        let res = if package.manifest.invoke.ends_with(".sh") {
+            let manifest = &package.manifest;
+            let secrets = opts.secrets;
+
+            Self::execute_bash_program(working_dir, package_path, &manifest, secrets).await
+        } else {
+            let manifest = &package.manifest;
+            let secrets = opts.secrets;
+
+            Self::execute_python_program(working_dir, package_path, &manifest, secrets).await
+        };
 
         if let Ok(child) = res {
             let child = Arc::new(Mutex::new(child));
@@ -243,6 +252,47 @@ impl App for LocalApp {
         } else {
             Err(Error::NoRunningApp)
         }
+    }
+}
+
+impl LocalApp {
+    async fn execute_python_program(cwd: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>) -> Result<Child, Error> {
+        let python_path = find_python().await?;
+        log::debug!("using python at {:?}", python_path);
+
+        log::debug!(" - python script {}", manifest.invoke);
+
+        let child = Command::new(python_path)
+            .current_dir(&cwd)
+            .arg("-u")
+            .arg(package_path.join(manifest.invoke.clone()))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .envs(make_env_vars(&secrets))
+            .kill_on_drop(true)
+            .spawn()?;
+
+        Ok(child)
+    }
+
+    async fn execute_bash_program(cwd: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>) -> Result<Child, Error> {
+        let bash_path = find_bash().await?;
+        log::debug!("using bash at {:?}", bash_path);
+
+        log::debug!(" - bash script {}", manifest.invoke);
+
+        let child = Command::new(bash_path)
+            .current_dir(&cwd)
+            .arg(package_path.join(manifest.invoke.clone()))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .envs(make_env_vars(&secrets))
+            .kill_on_drop(true)
+            .spawn()?;
+
+        Ok(child)
     }
 }
 

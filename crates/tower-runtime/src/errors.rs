@@ -49,4 +49,13 @@ pub enum Error {
 
     #[snafu(display("python could not be found"))]
     MissingPython,
+
+    #[snafu(display("bash could not be found"))]
+    MissingBash,
+}
+
+impl From<std::io::Error> for Error {
+    fn from(_: std::io::Error) -> Self {
+        Error::SpawnFailed
+    }
 }
