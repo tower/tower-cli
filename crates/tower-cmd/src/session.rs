@@ -9,14 +9,15 @@ pub fn login_cmd() -> Command {
         .about("Create a session with Tower")
 }
 
-pub async fn do_login(_config: Config, client: Client) {
+pub async fn do_login(config: Config, client: Client) {
     output::banner();
     let email: String = prompt("Email").unwrap();
     let password: String = rpassword::prompt_password("Password: ").unwrap();
     let spinner = output::spinner("Logging in...");
 
     match client.login(&email, &password).await {
-        Ok(session) => {
+        Ok(mut session) => {
+            session.tower_url = config.tower_url.clone();
             spinner.success();
 
             if let Err(err) = session.save() {

@@ -319,6 +319,7 @@ dependencies = [
  "snafu",
  "testutils",
  "toml",
+ "url",
 ]
 
 [[package]]
