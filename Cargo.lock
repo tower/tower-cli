@@ -319,6 +319,7 @@ dependencies = [
  "snafu",
  "testutils",
  "toml",
+ "url",
 ]
 
 [[package]]
@@ -2311,7 +2312,7 @@ dependencies = [
 
 [[package]]
 name = "tower-package"
-version = "0.0.0"
+version = "0.1.4"
 dependencies = [
  "async-compression",
  "config",
@@ -2329,7 +2330,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.0.0"
+version = "0.1.4"
 dependencies = [
  "chrono",
  "log",

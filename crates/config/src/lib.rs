@@ -1,32 +1,41 @@
+use url::Url;
 use serde::{Deserialize, Serialize};
 
 mod error;
 mod session;
 mod towerfile;
 
-pub use session::{User, Token, Session};
+pub use session::{
+    default_tower_url,
+    User,
+    Token,
+    Session,
+};
+
 pub use error::Error;
 pub use towerfile::Towerfile;
-
-const DEFAULT_TOWER_URL: &str = "https://services.tower.dev";
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub debug: bool,
-    pub tower_url: String,
+    pub tower_url: Url,
 }
 
 impl Config {
     pub fn default() -> Self {
         Self {
             debug: false,
-            tower_url: String::from(DEFAULT_TOWER_URL),
+            tower_url: default_tower_url(),
         }
     }
 
     pub fn from_env() -> Self {
         let debug = std::env::var("TOWER_DEBUG").is_ok();
-        let tower_url = std::env::var("TOWER_URL").unwrap_or_else(|_| String::from(DEFAULT_TOWER_URL));
+        let tower_url = if let Some(url) = std::env::var("TOWER_URL").ok() {
+            Url::parse(&url).unwrap()
+        } else {
+            default_tower_url()
+        };
 
         Self {
             debug,
@@ -42,7 +51,7 @@ impl Config {
         }
 
         if let Some(tower_url) = matches.get_one::<String>("tower_url") {
-            config.tower_url = tower_url.to_string();
+            config.tower_url = Url::parse(tower_url).unwrap();
         }
 
         config

@@ -138,7 +138,7 @@ pub struct Client {
 impl Client {
     pub fn default() -> Self {
         Self {
-            domain: Url::parse("https://services.tower.dev").unwrap(),
+            domain: config::default_tower_url(),
             session: None,
         }
     }
@@ -153,13 +153,21 @@ impl Client {
     pub fn from_config(config: &Config) -> Self {
         Self {
             session: None,
-            domain: Url::parse(&config.tower_url).unwrap(),
+            domain: config.tower_url.clone(),
         }
     }
 
     pub fn with_optional_session(&self, sess: Option<Session>) -> Self {
+        let domain = if let Some(sess) = &sess {
+            sess.tower_url.clone()
+        } else {
+            self.domain.clone()
+        };
+
+        log::debug!("Using domain from session: {}", domain);
+
         Self {
-            domain: self.domain.clone(),
+            domain,
             session: sess,
         }
     }

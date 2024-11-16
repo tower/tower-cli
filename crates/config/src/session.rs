@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use url::Url;
 
 use crate::error::Error;
 
@@ -15,8 +16,20 @@ pub struct Token {
     pub jwt: String,
 }
 
+const DEFAULT_TOWER_URL: &str = "https://services.tower.dev";
+
+pub fn default_tower_url() -> Url {
+    Url::parse(DEFAULT_TOWER_URL).unwrap()
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Session {
+    // tower_url is the URL of the Tower API that this session was created with. This is useful
+    // when the user is using multiple Tower instances. We don't want people to modify these on
+    // their own, really.
+    #[serde(default = "default_tower_url")]
+    pub tower_url: Url,
+
     pub user: User,
     pub token: Token,
 }
@@ -40,6 +53,7 @@ fn find_or_create_config_dir() -> Result<PathBuf, Error> {
 impl Session {
     pub fn new(user: User, token: Token) -> Self {
         Self {
+            tower_url: default_tower_url(),
             user,
             token,
         }
