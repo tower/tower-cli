@@ -7,6 +7,7 @@ mod secrets;
 mod session;
 mod deploy;
 mod run;
+mod version;
 pub mod output;
 
 pub struct App {
@@ -39,6 +40,7 @@ impl App {
 
         match matches.subcommand() {
             Some(("login", _)) => session::do_login(config, client).await,
+            Some(("version", _)) => version::do_version(config, client).await,
             Some(("apps", sub_matches)) => {
                 let apps_command = sub_matches.subcommand();
 
@@ -94,4 +96,5 @@ fn root_cmd() -> Command {
         .subcommand(secrets::secrets_cmd())
         .subcommand(deploy::deploy_cmd())
         .subcommand(run::run_cmd())
+        .subcommand(version::version_cmd())
 }
