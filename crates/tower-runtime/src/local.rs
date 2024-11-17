@@ -81,34 +81,51 @@ async fn is_executable(path: &PathBuf) -> bool {
     }
 }
 
+async fn find_executable_in_path_buf(executable_name: &str, dir: PathBuf) -> Option<PathBuf> {
+    let executable_path = dir.join(executable_name);
+
+    // Check if the path is a file and is executable
+    if executable_path.is_file() && is_executable(&executable_path).await {
+        return Some(executable_path);
+    }
+    None
+}
+
 async fn find_executable_in_path(executable_name: &str) -> Option<PathBuf> {
     // Get the PATH environment variable and split it into directories
     if let Ok(paths) = env::var("PATH") {
         for path in env::split_paths(&paths) {
-            let executable_path = path.join(executable_name);
-
-            // Check if the path is a file and is executable
-            if executable_path.is_file() && is_executable(&executable_path).await {
-                return Some(executable_path);
+            if let Some(path) = find_executable_in_path_buf(executable_name, path).await {
+                return Some(path);
             }
         }
     }
     None
 }
 
-async fn find_pip() -> Result<PathBuf, Error> {
-    if let Some(path) = find_executable_in_path("pip").await {
+async fn find_pip(dir: PathBuf) -> Result<PathBuf, Error> {
+    if let Some(path) = find_executable_in_path_buf("pip", dir).await {
         Ok(path)
     } else {
         Err(Error::MissingPip)
     }
 }
 
-async fn find_python() -> Result<PathBuf, Error> {
-    if let Some(path) = find_executable_in_path("python").await {
-        Ok(path)
+async fn find_python(dir: Option<PathBuf>) -> Result<PathBuf, Error> {
+    if let Some(dir) = dir {
+        // find a local python
+        if let Some(path) = find_executable_in_path_buf("python", dir).await {
+            Ok(path)
+        } else {
+            Err(Error::MissingPython)
+        }
     } else {
-        Err(Error::MissingPython)
+        // find the system installed python
+        if let Some(path) = find_executable_in_path("python").await {
+            Ok(path)
+        } else {
+            Err(Error::MissingPython)
+        }
     }
 }
 
@@ -129,11 +146,8 @@ impl App for LocalApp {
             .unwrap()
             .to_path_buf();
 
-        let pip_path = find_pip().await?;
-        log::debug!("using pip at {:?}", pip_path);
-
-        let python_path = find_python().await?;
-        log::debug!("using python at {:?}", python_path);
+        let mut python_path = find_python(None).await?;
+        log::debug!("using system python at {:?}", python_path);
 
         // set for later on.
         let working_dir = if let Some(dir) = opts.cwd {
@@ -144,6 +158,31 @@ impl App for LocalApp {
 
         if Path::new(&package_path.join("requirements.txt")).exists() {
             log::debug!("requirements.txt file found. installing dependencies");
+
+            // There's a requirements.txt, so we'll create a new virtualenv and install the files
+            // taht we want in there.
+            let res = Command::new(python_path)
+                .current_dir(&working_dir)
+                .arg("-m")
+                .arg("venv")
+                .arg(".venv")
+                .kill_on_drop(true)
+                .spawn();
+
+            if let Ok(mut child) = res {
+                // Wait for the child to complete entirely.
+                child.wait().await.expect("child failed to exit");
+            } else {
+                return Err(Error::VirtualEnvCreationFailed);
+            }
+
+            let pip_path = find_pip(working_dir.join(".venv").join("bin")).await?;
+
+            // We need to update our local python, too
+            //
+            // TODO: Find a better way to operate in the context of a virtual env here.
+            python_path = find_python(Some(working_dir.join(".venv").join("bin"))).await?;
+            log::debug!("using virtualenv python at {:?}", python_path);
 
             let res = Command::new(pip_path)
                 .current_dir(&working_dir)
@@ -172,7 +211,7 @@ impl App for LocalApp {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
 
-            Self::execute_python_program(working_dir, package_path, &manifest, secrets).await
+            Self::execute_python_program(working_dir, python_path, package_path, &manifest, secrets).await
         };
 
         if let Ok(child) = res {
@@ -256,10 +295,7 @@ impl App for LocalApp {
 }
 
 impl LocalApp {
-    async fn execute_python_program(cwd: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>) -> Result<Child, Error> {
-        let python_path = find_python().await?;
-        log::debug!("using python at {:?}", python_path);
-
+    async fn execute_python_program(cwd: PathBuf, python_path: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>) -> Result<Child, Error> {
         log::debug!(" - python script {}", manifest.invoke);
 
         let child = Command::new(python_path)

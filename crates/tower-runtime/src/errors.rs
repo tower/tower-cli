@@ -52,6 +52,9 @@ pub enum Error {
 
     #[snafu(display("bash could not be found"))]
     MissingBash,
+
+    #[snafu(display("failed to create a virtual environment"))]
+    VirtualEnvCreationFailed
 }
 
 impl From<std::io::Error> for Error {
