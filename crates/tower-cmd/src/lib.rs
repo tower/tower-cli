@@ -29,8 +29,11 @@ impl App {
         let client = Client::from_config(&config)
             .with_optional_session(self.session);
 
-        // TODO: Should this be configured every time?
-        simple_logger::SimpleLogger::new().env().init().unwrap();
+        simple_logger::SimpleLogger::new()
+            .with_module_level("rustyline", log::LevelFilter::Warn)
+            .env()
+            .init()
+            .unwrap();
 
         if config.debug {
             log::set_max_level(log::LevelFilter::Debug);

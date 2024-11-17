@@ -10,6 +10,11 @@ pub fn login_cmd() -> Command {
 }
 
 pub async fn do_login(config: Config, client: Client) {
+    // reset the client so that we don't use previous session information--including the
+    // last-authenticated tower_url!
+    let client = client.with_tower_url(config.tower_url.clone())
+        .anonymous();
+
     output::banner();
     let email: String = prompt("Email").unwrap();
     let password: String = rpassword::prompt_password("Password: ").unwrap();

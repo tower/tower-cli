@@ -128,8 +128,8 @@ pub type Result<T> = std::result::Result<T, TowerError>;
 type StreamResult<T> = std::result::Result<T, std::io::Error>;
 
 pub struct Client {
-    // domain is the URL that we use to connect to the client.
-    domain: Url,
+    // tower_url is the URL that we use to connect to the client.
+    tower_url: Url,
 
     // session is the current session that will be used for making subsequent requests.
     session: Option<Session>,
@@ -138,14 +138,14 @@ pub struct Client {
 impl Client {
     pub fn default() -> Self {
         Self {
-            domain: config::default_tower_url(),
+            tower_url: config::default_tower_url(),
             session: None,
         }
     }
 
-    pub fn new(domain: Url) -> Self {
+    pub fn new(tower_url: Url) -> Self {
         Self {
-            domain,
+            tower_url,
             session: None,
         }
     }
@@ -153,22 +153,34 @@ impl Client {
     pub fn from_config(config: &Config) -> Self {
         Self {
             session: None,
-            domain: config.tower_url.clone(),
+            tower_url: config.tower_url.clone(),
         }
     }
 
     pub fn with_optional_session(&self, sess: Option<Session>) -> Self {
-        let domain = if let Some(sess) = &sess {
+        let tower_url = if let Some(sess) = &sess {
             sess.tower_url.clone()
         } else {
-            self.domain.clone()
+            self.tower_url.clone()
         };
 
-        log::debug!("Using domain from session: {}", domain);
-
         Self {
-            domain,
+            tower_url,
             session: sess,
+        }
+    }
+    
+    pub fn with_tower_url(&self, tower_url: Url) -> Self {
+        Self {
+            tower_url,
+            session: self.session.clone(),
+        }
+    }
+
+    pub fn anonymous(&self) -> Self {
+        Self {
+            tower_url: self.tower_url.clone(),
+            session: None,
         }
     }
 
@@ -394,6 +406,6 @@ impl Client {
 
 
     fn url_from_path(&self, path: &str) -> Url {
-        self.domain.join(path).unwrap()
+        self.tower_url.join(path).unwrap()
     }
 }
