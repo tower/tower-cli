@@ -82,12 +82,16 @@ fn root_cmd() -> Command {
         .about("Tower is a compute platform for modern data projects")
         .arg(
             Arg::new("debug")
+                .short('d')
                 .long("debug")
+                .hide(true)
                 .action(clap::ArgAction::SetTrue)
         )
         .arg(
             Arg::new("tower_url")
+                .short('u')
                 .long("tower-url")
+                .hide(true)
                 .value_parser(value_parser!(String))
                 .action(clap::ArgAction::Set)
         )
