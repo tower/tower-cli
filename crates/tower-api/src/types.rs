@@ -38,12 +38,17 @@ pub struct AppSummary {
 pub struct Secret {
     pub name: String,
     pub preview: String,
+    #[serde(default)]
+    pub environment: String,
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct EncryptedSecret {
     pub name: String,
+
+    #[serde(default)]
+    pub environment: String,
     pub encrypted_value: String,
     pub created_at: DateTime<Utc>,
 }
@@ -51,6 +56,7 @@ pub struct EncryptedSecret {
 #[derive(Serialize, Deserialize)]
 pub struct ExportedSecret {
     pub name: String,
+    pub environment: String,
     pub value: String,
     pub created_at: DateTime<Utc>,
 }

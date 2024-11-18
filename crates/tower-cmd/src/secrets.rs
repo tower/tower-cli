@@ -14,8 +14,17 @@ pub fn secrets_cmd() -> Command {
             Command::new("list")
                 .arg(
                     Arg::new("show")
+                        .short('s')
                         .long("show")
                         .action(clap::ArgAction::SetTrue)
+                )
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .action(clap::ArgAction::Set)
                 )
                 .about("List all of your secrets")
         )
@@ -23,12 +32,22 @@ pub fn secrets_cmd() -> Command {
             Command::new("create")
                 .arg(
                     Arg::new("name")
+                        .short('n')
                         .long("name")
                         .value_parser(value_parser!(String))
                         .action(clap::ArgAction::Set)
                 )
                 .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .action(clap::ArgAction::Set)
+                )
+                .arg(
                     Arg::new("value")
+                        .short('v')
                         .long("value")
                         .value_parser(value_parser!(String))
                         .action(clap::ArgAction::Set)
@@ -45,16 +64,21 @@ pub fn secrets_cmd() -> Command {
 pub async fn do_list_secrets(_config: Config, client: Client, args: &ArgMatches) {
     let show = args.get_one::<bool>("show").unwrap_or(&false);
 
+    // Since environment has a default value, it is a big problem if it's not defined.
+    let env = args.get_one::<String>("environment").unwrap();
+
     let (headers, data) = if *show {
-        match client.export_secrets().await {
+        match client.export_secrets(Some(env.to_string())).await {
             Ok(secrets) => (
                 vec![
                     "Secret".bold().yellow().to_string(),
+                    "Environment".bold().yellow().to_string(),
                     "Value".bold().yellow().to_string(),
                 ],
                 secrets.iter().map(|sum| {
                     vec![
                         sum.name.clone(),
+                        sum.environment.clone(),
                         sum.value.dimmed().to_string(),
                     ]
                 }).collect(),
@@ -62,15 +86,17 @@ pub async fn do_list_secrets(_config: Config, client: Client, args: &ArgMatches)
             Err(err) => return output::tower_error(err),
         }
     } else {
-        match client.list_secrets().await {
+        match client.list_secrets(Some(env.to_string())).await {
             Ok(secrets) => (
                 vec![
                     "Secret".bold().yellow().to_string(),
+                    "Environment".bold().yellow().to_string(),
                     "Preview".bold().yellow().to_string(),
                 ],
                 secrets.iter().map(|sum| {
                     vec![
                         sum.name.clone(),
+                        sum.environment.clone(),
                         sum.preview.dimmed().to_string(),
                     ]
                 }).collect(),
@@ -87,6 +113,9 @@ pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches
         output::die("Secret name (--name) is required");
     });
 
+    // Since environment has a default value, it is a big problem if it's not defined.
+    let environment = args.get_one::<String>("environment").unwrap();
+
     let value = args.get_one::<String>("value").unwrap_or_else(|| {
         output::die("Secret value (--value) is required");
     });
@@ -98,7 +127,7 @@ pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches
             let encrypted_value = encrypt(public_key, value.to_string());
             let preview = create_preview(value);
 
-            match client.create_secret(&name, &encrypted_value, &preview).await {
+            match client.create_secret(&name, &encrypted_value, &preview, &environment).await {
                 Ok(secret) => {
                     spinner.success();
 

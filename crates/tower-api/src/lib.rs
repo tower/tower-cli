@@ -85,6 +85,7 @@ struct SecretsKeyResponse {
 #[derive(Serialize, Deserialize)]
 struct CreateSecretRequest {
     name: String,
+    environment: Option<String>,
     encrypted_value: String,
     preview: String,
 }
@@ -97,6 +98,7 @@ struct CreateSecretResponse {
 #[derive(Serialize, Deserialize)]
 struct ExportSecretsRequest {
     public_key: String,
+    environment: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -222,8 +224,16 @@ impl Client {
         Ok(res.app)
     }
 
-    pub async fn list_secrets(&self) -> Result<Vec<Secret>> {
-        let res = self.request_object::<ListSecretsResponse>(Method::GET, "/api/secrets", None, None).await?;
+    /// list_secrets returns a list of secrets that are stored in the Tower instance. The optional
+    /// `env` parameter can be used to include the secrets for a certain environment.
+    pub async fn list_secrets(&self, env: Option<String>) -> Result<Vec<Secret>> {
+        let path = if let Some(env) = env {
+            format!("/api/secrets?environment={}", env)
+        } else {
+            String::from("/api/secrets")
+        };
+
+        let res = self.request_object::<ListSecretsResponse>(Method::GET, &path, None, None).await?;
         Ok(res.secrets)
     }
 
@@ -244,9 +254,10 @@ impl Client {
         Ok(public_key)
     }
 
-    pub async fn create_secret(&self, name: &str, encrypted_value: &str, preview: &str) -> Result<Secret> {
+    pub async fn create_secret(&self, name: &str, encrypted_value: &str, preview: &str, environment: &str) -> Result<Secret> {
         let data = CreateSecretRequest {
             name: String::from(name),
+            environment: Some(String::from(environment)),
             encrypted_value: String::from(encrypted_value),
             preview: String::from(preview),
         };
@@ -256,11 +267,14 @@ impl Client {
         Ok(res.secret)
     }
 
-    pub async fn export_secrets(&self) -> Result<Vec<ExportedSecret>> {
+    /// export_secrets returns a list of secrets that are stored in the Tower instance. The
+    /// optional `env` parameter can be used to include the secrets for a certain environment.
+    pub async fn export_secrets(&self, env: Option<String>) -> Result<Vec<ExportedSecret>> {
         let (private_key, public_key) = crypto::generate_key_pair();
 
         let data = ExportSecretsRequest {
             public_key: crypto::serialize_public_key(public_key),
+            environment: env,
         };
 
         let body = serde_json::to_value(data).expect("Failed to serialize data");
@@ -275,8 +289,9 @@ impl Client {
                 let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.clone());
                 ExportedSecret {
                     name: secret.name.clone(),
+                    environment: secret.environment.clone(),
                     value: decrypted_value,
-                    created_at: secret.created_at,
+                    created_at: secret.created_at.clone(),
                 }
             })
             .collect();

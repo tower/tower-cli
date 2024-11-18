@@ -139,7 +139,7 @@ fn get_run_parameters(args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Re
 /// used by the local runtime during local app execution.
 async fn get_secrets(client: &Client) -> HashMap<String, String> {
     let spinner = output::spinner("Getting secrets...");
-    match client.export_secrets().await {
+    match client.export_secrets(None).await {
         Ok(secrets) => {
             spinner.success();
             secrets.into_iter().map(|sec| (sec.name, sec.value)).collect()
