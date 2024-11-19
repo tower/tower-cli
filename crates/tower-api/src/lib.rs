@@ -99,6 +99,7 @@ struct CreateSecretResponse {
 struct ExportSecretsRequest {
     public_key: String,
     environment: Option<String>,
+    all: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -226,11 +227,13 @@ impl Client {
 
     /// list_secrets returns a list of secrets that are stored in the Tower instance. The optional
     /// `env` parameter can be used to include the secrets for a certain environment.
-    pub async fn list_secrets(&self, env: Option<String>) -> Result<Vec<Secret>> {
-        let path = if let Some(env) = env {
+    pub async fn list_secrets(&self, all: bool, env: Option<String>) -> Result<Vec<Secret>> {
+        let path = if all {
+            "/api/secrets?all=true".to_string()
+        } else if let Some(env) = env {
             format!("/api/secrets?environment={}", env)
         } else {
-            String::from("/api/secrets")
+            "/api/secrets".to_string()
         };
 
         let res = self.request_object::<ListSecretsResponse>(Method::GET, &path, None, None).await?;
@@ -269,10 +272,11 @@ impl Client {
 
     /// export_secrets returns a list of secrets that are stored in the Tower instance. The
     /// optional `env` parameter can be used to include the secrets for a certain environment.
-    pub async fn export_secrets(&self, env: Option<String>) -> Result<Vec<ExportedSecret>> {
+    pub async fn export_secrets(&self, all: bool, env: Option<String>) -> Result<Vec<ExportedSecret>> {
         let (private_key, public_key) = crypto::generate_key_pair();
 
         let data = ExportSecretsRequest {
+            all,
             public_key: crypto::serialize_public_key(public_key),
             environment: env,
         };

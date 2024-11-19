@@ -26,6 +26,12 @@ pub fn secrets_cmd() -> Command {
                         .value_parser(value_parser!(String))
                         .action(clap::ArgAction::Set)
                 )
+                .arg(
+                    Arg::new("all")
+                        .short('a')
+                        .long("all")
+                        .action(clap::ArgAction::SetTrue)
+                )
                 .about("List all of your secrets")
         )
         .subcommand(
@@ -67,8 +73,10 @@ pub async fn do_list_secrets(_config: Config, client: Client, args: &ArgMatches)
     // Since environment has a default value, it is a big problem if it's not defined.
     let env = args.get_one::<String>("environment").unwrap();
 
+    let all = args.get_one::<bool>("all").unwrap_or(&false);
+
     let (headers, data) = if *show {
-        match client.export_secrets(Some(env.to_string())).await {
+        match client.export_secrets(*all, Some(env.to_string())).await {
             Ok(secrets) => (
                 vec![
                     "Secret".bold().yellow().to_string(),
@@ -86,7 +94,7 @@ pub async fn do_list_secrets(_config: Config, client: Client, args: &ArgMatches)
             Err(err) => return output::tower_error(err),
         }
     } else {
-        match client.list_secrets(Some(env.to_string())).await {
+        match client.list_secrets(*all, Some(env.to_string())).await {
             Ok(secrets) => (
                 vec![
                     "Secret".bold().yellow().to_string(),

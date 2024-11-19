@@ -17,6 +17,12 @@ pub fn run_cmd() -> Command {
                 .default_value("false")
                 .action(clap::ArgAction::SetTrue)
         )
+        .arg(
+            Arg::new("environment")
+                .short('e')
+                .long("environment")
+                .default_value("default")
+        )
         .about("Run your code in Tower or locally")
 }
 
@@ -139,7 +145,7 @@ fn get_run_parameters(args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Re
 /// used by the local runtime during local app execution.
 async fn get_secrets(client: &Client) -> HashMap<String, String> {
     let spinner = output::spinner("Getting secrets...");
-    match client.export_secrets(None).await {
+    match client.export_secrets(false, None).await {
         Ok(secrets) => {
             spinner.success();
             secrets.into_iter().map(|sec| (sec.name, sec.value)).collect()
