@@ -114,6 +114,11 @@ struct UploadCodeResponse {
 }
 
 #[derive(Serialize, Deserialize)]
+struct AppRunRequest {
+    environment: String,
+}
+
+#[derive(Serialize, Deserialize)]
 struct AppRunResponse {
     run: Run,
 }
@@ -329,9 +334,14 @@ impl Client {
         Ok(res.code)
     }
 
-    pub async fn run_app(&self, name: &str) -> Result<Run> {
+    pub async fn run_app(&self, name: &str, env: &str) -> Result<Run> {
+        let data = AppRunRequest {
+            environment: String::from(env),
+        };
+
+        let body = serde_json::to_value(data).unwrap();
         let path = format!("/api/apps/{}/runs", name);
-        let res = self.request_object::<AppRunResponse>(Method::POST, &path, None, None).await?;
+        let res = self.request_object::<AppRunResponse>(Method::POST, &path, Some(body), None).await?;
         Ok(res.run)
     }
 

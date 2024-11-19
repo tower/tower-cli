@@ -38,7 +38,11 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
             if local {
                 do_run_local(config, client, path).await;
             } else {
-                do_run_remote(config, client, path).await;
+                // We always expect there to be an environmnt due to the fact that there is a
+                // default value.
+                let env = args.get_one::<String>("environment").unwrap();
+
+                do_run_remote(config, client, path, env).await;
             }
         },
         Err(err) => {
@@ -97,14 +101,14 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(_config: Config, client: Client, path: PathBuf) {
+async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str) {
     let spinner = output::spinner("Scheduling run...");
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
     let towerfile = load_towerfile(&towerfile_path);
 
-    let res = client.run_app(&towerfile.app.name).await;
+    let res = client.run_app(&towerfile.app.name, env).await;
 
     match res {
         Ok(run) => {
