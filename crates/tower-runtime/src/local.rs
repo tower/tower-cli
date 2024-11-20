@@ -205,13 +205,15 @@ impl App for LocalApp {
         let res = if package.manifest.invoke.ends_with(".sh") {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
+            let params= opts.parameters;
 
-            Self::execute_bash_program(working_dir, package_path, &manifest, secrets).await
+            Self::execute_bash_program(working_dir, package_path, &manifest, secrets, params).await
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
+            let params= opts.parameters;
 
-            Self::execute_python_program(working_dir, python_path, package_path, &manifest, secrets).await
+            Self::execute_python_program(working_dir, python_path, package_path, &manifest, secrets, params).await
         };
 
         if let Ok(child) = res {
@@ -295,7 +297,7 @@ impl App for LocalApp {
 }
 
 impl LocalApp {
-    async fn execute_python_program(cwd: PathBuf, python_path: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>) -> Result<Child, Error> {
+    async fn execute_python_program(cwd: PathBuf, python_path: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>, params: HashMap<String, String>) -> Result<Child, Error> {
         log::debug!(" - python script {}", manifest.invoke);
 
         let child = Command::new(python_path)
@@ -305,14 +307,14 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(&secrets))
+            .envs(make_env_vars(&secrets, &params))
             .kill_on_drop(true)
             .spawn()?;
 
         Ok(child)
     }
 
-    async fn execute_bash_program(cwd: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>) -> Result<Child, Error> {
+    async fn execute_bash_program(cwd: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>, params: HashMap<String, String>) -> Result<Child, Error> {
         let bash_path = find_bash().await?;
         log::debug!("using bash at {:?}", bash_path);
 
@@ -324,7 +326,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(&secrets))
+            .envs(make_env_vars(&secrets, &params))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -341,15 +343,21 @@ fn make_env_var_key(src: &str) -> String {
     }
 }
 
-fn make_env_vars(src: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(secs: &HashMap<String, String>, params: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
-    log::debug!("converting {} env variables", src.len());
+    log::debug!("converting {} env variables", (params.len() + secs.len()));
 
-    for (key, value) in src.into_iter() {
+    for (key, value) in secs.into_iter() {
         log::debug!("adding key {}", make_env_var_key(&key));
         res.insert(make_env_var_key(&key), value.to_string());
     }
+
+    for (key, value) in params.into_iter() {
+        log::debug!("adding key {}", make_env_var_key(&key));
+        res.insert(key.to_string(), value.to_string());
+    }
+
 
     res
 }

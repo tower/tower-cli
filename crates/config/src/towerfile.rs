@@ -3,6 +3,18 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 #[derive(Deserialize)]
+pub struct Parameter{
+    #[serde(default)]
+    pub name: String,
+
+    #[serde(default)]
+    pub description: String,
+
+    #[serde(default)]
+    pub default: String,
+}
+
+#[derive(Deserialize)]
 pub struct App {
     #[serde(default)]
     pub name: String,
@@ -25,12 +37,16 @@ pub struct Towerfile {
     pub base_dir: PathBuf,
 
     pub app: App,
+
+    #[serde(default)]
+    pub parameters: Vec<Parameter>,
 }
 
 impl Towerfile {
     pub fn default() -> Self {
         Self {
             base_dir: PathBuf::new(),
+            parameters: vec![],
             app: App {
                 name: String::from(""),
                 script: String::from(""),
@@ -198,5 +214,32 @@ mod test {
 
         // explicitly drop this file so it's cleaned up when other test cases run.
         drop(tempfile);
+    }
+
+    #[test]
+    fn test_parses_parameters() {
+        // Second test case tests for success mode: There is a local file. A Towerfile should be
+        // parsed and validly returned.
+        let toml = r#"
+            [app]
+            name = "my-app"
+            script = "./script.py"
+            source = ["*.py"]
+
+            [[parameters]]
+            name = "my_first_param"
+            description = "Some type of parameter."
+            default = ""
+
+            [[parameters]]
+            name = "my_second_param"
+            description = "Some other type of parameter."
+            default = ""
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.parameters.len(), 2);
+        assert_eq!(towerfile.parameters[0].name, "my_first_param");
+        assert_eq!(towerfile.parameters[1].name, "my_second_param");
     }
 }

@@ -18,9 +18,17 @@ pub use error::Error;
 const CURRENT_PACKAGE_VERSION: i32 = 1;
 
 #[derive(Clone, Serialize, Deserialize)]
+pub struct Parameter{
+    pub name: String,
+    pub description: String,
+    pub default: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Manifest {
     pub version: Option<i32>,
     pub invoke: String,
+    pub parameters: Vec<Parameter>
 }
 
 impl Manifest {
@@ -44,6 +52,21 @@ pub struct PackageSpec {
 
     // file_globs is a list of globs that match the files in the package.
     pub file_globs: Vec<String>,
+
+    // parameters are the parameters to use for this app.
+    pub parameters: Vec<Parameter>,
+}
+
+fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
+    let mut parameters = Vec::new();
+    for p in &towerfile.parameters {
+        parameters.push(Parameter {
+            name: p.name.clone(),
+            description: p.description.clone(),
+            default: p.default.clone(),
+        });
+    }
+    parameters
 }
 
 impl PackageSpec {
@@ -54,6 +77,7 @@ impl PackageSpec {
             base_dir,
             invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
+            parameters: get_parameters(towerfile),
         }  
     }
 }
@@ -81,6 +105,7 @@ impl Package {
            manifest: Manifest {
                version: Some(CURRENT_PACKAGE_VERSION),
                invoke: "".to_string(),
+               parameters: vec![],
            },
        }
    }
@@ -144,6 +169,7 @@ impl Package {
        let manifest = Manifest {
            version: Some(CURRENT_PACKAGE_VERSION),
            invoke: String::from(spec.invoke),
+           parameters: spec.parameters,
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
