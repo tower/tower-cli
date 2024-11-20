@@ -63,12 +63,14 @@ impl<A: App> AppLauncher<A> {
         &mut self,
         package: Package,
         secrets: HashMap<String, String>,
+        parameters: HashMap<String, String>,
     ) -> Result<(), Error> {
         let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
 
         let opts = StartOptions {
             cwd: Some(cwd),
             secrets,
+            parameters,
             package,
         };
 
@@ -107,6 +109,7 @@ pub struct StartOptions {
     pub package: Package,
     pub cwd: Option<PathBuf>,
     pub secrets: HashMap<String, String>,
+    pub parameters: HashMap<String, String>,
 }
 
 pub struct ExecuteOptions {

@@ -23,6 +23,12 @@ pub fn run_cmd() -> Command {
                 .long("environment")
                 .default_value("default")
         )
+        .arg(
+            Arg::new("parameters")
+                .short('p')
+                .long("parameter")
+                .action(clap::ArgAction::Append)
+        )
         .about("Run your code in Tower or locally")
 }
 
@@ -32,17 +38,17 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
     let res = get_run_parameters(args, cmd);
 
     match res {
-        Ok((local, path)) => {
+        Ok((local, path, params)) => {
             log::debug!("Running app at {}, local: {}", path.to_str().unwrap(), local);
 
             if local {
-                do_run_local(config, client, path).await;
+                do_run_local(config, client, path, params).await;
             } else {
                 // We always expect there to be an environmnt due to the fact that there is a
                 // default value.
                 let env = args.get_one::<String>("environment").unwrap();
 
-                do_run_remote(config, client, path, env).await;
+                do_run_remote(config, client, path, env, params).await;
             }
         },
         Err(err) => {
@@ -54,13 +60,19 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
+async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params: HashMap<String, String>) {
     // Load all the secrets from the server
     let secrets = get_secrets(&client).await;
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
     let towerfile = load_towerfile(&towerfile_path);
+
+    for param in &towerfile.parameters {
+        if !params.contains_key(&param.name) {
+            params.insert(param.name.clone(), param.default.clone());
+        }
+    }
 
     // Build the package
     let mut package = build_package(&towerfile).await;
@@ -73,7 +85,7 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
     }
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    if let Err(err) = launcher.launch(package, secrets).await {
+    if let Err(err) = launcher.launch(package, secrets, params).await {
         output::runtime_error(err);
         return;
     }
@@ -101,14 +113,14 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf) {
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str) {
+async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str, params: HashMap<String, String>) {
     let spinner = output::spinner("Scheduling run...");
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
     let towerfile = load_towerfile(&towerfile_path);
 
-    let res = client.run_app(&towerfile.app.name, env).await;
+    let res = client.run_app(&towerfile.app.name, env, params).await;
 
     match res {
         Ok(run) => {
@@ -129,19 +141,37 @@ async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str
 /// internals to figure out what the user is requesting. In the end, it determines if we are meant
 /// to do a local run or a remote run, and it determines the path to the relevant Towerfile that
 /// should be loaded.
-fn get_run_parameters(args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Result<(bool, PathBuf), config::Error> {
-    let local = args.get_one::<bool>("local").unwrap();
+fn get_run_parameters(
+    args: &ArgMatches,
+    cmd: Option<(&str, &ArgMatches)>,
+) -> Result<(bool, PathBuf, HashMap<String, String>), config::Error> {
+    let local = *args.get_one::<bool>("local").unwrap();
+    let path = resolve_path(cmd);
+    let params = parse_parameters(args);
 
-    if let Some(cmd) = cmd {
-        let path = cmd.0.to_string();
+    Ok((local, path, params))
+}
 
-        if path.is_empty() {
-            Ok((*local, PathBuf::from(".")))
-        } else {
-            Ok((*local, PathBuf::from(path)))
+/// Parses `--parameter` arguments into a HashMap of key-value pairs.
+fn parse_parameters(args: &ArgMatches) -> HashMap<String, String> {
+    let mut param_map = HashMap::new();
+
+    if let Some(parameters) = args.get_many::<String>("parameters") {
+        for param in parameters {
+            if let Some((key, value)) = param.split_once('=') {
+                param_map.insert(key.to_string(), value.to_string());
+            }
         }
-    } else {
-        Ok((*local, PathBuf::from(".")))
+    }
+
+    param_map
+}
+
+/// Resolves the path based on the `cmd` option.
+fn resolve_path(cmd: Option<(&str, &ArgMatches)>) -> PathBuf {
+    match cmd {
+        Some((path, _)) if !path.is_empty() => PathBuf::from(path),
+        _ => PathBuf::from("."),
     }
 }
 

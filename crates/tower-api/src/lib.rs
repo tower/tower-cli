@@ -115,6 +115,7 @@ struct UploadCodeResponse {
 
 #[derive(Serialize, Deserialize)]
 struct AppRunRequest {
+    parameters: HashMap<String, String>,
     environment: String,
 }
 
@@ -334,8 +335,9 @@ impl Client {
         Ok(res.code)
     }
 
-    pub async fn run_app(&self, name: &str, env: &str) -> Result<Run> {
+    pub async fn run_app(&self, name: &str, env: &str, parameters: HashMap<String, String>) -> Result<Run> {
         let data = AppRunRequest {
+            parameters,
             environment: String::from(env),
         };
 
