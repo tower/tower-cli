@@ -28,6 +28,8 @@ pub struct Parameter{
 pub struct Manifest {
     pub version: Option<i32>,
     pub invoke: String,
+
+    #[serde(default)]
     pub parameters: Vec<Parameter>
 }
 
