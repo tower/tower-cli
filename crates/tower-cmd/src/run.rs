@@ -114,7 +114,7 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
 async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str, params: HashMap<String, String>) {
-    let spinner = output::spinner("Scheduling run...");
+    let mut spinner = output::spinner("Scheduling run...");
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -178,7 +178,7 @@ fn resolve_path(cmd: Option<(&str, &ArgMatches)>) -> PathBuf {
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
 async fn get_secrets(client: &Client) -> HashMap<String, String> {
-    let spinner = output::spinner("Getting secrets...");
+    let mut spinner = output::spinner("Getting secrets...");
     match client.export_secrets(false, None).await {
         Ok(secrets) => {
             spinner.success();
@@ -207,7 +207,7 @@ fn load_towerfile(path: &PathBuf) -> Towerfile {
 /// build_package manages the process of building a package in an interactive way for local app
 /// execution. If the pacakge fails to build for wahatever reason, the app will exit.
 async fn build_package(towerfile: &Towerfile) -> Package { 
-    let spinner = output::spinner("Building package...");
+    let mut spinner = output::spinner("Building package...");
     let package_spec = PackageSpec::from_towerfile(towerfile);
     match Package::build(package_spec).await {
         Ok(package) => {

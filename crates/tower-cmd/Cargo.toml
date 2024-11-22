@@ -12,6 +12,7 @@ config = { workspace = true }
 crypto = { workspace = true }
 indicatif = { workspace = true }
 log = { workspace = true }
+open = { workspace = true }
 promptly = { workspace = true }
 rpassword = { workspace = true }
 simple_logger = { workspace = true }

@@ -73,6 +73,17 @@ pub struct LogLine {
     pub message: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DeviceLoginTicket {
+    pub device_code: String,
+    pub user_code: String,
+    pub login_url: String,
+    pub verification_url: String,
+    pub generated_at: DateTime<Utc>,
+    pub expires_in: i32,
+    pub interval: i32
+}
+
 impl LogLine {
     pub fn from_str(body: &str) -> Vec<LogLine> {
         body.lines().map(|line| {

@@ -193,6 +193,17 @@ impl Client {
         }
     }
 
+    pub async fn device_login(&self) -> Result<DeviceLoginTicket> {
+        let res = self.request_object(Method::GET, "/api/login/device", None, None).await?;
+        Ok(res)
+    }
+
+    pub async fn check_device_login(&self, device_code: &str) -> Result<Session> {
+        let path = format!("/api/login/device/{}", device_code);
+        let res = self.request_object(Method::GET, &path, None, None).await?;
+        Ok(res)
+    }
+
     pub async fn login(&self, username: &str, password: &str) -> Result<Session> {
         let data = LoginRequest { 
             username: String::from(username),

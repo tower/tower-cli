@@ -59,7 +59,7 @@ pub async fn do_logs_app(_config: Config, client: Client, cmd: Option<(&str, &Ar
         output::die("Run number is required (e.g. tower apps show <name>#<num>)");
     };
 
-    let spinner = output::spinner("Fetching logs...");
+    let mut spinner = output::spinner("Fetching logs...");
 
     match client.get_run_logs(&app_name, num).await {
         Ok(logs) => {
@@ -176,7 +176,7 @@ pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
 
     let description = args.get_one::<String>("description").unwrap();
 
-    let spinner = output::spinner("Creating app");
+    let mut spinner = output::spinner("Creating app");
 
     match client.create_app(&name, &description).await {
         Ok(_app) => {
@@ -198,7 +198,7 @@ pub async fn do_delete_app(_config: Config, client: Client, cmd: Option<(&str, &
         output::die("App name (e.g. tower apps delete <name>) is required");
     });
 
-    let spinner = output::spinner("Deleting app...");
+    let mut spinner = output::spinner("Deleting app...");
 
     match client.delete_app(&opts.0).await {
         Ok(_app) => {

@@ -19,7 +19,7 @@ pub async fn do_deploy(_config: Config, client: Client, cmd: Option<(&str, &ArgM
     match Towerfile::from_dir_str(dir) {
         Ok(towerfile) => {
             let spec = PackageSpec::from_towerfile(&towerfile);
-            let spinner = output::spinner("Building package...");
+            let mut spinner = output::spinner("Building package...");
 
             match Package::build(spec).await {
                 Ok(package) => {

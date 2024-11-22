@@ -128,7 +128,7 @@ pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches
         output::die("Secret value (--value) is required");
     });
 
-    let spinner = output::spinner("Creating secret...");
+    let mut spinner = output::spinner("Creating secret...");
 
     match client.secrets_key().await {
         Ok(public_key) => {
@@ -160,7 +160,7 @@ pub async fn do_delete_secret(_config: Config, client: Client, cmd: Option<(&str
         output::die("Secret name (e.g. tower secrets delete <name>) is required");
     });
 
-    let spinner = output::spinner("Deleting secret...");
+    let mut spinner = output::spinner("Deleting secret...");
 
     match client.delete_secret(&opts.0).await {
         Ok(_app) => {
