@@ -22,13 +22,14 @@ pub async fn do_login(config: Config, client: Client) {
 
 /// Handles the device login process, including polling for user authentication.
 async fn handle_device_login(config: &Config, client: Client, ticket: DeviceLoginTicket) {
-    let mut spinner = output::spinner("Waiting for login...");
-
+    // first open the link in the browser. if we can't do that, we'll just print the link for
+    // people.
     if let Err(_) = open::that(&ticket.login_url) {
-        spinner.failure();
-        output::failure("Failed to open the login URL.");
-        return;
+        let line = format!("Please open the following URL in your browser: {}", ticket.login_url);
+        output::write(&line);
     }
+
+    let mut spinner = output::spinner("Waiting for login...");
 
     if !poll_for_login(&client, &ticket, config, &mut spinner).await {
         spinner.failure();
