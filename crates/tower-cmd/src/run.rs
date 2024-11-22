@@ -178,8 +178,9 @@ fn resolve_path(cmd: Option<(&str, &ArgMatches)>) -> PathBuf {
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
 async fn get_secrets(client: &Client) -> HashMap<String, String> {
+    let env = "local".to_string();
     let mut spinner = output::spinner("Getting secrets...");
-    match client.export_secrets(false, None).await {
+    match client.export_secrets(false, Some(env)).await {
         Ok(secrets) => {
             spinner.success();
             secrets.into_iter().map(|sec| (sec.name, sec.value)).collect()
