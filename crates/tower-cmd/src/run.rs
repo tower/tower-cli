@@ -61,8 +61,11 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
 async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params: HashMap<String, String>) {
+    // There is always an implicit `local` environment when running in a local context.
+    let env = "local".to_string();
+
     // Load all the secrets from the server
-    let secrets = get_secrets(&client).await;
+    let secrets = get_secrets(&client, &env).await;
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -84,8 +87,9 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params
         std::process::exit(1);
     }
 
+
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    if let Err(err) = launcher.launch(package, secrets, params).await {
+    if let Err(err) = launcher.launch(package, env, secrets, params).await {
         output::runtime_error(err);
         return;
     }
@@ -177,10 +181,9 @@ fn resolve_path(cmd: Option<(&str, &ArgMatches)>) -> PathBuf {
 
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
-async fn get_secrets(client: &Client) -> HashMap<String, String> {
-    let env = "local".to_string();
+async fn get_secrets(client: &Client, env: &str) -> HashMap<String, String> {
     let mut spinner = output::spinner("Getting secrets...");
-    match client.export_secrets(false, Some(env)).await {
+    match client.export_secrets(false, Some(env.to_string())).await {
         Ok(secrets) => {
             spinner.success();
             secrets.into_iter().map(|sec| (sec.name, sec.value)).collect()
