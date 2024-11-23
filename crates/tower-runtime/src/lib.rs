@@ -62,6 +62,7 @@ impl<A: App> AppLauncher<A> {
     pub async fn launch(
         &mut self,
         package: Package,
+        environment: String,
         secrets: HashMap<String, String>,
         parameters: HashMap<String, String>,
     ) -> Result<(), Error> {
@@ -69,6 +70,7 @@ impl<A: App> AppLauncher<A> {
 
         let opts = StartOptions {
             cwd: Some(cwd),
+            environment,
             secrets,
             parameters,
             package,
@@ -108,6 +110,7 @@ impl<A: App> AppLauncher<A> {
 pub struct StartOptions {
     pub package: Package,
     pub cwd: Option<PathBuf>,
+    pub environment: String,
     pub secrets: HashMap<String, String>,
     pub parameters: HashMap<String, String>,
 }

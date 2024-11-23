@@ -141,6 +141,7 @@ async fn find_bash() -> Result<PathBuf, Error> {
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         let package = opts.package;
+        let environment = opts.environment;
         let package_path = package.unpacked_path
             .clone()
             .unwrap()
@@ -155,6 +156,8 @@ impl App for LocalApp {
         } else {
             current_dir().unwrap()
         };
+
+        let mut is_virtualenv = false;
 
         if Path::new(&package_path.join("requirements.txt")).exists() {
             log::debug!("requirements.txt file found. installing dependencies");
@@ -184,6 +187,8 @@ impl App for LocalApp {
             python_path = find_python(Some(working_dir.join(".venv").join("bin"))).await?;
             log::debug!("using virtualenv python at {:?}", python_path);
 
+            is_virtualenv = true;
+
             let res = Command::new(pip_path)
                 .current_dir(&working_dir)
                 .arg("install")
@@ -207,13 +212,13 @@ impl App for LocalApp {
             let secrets = opts.secrets;
             let params= opts.parameters;
 
-            Self::execute_bash_program(working_dir, package_path, &manifest, secrets, params).await
+            Self::execute_bash_program(&environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params).await
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
 
-            Self::execute_python_program(working_dir, python_path, package_path, &manifest, secrets, params).await
+            Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params).await
         };
 
         if let Ok(child) = res {
@@ -297,7 +302,16 @@ impl App for LocalApp {
 }
 
 impl LocalApp {
-    async fn execute_python_program(cwd: PathBuf, python_path: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>, params: HashMap<String, String>) -> Result<Child, Error> {
+    async fn execute_python_program(
+        env: &str,
+        cwd: PathBuf,
+        is_virtualenv: bool,
+        python_path: PathBuf,
+        package_path: PathBuf,
+        manifest: &Manifest,
+        secrets: HashMap<String, String>,
+        params: HashMap<String, String>,
+    ) -> Result<Child, Error> {
         log::debug!(" - python script {}", manifest.invoke);
 
         let child = Command::new(python_path)
@@ -307,14 +321,22 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(&secrets, &params))
+            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params))
             .kill_on_drop(true)
             .spawn()?;
 
         Ok(child)
     }
 
-    async fn execute_bash_program(cwd: PathBuf, package_path: PathBuf, manifest: &Manifest, secrets: HashMap<String, String>, params: HashMap<String, String>) -> Result<Child, Error> {
+    async fn execute_bash_program(
+        env: &str,
+        cwd: PathBuf,
+        is_virtualenv: bool,
+        package_path: PathBuf,
+        manifest: &Manifest,
+        secrets: HashMap<String, String>,
+        params: HashMap<String, String>,
+    ) -> Result<Child, Error> {
         let bash_path = find_bash().await?;
         log::debug!("using bash at {:?}", bash_path);
 
@@ -326,7 +348,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(&secrets, &params))
+            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -343,7 +365,7 @@ fn make_env_var_key(src: &str) -> String {
     }
 }
 
-fn make_env_vars(secs: &HashMap<String, String>, params: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
     log::debug!("converting {} env variables", (params.len() + secs.len()));
@@ -358,6 +380,33 @@ fn make_env_vars(secs: &HashMap<String, String>, params: &HashMap<String, String
         res.insert(key.to_string(), value.to_string());
     }
 
+    // If we're in a virtual environment, we need to add the bin directory to the PATH so that we
+    // can find any executables that were installed there.
+    if is_virtualenv {
+        let venv_path = cwd.join(".venv")
+            .join("bin")
+            .to_string_lossy()
+            .to_string();
+
+        if let Ok(path) =  std::env::var("PATH") {
+            res.insert("PATH".to_string(), format!("{}:{}", venv_path, path));
+        } else {
+            res.insert("PATH".to_string(), venv_path);
+        }
+    }
+
+    // We also need a PYTHONPATH that is set to the current working directory to help with the
+    // dependency resolution problem at runtime.
+    let pythonpath = cwd.to_string_lossy().to_string();
+    res.insert("PYTHONPATH".to_string(), pythonpath);
+
+    // Inject a TOWER_ENVIRONMENT parameter so you know what environment you're running in. Empty
+    // environment is "default" by default.
+    if env.is_empty() {
+        res.insert("TOWER_ENVIRONMENT".to_string(), "default".to_string());
+    } else {
+        res.insert("TOWER_ENVIRONMENT".to_string(), env.to_string());
+    }
 
     res
 }
