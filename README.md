@@ -1,4 +1,4 @@
-# :tokyo_tower: Tower CLI
+# Tower CLI
 
 The Tower CLI is one of the main ways to interact with the Tower environment.
 You can do basically everything you need inside the Tower CLI, including run
