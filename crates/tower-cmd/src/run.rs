@@ -12,21 +12,31 @@ pub fn run_cmd() -> Command {
     Command::new("run")
         .allow_external_subcommands(true)
         .arg(
+            Arg::new("dir")
+                .long("dir")
+                .short('d')
+                .help("The directory containing the Towerfile")
+                .default_value(".")
+        )
+        .arg(
             Arg::new("local")
                 .long("local")
                 .default_value("false")
+                .help("Run this app locally")
                 .action(clap::ArgAction::SetTrue)
         )
         .arg(
             Arg::new("environment")
                 .short('e')
                 .long("environment")
+                .help("The environment to invoke the app in")
                 .default_value("default")
         )
         .arg(
             Arg::new("parameters")
                 .short('p')
                 .long("parameter")
+                .help("Parameters (key=value) to pass to the app")
                 .action(clap::ArgAction::Append)
         )
         .about("Run your code in Tower or locally")
@@ -38,17 +48,22 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
     let res = get_run_parameters(args, cmd);
 
     match res {
-        Ok((local, path, params)) => {
+        Ok((local, path, params, app_name)) => {
             log::debug!("Running app at {}, local: {}", path.to_str().unwrap(), local);
 
             if local {
-                do_run_local(config, client, path, params).await;
+                // For the time being, we should report that we can't run an app by name locally.
+                if app_name.is_some() {
+                    output::die("Running apps by name locally is not supported yet.");
+                } else {
+                    do_run_local(config, client, path, params).await;
+                }
             } else {
                 // We always expect there to be an environmnt due to the fact that there is a
                 // default value.
                 let env = args.get_one::<String>("environment").unwrap();
 
-                do_run_remote(config, client, path, env, params).await;
+                do_run_remote(config, client, path, env, params, app_name).await;
             }
         },
         Err(err) => {
@@ -117,20 +132,23 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str, params: HashMap<String, String>) {
+async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str, params: HashMap<String, String>, app_name: Option<String>) {
     let mut spinner = output::spinner("Scheduling run...");
 
-    // Load the Towerfile
-    let towerfile_path = path.join("Towerfile");
-    let towerfile = load_towerfile(&towerfile_path);
+    let app_name = app_name.unwrap_or_else(|| {
+        // Load the Towerfile
+        let towerfile_path = path.join("Towerfile");
+        let towerfile = load_towerfile(&towerfile_path);
+        towerfile.app.name
+    });
 
-    let res = client.run_app(&towerfile.app.name, env, params).await;
+    let res = client.run_app(&app_name, env, params).await;
 
     match res {
         Ok(run) => {
             spinner.success();
 
-            let line = format!("Run #{} for app `{}` has been scheduled", run.number, towerfile.app.name);
+            let line = format!("Run #{} for app `{}` has been scheduled", run.number, app_name);
             output::success(&line);
         },
         Err(err) => {
@@ -148,12 +166,13 @@ async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str
 fn get_run_parameters(
     args: &ArgMatches,
     cmd: Option<(&str, &ArgMatches)>,
-) -> Result<(bool, PathBuf, HashMap<String, String>), config::Error> {
+) -> Result<(bool, PathBuf, HashMap<String, String>, Option<String>), config::Error> {
     let local = *args.get_one::<bool>("local").unwrap();
-    let path = resolve_path(cmd);
+    let path = resolve_path(args);
     let params = parse_parameters(args);
+    let app_name = get_app_name(cmd);
 
-    Ok((local, path, params))
+    Ok((local, path, params, app_name))
 }
 
 /// Parses `--parameter` arguments into a HashMap of key-value pairs.
@@ -172,10 +191,19 @@ fn parse_parameters(args: &ArgMatches) -> HashMap<String, String> {
 }
 
 /// Resolves the path based on the `cmd` option.
-fn resolve_path(cmd: Option<(&str, &ArgMatches)>) -> PathBuf {
+fn resolve_path(args: &ArgMatches) -> PathBuf {
+    if let Some(dir) = args.get_one::<String>("dir") {
+        PathBuf::from(dir)
+    } else {
+        PathBuf::from(".")
+    }
+}
+
+/// get_app_name is a helper function that will extract the app name from the `clap` arguments if
+fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String>{ 
     match cmd {
-        Some((path, _)) if !path.is_empty() => PathBuf::from(path),
-        _ => PathBuf::from("."),
+        Some((name, _)) if !name.is_empty() => Some(name.to_string()),
+        _ => None,
     }
 }
 
