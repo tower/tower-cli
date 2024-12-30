@@ -67,7 +67,7 @@ impl App {
                 }
             },
             Some(("deploy", args)) => {
-                deploy::do_deploy(config, client, args.subcommand()).await
+                deploy::do_deploy(config, client, args).await
             },
             Some(("run", args)) => {
                 run::do_run(config, client, args, args.subcommand()).await

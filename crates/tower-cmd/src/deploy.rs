@@ -1,5 +1,6 @@
 use config::{Config, Towerfile};
-use clap::{Command, ArgMatches};
+use clap::{Command, ArgMatches, Arg};
+use std::path::PathBuf;
 use tower_api::Client;
 use tower_package::{Package, PackageSpec};
 use std::sync::{Arc, Mutex};
@@ -8,15 +9,32 @@ use crate::output;
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")
-        .allow_external_subcommands(true)
+        .arg(
+            Arg::new("dir")
+                .long("dir")
+                .short('d')
+                .help("The directory containing the app to deploy")
+                .default_value(".")
+        )
         .about("Deploy your latest code to Tower")
 }
 
-pub async fn do_deploy(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
-    // Determine the directory to build the package from
-    let dir = cmd.map_or(".", |cmd| if cmd.0.is_empty() { "." } else { cmd.0 });
+fn resolve_path(args: &ArgMatches) -> PathBuf {
+    if let Some(dir) = args.get_one::<String>("dir") {
+        PathBuf::from(dir)
+    } else {
+        PathBuf::from(".")
+    }
+}
 
-    match Towerfile::from_dir_str(dir) {
+pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
+    // Determine the directory to build the package from
+    let dir = resolve_path(args);
+    log::debug!("Building package from directory: {:?}", dir);
+
+    let path = dir.join("Towerfile");
+
+    match Towerfile::from_path(path) {
         Ok(towerfile) => {
             let spec = PackageSpec::from_towerfile(&towerfile);
             let mut spinner = output::spinner("Building package...");

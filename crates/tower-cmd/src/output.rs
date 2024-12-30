@@ -77,7 +77,7 @@ pub fn config_error(err: config::Error) {
             "Couldn't read the Towerfile in this directory".to_string()
         },
         config::Error::MissingTowerfile => {
-            "No Towerfile was found in the current directory".to_string()
+            "No Towerfile was found in the target directory".to_string()
         },
         config::Error::MissingRequiredAppField { ref field } => {
             format!("Missing required app field `{}` in Towerfile", field)
