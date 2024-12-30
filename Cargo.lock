@@ -389,6 +389,7 @@ dependencies = [
 
 [[package]]
 name = "crypto"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "base64 0.22.1",
@@ -2257,6 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "pem",
@@ -2467,6 +2469,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "bytes",
@@ -2489,6 +2492,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cli"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "tokio",
@@ -2498,6 +2502,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "anyhow",
@@ -2523,6 +2528,7 @@ dependencies = [
 
 [[package]]
 name = "tower-package"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "async-compression",
@@ -2541,6 +2547,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
+version = "0.1.21"
 version = "0.1.23"
 dependencies = [
  "chrono",
