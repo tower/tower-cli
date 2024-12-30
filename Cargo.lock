@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "clap",
  "dirs",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "crypto"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "base64 0.22.1",
  "pem",
@@ -2257,7 +2257,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "pem",
  "rsa",
@@ -2467,7 +2467,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "bytes",
  "chrono",
@@ -2489,7 +2489,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cli"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "tokio",
  "tower-api",
@@ -2498,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2523,7 +2523,7 @@ dependencies = [
 
 [[package]]
 name = "tower-package"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "async-compression",
  "config",
@@ -2541,7 +2541,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.1.22"
+version = "0.1.21"
 dependencies = [
  "chrono",
  "log",
