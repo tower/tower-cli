@@ -1,6 +1,6 @@
-from tower_api_client import AuthenticatedClient
-from tower_api_client.models import PostAppRunsOutputBody
-from tower_api_client.api.default import post_app_run
+from .tower_api_client import AuthenticatedClient
+from .tower_api_client.models import PostAppRunsOutputBody
+from .tower_api_client.api.default import post_app_run
 
 class Client:
     def __init__(self, token: str):
