@@ -37,12 +37,17 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
+dependencies = [
+    "attrs>=24.2.0",
+    "httpx>=0.23.3",
+    "python-dateutil>=2.9.0.post0",
+]
 
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/tower-cli/Cargo.toml"
 module-name = "tower"
-python-source = "python"
+python-source = "src"
 strip = true
 exclude = [
 ]
@@ -56,4 +61,5 @@ tower-cli = { workspace = true }
 [dependency-groups]
 dev = [
     "tower-cli",
+    "openapi-python-client>=0.12.1",
 ]
