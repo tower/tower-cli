@@ -27,6 +27,7 @@ async fn it_creates_package() {
         base_dir: tmp_dir.to_path_buf(),
         file_globs: vec!["*.py".to_string()],
         parameters: vec![],
+        schedule: None,
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
@@ -62,6 +63,7 @@ async fn it_respects_complex_file_globs() {
             "**/*.py".to_string(),
         ],
         parameters: vec![],
+        schedule: None,
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
