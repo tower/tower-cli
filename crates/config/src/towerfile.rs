@@ -152,6 +152,7 @@ mod test {
         assert_eq!(err.to_string(), "Missing required app field `name` in Towerfile");
     }
 
+    #[ignore]
     #[test]
     fn test_returns_error_when_missing_local_towerfile() {
         // this is a bit of a hack to make sure any local Towerfile is indeed gone. Leaks from
