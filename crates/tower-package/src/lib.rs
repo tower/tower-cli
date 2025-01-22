@@ -61,6 +61,9 @@ pub struct PackageSpec {
 
     // parameters are the parameters to use for this app.
     pub parameters: Vec<Parameter>,
+
+    // schedule defines the frequency that this app should be run on.
+    pub schedule: Option<String>,
 }
 
 fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
@@ -78,8 +81,14 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
         let base_dir = towerfile.base_dir.clone();
+        let schedule = if towerfile.app.schedule.is_empty() {
+            None
+        } else {
+            Some(towerfile.app.schedule.to_string())
+        };
 
         Self {
+            schedule,
             base_dir,
             invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
@@ -100,9 +109,6 @@ pub struct Package {
 
     // unpacked_path is the path to the unpackaged package on disk.
     pub unpacked_path: Option<PathBuf>,
-
-    // schedule defines the frequency that this app should be run on.
-    pub schedule: Option<Schedule>,
 }
 
 impl Package {
