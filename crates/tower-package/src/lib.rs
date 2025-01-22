@@ -30,7 +30,11 @@ pub struct Manifest {
     pub invoke: String,
 
     #[serde(default)]
-    pub parameters: Vec<Parameter>
+    pub parameters: Vec<Parameter>,
+
+    // schedule is the schedule that we want to execute this app on. this is, just temporarily,
+    // where it will live.
+    pub schedule: Option<String>,
 }
 
 impl Manifest {
@@ -96,6 +100,9 @@ pub struct Package {
 
     // unpacked_path is the path to the unpackaged package on disk.
     pub unpacked_path: Option<PathBuf>,
+
+    // schedule defines the frequency that this app should be run on.
+    pub schedule: Option<Schedule>,
 }
 
 impl Package {
@@ -108,6 +115,7 @@ impl Package {
                version: Some(CURRENT_PACKAGE_VERSION),
                invoke: "".to_string(),
                parameters: vec![],
+               schedule: None,
            },
        }
    }
@@ -172,6 +180,7 @@ impl Package {
            version: Some(CURRENT_PACKAGE_VERSION),
            invoke: String::from(spec.invoke),
            parameters: spec.parameters,
+           schedule: spec.schedule,
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
