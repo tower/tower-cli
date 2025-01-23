@@ -4,6 +4,7 @@ version = { workspace = true }
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.95"
 chrono = { workspace = true }
 clap = { workspace = true }
 cli-table = { workspace = true }
@@ -21,3 +22,5 @@ tokio = { workspace = true }
 tower-api = { workspace = true }
 tower-package = { workspace = true }
 tower-runtime = { workspace = true }
+reqwest = { version = "0.11", features = ["json"] }
+serde_json = "1.0"

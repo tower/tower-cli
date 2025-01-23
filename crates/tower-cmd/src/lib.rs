@@ -1,6 +1,10 @@
+use anyhow::Result;
 use clap::{Arg, Command, value_parser};
 use config::{Config, Session};
+use colored::*;
 use tower_api::Client;
+use reqwest;
+use serde_json::Value;
 
 mod apps;
 mod secrets;
@@ -23,8 +27,41 @@ impl App {
         Self { cmd, session }
     }
 
+    async fn check_latest_version() -> Result<Option<String>> {
+        let client = reqwest::Client::new();
+        let resp = client
+            .get("https://pypi.org/pypi/tower-cli/json")
+            .send()
+            .await?;
+            
+        if resp.status().is_success() {
+            let json: Value = resp.json().await?;
+            if let Some(version) = json.get("info").and_then(|info| info.get("version")).and_then(|v| v.as_str()) {
+                return Ok(Some(version.to_string()));
+            }
+        }
+        Ok(None)
+    }
+
     pub async fn run(self) {
+        let mut cmd_clone = self.cmd.clone();
         let matches = self.cmd.get_matches();
+
+        // Check for newer version
+        if let Ok(Some(latest_version)) = Self::check_latest_version().await {
+            let current_version = env!("CARGO_PKG_VERSION");
+            if latest_version != current_version {
+                eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
+                latest_version, current_version).yellow());
+                eprintln!("{}", "To upgrade, run: pip install --upgrade tower-cli\n".yellow());
+            }
+        }
+
+        // If no subcommand was provided, show help and exit
+        if matches.subcommand().is_none() {
+            cmd_clone.print_help().unwrap();
+            std::process::exit(0);
+        }
         let config = Config::from_arg_matches(&matches);
         let client = Client::from_config(&config)
             .with_optional_session(self.session);
@@ -95,8 +132,8 @@ fn root_cmd() -> Command {
                 .value_parser(value_parser!(String))
                 .action(clap::ArgAction::Set)
         )
-        .subcommand_required(true)
-        .arg_required_else_help(true)
+        .subcommand_required(false)
+        .arg_required_else_help(false)
         .allow_external_subcommands(true)
         .subcommand(session::login_cmd())
         .subcommand(apps::apps_cmd())
