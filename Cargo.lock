@@ -2561,6 +2561,7 @@ name = "tower-version"
 version = "0.1.22"
 dependencies = [
  "anyhow",
+ "log",
  "reqwest 0.11.27",
  "serde_json",
 ]
