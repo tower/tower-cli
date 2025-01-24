@@ -33,22 +33,6 @@ impl App {
         let mut cmd_clone = self.cmd.clone();
         let matches = self.cmd.get_matches();
 
-        // Check for newer version
-        if let Ok(Some(latest_version)) = Self::check_latest_version().await {
-            let current_version = tower_version::current_version();
-            if latest_version != current_version {
-                eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
-                latest_version, current_version).yellow());
-                eprintln!("{}", "To upgrade, run: pip install --upgrade tower-cli\n".yellow());
-            }
-        }
-
-        // If no subcommand was provided, show help and exit
-        if matches.subcommand().is_none() {
-            cmd_clone.print_help().unwrap();
-            std::process::exit(0);
-        }
-        
         let config = Config::from_arg_matches(&matches);
         let client = Client::from_config(&config)
             .with_optional_session(self.session);
@@ -63,6 +47,22 @@ impl App {
             log::set_max_level(log::LevelFilter::Debug);
         } else {
             log::set_max_level(log::LevelFilter::Info);
+        }
+
+        // Check for newer version
+        if let Ok(Some(latest_version)) = Self::check_latest_version().await {
+            let current_version = tower_version::current_version();
+            if latest_version != current_version {
+                eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
+                latest_version, current_version).yellow());
+                eprintln!("{}", "To upgrade, run: pip install --upgrade tower-cli\n".yellow());
+            }
+        }
+
+        // If no subcommand was provided, show help and exit
+        if matches.subcommand().is_none() {
+            cmd_clone.print_help().unwrap();
+            std::process::exit(101);
         }
 
         match matches.subcommand() {
