@@ -37,6 +37,7 @@ impl App {
         let client = Client::from_config(&config)
             .with_optional_session(self.session);
 
+        // Setup logging
         simple_logger::SimpleLogger::new()
             .with_module_level("rustyline", log::LevelFilter::Warn)
             .env()
@@ -49,12 +50,13 @@ impl App {
             log::set_max_level(log::LevelFilter::Info);
         }
 
-        // Check for newer version
+        // Check for newer version only if we successfully get a latest version
         if let Ok(Some(latest_version)) = Self::check_latest_version().await {
             let current_version = tower_version::current_version();
+            // Compare versions
             if latest_version != current_version {
                 eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
-                latest_version, current_version).yellow());
+                    latest_version, current_version).yellow());
                 eprintln!("{}", "To upgrade, run: pip install --upgrade tower-cli\n".yellow());
             }
         }
