@@ -2511,15 +2511,14 @@ dependencies = [
  "log",
  "open",
  "promptly",
- "reqwest 0.11.27",
  "rpassword",
- "serde_json",
  "simple_logger",
  "spinners",
  "tokio",
  "tower-api",
  "tower-package",
  "tower-runtime",
+ "tower-version",
 ]
 
 [[package]]
@@ -2556,6 +2555,15 @@ name = "tower-service"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
+
+[[package]]
+name = "tower-version"
+version = "0.1.22"
+dependencies = [
+ "anyhow",
+ "reqwest 0.11.27",
+ "serde_json",
+]
 
 [[package]]
 name = "tracing"

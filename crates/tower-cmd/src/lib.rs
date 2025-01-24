@@ -3,8 +3,6 @@ use clap::{Arg, Command, value_parser};
 use config::{Config, Session};
 use colored::*;
 use tower_api::Client;
-use reqwest;
-use serde_json::Value;
 
 mod apps;
 mod secrets;
@@ -28,19 +26,7 @@ impl App {
     }
 
     async fn check_latest_version() -> Result<Option<String>> {
-        let client = reqwest::Client::new();
-        let resp = client
-            .get("https://pypi.org/pypi/tower-cli/json")
-            .send()
-            .await?;
-            
-        if resp.status().is_success() {
-            let json: Value = resp.json().await?;
-            if let Some(version) = json.get("info").and_then(|info| info.get("version")).and_then(|v| v.as_str()) {
-                return Ok(Some(version.to_string()));
-            }
-        }
-        Ok(None)
+        tower_version::check_latest_version().await
     }
 
     pub async fn run(self) {
@@ -49,7 +35,7 @@ impl App {
 
         // Check for newer version
         if let Ok(Some(latest_version)) = Self::check_latest_version().await {
-            let current_version = env!("CARGO_PKG_VERSION");
+            let current_version = tower_version::current_version();
             if latest_version != current_version {
                 eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
                 latest_version, current_version).yellow());
@@ -62,6 +48,7 @@ impl App {
             cmd_clone.print_help().unwrap();
             std::process::exit(0);
         }
+        
         let config = Config::from_arg_matches(&matches);
         let client = Client::from_config(&config)
             .with_optional_session(self.session);
