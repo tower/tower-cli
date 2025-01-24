@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log;
 use reqwest;
 use serde_json::Value;
 
@@ -17,8 +18,12 @@ pub async fn check_latest_version() -> Result<Option<String>> {
         .send()
         .await?;
         
-    if resp.status().is_success() {
+    let status = resp.status();
+    log::debug!("PyPI returned status code: {}", status);
+    
+    if status.is_success() {
         let json: Value = resp.json().await?;
+        log::debug!("PyPI response payload: {}", serde_json::to_string_pretty(&json)?);
         if let Some(version) = json.get("info")
             .and_then(|info| info.get("version"))
             .and_then(|v| v.as_str()) {
