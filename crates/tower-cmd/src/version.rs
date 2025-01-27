@@ -9,6 +9,6 @@ pub fn version_cmd() -> Command {
 }
 
 pub async fn do_version(_config: Config, _client: Client) {
-    let line = format!("v{}\n", env!("CARGO_PKG_VERSION"));
+    let line = format!("v{}\n", tower_version::current_version());
     output::write(&line);
 }
