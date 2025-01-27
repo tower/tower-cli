@@ -58,7 +58,7 @@ impl Towerfile {
 
     /// from_toml parses a new Towerfile from a TOML string. It's not exposed externally because
     /// the base_dir field always needs to be set after parsing.
-    fn from_toml(toml: &str) -> Result<Self, Error> {
+    pub fn from_toml(toml: &str) -> Result<Self, Error> {
         let towerfile: Towerfile = toml::from_str(toml)?;
 
         if towerfile.app.name.is_empty() {

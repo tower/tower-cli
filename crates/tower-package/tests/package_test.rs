@@ -11,6 +11,7 @@ use tokio_stream::*;
 
 use tokio_tar::Archive;
 use tower_package::{Package, PackageSpec};
+use config::Towerfile;
 
 #[tokio::test]
 async fn it_creates_package() {
@@ -63,13 +64,14 @@ async fn it_respects_complex_file_globs() {
             "**/*.py".to_string(),
         ],
         parameters: vec![],
-        schedule: None,
+        schedule: Some("every 1 minute".to_string()),
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
     assert_eq!(package.manifest.version, Some(1));
     assert_eq!(package.manifest.invoke, "main.py");
+    assert_eq!(package.manifest.schedule, Some("every 1 minute".to_string()));
 
     let package_file_path = package.package_file_path.clone().unwrap();
     assert!(!package_file_path.as_os_str().is_empty());
@@ -79,6 +81,23 @@ async fn it_respects_complex_file_globs() {
     assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
     assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
     assert!(files.contains_key("pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
+}
+
+#[tokio::test]
+async fn building_package_spec_from_towerfile() {
+    let toml = r#"
+        [app]
+        name = "test"
+        script = "./script.py"
+        source = ["*.py"]
+        schedule = "0 0 * * *"
+    "#;
+
+    let towerfile = Towerfile::from_toml(toml).unwrap();
+    let spec = PackageSpec::from_towerfile(&towerfile);
+
+    assert_eq!(spec.invoke, "./script.py");
+    assert_eq!(spec.schedule, Some("0 0 * * *".to_string()));
 }
 
 // read_package_files reads the contents of a given package  and returns a map of the file paths to
@@ -131,4 +150,3 @@ where
     reader.read_to_string(&mut content).await.expect("Failed to read string from stream");
     content
 }
-
