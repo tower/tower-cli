@@ -49,14 +49,14 @@ pub fn apps_cmd() -> Command {
 
 pub async fn do_logs_app(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
     let opts = cmd.unwrap_or_else(|| {
-        output::die("App name (e.g. tower apps show <name>#<num>) is required");
+        output::die("App name (e.g. tower apps logs <app name>#<run number>) is required");
     });
 
     let (app_name, num) = if opts.0.contains("#") {
         let parts: Vec<&str> = opts.0.split("#").collect();
         (parts[0], parts[1])
     } else {
-        output::die("Run number is required (e.g. tower apps show <name>#<num>)");
+        output::die("Run number is required (e.g. tower apps logs <app name>#<run number>)");
     };
 
     let mut spinner = output::spinner("Fetching logs...");
@@ -78,7 +78,7 @@ pub async fn do_logs_app(_config: Config, client: Client, cmd: Option<(&str, &Ar
 
 pub async fn do_show_app(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
     let opts = cmd.unwrap_or_else(|| {
-        output::die("App name (e.g. tower apps show <name>) is required");
+        output::die("App name (e.g. tower apps show <app name>) is required");
     });
 
     match client.get_app(&opts.0).await {
@@ -195,7 +195,7 @@ pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
 
 pub async fn do_delete_app(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
     let opts = cmd.unwrap_or_else(|| {
-        output::die("App name (e.g. tower apps delete <name>) is required");
+        output::die("App name (e.g. tower apps delete <app name>) is required");
     });
 
     let mut spinner = output::spinner("Deleting app...");
