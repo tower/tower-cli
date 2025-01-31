@@ -27,6 +27,9 @@ pub struct App {
 
     #[serde(default)]
     pub schedule: String,
+
+    #[serde(default)]
+    pub description: String,
 }
 
 #[derive(Deserialize)]
@@ -52,6 +55,7 @@ impl Towerfile {
                 script: String::from(""),
                 source: vec![],
                 schedule: String::from("0 0 * * *"),
+                description: String::from(""),
             },
         }
     }
