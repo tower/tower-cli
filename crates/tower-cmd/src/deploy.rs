@@ -5,7 +5,7 @@ use tower_api::Client;
 use tower_package::{Package, PackageSpec};
 use std::sync::{Arc, Mutex};
 
-use crate::output;
+use crate::{output, util};
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")
@@ -36,6 +36,12 @@ pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
 
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
+            // Add app existence check before proceeding
+            if let Err(err) = util::ensure_app_exists(&client, &towerfile.app.name, &towerfile.app.description, &towerfile.app.schedule).await {
+                output::tower_error(err);
+                return;
+            }
+
             let spec = PackageSpec::from_towerfile(&towerfile);
             let mut spinner = output::spinner("Building package...");
 
