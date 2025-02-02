@@ -103,7 +103,7 @@ pub fn tower_error(err: tower_api::TowerError) {
 
     // Handle any nested validation errors if present
     if let Some(items) = err.items {
-        writeln!(io::stdout(), "\n{}", "Exception details:".yellow()).unwrap();
+        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
         for (field, error) in items {
             let msg = format!("  • {}: {}", field, error.description.friendly);
             writeln!(io::stdout(), "{}", msg.red()).unwrap();
