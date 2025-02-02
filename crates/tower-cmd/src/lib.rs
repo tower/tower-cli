@@ -11,6 +11,7 @@ mod deploy;
 mod run;
 mod version;
 pub mod output;
+mod util;
 
 pub struct App {
     session: Option<Session>,
