@@ -69,9 +69,17 @@ pub async fn do_logs_app(_config: Config, configuration: &Configuration, cmd: Op
     match default_api::get_app_run_logs(configuration, GetAppRunLogsParams { name: app_name, seq }).await {
         Ok(response) => {
             spinner.success();
-            if let Some(logs) = response.entity {
-                for line in logs.lines {
-                    output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
+            match response.entity {
+                Some(default_api::GetAppRunLogsSuccess::Status200(logs)) => {
+                    for line in logs.log_lines {
+                        output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
+                    }
+                },
+                Some(default_api::GetAppRunLogsSuccess::UnknownValue(value)) => {
+                    output::failure(&format!("Received unexpected response format from server: {}", value));
+                },
+                None => {
+                    output::failure("No response received from server");
                 }
             }
         },
@@ -92,31 +100,32 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
         runs: Some(5) // Get 5 recent runs
     }).await {
         Ok(response) => {
-            if let Some(resp) = response.entity {
-                let app = resp.app;
-                let line = format!("{} {}\n", "Name:".bold().green(), app.name);
-                output::write(&line);
+            match response.entity {
+                Some(default_api::DescribeAppSuccess::Status200(resp)) => {
+                    let app = resp.app;
+                    let line = format!("{} {}\n", "Name:".bold().green(), app.name);
+                    output::write(&line);
 
-                let line = format!("{}\n", "Description:".bold().green());
-                output::write(&line);
+                    let line = format!("{}\n", "Description:".bold().green());
+                    output::write(&line);
 
-                let line = output::paragraph(&app.short_description);
-                output::write(&line);
+                    let line = output::paragraph(&app.short_description);
+                    output::write(&line);
 
-                output::newline();
-                output::newline();
+                    output::newline();
+                    output::newline();
 
-                let line = format!("{}\n", "Recent runs:".bold().green());
-                output::write(&line);
-        
-                let headers = vec![
-                    "#".yellow().to_string(),
-                    "Status".yellow().to_string(),
-                    "Start Time".yellow().to_string(),
-                    "Elapsed Time".yellow().to_string(),
-                ];
+                    let line = format!("{}\n", "Recent runs:".bold().green());
+                    output::write(&line);
+            
+                    let headers = vec![
+                        "#".yellow().to_string(),
+                        "Status".yellow().to_string(),
+                        "Start Time".yellow().to_string(),
+                        "Elapsed Time".yellow().to_string(),
+                    ];
 
-                let rows = resp.runs.iter().map(|run| {
+                    let rows = resp.runs.iter().map(|run| {
                     let status = &run.status;
 
                     // Format start time
@@ -136,14 +145,21 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
                     };
 
                     vec![
-                        run.seq.to_string(),
+                        run.number.to_string(),
                         status.to_string(),
                         start_time,
                         elapsed_time,
                     ]
                 }).collect();
 
-                output::table(headers, rows);
+                    output::table(headers, rows);
+                },
+                Some(default_api::DescribeAppSuccess::UnknownValue(value)) => {
+                    output::failure(&format!("Received unexpected response format from server: {}", value));
+                },
+                None => {
+                    output::failure("No response received from server");
+                }
             }
         },
         Err(err) => {
@@ -159,16 +175,24 @@ pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
         page_size: None,
     }).await {
         Ok(response) => {
-            if let Some(resp) = response.entity {
-                let items = resp.apps.into_iter().map(|app| {
-                    let desc = if app.short_description.is_empty() {
-                        "No description".white().dimmed().italic()
-                    } else {
-                        app.short_description.normal().clear()
-                    };
-                    format!("{}\n{}", app.name.bold().green(), desc)
-                }).collect();
-                output::list(items);
+            match response.entity {
+                Some(default_api::ListAppsSuccess::Status200(resp)) => {
+                    let items = resp.apps.into_iter().map(|app| {
+                        let desc = if app.short_description.is_empty() {
+                            "No description".white().dimmed().italic()
+                        } else {
+                            app.short_description.normal().clear()
+                        };
+                        format!("{}\n{}", app.name.bold().green(), desc)
+                    }).collect();
+                    output::list(items);
+                },
+                Some(default_api::ListAppsSuccess::UnknownValue(value)) => {
+                    output::failure(&format!("Received unexpected response format from server: {}", value));
+                },
+                None => {
+                    output::failure("No response received from server");
+                }
             }
         },
         Err(err) => {
@@ -188,16 +212,26 @@ pub async fn do_create_app(_config: Config, configuration: &Configuration, args:
     let mut spinner = output::spinner("Creating app");
 
     match default_api::create_apps(configuration, CreateAppsParams {
-        create_app_params: tower_api::models::CreateAppParams {
-            name: name.clone(),
-            short_description: description.clone(),
-            schedule: Some(schedule.clone()),
-        }
+        create_app_params: tower_api::models::CreateAppParams::new(name.clone())
+            .with_short_description(Some(description.clone()))
+            .with_schedule(Some(schedule.clone()))
     }).await {
-        Ok(_) => {
-            spinner.success();
-            let line = format!("App \"{}\" was created", name);
-            output::success(&line);
+        Ok(response) => {
+            match response.entity {
+                Some(default_api::CreateAppsSuccess::Status200(_)) => {
+                    spinner.success();
+                    let line = format!("App \"{}\" was created", name);
+                    output::success(&line);
+                },
+                Some(default_api::CreateAppsSuccess::UnknownValue(value)) => {
+                    spinner.failure();
+                    output::failure(&format!("Received unexpected response format from server: {}", value));
+                },
+                None => {
+                    spinner.failure();
+                    output::failure("No response received from server");
+                }
+            }
         },
         Err(err) => {
             spinner.failure();
@@ -216,10 +250,22 @@ pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: 
     match default_api::delete_app(configuration, DeleteAppParams {
         name: name.to_string()
     }).await {
-        Ok(_) => {
-            spinner.success();
-            let line = format!("App \"{}\" was deleted", name);
-            output::success(&line);
+        Ok(response) => {
+            match response.entity {
+                Some(default_api::DeleteAppSuccess::Status200(_)) => {
+                    spinner.success();
+                    let line = format!("App \"{}\" was deleted", name);
+                    output::success(&line);
+                },
+                Some(default_api::DeleteAppSuccess::UnknownValue(value)) => {
+                    spinner.failure();
+                    output::failure(&format!("Received unexpected response format from server: {}", value));
+                },
+                None => {
+                    spinner.failure();
+                    output::failure("No response received from server");
+                }
+            }
         },
         Err(err) => {
             spinner.failure();

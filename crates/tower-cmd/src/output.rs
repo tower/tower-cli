@@ -20,20 +20,18 @@ pub enum LogLineType {
     Local,
 }
 
-fn format_timestamp(timesetamp: &chrono::DateTime<chrono::Utc>, t: LogLineType) -> String {
-    let timestamp = timesetamp.format("%Y-%m-%d %H:%M:%S")
-        .to_string()
-        .bold();
+fn format_timestamp(timestamp: &str, t: LogLineType) -> String {
+    let ts = timestamp.bold();
 
     let sep = "|".bold();
 
     match t {
-        LogLineType::Remote => format!("{} {}", timestamp.yellow(), sep.yellow()),
-        LogLineType::Local => format!("{} {}", timestamp.green(), sep.green()),
+        LogLineType::Remote => format!("{} {}", ts.yellow(), sep.yellow()),
+        LogLineType::Local => format!("{} {}", ts.green(), sep.green()),
     }
 }
 
-pub fn log_line(timestamp: &chrono::DateTime<chrono::Utc>, message: &str, t: LogLineType) {
+pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
     let line = format!("{} {}\n", format_timestamp(timestamp, t), message);
     write(&line);
 }
