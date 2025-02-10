@@ -21,6 +21,8 @@ pub struct App {
     pub name: String,
     #[serde(rename = "owner")]
     pub owner: String,
+    #[serde(rename = "schedule")]
+    pub schedule: String,
     #[serde(rename = "short_description")]
     pub short_description: String,
     #[serde(rename = "version")]
@@ -28,12 +30,13 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(created_at: String, last_run_at: String, name: String, owner: String, short_description: String, version: String) -> App {
+    pub fn new(created_at: String, last_run_at: String, name: String, owner: String, schedule: String, short_description: String, version: String) -> App {
         App {
             created_at,
             last_run_at,
             name,
             owner,
+            schedule,
             short_description,
             version,
         }
