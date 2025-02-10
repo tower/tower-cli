@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct GetRunLogsOutputBody {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "log_lines")]
     pub log_lines: Vec<models::GetRunLogLine>,
 }
@@ -23,7 +23,7 @@ pub struct GetRunLogsOutputBody {
 impl GetRunLogsOutputBody {
     pub fn new(log_lines: Vec<models::GetRunLogLine>) -> GetRunLogsOutputBody {
         GetRunLogsOutputBody {
-            dollar_schema: None,
+            schema: None,
             log_lines,
         }
     }

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct DescribeSecretsKeyResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "public_key")]
     pub public_key: String,
 }
@@ -23,7 +23,7 @@ pub struct DescribeSecretsKeyResponse {
 impl DescribeSecretsKeyResponse {
     pub fn new(public_key: String) -> DescribeSecretsKeyResponse {
         DescribeSecretsKeyResponse {
-            dollar_schema: None,
+            schema: None,
             public_key,
         }
     }

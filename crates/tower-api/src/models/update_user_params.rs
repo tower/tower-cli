@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct UpdateUserParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "company", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub company: Option<Option<String>>,
     #[serde(rename = "country", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
@@ -29,7 +29,7 @@ pub struct UpdateUserParams {
 impl UpdateUserParams {
     pub fn new() -> UpdateUserParams {
         UpdateUserParams {
-            dollar_schema: None,
+            schema: None,
             company: None,
             country: None,
             first_name: None,

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct UpdateUserResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "user")]
     pub user: Box<models::User>,
 }
@@ -23,7 +23,7 @@ pub struct UpdateUserResponse {
 impl UpdateUserResponse {
     pub fn new(user: models::User) -> UpdateUserResponse {
         UpdateUserResponse {
-            dollar_schema: None,
+            schema: None,
             user: Box::new(user),
         }
     }

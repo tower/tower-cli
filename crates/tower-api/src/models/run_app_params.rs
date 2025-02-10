@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct RunAppParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "environment")]
     pub environment: String,
     #[serde(rename = "parameters")]
@@ -25,7 +25,7 @@ pub struct RunAppParams {
 impl RunAppParams {
     pub fn new(environment: String, parameters: std::collections::HashMap<String, String>) -> RunAppParams {
         RunAppParams {
-            dollar_schema: None,
+            schema: None,
             environment,
             parameters,
         }

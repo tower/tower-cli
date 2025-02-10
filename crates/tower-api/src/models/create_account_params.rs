@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateAccountParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "company")]
     pub company: String,
     #[serde(rename = "country")]
@@ -35,7 +35,7 @@ pub struct CreateAccountParams {
 impl CreateAccountParams {
     pub fn new(company: String, country: String, email: String, first_name: String, invite: String, last_name: String, password: String) -> CreateAccountParams {
         CreateAccountParams {
-            dollar_schema: None,
+            schema: None,
             company,
             country,
             email,

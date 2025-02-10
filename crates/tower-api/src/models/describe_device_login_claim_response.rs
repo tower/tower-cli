@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct DescribeDeviceLoginClaimResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// The JWT token.
     #[serde(rename = "token")]
     pub token: String,
@@ -27,7 +27,7 @@ pub struct DescribeDeviceLoginClaimResponse {
 impl DescribeDeviceLoginClaimResponse {
     pub fn new(token: String, user: models::User) -> DescribeDeviceLoginClaimResponse {
         DescribeDeviceLoginClaimResponse {
-            dollar_schema: None,
+            schema: None,
             token,
             user: Box::new(user),
         }

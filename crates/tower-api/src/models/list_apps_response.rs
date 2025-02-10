@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct ListAppsResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "apps")]
     pub apps: Vec<models::AppSummary>,
     #[serde(rename = "pages")]
@@ -25,7 +25,7 @@ pub struct ListAppsResponse {
 impl ListAppsResponse {
     pub fn new(apps: Vec<models::AppSummary>, pages: models::Pagination) -> ListAppsResponse {
         ListAppsResponse {
-            dollar_schema: None,
+            schema: None,
             apps,
             pages: Box::new(pages),
         }

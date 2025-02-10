@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct ListApiKeysResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// List of API keys
     #[serde(rename = "api_keys")]
     pub api_keys: Vec<models::ApiKey>,
@@ -24,7 +24,7 @@ pub struct ListApiKeysResponse {
 impl ListApiKeysResponse {
     pub fn new(api_keys: Vec<models::ApiKey>) -> ListApiKeysResponse {
         ListApiKeysResponse {
-            dollar_schema: None,
+            schema: None,
             api_keys,
         }
     }

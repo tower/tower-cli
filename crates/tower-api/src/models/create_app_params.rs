@@ -15,10 +15,13 @@ use serde::{Deserialize, Serialize};
 pub struct CreateAppParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// The name of the app.
     #[serde(rename = "name")]
     pub name: String,
+    /// The execution schedule for the app.
+    #[serde(rename = "schedule", skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<String>,
     /// A description of the app.
     #[serde(rename = "short_description", skip_serializing_if = "Option::is_none")]
     pub short_description: Option<String>,
@@ -27,8 +30,9 @@ pub struct CreateAppParams {
 impl CreateAppParams {
     pub fn new(name: String) -> CreateAppParams {
         CreateAppParams {
-            dollar_schema: None,
+            schema: None,
             name,
+            schedule: None,
             short_description: None,
         }
     }

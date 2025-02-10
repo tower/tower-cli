@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct RunAppResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "run")]
     pub run: Box<models::Run>,
 }
@@ -23,7 +23,7 @@ pub struct RunAppResponse {
 impl RunAppResponse {
     pub fn new(run: models::Run) -> RunAppResponse {
         RunAppResponse {
-            dollar_schema: None,
+            schema: None,
             run: Box::new(run),
         }
     }

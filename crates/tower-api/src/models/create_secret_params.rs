@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateSecretParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "encrypted_value")]
     pub encrypted_value: String,
     #[serde(rename = "environment")]
@@ -29,7 +29,7 @@ pub struct CreateSecretParams {
 impl CreateSecretParams {
     pub fn new(encrypted_value: String, environment: String, name: String, preview: String) -> CreateSecretParams {
         CreateSecretParams {
-            dollar_schema: None,
+            schema: None,
             encrypted_value,
             environment,
             name,

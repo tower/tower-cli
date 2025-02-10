@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct DeployAppResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "version")]
     pub version: Box<models::AppVersion>,
 }
@@ -23,7 +23,7 @@ pub struct DeployAppResponse {
 impl DeployAppResponse {
     pub fn new(version: models::AppVersion) -> DeployAppResponse {
         DeployAppResponse {
-            dollar_schema: None,
+            schema: None,
             version: Box::new(version),
         }
     }

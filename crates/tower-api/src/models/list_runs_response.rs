@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct ListRunsResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "pages")]
     pub pages: Box<models::Pagination>,
     #[serde(rename = "runs")]
@@ -25,7 +25,7 @@ pub struct ListRunsResponse {
 impl ListRunsResponse {
     pub fn new(pages: models::Pagination, runs: Vec<models::Run>) -> ListRunsResponse {
         ListRunsResponse {
-            dollar_schema: None,
+            schema: None,
             pages: Box::new(pages),
             runs,
         }

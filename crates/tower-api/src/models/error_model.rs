@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct ErrorModel {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// A human-readable explanation specific to this occurrence of the problem.
     #[serde(rename = "detail", skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
@@ -39,7 +39,7 @@ pub struct ErrorModel {
 impl ErrorModel {
     pub fn new() -> ErrorModel {
         ErrorModel {
-            dollar_schema: None,
+            schema: None,
             detail: None,
             errors: None,
             instance: None,

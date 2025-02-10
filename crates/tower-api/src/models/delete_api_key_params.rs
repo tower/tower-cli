@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct DeleteApiKeyParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "identifier")]
     pub identifier: String,
 }
@@ -23,7 +23,7 @@ pub struct DeleteApiKeyParams {
 impl DeleteApiKeyParams {
     pub fn new(identifier: String) -> DeleteApiKeyParams {
         DeleteApiKeyParams {
-            dollar_schema: None,
+            schema: None,
             identifier,
         }
     }

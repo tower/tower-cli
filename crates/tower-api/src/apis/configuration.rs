@@ -40,7 +40,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Configuration {
             base_path: "http://localhost:8081/v1".to_owned(),
-            user_agent: Some("OpenAPI-Generator/development/rust".to_owned()),
+            user_agent: Some("tower_cli_client".to_owned()),
             client: reqwest::Client::new(),
             basic_auth: None,
             oauth_access_token: None,

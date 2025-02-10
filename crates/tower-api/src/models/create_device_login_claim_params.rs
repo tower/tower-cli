@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateDeviceLoginClaimParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// The user code to claim.
     #[serde(rename = "user_code")]
     pub user_code: String,
@@ -24,7 +24,7 @@ pub struct CreateDeviceLoginClaimParams {
 impl CreateDeviceLoginClaimParams {
     pub fn new(user_code: String) -> CreateDeviceLoginClaimParams {
         CreateDeviceLoginClaimParams {
-            dollar_schema: None,
+            schema: None,
             user_code,
         }
     }

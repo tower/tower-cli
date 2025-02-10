@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateApiKeyResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// Created API key
     #[serde(rename = "api_key")]
     pub api_key: Box<models::ApiKey>,
@@ -24,7 +24,7 @@ pub struct CreateApiKeyResponse {
 impl CreateApiKeyResponse {
     pub fn new(api_key: models::ApiKey) -> CreateApiKeyResponse {
         CreateApiKeyResponse {
-            dollar_schema: None,
+            schema: None,
             api_key: Box::new(api_key),
         }
     }

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateSessionResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// The new session information.
     #[serde(rename = "session")]
     pub session: Box<models::Session>,
@@ -24,7 +24,7 @@ pub struct CreateSessionResponse {
 impl CreateSessionResponse {
     pub fn new(session: models::Session) -> CreateSessionResponse {
         CreateSessionResponse {
-            dollar_schema: None,
+            schema: None,
             session: Box::new(session),
         }
     }

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct AcceptInvitationParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// The invitation code to accept
     #[serde(rename = "code")]
     pub code: String,
@@ -24,7 +24,7 @@ pub struct AcceptInvitationParams {
 impl AcceptInvitationParams {
     pub fn new(code: String) -> AcceptInvitationParams {
         AcceptInvitationParams {
-            dollar_schema: None,
+            schema: None,
             code,
         }
     }

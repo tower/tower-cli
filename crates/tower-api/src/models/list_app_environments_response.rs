@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct ListAppEnvironmentsResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "environments")]
     pub environments: Vec<String>,
 }
@@ -23,7 +23,7 @@ pub struct ListAppEnvironmentsResponse {
 impl ListAppEnvironmentsResponse {
     pub fn new(environments: Vec<String>) -> ListAppEnvironmentsResponse {
         ListAppEnvironmentsResponse {
-            dollar_schema: None,
+            schema: None,
             environments,
         }
     }

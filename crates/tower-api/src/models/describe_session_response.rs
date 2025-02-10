@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct DescribeSessionResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     /// The current session associated with your authentication method.
     #[serde(rename = "session")]
     pub session: Box<models::Session>,
@@ -24,7 +24,7 @@ pub struct DescribeSessionResponse {
 impl DescribeSessionResponse {
     pub fn new(session: models::Session) -> DescribeSessionResponse {
         DescribeSessionResponse {
-            dollar_schema: None,
+            schema: None,
             session: Box::new(session),
         }
     }

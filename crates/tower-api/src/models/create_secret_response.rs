@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateSecretResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub dollar_schema: Option<String>,
+    pub schema: Option<String>,
     #[serde(rename = "secret")]
     pub secret: Box<models::Secret>,
 }
@@ -23,7 +23,7 @@ pub struct CreateSecretResponse {
 impl CreateSecretResponse {
     pub fn new(secret: models::Secret) -> CreateSecretResponse {
         CreateSecretResponse {
-            dollar_schema: None,
+            schema: None,
             secret: Box::new(secret),
         }
     }
