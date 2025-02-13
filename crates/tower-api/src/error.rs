@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct DetailedString {
@@ -28,6 +29,8 @@ pub struct TowerError {
     pub domain: String,
     pub description: DetailedString,
     pub formatted: DetailedString,
+    #[serde(default)]
+    pub items: Option<HashMap<String, Self>>,
 }
 
 impl From<reqwest::Error> for TowerError {
@@ -38,6 +41,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("The Tower API is redirecting your request in a way that Tower CLI cannot handle"),
                 formatted: DetailedString::from_string("The Tower API is redirecting your request in a way that Tower CLI cannot handle"),
+                items: None,
             }
         } else if err.is_status() {
             let line = format!("An unexpected status code (status code: {}) was returned from the Tower API", err.status().unwrap());
@@ -47,6 +51,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string(&line),
                 formatted: DetailedString::from_string(&line),
+                items: None,
             }
         } else if err.is_connect() {
             Self {
@@ -54,6 +59,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("A connection to the Tower API could not be established"),
                 formatted: DetailedString::from_string("A connection to the Tower API could not be established"),
+                items: None,
             }
         } else if err.is_body() {
             Self {
@@ -61,6 +67,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("There was something wrong with the body of the response from the Tower API"),
                 formatted: DetailedString::from_string("There was something wrong with the body of the response from the Tower API"),
+                items: None,
             }
         } else if err.is_decode() {
             log::debug!("failed to decode the body: {:?}", err);
@@ -72,6 +79,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("There was an error decoding the response from the Tower API"),
                 formatted: DetailedString::from_string("There was an error decoding the response from the Tower API"),
+                items: None,
             }
         } else if err.is_builder() {
             Self {
@@ -79,6 +87,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("There was an unexpected internal error in the Tower CLI request builder"),
                 formatted: DetailedString::from_string("There was an unexpected internal error in the Tower CLI request builder"),
+                items: None,
             }
         } else if err.is_timeout() {
             Self {
@@ -86,6 +95,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("A request to the Tower API timed out"),
                 formatted: DetailedString::from_string("A request to the Tower API timed out"),
+                items: None,
             }
         } else {
             log::debug!("Unexpected error: {:?}", err);
@@ -95,6 +105,7 @@ impl From<reqwest::Error> for TowerError {
                 domain: "tower_api_client".to_string(),
                 description: DetailedString::from_string("An unexpected or unknown error occured!"),
                 formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+                items: None,
             }   
         }
     }
@@ -109,6 +120,7 @@ impl From<pem::PemError> for TowerError {
             domain: "tower_api_client".to_string(),
             description: DetailedString::from_string("An unexpected or unknown error occured!"),
             formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+            items: None,
         }   
     }
 }
@@ -122,6 +134,7 @@ impl From<rsa::pkcs1::Error> for TowerError {
             domain: "tower_api_client".to_string(),
             description: DetailedString::from_string("An unexpected or unknown error occured!"),
             formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+            items: None,
         }   
     }
 }
@@ -135,6 +148,7 @@ impl From<serde_json::Error> for TowerError {
             domain: "tower_api_client".to_string(),
             description: DetailedString::from_string("An unexpected or unknown error occured!"),
             formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+            items: None,
         }   
     }
 }
@@ -148,6 +162,7 @@ impl From<std::io::Error> for TowerError {
             domain: "tower_api_client".to_string(),
             description: DetailedString::from_string("An unexpected or unknown error occured!"),
             formatted: DetailedString::from_string("An unexpected or unknown error occured!"),
+            items: None,
         }   
     }
 }

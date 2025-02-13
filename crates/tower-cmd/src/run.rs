@@ -159,7 +159,7 @@ async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str
     }
 }
 
-/// get_run_parameters takes care of all the hariy bits around digging about in the `clap`
+/// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
 /// internals to figure out what the user is requesting. In the end, it determines if we are meant
 /// to do a local run or a remote run, and it determines the path to the relevant Towerfile that
 /// should be loaded.

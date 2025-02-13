@@ -100,6 +100,15 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
 pub fn tower_error(err: tower_api::TowerError) {
     let line = format!("{} {}\n", "Error:".red(), err.description.friendly);
     io::stdout().write_all(line.as_bytes()).unwrap();
+
+    // Handle any nested validation errors if present
+    if let Some(items) = err.items {
+        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+        for (field, error) in items {
+            let msg = format!("  • {}: {}", field, error.description.friendly);
+            writeln!(io::stdout(), "{}", msg.red()).unwrap();
+        }
+    }
 }
 
 pub fn table(headers: Vec<String>, data: Vec<Vec<String>>) {

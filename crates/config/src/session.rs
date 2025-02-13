@@ -16,7 +16,7 @@ pub struct Token {
     pub jwt: String,
 }
 
-const DEFAULT_TOWER_URL: &str = "https://services.tower.dev";
+const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
 
 pub fn default_tower_url() -> Url {
     Url::parse(DEFAULT_TOWER_URL).unwrap()

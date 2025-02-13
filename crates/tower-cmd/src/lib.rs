@@ -11,6 +11,7 @@ mod deploy;
 mod run;
 mod version;
 pub mod output;
+mod util;
 
 pub struct App {
     session: Option<Session>,
@@ -64,7 +65,7 @@ impl App {
         // If no subcommand was provided, show help and exit
         if matches.subcommand().is_none() {
             cmd_clone.print_help().unwrap();
-            std::process::exit(101);
+            std::process::exit(2);
         }
 
         match matches.subcommand() {
@@ -79,17 +80,23 @@ impl App {
                     Some(("logs", args)) => apps::do_logs_app(config, client, args.subcommand()).await,
                     Some(("create", args)) => apps::do_create_app(config, client, args).await,
                     Some(("delete", args)) => apps::do_delete_app(config, client, args.subcommand()).await,
-                    _ => unreachable!()
+                    _ => {
+                        apps::apps_cmd().print_help().unwrap();
+                        std::process::exit(2);
+                    }
                 }
             },
             Some(("secrets", sub_matches)) => {
-                let apps_command = sub_matches.subcommand();
+                let secrets_command = sub_matches.subcommand();
 
-                match apps_command {
+                match secrets_command {
                     Some(("list", args)) => secrets::do_list_secrets(config, client, args).await,
                     Some(("create", args)) => secrets::do_create_secret(config, client, args).await,
                     Some(("delete", args)) => secrets::do_delete_secret(config, client, args.subcommand()).await,
-                    _ => unreachable!()
+                    _ => {
+                        secrets::secrets_cmd().print_help().unwrap();
+                        std::process::exit(2);
+                    }
                 }
             },
             Some(("deploy", args)) => {
@@ -97,8 +104,11 @@ impl App {
             },
             Some(("run", args)) => {
                 run::do_run(config, client, args, args.subcommand()).await
+            },
+            _ => {
+                cmd_clone.print_help().unwrap();
+                std::process::exit(2);
             }
-            _ => unreachable!()
         }
     }
 }
@@ -123,7 +133,6 @@ fn root_cmd() -> Command {
         )
         .subcommand_required(false)
         .arg_required_else_help(false)
-        .allow_external_subcommands(true)
         .subcommand(session::login_cmd())
         .subcommand(apps::apps_cmd())
         .subcommand(secrets::secrets_cmd())
