@@ -4,8 +4,10 @@ use config::Config;
 
 use tower_api::apis::{
     configuration::Configuration,
-    default_api::{self, ListAppsParams, CreateAppsParams, DeleteAppParams, DescribeAppParams, GetAppRunLogsParams},
+    default_api::{self, ListAppsParams, DeleteAppParams, DescribeAppParams, GetAppRunLogsParams, GetAppRunLogsSuccess},
 };
+
+use tower_api::models::{CreateAppParams, Pagination, GetRunLogLine, GetRunLogsOutputBody, App, Run};
 
 use crate::output;
 
@@ -66,26 +68,25 @@ pub async fn do_logs_app(_config: Config, configuration: &Configuration, cmd: Op
 
     let mut spinner = output::spinner("Fetching logs...");
     
-    match default_api::get_app_run_logs(configuration, GetAppRunLogsParams { name: app_name, seq }).await {
+    match default_api::get_app_run_logs(configuration, GetAppRunLogsParams { 
+        name: app_name, 
+        seq 
+    }).await {
         Ok(response) => {
             spinner.success();
-            match response.entity {
-                Some(default_api::GetAppRunLogsSuccess::Status200(logs)) => {
-                    for line in logs.log_lines {
-                        output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
-                    }
-                },
-                Some(default_api::GetAppRunLogsSuccess::UnknownValue(value)) => {
-                    output::failure(&format!("Received unexpected response format from server: {}", value));
-                },
-                None => {
-                    output::failure("No response received from server");
+            if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
+                for line in logs.log_lines {
+                    output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
                 }
             }
         },
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            if let tower_api::apis::Error::ResponseError(err) = &err {
+                output::failure(&format!("{}: {}", err.status, err.content));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
         }
     }
 }
@@ -97,35 +98,36 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
 
     match default_api::describe_app(configuration, DescribeAppParams { 
         name: name.to_string(),
-        runs: Some(5) // Get 5 recent runs
+        runs: Some(5)
     }).await {
         Ok(response) => {
-            match response.entity {
-                Some(default_api::DescribeAppSuccess::Status200(resp)) => {
-                    let app = resp.app;
-                    let line = format!("{} {}\n", "Name:".bold().green(), app.name);
-                    output::write(&line);
+            if let DescribeAppSuccess::Status200(app_response) = response.entity.unwrap() {
+                let app = app_response.app;
+                let runs = app_response.runs;
+                
+                let line = format!("{} {}\n", "Name:".bold().green(), app.name);
+                output::write(&line);
 
-                    let line = format!("{}\n", "Description:".bold().green());
-                    output::write(&line);
+                let line = format!("{}\n", "Description:".bold().green());
+                output::write(&line);
 
-                    let line = output::paragraph(&app.short_description);
-                    output::write(&line);
+                let line = output::paragraph(&app.short_description);
+                output::write(&line);
 
-                    output::newline();
-                    output::newline();
+                output::newline();
+                output::newline();
 
-                    let line = format!("{}\n", "Recent runs:".bold().green());
-                    output::write(&line);
-            
-                    let headers = vec![
-                        "#".yellow().to_string(),
-                        "Status".yellow().to_string(),
-                        "Start Time".yellow().to_string(),
-                        "Elapsed Time".yellow().to_string(),
-                    ];
+                let line = format!("{}\n", "Recent runs:".bold().green());
+                output::write(&line);
+        
+                let headers = vec![
+                    "#".yellow().to_string(),
+                    "Status".yellow().to_string(),
+                    "Start Time".yellow().to_string(),
+                    "Elapsed Time".yellow().to_string(),
+                ];
 
-                    let rows = resp.runs.iter().map(|run| {
+                let rows = runs.iter().map(|run| {
                     let status = &run.status;
 
                     // Format start time
@@ -137,11 +139,17 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
 
                     // Calculate elapsed time
                     let elapsed_time = if !run.ended_at.is_empty() {
-                        format!("{}s", run.elapsed_time)
+                        let start = run.started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                        let end = run.ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                        if let (Some(start), Some(end)) = (start, end) {
+                            format!("{:.1}s", (end - start).num_seconds_f64())
+                        } else {
+                            "Invalid time".into()
+                        }
                     } else if !run.started_at.is_empty() {
-                        format!("Running for {}s", run.elapsed_time)
+                        "Running".into()
                     } else {
-                        format!("{}s ago", run.elapsed_time)
+                        "Pending".into()
                     };
 
                     vec![
@@ -152,32 +160,30 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
                     ]
                 }).collect();
 
-                    output::table(headers, rows);
-                },
-                Some(default_api::DescribeAppSuccess::UnknownValue(value)) => {
-                    output::failure(&format!("Received unexpected response format from server: {}", value));
-                },
-                None => {
-                    output::failure("No response received from server");
-                }
+                output::table(headers, rows);
             }
         },
         Err(err) => {
-            output::tower_error(err);
+            if let tower_api::apis::Error::ResponseError(err) = err {
+                output::failure(&format!("{}: {}", err.status, err.content));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
         }
     }
 }
 
 pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
     match default_api::list_apps(configuration, ListAppsParams {
+        pagination: Some(PaginationParams {
+            page: None,
+            page_size: None
+        }),
         query: None,
-        page: None,
-        page_size: None,
     }).await {
         Ok(response) => {
-            match response.entity {
-                Some(default_api::ListAppsSuccess::Status200(resp)) => {
-                    let items = resp.apps.into_iter().map(|app| {
+            let apps = response.into_inner().apps;
+            let items = apps.into_iter().map(|app| {
                         let desc = if app.short_description.is_empty() {
                             "No description".white().dimmed().italic()
                         } else {
@@ -186,17 +192,17 @@ pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
                         format!("{}\n{}", app.name.bold().green(), desc)
                     }).collect();
                     output::list(items);
-                },
-                Some(default_api::ListAppsSuccess::UnknownValue(value)) => {
-                    output::failure(&format!("Received unexpected response format from server: {}", value));
-                },
-                None => {
-                    output::failure("No response received from server");
-                }
-            }
         },
         Err(err) => {
-            output::tower_error(err);
+            if let tower_api::Error::ResponseError(err) = err {
+                output::failure(&format!(
+                    "{}: {}",
+                    err.status,
+                    err.content.detail.unwrap_or_else(|| "Unknown error".into())
+                ));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
         }
     }
 }
@@ -211,31 +217,23 @@ pub async fn do_create_app(_config: Config, configuration: &Configuration, args:
 
     let mut spinner = output::spinner("Creating app");
 
-    match default_api::create_apps(configuration, CreateAppsParams {
-        create_app_params: tower_api::models::CreateAppParams::new(name.clone())
-            .with_short_description(Some(description.clone()))
-            .with_schedule(Some(schedule.clone()))
+    match default_api::create_app(configuration, CreateAppParams { 
+        name: name.clone(),
+        short_description: Some(description.clone()),
+        schedule: schedule.clone(),
     }).await {
-        Ok(response) => {
-            match response.entity {
-                Some(default_api::CreateAppsSuccess::Status200(_)) => {
-                    spinner.success();
-                    let line = format!("App \"{}\" was created", name);
-                    output::success(&line);
-                },
-                Some(default_api::CreateAppsSuccess::UnknownValue(value)) => {
-                    spinner.failure();
-                    output::failure(&format!("Received unexpected response format from server: {}", value));
-                },
-                None => {
-                    spinner.failure();
-                    output::failure("No response received from server");
-                }
-            }
+        Ok(_) => {
+            spinner.success();
+            output::success(&format!("App '{}' created", name));
         },
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            if let tower_api::Error::ResponseError(err) = err {
+                let detail = err.content.detail.unwrap_or_else(|| "Unknown error".into());
+                output::failure(&format!("{}: {}", err.status, detail));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
         }
     }
 }
@@ -247,29 +245,20 @@ pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: 
 
     let mut spinner = output::spinner("Deleting app...");
 
-    match default_api::delete_app(configuration, DeleteAppParams {
+    match default_api::delete_app(configuration, DeleteAppParams { 
         name: name.to_string()
     }).await {
-        Ok(response) => {
-            match response.entity {
-                Some(default_api::DeleteAppSuccess::Status200(_)) => {
-                    spinner.success();
-                    let line = format!("App \"{}\" was deleted", name);
-                    output::success(&line);
-                },
-                Some(default_api::DeleteAppSuccess::UnknownValue(value)) => {
-                    spinner.failure();
-                    output::failure(&format!("Received unexpected response format from server: {}", value));
-                },
-                None => {
-                    spinner.failure();
-                    output::failure("No response received from server");
-                }
-            }
+        Ok(_) => {
+            spinner.success();
+            output::success(&format!("App '{}' deleted", name));
         },
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            if let tower_api::Error::ResponseError(err) = err {
+                output::failure(&format!("{}: {}", err.status, err.content.detail.unwrap_or_default()));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
         }
     }
 }
