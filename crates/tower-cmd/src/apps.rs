@@ -9,7 +9,9 @@ use tower_api::apis::{
         GetAppRunLogsParams, 
         GetAppRunLogsSuccess, 
         DescribeAppParams, 
-        DescribeAppSuccess
+        DescribeAppSuccess,
+        ListAppsParams,
+        ListAppsSuccess
     },
 };
 
@@ -191,39 +193,35 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
     }
 }
 
-// pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
-//     match default_api::list_apps(configuration, ListAppsParams {
-//         pagination: Some(PaginationParams {
-//             page: None,
-//             page_size: None
-//         }),
-//         query: None,
-//     }).await {
-//         Ok(response) => {
-//             let apps = response.into_inner().apps;
-//             let items = apps.into_iter().map(|app| {
-//                         let desc = if app.short_description.is_empty() {
-//                             "No description".white().dimmed().italic()
-//                         } else {
-//                             app.short_description.normal().clear()
-//                         };
-//                         format!("{}\n{}", app.name.bold().green(), desc)
-//                     }).collect();
-//                     output::list(items);
-//         },
-//         Err(err) => {
-//             if let tower_api::Error::ResponseError(err) = err {
-//                 output::failure(&format!(
-//                     "{}: {}",
-//                     err.status,
-//                     err.content.detail.unwrap_or_else(|| "Unknown error".into())
-//                 ));
-//             } else {
-//                 output::failure(&format!("Unexpected error: {}", err));
-//             }
-//         }
-//     }
-// }
+pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
+    match default_api::list_apps(configuration, ListAppsParams {
+        query: None,
+        page: None,
+        page_size: None,
+    }).await {
+        Ok(response) => {
+            if let ListAppsSuccess::Status200(list_response) = response.entity.unwrap() {
+                let items = list_response.apps.into_iter().map(|app_summary| {
+                    let app = app_summary.app;
+                    let desc = if app.short_description.is_empty() {
+                        "No description".white().dimmed().italic()
+                    } else {
+                        app.short_description.normal().clear()
+                    };
+                    format!("{}\n{}", app.name.bold().green(), desc)
+                }).collect();
+                output::list(items);
+            }
+        },
+        Err(err) => {
+            if let tower_api::apis::Error::ResponseError(err) = err {
+                output::failure(&format!("{}: {}", err.status, err.content));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
+        }
+    }
+}
 
 // pub async fn do_create_app(_config: Config, configuration: &Configuration, args: &ArgMatches) {
 //     let name = args.get_one::<String>("name").unwrap_or_else(|| {
