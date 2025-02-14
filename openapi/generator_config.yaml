@@ -1,0 +1,25 @@
+# Generator Configuration
+generatorName: rust
+inputSpec: /local/openapi.json
+outputDir: /local/tower-api
+httpUserAgent: "tower_cli_client"
+nameMappings:
+  $schema: schema
+
+globalProperties:
+  modelDocs: false
+  apiDocs: false
+
+additionalProperties:
+  packageName: tower-api
+  packageVersion: "1.0.0"
+  # Rust client options
+  supportAsync: true
+  supportMultipleResponses: true
+  useSingleRequestParameter: true
+  generateOptionalConstructor: true
+  library: reqwest
+  bestFitInt: true
+  dateLibrary: chrono
+  useRustLogging: true
+  rustfmt: true
