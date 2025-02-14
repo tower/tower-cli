@@ -11,8 +11,10 @@ use tower_api::apis::{
         DescribeAppParams, 
         DescribeAppSuccess,
         ListAppsParams,
-        ListAppsSuccess
+        ListAppsSuccess,
+        CreateAppsParams
     },
+    models
 };
 
 use crate::output;
@@ -223,36 +225,36 @@ pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
     }
 }
 
-// pub async fn do_create_app(_config: Config, configuration: &Configuration, args: &ArgMatches) {
-//     let name = args.get_one::<String>("name").unwrap_or_else(|| {
-//         output::die("App name (--name) is required");
-//     });
+pub async fn do_create_app(_config: Config, configuration: &Configuration, args: &ArgMatches) {
+    let name = args.get_one::<String>("name").unwrap_or_else(|| {
+        output::die("App name (--name) is required");
+    });
 
-//     let description = args.get_one::<String>("description").unwrap();
-//     let schedule = args.get_one::<String>("schedule").unwrap();
+    let description = args.get_one::<String>("description").unwrap();
 
-//     let mut spinner = output::spinner("Creating app");
-
-//     match default_api::create_app(configuration, CreateAppParams { 
-//         name: name.clone(),
-//         short_description: Some(description.clone()),
-//         schedule: schedule.clone(),
-//     }).await {
-//         Ok(_) => {
-//             spinner.success();
-//             output::success(&format!("App '{}' created", name));
-//         },
-//         Err(err) => {
-//             spinner.failure();
-//             if let tower_api::Error::ResponseError(err) = err {
-//                 let detail = err.content.detail.unwrap_or_else(|| "Unknown error".into());
-//                 output::failure(&format!("{}: {}", err.status, detail));
-//             } else {
-//                 output::failure(&format!("Unexpected error: {}", err));
-//             }
-//         }
-//     }
-// }
+    let mut spinner = output::Spinner::new("Creating app".to_string());
+    
+    match default_api::create_apps(configuration, CreateAppsParams {
+        create_app_params: models::CreateAppParams {
+            name: name.clone(),
+            short_description: description.clone(),
+            schedule: None,
+        }
+    }).await {
+        Ok(_) => {
+            spinner.success();
+            output::success(&format!("App '{}' created", name));
+        },
+        Err(err) => {
+            spinner.failure();
+            if let tower_api::apis::Error::ResponseError(err) = err {
+                output::failure(&format!("{}: {}", err.status, err.content));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
+        }
+    }
+}
 
 // pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: Option<(&str, &ArgMatches)>) {
 //     let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
