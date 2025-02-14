@@ -4,10 +4,14 @@ use config::Config;
 
 use tower_api::apis::{
     configuration::Configuration,
-    default_api::{self, ListAppsParams, DeleteAppParams, DescribeAppParams, GetAppRunLogsParams, GetAppRunLogsSuccess},
+    default_api::{
+        self, 
+        GetAppRunLogsParams, 
+        GetAppRunLogsSuccess, 
+        DescribeAppParams, 
+        DescribeAppSuccess
+    },
 };
-
-use tower_api::models::{CreateAppParams, Pagination, GetRunLogLine, GetRunLogsOutputBody, App, Run};
 
 use crate::output;
 
@@ -131,22 +135,36 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
                     let status = &run.status;
 
                     // Format start time
-                    let start_time = if !run.started_at.is_empty() {
-                        run.started_at.clone()
+                    let start_time = if let Some(started_at) = &run.started_at {
+                        if !started_at.is_empty() {
+                            started_at.clone()
+                        } else {
+                            format!("Scheduled at {}", run.scheduled_at)
+                        }
                     } else {
                         format!("Scheduled at {}", run.scheduled_at)
                     };
 
                     // Calculate elapsed time
-                    let elapsed_time = if !run.ended_at.is_empty() {
-                        let start = run.started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                        let end = run.ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                        if let (Some(start), Some(end)) = (start, end) {
-                            format!("{:.1}s", (end - start).num_seconds_f64())
+                    let elapsed_time = if let Some(ended_at) = &run.ended_at {
+                        if !ended_at.is_empty() {
+                            if let (Some(started_at), Some(ended_at)) = (&run.started_at, &run.ended_at) {
+                                let start = started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                let end = ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                if let (Some(start), Some(end)) = (start, end) {
+                                    format!("{:.1}s", (end - start).num_seconds())
+                                } else {
+                                    "Invalid time".into()
+                                }
+                            } else {
+                                "Invalid time".into()
+                            }
+                        } else if run.started_at.is_some() {
+                            "Running".into()
                         } else {
-                            "Invalid time".into()
+                            "Pending".into()
                         }
-                    } else if !run.started_at.is_empty() {
+                    } else if run.started_at.is_some() {
                         "Running".into()
                     } else {
                         "Pending".into()
@@ -173,92 +191,92 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
     }
 }
 
-pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
-    match default_api::list_apps(configuration, ListAppsParams {
-        pagination: Some(PaginationParams {
-            page: None,
-            page_size: None
-        }),
-        query: None,
-    }).await {
-        Ok(response) => {
-            let apps = response.into_inner().apps;
-            let items = apps.into_iter().map(|app| {
-                        let desc = if app.short_description.is_empty() {
-                            "No description".white().dimmed().italic()
-                        } else {
-                            app.short_description.normal().clear()
-                        };
-                        format!("{}\n{}", app.name.bold().green(), desc)
-                    }).collect();
-                    output::list(items);
-        },
-        Err(err) => {
-            if let tower_api::Error::ResponseError(err) = err {
-                output::failure(&format!(
-                    "{}: {}",
-                    err.status,
-                    err.content.detail.unwrap_or_else(|| "Unknown error".into())
-                ));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
-    }
-}
+// pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
+//     match default_api::list_apps(configuration, ListAppsParams {
+//         pagination: Some(PaginationParams {
+//             page: None,
+//             page_size: None
+//         }),
+//         query: None,
+//     }).await {
+//         Ok(response) => {
+//             let apps = response.into_inner().apps;
+//             let items = apps.into_iter().map(|app| {
+//                         let desc = if app.short_description.is_empty() {
+//                             "No description".white().dimmed().italic()
+//                         } else {
+//                             app.short_description.normal().clear()
+//                         };
+//                         format!("{}\n{}", app.name.bold().green(), desc)
+//                     }).collect();
+//                     output::list(items);
+//         },
+//         Err(err) => {
+//             if let tower_api::Error::ResponseError(err) = err {
+//                 output::failure(&format!(
+//                     "{}: {}",
+//                     err.status,
+//                     err.content.detail.unwrap_or_else(|| "Unknown error".into())
+//                 ));
+//             } else {
+//                 output::failure(&format!("Unexpected error: {}", err));
+//             }
+//         }
+//     }
+// }
 
-pub async fn do_create_app(_config: Config, configuration: &Configuration, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap_or_else(|| {
-        output::die("App name (--name) is required");
-    });
+// pub async fn do_create_app(_config: Config, configuration: &Configuration, args: &ArgMatches) {
+//     let name = args.get_one::<String>("name").unwrap_or_else(|| {
+//         output::die("App name (--name) is required");
+//     });
 
-    let description = args.get_one::<String>("description").unwrap();
-    let schedule = args.get_one::<String>("schedule").unwrap();
+//     let description = args.get_one::<String>("description").unwrap();
+//     let schedule = args.get_one::<String>("schedule").unwrap();
 
-    let mut spinner = output::spinner("Creating app");
+//     let mut spinner = output::spinner("Creating app");
 
-    match default_api::create_app(configuration, CreateAppParams { 
-        name: name.clone(),
-        short_description: Some(description.clone()),
-        schedule: schedule.clone(),
-    }).await {
-        Ok(_) => {
-            spinner.success();
-            output::success(&format!("App '{}' created", name));
-        },
-        Err(err) => {
-            spinner.failure();
-            if let tower_api::Error::ResponseError(err) = err {
-                let detail = err.content.detail.unwrap_or_else(|| "Unknown error".into());
-                output::failure(&format!("{}: {}", err.status, detail));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
-    }
-}
+//     match default_api::create_app(configuration, CreateAppParams { 
+//         name: name.clone(),
+//         short_description: Some(description.clone()),
+//         schedule: schedule.clone(),
+//     }).await {
+//         Ok(_) => {
+//             spinner.success();
+//             output::success(&format!("App '{}' created", name));
+//         },
+//         Err(err) => {
+//             spinner.failure();
+//             if let tower_api::Error::ResponseError(err) = err {
+//                 let detail = err.content.detail.unwrap_or_else(|| "Unknown error".into());
+//                 output::failure(&format!("{}: {}", err.status, detail));
+//             } else {
+//                 output::failure(&format!("Unexpected error: {}", err));
+//             }
+//         }
+//     }
+// }
 
-pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: Option<(&str, &ArgMatches)>) {
-    let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
-        output::die("App name (e.g. tower apps delete <app name>) is required");
-    });
+// pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: Option<(&str, &ArgMatches)>) {
+//     let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
+//         output::die("App name (e.g. tower apps delete <app name>) is required");
+//     });
 
-    let mut spinner = output::spinner("Deleting app...");
+//     let mut spinner = output::spinner("Deleting app...");
 
-    match default_api::delete_app(configuration, DeleteAppParams { 
-        name: name.to_string()
-    }).await {
-        Ok(_) => {
-            spinner.success();
-            output::success(&format!("App '{}' deleted", name));
-        },
-        Err(err) => {
-            spinner.failure();
-            if let tower_api::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content.detail.unwrap_or_default()));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
-    }
-}
+//     match default_api::delete_app(configuration, DeleteAppParams { 
+//         name: name.to_string()
+//     }).await {
+//         Ok(_) => {
+//             spinner.success();
+//             output::success(&format!("App '{}' deleted", name));
+//         },
+//         Err(err) => {
+//             spinner.failure();
+//             if let tower_api::Error::ResponseError(err) = err {
+//                 output::failure(&format!("{}: {}", err.status, err.content.detail.unwrap_or_default()));
+//             } else {
+//                 output::failure(&format!("Unexpected error: {}", err));
+//             }
+//         }
+//     }
+// }
