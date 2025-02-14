@@ -12,10 +12,12 @@ use tower_api::apis::{
         DescribeAppSuccess,
         ListAppsParams,
         ListAppsSuccess,
-        CreateAppsParams
-    },
-    models
+        CreateAppsParams,
+        DeleteAppParams
+    }
 };
+
+use tower_api::models;
 
 use crate::output;
 
@@ -236,8 +238,9 @@ pub async fn do_create_app(_config: Config, configuration: &Configuration, args:
     
     match default_api::create_apps(configuration, CreateAppsParams {
         create_app_params: models::CreateAppParams {
+            schema: None,
             name: name.clone(),
-            short_description: description.clone(),
+            short_description: Some(description.clone()),
             schedule: None,
         }
     }).await {
@@ -256,27 +259,27 @@ pub async fn do_create_app(_config: Config, configuration: &Configuration, args:
     }
 }
 
-// pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: Option<(&str, &ArgMatches)>) {
-//     let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
-//         output::die("App name (e.g. tower apps delete <app name>) is required");
-//     });
+pub async fn do_delete_app(_config: Config, configuration: &Configuration, cmd: Option<(&str, &ArgMatches)>) {
+    let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
+        output::die("App name (e.g. tower apps delete <app name>) is required");
+    });
 
-//     let mut spinner = output::spinner("Deleting app...");
-
-//     match default_api::delete_app(configuration, DeleteAppParams { 
-//         name: name.to_string()
-//     }).await {
-//         Ok(_) => {
-//             spinner.success();
-//             output::success(&format!("App '{}' deleted", name));
-//         },
-//         Err(err) => {
-//             spinner.failure();
-//             if let tower_api::Error::ResponseError(err) = err {
-//                 output::failure(&format!("{}: {}", err.status, err.content.detail.unwrap_or_default()));
-//             } else {
-//                 output::failure(&format!("Unexpected error: {}", err));
-//             }
-//         }
-//     }
-// }
+    let mut spinner = output::Spinner::new("Deleting app...".to_string());
+    
+    match default_api::delete_app(configuration, DeleteAppParams { 
+        name: name.to_string() 
+    }).await {
+        Ok(_) => {
+            spinner.success();
+            output::success(&format!("App '{}' deleted", name));
+        },
+        Err(err) => {
+            spinner.failure();
+            if let tower_api::apis::Error::ResponseError(err) = err {
+                output::failure(&format!("{}: {}", err.status, err.content));
+            } else {
+                output::failure(&format!("Unexpected error: {}", err));
+            }
+        }
+    }
+}
