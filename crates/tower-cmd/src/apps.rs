@@ -38,6 +38,13 @@ pub fn apps_cmd() -> Command {
                         .default_value("")
                         .action(clap::ArgAction::Set)
                 )
+                .arg(
+                    Arg::new("schedule")
+                        .long("schedule")
+                        .value_parser(value_parser!(String))
+                        .default_value("")
+                        .action(clap::ArgAction::Set)
+                )
                 .about("Create a new app in Tower")
         )
         .subcommand(
