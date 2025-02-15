@@ -11,6 +11,7 @@ pub use config::{
 pub struct App{
     pub name: String,
     pub short_description: String,
+    pub schedule: String,
     pub owner: String,
     pub created_at: DateTime<Utc>,
 }
