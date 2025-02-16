@@ -49,7 +49,6 @@ struct ListAppsResponse {
 struct CreateAppRequest {
     name: String,
     short_description: String,
-    schedule: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -232,11 +231,10 @@ impl Client {
         Ok(res.app)
     }
 
-    pub async fn create_app(&self, name: &str, description: &str, schedule: &str) -> Result<App> {
+    pub async fn create_app(&self, name: &str, description: &str) -> Result<App> {
         let data = CreateAppRequest {
             name: String::from(name),
             short_description: String::from(description),
-            schedule: String::from(schedule),
         };
 
         let body = serde_json::to_value(data).unwrap();

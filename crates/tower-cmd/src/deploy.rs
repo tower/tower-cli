@@ -37,7 +37,7 @@ pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
             // Add app existence check before proceeding
-            if let Err(err) = util::ensure_app_exists(&client, &towerfile.app.name, &towerfile.app.description, &towerfile.app.schedule).await {
+            if let Err(err) = util::ensure_app_exists(&client, &towerfile.app.name, &towerfile.app.description).await {
                 output::tower_error(err);
                 return;
             }

@@ -175,11 +175,10 @@ pub async fn do_create_app(_config: Config, client: Client, args: &ArgMatches) {
     });
 
     let description = args.get_one::<String>("description").unwrap();
-    let schedule = args.get_one::<String>("schedule").unwrap();
 
     let mut spinner = output::spinner("Creating app");
 
-    match client.create_app(&name, &description, &schedule).await {
+    match client.create_app(&name, &description).await {
         Ok(_app) => {
             spinner.success();
 
