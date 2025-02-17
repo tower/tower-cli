@@ -70,3 +70,8 @@ fi
 echo "Version bumped successfully in Cargo.toml and pyproject.toml!"
 
 cargo build
+
+# Do git things
+git add Cargo.lock Cargo.toml pyproject.toml
+git commit -m "Version bump to ${new_version}"
+git tag "${new_version}"
