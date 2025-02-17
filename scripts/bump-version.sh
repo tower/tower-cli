@@ -68,3 +68,5 @@ else
 fi
 
 echo "Version bumped successfully in Cargo.toml and pyproject.toml!"
+
+cargo build
