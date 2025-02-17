@@ -1,9 +1,12 @@
-use config::{Config, Towerfile};
 use clap::{Command, ArgMatches, Arg};
 use std::path::PathBuf;
-use tower_api::Client;
-use tower_package::{Package, PackageSpec};
 use std::sync::{Arc, Mutex};
+use config::{Config, Towerfile};
+use tower_api::apis::{
+    configuration::Configuration,
+    default_api::{self, DeployAppParams},
+};
+use tower_package::{Package, PackageSpec};
 
 use crate::{output, util};
 
@@ -27,7 +30,7 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
     }
 }
 
-pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
+pub async fn do_deploy(_config: Config, configuration: Configuration, args: &ArgMatches) {
     // Determine the directory to build the package from
     let dir = resolve_path(args);
     log::debug!("Building package from directory: {:?}", dir);
@@ -37,7 +40,7 @@ pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
             // Add app existence check before proceeding
-            if let Err(err) = util::ensure_app_exists(&client, &towerfile.app.name, &towerfile.app.description, &towerfile.app.schedule).await {
+            if let Err(err) = util::ensure_app_exists(&configuration, &towerfile.app.name, &towerfile.app.description, &towerfile.app.schedule).await {
                 output::tower_error(err);
                 return;
             }
@@ -60,23 +63,30 @@ pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
                         }
                     });
                     
-                    match client.upload_code(&towerfile.app.name, package, Some(callback)).await {
+                    match default_api::deploy_app(&configuration, DeployAppParams {
+                        name: towerfile.app.name.clone(),
+                        content_encoding: Some("gzip".to_string()),
+                    }).await {
+                        Ok(response) => {
+                            let progress_bar = progress_bar.lock().unwrap();
+                            progress_bar.finish();
+                            output::newline();
+
+                            if let tower_api::apis::default_api::DeployAppSuccess::Status200(deploy) = response.entity.unwrap() {
+                                let line = format!("Version `{}` of your code has been deployed to Tower!", deploy.version.version);
+                                output::success(&line);
+                            }
+                        },
                         Err(err) => {
-
-                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
+                            let progress_bar = progress_bar.lock().unwrap();
                             progress_bar.finish();
-
-                            output::newline();
-                            output::tower_error(err);
-                        }
-                        Ok(code) => {
-                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
-                            progress_bar.finish();
-
                             output::newline();
 
-                            let line = format!("Version `{}` of your code has been deployed to Tower!", code.version);
-                            output::success(&line);
+                            if let tower_api::apis::Error::ResponseError(err) = err {
+                                output::failure(&format!("{}: {}", err.status, err.content));
+                            } else {
+                                output::failure(&format!("Unexpected error: {}", err));
+                            }
                         }
                     }
                 },
