@@ -95,16 +95,34 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
-pub fn tower_error(err: tower_api::TowerError) {
-    let line = format!("{} {}\n", "Error:".red(), err.description.friendly);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+pub fn tower_error(err: tower_api::apis::Error<tower_api::models::ErrorModel>) {
+    match err {
+        tower_api::apis::Error::ResponseError(response) => {
+            // First show the main error message from the detail field
+            if let Some(error_model) = &response.entity {
+                let detail = error_model.detail.as_deref().unwrap_or("Unknown error");
+                let line = format!("{} {}\n", "Error:".red(), detail);
+                io::stdout().write_all(line.as_bytes()).unwrap();
 
-    // Handle any nested validation errors if present
-    if let Some(items) = err.items {
-        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
-        for (field, error) in items {
-            let msg = format!("  • {}: {}", field, error.description.friendly);
-            writeln!(io::stdout(), "{}", msg.red()).unwrap();
+                // Then show any additional error details from the errors field
+                if let Some(errors) = &error_model.errors {
+                    if !errors.is_empty() {
+                        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+                        for error in errors {
+                            let msg = format!("  • {}", error.message.as_deref().unwrap_or("Unknown error"));
+                            writeln!(io::stdout(), "{}", msg.red()).unwrap();
+                        }
+                    }
+                }
+            } else {
+                // Fallback if we don't have an error model
+                let line = format!("{} {}: {}\n", "Error:".red(), response.status, response.content);
+                io::stdout().write_all(line.as_bytes()).unwrap();
+            }
+        },
+        _ => {
+            let line = format!("{} {}\n", "Error:".red(), err);
+            io::stdout().write_all(line.as_bytes()).unwrap();
         }
     }
 }
