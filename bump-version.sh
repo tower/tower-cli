@@ -36,7 +36,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-# Get current version from workspace package section
+# Get current version from Cargo.toml workspace package section
 current_version=$(grep '^version = ' Cargo.toml | head -1 | cut -d '"' -f 2)
 
 if [ -z "$current_version" ]; then
@@ -58,4 +58,13 @@ else
     sed -i "s/^version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
 fi
 
-echo "Version bumped successfully!"
+# Update version in pyproject.toml
+if [ "$(uname)" == "Darwin" ]; then
+    # macOS sed
+    sed -i '' "s/^version = \"$current_version\"/version = \"$new_version\"/" pyproject.toml
+else
+    # GNU sed
+    sed -i "s/^version = \"$current_version\"/version = \"$new_version\"/" pyproject.toml
+fi
+
+echo "Version bumped successfully in Cargo.toml and pyproject.toml!"
