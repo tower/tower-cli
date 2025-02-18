@@ -1,6 +1,6 @@
 use clap::Command;
 use crate::output;
-use tower_api::Client;
+use tower_api::apis::configuration::Configuration;
 use config::Config;
 
 pub fn version_cmd() -> Command {
@@ -8,7 +8,7 @@ pub fn version_cmd() -> Command {
         .about("Print the current version of Tower")
 }
 
-pub async fn do_version(_config: Config, _client: Client) {
+pub async fn do_version(_config: Config, _configuration: &Configuration) {
     let line = format!("v{}\n", tower_version::current_version());
     output::write(&line);
 }
