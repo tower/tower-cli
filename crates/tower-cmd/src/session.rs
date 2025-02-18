@@ -17,11 +17,11 @@ pub fn login_cmd() -> Command {
         .about("Create a session with Tower")
 }
 
-pub async fn do_login(config: Config, configuration: Configuration) {
+pub async fn do_login(config: Config, configuration: &Configuration) {
     // Create anonymous configuration (no bearer token)
-    let configuration = Configuration {
+    let api_config = Configuration {
         base_path: config.tower_url.to_string(),
-        ..configuration
+        ..configuration.clone()
     };
 
     output::banner();
@@ -29,17 +29,17 @@ pub async fn do_login(config: Config, configuration: Configuration) {
     let mut spinner = output::spinner("Starting device login...");
 
     // Request device login code
-    match default_api::create_device_login(&configuration).await {
+    match default_api::create_device_login(&api_config).await {
         Ok(response) => {
             spinner.success();
             if let CreateDeviceLoginSuccess::Status200(_login) = response.entity.unwrap() {
                 // Now create the claim with the user_code from the login response
                 match default_api::create_device_login(
-                    &configuration
+                    &api_config
                 ).await {
                     Ok(claim_response) => {
                         if let CreateDeviceLoginSuccess::Status200(claim) = claim_response.entity.unwrap() {
-                            handle_device_login(&config, &configuration, claim).await;
+                            handle_device_login(&config, &api_config, claim).await;
                         }
                     },
                     Err(err) => {
