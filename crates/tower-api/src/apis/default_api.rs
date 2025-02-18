@@ -235,6 +235,14 @@ pub enum CreateAppsSuccess {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed successes of method [`create_device_login`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CreateDeviceLoginSuccess {
+    Status200(models::CreateDeviceLoginResponse),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed successes of method [`create_device_login_claim`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -447,6 +455,14 @@ pub enum CreateApiKeyError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CreateAppsError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`create_device_login`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CreateDeviceLoginError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -750,6 +766,32 @@ pub async fn create_apps(configuration: &configuration::Configuration, params: C
     } else {
         let content = resp.text().await?;
         let entity: Option<CreateAppsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Creates a new device login request and returns the codes needed for authentication.
+pub async fn create_device_login(configuration: &configuration::Configuration) -> Result<ResponseContent<CreateDeviceLoginSuccess>, Error<CreateDeviceLoginError>> {
+
+    let uri_str = format!("{}/login/device", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<CreateDeviceLoginSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<CreateDeviceLoginError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }

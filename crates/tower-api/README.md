@@ -31,6 +31,7 @@ Class | Method | HTTP request | Description
 *DefaultApi* | [**create_account**](docs/DefaultApi.md#create_account) | **POST** /accounts | Create account
 *DefaultApi* | [**create_api_key**](docs/DefaultApi.md#create_api_key) | **POST** /api-keys | Create API Key
 *DefaultApi* | [**create_apps**](docs/DefaultApi.md#create_apps) | **POST** /apps | Create app
+*DefaultApi* | [**create_device_login**](docs/DefaultApi.md#create_device_login) | **GET** /login/device | Create device login request
 *DefaultApi* | [**create_device_login_claim**](docs/DefaultApi.md#create_device_login_claim) | **POST** /login/device/claim | Create device login claim
 *DefaultApi* | [**create_secret**](docs/DefaultApi.md#create_secret) | **POST** /secrets | Create secret
 *DefaultApi* | [**create_session**](docs/DefaultApi.md#create_session) | **POST** /session | Create session
@@ -73,6 +74,7 @@ Class | Method | HTTP request | Description
  - [CreateAppResponse](docs/CreateAppResponse.md)
  - [CreateDeviceLoginClaimParams](docs/CreateDeviceLoginClaimParams.md)
  - [CreateDeviceLoginClaimResponse](docs/CreateDeviceLoginClaimResponse.md)
+ - [CreateDeviceLoginResponse](docs/CreateDeviceLoginResponse.md)
  - [CreateSecretParams](docs/CreateSecretParams.md)
  - [CreateSecretResponse](docs/CreateSecretResponse.md)
  - [CreateSessionParams](docs/CreateSessionParams.md)

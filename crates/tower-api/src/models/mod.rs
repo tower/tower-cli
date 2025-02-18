@@ -28,6 +28,8 @@ pub mod create_device_login_claim_params;
 pub use self::create_device_login_claim_params::CreateDeviceLoginClaimParams;
 pub mod create_device_login_claim_response;
 pub use self::create_device_login_claim_response::CreateDeviceLoginClaimResponse;
+pub mod create_device_login_response;
+pub use self::create_device_login_response::CreateDeviceLoginResponse;
 pub mod create_secret_params;
 pub use self::create_secret_params::CreateSecretParams;
 pub mod create_secret_response;
