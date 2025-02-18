@@ -2,7 +2,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use config::{Config, Towerfile};
 use clap::{Arg, Command, ArgMatches};
-use tower_api::Client;
+use tower_api::apis::{
+    configuration::Configuration,
+    default_api::{self, ListSecretsParams, RunAppParams},
+};
+use tower_api::models;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{AppLauncher, App, OutputChannel, local::LocalApp};
 
@@ -44,7 +48,7 @@ pub fn run_cmd() -> Command {
 
 /// do_run is the primary entrypoint into running apps both locally and remotely in Tower. It will
 /// use the configuration to determine the requested way of running a Tower app.
-pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
+pub async fn do_run(config: Config, configuration: &Configuration, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     let res = get_run_parameters(args, cmd);
 
     match res {
@@ -56,14 +60,14 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
                 if app_name.is_some() {
                     output::die("Running apps by name locally is not supported yet.");
                 } else {
-                    do_run_local(config, client, path, params).await;
+                    do_run_local(config, configuration, path, params).await;
                 }
             } else {
                 // We always expect there to be an environmnt due to the fact that there is a
                 // default value.
                 let env = args.get_one::<String>("environment").unwrap();
 
-                do_run_remote(config, client, path, env, params, app_name).await;
+                do_run_remote(config, configuration, path, env, params, app_name).await;
             }
         },
         Err(err) => {
@@ -75,12 +79,12 @@ pub async fn do_run(config: Config, client: Client, args: &ArgMatches, cmd: Opti
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params: HashMap<String, String>) {
+async fn do_run_local(_config: Config, configuration: &Configuration, path: PathBuf, mut params: HashMap<String, String>) {
     // There is always an implicit `local` environment when running in a local context.
     let env = "local".to_string();
 
     // Load all the secrets from the server
-    let secrets = get_secrets(&client, &env).await;
+    let secrets = get_secrets(configuration, &env).await;
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -122,7 +126,7 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params
     log::debug!("Waiting for app tasks to complete");
     let (res1, res2) = tokio::join!(output_task, status_task);
 
-    // We have to unwrap both of these as a method for propogating any panics htat happened
+    // We have to unwrap both of these as a method for propagating any panics that happened
     // internally.
     res1.unwrap();
     res2.unwrap();
@@ -132,7 +136,7 @@ async fn do_run_local(_config: Config, client: Client, path: PathBuf, mut params
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str, params: HashMap<String, String>, app_name: Option<String>) {
+async fn do_run_remote(_config: Config, configuration: &Configuration, path: PathBuf, env: &str, params: HashMap<String, String>, app_name: Option<String>) {
     let mut spinner = output::spinner("Scheduling run...");
 
     let app_name = app_name.unwrap_or_else(|| {
@@ -142,18 +146,23 @@ async fn do_run_remote(_config: Config, client: Client, path: PathBuf, env: &str
         towerfile.app.name
     });
 
-    let res = client.run_app(&app_name, env, params).await;
-
-    match res {
-        Ok(run) => {
+    match default_api::run_app(configuration, RunAppParams {
+        name: app_name.clone(),
+        run_app_params: models::RunAppParams {
+            schema: None,
+            environment: env.to_string(),
+            parameters: params,
+        }
+    }).await {
+        Ok(response) => {
             spinner.success();
-
-            let line = format!("Run #{} for app `{}` has been scheduled", run.number, app_name);
-            output::success(&line);
+            if let tower_api::apis::default_api::RunAppSuccess::Status200(run_response) = response.entity.unwrap() {
+                let line = format!("Run #{} for app `{}` has been scheduled", run_response.run.number, app_name);
+                output::success(&line);
+            }
         },
         Err(err) => {
             spinner.failure();
-
             output::tower_error(err);
         }
     }
@@ -209,12 +218,23 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String>{
 
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
-async fn get_secrets(client: &Client, env: &str) -> HashMap<String, String> {
+async fn get_secrets(configuration: &Configuration, env: &str) -> HashMap<String, String> {
     let mut spinner = output::spinner("Getting secrets...");
-    match client.export_secrets(false, Some(env.to_string())).await {
-        Ok(secrets) => {
+    match default_api::list_secrets(configuration, ListSecretsParams {
+        environment: Some(env.to_string()),
+        all: Some(false),
+        page: None,
+        page_size: None,
+    }).await {
+        Ok(response) => {
             spinner.success();
-            secrets.into_iter().map(|sec| (sec.name, sec.value)).collect()
+            if let tower_api::apis::default_api::ListSecretsSuccess::Status200(list_response) = response.entity.unwrap() {
+                list_response.secrets.into_iter()
+                    .map(|secret| (secret.name, secret.preview))
+                    .collect()
+            } else {
+                HashMap::new()
+            }
         },
         Err(err) => {
             spinner.failure();
@@ -262,7 +282,7 @@ async fn monitor_output(output: OutputChannel) {
         if let Some(line) = output.lock().await.recv().await {
             let ts = &line.time;
             let msg = &line.line;
-            output::log_line(ts, msg, output::LogLineType::Local);
+            output::log_line(&ts.to_rfc3339(), msg, output::LogLineType::Local);
         } else {
             break;
         }
