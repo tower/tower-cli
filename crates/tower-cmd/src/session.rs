@@ -116,8 +116,23 @@ async fn poll_for_login(
             },
             Err(err) => {
                 if let tower_api::apis::Error::ResponseError(err) = err {
-                    // Only continue polling if we get an incomplete login error
-                    if !err.content.contains("incomplete_device_login") {
+                    // Try to parse the error content as an ErrorModel
+                    if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&err.content) {
+                        // Check if any error detail has "incomplete_device_login" in its location
+                        // FIXME: Ugly, but I don't have a better option currently.
+                        let is_incomplete_login = error_model.errors
+                            .as_ref()
+                            .and_then(|errors| errors.first())
+                            .and_then(|error| error.location.as_ref())
+                            .map(|message| message.contains("incomplete_device_login"))
+                            .unwrap_or(false);
+
+                        // Continue polling only if it's a 404 with incomplete_device_login as True
+                        if err.status != 404 && !is_incomplete_login {
+                            output::failure(&format!("{}: {}", err.status, err.content));
+                            return false;
+                        }
+                    } else {
                         output::failure(&format!("{}: {}", err.status, err.content));
                         return false;
                     }
