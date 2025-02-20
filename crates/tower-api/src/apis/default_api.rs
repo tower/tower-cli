@@ -23,7 +23,7 @@ pub struct AcceptInvitationParams {
 /// struct for passing parameters to the method [`claim_device_login_ticket`]
 #[derive(Clone, Debug)]
 pub struct ClaimDeviceLoginTicketParams {
-    pub claim_device_login_params: models::ClaimDeviceLoginParams
+    pub claim_device_login_ticket_params: models::ClaimDeviceLoginTicketParams
 }
 
 /// struct for passing parameters to the method [`create_account`]
@@ -228,7 +228,7 @@ pub enum AcceptInvitationSuccess {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ClaimDeviceLoginTicketSuccess {
-    Status200(models::ClaimDeviceLoginResponse),
+    Status200(models::ClaimDeviceLoginTicketResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -741,7 +741,7 @@ pub async fn claim_device_login_ticket(configuration: &configuration::Configurat
     if let Some(ref token) = configuration.bearer_access_token {
         req_builder = req_builder.bearer_auth(token.to_owned());
     };
-    req_builder = req_builder.json(&params.claim_device_login_params);
+    req_builder = req_builder.json(&params.claim_device_login_ticket_params);
 
     let req = req_builder.build()?;
     let resp = configuration.client.execute(req).await?;
