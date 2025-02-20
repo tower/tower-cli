@@ -4,9 +4,10 @@ use tower_api::apis::{
     configuration::Configuration,
     default_api::{
         self,
-        CreateDeviceLoginSuccess,
-        DescribeDeviceLoginClaimParams,
-        DescribeDeviceLoginClaimSuccess,
+        CreateDeviceLoginTicketSuccess,
+        ClaimDeviceLoginTicketSuccess,
+        DescribeDeviceLoginSessionParams,
+        DescribeDeviceLoginSessionSuccess
     }
 };
 use crate::output;
@@ -29,17 +30,23 @@ pub async fn do_login(config: Config, configuration: &Configuration) {
     let mut spinner = output::spinner("Starting device login...");
 
     // Request device login code
-    match default_api::create_device_login(&api_config).await {
+    match default_api::create_device_login_ticket(&api_config).await {
         Ok(response) => {
             spinner.success();
-            if let CreateDeviceLoginSuccess::Status200(_login) = response.entity.unwrap() {
-                // Now create the claim with the user_code from the login response
-                match default_api::create_device_login(
-                    &api_config
+            if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response.entity.unwrap() {
+                // Now claim the ticket with the user_code from the login response
+                match default_api::claim_device_login_ticket(
+                    &api_config,
+                    default_api::ClaimDeviceLoginTicketParams {
+                        claim_device_login_ticket_params: tower_api::models::ClaimDeviceLoginTicketParams {
+                            schema: None,
+                            user_code: login_claim.user_code.clone(),
+                        }
+                    }
                 ).await {
                     Ok(claim_response) => {
-                        if let CreateDeviceLoginSuccess::Status200(claim) = claim_response.entity.unwrap() {
-                            handle_device_login(&config, &api_config, claim).await;
+                        if let ClaimDeviceLoginTicketSuccess::Status200(_claim) = claim_response.entity.unwrap() {
+                            handle_device_login(&config, &api_config, login_claim).await;
                         }
                     },
                     Err(err) => {
@@ -67,11 +74,11 @@ pub async fn do_login(config: Config, configuration: &Configuration) {
 async fn handle_device_login(
     _config: &Config,
     configuration: &Configuration,
-    claim: tower_api::models::CreateDeviceLoginResponse,
+    claim: tower_api::models::CreateDeviceLoginTicketResponse,
 ) {
     // Try to open the login URL in browser
-    if let Err(_) = open::that(&claim.verification_url) {
-        let line = format!("Please open the following URL in your browser: {}", claim.verification_url);
+    if let Err(_) = open::that(&claim.login_url) {
+        let line = format!("Please open the following URL in your browser: {}", claim.login_url);
         output::write(&line);
     }
 
@@ -85,7 +92,7 @@ async fn handle_device_login(
 
 async fn poll_for_login(
     configuration: &Configuration,
-    claim: &tower_api::models::CreateDeviceLoginResponse,
+    claim: &tower_api::models::CreateDeviceLoginTicketResponse,
     spinner: &mut output::Spinner,
 ) -> bool {
     let interval_duration = Duration::from_secs(claim.interval as u64);
@@ -95,14 +102,14 @@ async fn poll_for_login(
     let expires_at = chrono::Utc::now() + expires_in;
 
     while chrono::Utc::now() < expires_at {
-        match default_api::describe_device_login_claim(
+        match default_api::describe_device_login_session(
             configuration,
-            DescribeDeviceLoginClaimParams {
+            DescribeDeviceLoginSessionParams {
                 device_code: claim.device_code.clone()
             }
         ).await {
             Ok(response) => {
-                if let DescribeDeviceLoginClaimSuccess::Status200(session_response) = response.entity.unwrap() {
+                if let DescribeDeviceLoginSessionSuccess::Status200(session_response) = response.entity.unwrap() {
                     finalize_session(&session_response, configuration, spinner);
                     return true;
                 }
@@ -126,18 +133,18 @@ async fn poll_for_login(
 }
 
 fn finalize_session(
-    session_response: &tower_api::models::DescribeDeviceLoginClaimResponse,
+    session_response: &tower_api::models::DescribeDeviceLoginSessionResponse,
     _configuration: &Configuration,
     spinner: &mut output::Spinner,
 ) {
     // Create and save the session
     let session = config::Session::new(
         config::User {
-            email: session_response.user.email.clone(),
-            created_at: session_response.user.created_at.clone(),
+            email: session_response.session.user.email.clone(),
+            created_at: session_response.session.user.created_at.clone(),
         },
         config::Token {
-            jwt: session_response.token.clone(),
+            jwt: session_response.session.token.jwt.clone(),
         }
     );
 
@@ -146,7 +153,7 @@ fn finalize_session(
         output::failure(&format!("Failed to save session: {}", err));
     } else {
         spinner.success();
-        let message = format!("Hello, {}!", session_response.user.email);
+        let message = format!("Hello, {}!", session_response.session.user.email.clone());
         output::success(&message);
     }
 }
