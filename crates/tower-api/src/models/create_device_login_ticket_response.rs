@@ -20,8 +20,8 @@ pub struct CreateDeviceLoginTicketResponse {
     #[serde(rename = "device_code")]
     pub device_code: String,
     /// Number of seconds until this request expires.
-    #[serde(rename = "expres_in")]
-    pub expres_in: i64,
+    #[serde(rename = "expires_in")]
+    pub expires_in: i64,
     /// When this device login request was created.
     #[serde(rename = "generated_at")]
     pub generated_at: String,
@@ -40,11 +40,11 @@ pub struct CreateDeviceLoginTicketResponse {
 }
 
 impl CreateDeviceLoginTicketResponse {
-    pub fn new(device_code: String, expres_in: i64, generated_at: String, interval: i64, login_url: String, user_code: String, verification_url: String) -> CreateDeviceLoginTicketResponse {
+    pub fn new(device_code: String, expires_in: i64, generated_at: String, interval: i64, login_url: String, user_code: String, verification_url: String) -> CreateDeviceLoginTicketResponse {
         CreateDeviceLoginTicketResponse {
             schema: None,
             device_code,
-            expres_in,
+            expires_in,
             generated_at,
             interval,
             login_url,
