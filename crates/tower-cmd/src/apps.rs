@@ -202,6 +202,9 @@ pub async fn do_list_apps(_config: Config, configuration: &Configuration) {
         query: None,
         page: None,
         page_size: None,
+        period: None,
+        num_runs: None,
+        status: None
     }).await {
         Ok(response) => {
             if let ListAppsSuccess::Status200(list_response) = response.entity.unwrap() {
