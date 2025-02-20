@@ -49,12 +49,12 @@ pub async fn do_deploy(_config: Config, configuration: Configuration, args: &Arg
             let mut spinner = output::spinner("Building package...");
 
             match Package::build(spec).await {
-                Ok(package) => {
+                Ok(_package) => {
                     spinner.success();
 
                     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
-                    let callback = Box::new({
+                    let _callback = Box::new({
                         let progress_bar = Arc::clone(&progress_bar);
                         move |progress, total| {
                             let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
