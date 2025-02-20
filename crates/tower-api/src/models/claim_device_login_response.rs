@@ -12,19 +12,20 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct GenerateAppStatisticsResponse {
+pub struct ClaimDeviceLoginResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    #[serde(rename = "statistics")]
-    pub statistics: Box<models::AppStatistics>,
+    /// Whether the code was successfully claimed.
+    #[serde(rename = "claimed")]
+    pub claimed: bool,
 }
 
-impl GenerateAppStatisticsResponse {
-    pub fn new(statistics: models::AppStatistics) -> GenerateAppStatisticsResponse {
-        GenerateAppStatisticsResponse {
+impl ClaimDeviceLoginResponse {
+    pub fn new(claimed: bool) -> ClaimDeviceLoginResponse {
+        ClaimDeviceLoginResponse {
             schema: None,
-            statistics: Box::new(statistics),
+            claimed,
         }
     }
 }

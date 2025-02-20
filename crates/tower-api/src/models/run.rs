@@ -31,10 +31,12 @@ pub struct Run {
     pub started_at: Option<String>,
     #[serde(rename = "status")]
     pub status: String,
+    #[serde(rename = "status_group")]
+    pub status_group: String,
 }
 
 impl Run {
-    pub fn new(app_name: String, cancelled_at: Option<String>, created_at: String, ended_at: Option<String>, number: i64, run_id: String, scheduled_at: String, started_at: Option<String>, status: String) -> Run {
+    pub fn new(app_name: String, cancelled_at: Option<String>, created_at: String, ended_at: Option<String>, number: i64, run_id: String, scheduled_at: String, started_at: Option<String>, status: String, status_group: String) -> Run {
         Run {
             app_name,
             cancelled_at,
@@ -45,6 +47,7 @@ impl Run {
             scheduled_at,
             started_at,
             status,
+            status_group,
         }
     }
 }

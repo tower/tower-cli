@@ -12,19 +12,20 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct GenerateAppStatisticsResponse {
+pub struct DescribeDeviceLoginSessionResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    #[serde(rename = "statistics")]
-    pub statistics: Box<models::AppStatistics>,
+    /// The current session associated with your authentication method.
+    #[serde(rename = "session")]
+    pub session: Box<models::Session>,
 }
 
-impl GenerateAppStatisticsResponse {
-    pub fn new(statistics: models::AppStatistics) -> GenerateAppStatisticsResponse {
-        GenerateAppStatisticsResponse {
+impl DescribeDeviceLoginSessionResponse {
+    pub fn new(session: models::Session) -> DescribeDeviceLoginSessionResponse {
+        DescribeDeviceLoginSessionResponse {
             schema: None,
-            statistics: Box::new(statistics),
+            session: Box::new(session),
         }
     }
 }

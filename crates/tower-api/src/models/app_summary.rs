@@ -15,15 +15,21 @@ use serde::{Deserialize, Serialize};
 pub struct AppSummary {
     #[serde(rename = "app")]
     pub app: Box<models::App>,
+    #[serde(rename = "run_results")]
+    pub run_results: Box<models::RunResults>,
     #[serde(rename = "runs")]
     pub runs: Vec<models::Run>,
+    #[serde(rename = "total_runs")]
+    pub total_runs: i64,
 }
 
 impl AppSummary {
-    pub fn new(app: models::App, runs: Vec<models::Run>) -> AppSummary {
+    pub fn new(app: models::App, run_results: models::RunResults, runs: Vec<models::Run>, total_runs: i64) -> AppSummary {
         AppSummary {
             app: Box::new(app),
+            run_results: Box::new(run_results),
             runs,
+            total_runs,
         }
     }
 }

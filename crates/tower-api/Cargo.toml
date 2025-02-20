@@ -3,7 +3,8 @@ name = "tower-api"
 version = "1.0.0"
 authors = ["hello@tower.dev"]
 description = "REST API to interact with Tower Services."
-license = "MIT"
+# Override this license by providing a License Object in the OpenAPI.
+license = "Unlicense"
 edition = "2021"
 
 [dependencies]

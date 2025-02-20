@@ -20,6 +20,12 @@ pub struct AcceptInvitationParams {
     pub accept_invitation_params: models::AcceptInvitationParams
 }
 
+/// struct for passing parameters to the method [`claim_device_login_ticket`]
+#[derive(Clone, Debug)]
+pub struct ClaimDeviceLoginTicketParams {
+    pub claim_device_login_params: models::ClaimDeviceLoginParams
+}
+
 /// struct for passing parameters to the method [`create_account`]
 #[derive(Clone, Debug)]
 pub struct CreateAccountParams {
@@ -36,12 +42,6 @@ pub struct CreateApiKeyParams {
 #[derive(Clone, Debug)]
 pub struct CreateAppsParams {
     pub create_app_params: models::CreateAppParams
-}
-
-/// struct for passing parameters to the method [`create_device_login_claim`]
-#[derive(Clone, Debug)]
-pub struct CreateDeviceLoginClaimParams {
-    pub create_device_login_claim_params: models::CreateDeviceLoginClaimParams
 }
 
 /// struct for passing parameters to the method [`create_secret`]
@@ -105,9 +105,9 @@ pub struct DescribeAppVersionParams {
     pub num: String
 }
 
-/// struct for passing parameters to the method [`describe_device_login_claim`]
+/// struct for passing parameters to the method [`describe_device_login_session`]
 #[derive(Clone, Debug)]
-pub struct DescribeDeviceLoginClaimParams {
+pub struct DescribeDeviceLoginSessionParams {
     /// The device code to check.
     pub device_code: String
 }
@@ -126,6 +126,13 @@ pub struct DescribeRunParams {
 pub struct DescribeSecretsKeyParams {
     /// The format to return the key in. Options are 'pkcs1' and 'spki'.
     pub format: Option<String>
+}
+
+/// struct for passing parameters to the method [`generate_run_statistics`]
+#[derive(Clone, Debug)]
+pub struct GenerateRunStatisticsParams {
+    /// Time period for statistics (24h, 7d, 30d)
+    pub period: Option<String>
 }
 
 /// struct for passing parameters to the method [`get_app_run_logs`]
@@ -152,7 +159,13 @@ pub struct ListAppsParams {
     /// The page number to fetch.
     pub page: Option<i64>,
     /// The number of records to fetch on each page.
-    pub page_size: Option<i64>
+    pub page_size: Option<i64>,
+    /// Time period for statistics (24h, 7d, 30d, or none)
+    pub period: Option<String>,
+    /// Number of recent runs to fetch (-1 for all runs, defaults to 20)
+    pub num_runs: Option<i64>,
+    /// Filter apps by status(es). Valid values: active, failed, disabled etc.
+    pub status: Option<Vec<String>>
 }
 
 /// struct for passing parameters to the method [`list_runs`]
@@ -211,6 +224,14 @@ pub enum AcceptInvitationSuccess {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed successes of method [`claim_device_login_ticket`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ClaimDeviceLoginTicketSuccess {
+    Status200(models::ClaimDeviceLoginResponse),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed successes of method [`create_account`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -235,19 +256,11 @@ pub enum CreateAppsSuccess {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed successes of method [`create_device_login`]
+/// struct for typed successes of method [`create_device_login_ticket`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum CreateDeviceLoginSuccess {
-    Status200(models::CreateDeviceLoginResponse),
-    UnknownValue(serde_json::Value),
-}
-
-/// struct for typed successes of method [`create_device_login_claim`]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum CreateDeviceLoginClaimSuccess {
-    Status200(models::CreateDeviceLoginClaimResponse),
+pub enum CreateDeviceLoginTicketSuccess {
+    Status200(models::CreateDeviceLoginTicketResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -315,11 +328,11 @@ pub enum DescribeAppVersionSuccess {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed successes of method [`describe_device_login_claim`]
+/// struct for typed successes of method [`describe_device_login_session`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum DescribeDeviceLoginClaimSuccess {
-    Status200(models::DescribeDeviceLoginClaimResponse),
+pub enum DescribeDeviceLoginSessionSuccess {
+    Status200(models::DescribeDeviceLoginSessionResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -344,6 +357,22 @@ pub enum DescribeSecretsKeySuccess {
 #[serde(untagged)]
 pub enum DescribeSessionSuccess {
     Status200(models::DescribeSessionResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`generate_app_statistics`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GenerateAppStatisticsSuccess {
+    Status200(models::GenerateAppStatisticsResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`generate_run_statistics`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GenerateRunStatisticsSuccess {
+    Status200(models::GenerateRunStatisticsResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -435,6 +464,14 @@ pub enum AcceptInvitationError {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed errors of method [`claim_device_login_ticket`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ClaimDeviceLoginTicketError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed errors of method [`create_account`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -459,18 +496,10 @@ pub enum CreateAppsError {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed errors of method [`create_device_login`]
+/// struct for typed errors of method [`create_device_login_ticket`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum CreateDeviceLoginError {
-    DefaultResponse(models::ErrorModel),
-    UnknownValue(serde_json::Value),
-}
-
-/// struct for typed errors of method [`create_device_login_claim`]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum CreateDeviceLoginClaimError {
+pub enum CreateDeviceLoginTicketError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -541,10 +570,10 @@ pub enum DescribeAppVersionError {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed errors of method [`describe_device_login_claim`]
+/// struct for typed errors of method [`describe_device_login_session`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum DescribeDeviceLoginClaimError {
+pub enum DescribeDeviceLoginSessionError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -569,6 +598,22 @@ pub enum DescribeSecretsKeyError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DescribeSessionError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`generate_app_statistics`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GenerateAppStatisticsError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`generate_run_statistics`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GenerateRunStatisticsError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -684,6 +729,36 @@ pub async fn accept_invitation(configuration: &configuration::Configuration, par
     }
 }
 
+/// Claims a device login ticket code for the authenticated user.
+pub async fn claim_device_login_ticket(configuration: &configuration::Configuration, params: ClaimDeviceLoginTicketParams) -> Result<ResponseContent<ClaimDeviceLoginTicketSuccess>, Error<ClaimDeviceLoginTicketError>> {
+
+    let uri_str = format!("{}/login/device/claim", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.claim_device_login_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<ClaimDeviceLoginTicketSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ClaimDeviceLoginTicketError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
 /// This is the primary way that users register new accounts with Tower.
 pub async fn create_account(configuration: &configuration::Configuration, params: CreateAccountParams) -> Result<ResponseContent<CreateAccountSuccess>, Error<CreateAccountError>> {
 
@@ -770,8 +845,8 @@ pub async fn create_apps(configuration: &configuration::Configuration, params: C
     }
 }
 
-/// Creates a new device login request and returns the codes needed for authentication.
-pub async fn create_device_login(configuration: &configuration::Configuration) -> Result<ResponseContent<CreateDeviceLoginSuccess>, Error<CreateDeviceLoginError>> {
+/// Creates a new device login ticket and returns the codes and urls needed for authentication.
+pub async fn create_device_login_ticket(configuration: &configuration::Configuration) -> Result<ResponseContent<CreateDeviceLoginTicketSuccess>, Error<CreateDeviceLoginTicketError>> {
 
     let uri_str = format!("{}/login/device", configuration.base_path);
     let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
@@ -787,41 +862,11 @@ pub async fn create_device_login(configuration: &configuration::Configuration) -
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
-        let entity: Option<CreateDeviceLoginSuccess> = serde_json::from_str(&content).ok();
+        let entity: Option<CreateDeviceLoginTicketSuccess> = serde_json::from_str(&content).ok();
         Ok(ResponseContent { status, content, entity })
     } else {
         let content = resp.text().await?;
-        let entity: Option<CreateDeviceLoginError> = serde_json::from_str(&content).ok();
-        Err(Error::ResponseError(ResponseContent { status, content, entity }))
-    }
-}
-
-/// Claims a device login code for the authenticated user.
-pub async fn create_device_login_claim(configuration: &configuration::Configuration, params: CreateDeviceLoginClaimParams) -> Result<ResponseContent<CreateDeviceLoginClaimSuccess>, Error<CreateDeviceLoginClaimError>> {
-
-    let uri_str = format!("{}/login/device/claim", configuration.base_path);
-    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
-
-    if let Some(ref user_agent) = configuration.user_agent {
-        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
-    }
-    if let Some(ref token) = configuration.bearer_access_token {
-        req_builder = req_builder.bearer_auth(token.to_owned());
-    };
-    req_builder = req_builder.json(&params.create_device_login_claim_params);
-
-    let req = req_builder.build()?;
-    let resp = configuration.client.execute(req).await?;
-
-    let status = resp.status();
-
-    if !status.is_client_error() && !status.is_server_error() {
-        let content = resp.text().await?;
-        let entity: Option<CreateDeviceLoginClaimSuccess> = serde_json::from_str(&content).ok();
-        Ok(ResponseContent { status, content, entity })
-    } else {
-        let content = resp.text().await?;
-        let entity: Option<CreateDeviceLoginClaimError> = serde_json::from_str(&content).ok();
+        let entity: Option<CreateDeviceLoginTicketError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
@@ -1005,7 +1050,7 @@ pub async fn deploy_app(configuration: &configuration::Configuration, params: De
     }
 }
 
-/// Get all the apps for the current account.
+/// Get all the runs for the current account.
 pub async fn describe_app(configuration: &configuration::Configuration, params: DescribeAppParams) -> Result<ResponseContent<DescribeAppSuccess>, Error<DescribeAppError>> {
 
     let uri_str = format!("{}/apps/{name}", configuration.base_path, name=crate::apis::urlencode(params.name));
@@ -1067,7 +1112,7 @@ pub async fn describe_app_version(configuration: &configuration::Configuration, 
 }
 
 /// Checks if a device login code has been claimed and returns the user session if so.
-pub async fn describe_device_login_claim(configuration: &configuration::Configuration, params: DescribeDeviceLoginClaimParams) -> Result<ResponseContent<DescribeDeviceLoginClaimSuccess>, Error<DescribeDeviceLoginClaimError>> {
+pub async fn describe_device_login_session(configuration: &configuration::Configuration, params: DescribeDeviceLoginSessionParams) -> Result<ResponseContent<DescribeDeviceLoginSessionSuccess>, Error<DescribeDeviceLoginSessionError>> {
 
     let uri_str = format!("{}/login/device/{device_code}", configuration.base_path, device_code=crate::apis::urlencode(params.device_code));
     let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
@@ -1083,11 +1128,11 @@ pub async fn describe_device_login_claim(configuration: &configuration::Configur
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
-        let entity: Option<DescribeDeviceLoginClaimSuccess> = serde_json::from_str(&content).ok();
+        let entity: Option<DescribeDeviceLoginSessionSuccess> = serde_json::from_str(&content).ok();
         Ok(ResponseContent { status, content, entity })
     } else {
         let content = resp.text().await?;
-        let entity: Option<DescribeDeviceLoginClaimError> = serde_json::from_str(&content).ok();
+        let entity: Option<DescribeDeviceLoginSessionError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
@@ -1178,6 +1223,67 @@ pub async fn describe_session(configuration: &configuration::Configuration) -> R
     } else {
         let content = resp.text().await?;
         let entity: Option<DescribeSessionError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Generates current statistics about apps
+pub async fn generate_app_statistics(configuration: &configuration::Configuration) -> Result<ResponseContent<GenerateAppStatisticsSuccess>, Error<GenerateAppStatisticsError>> {
+
+    let uri_str = format!("{}/stats/apps", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<GenerateAppStatisticsSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<GenerateAppStatisticsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Generates statistics about runs over a specified time period.
+pub async fn generate_run_statistics(configuration: &configuration::Configuration, params: GenerateRunStatisticsParams) -> Result<ResponseContent<GenerateRunStatisticsSuccess>, Error<GenerateRunStatisticsError>> {
+
+    let uri_str = format!("{}/stats/runs", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref param_value) = params.period {
+        req_builder = req_builder.query(&[("period", &param_value.to_string())]);
+    }
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<GenerateRunStatisticsSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<GenerateRunStatisticsError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
@@ -1283,6 +1389,18 @@ pub async fn list_apps(configuration: &configuration::Configuration, params: Lis
     }
     if let Some(ref param_value) = params.page_size {
         req_builder = req_builder.query(&[("page_size", &param_value.to_string())]);
+    }
+    if let Some(ref param_value) = params.period {
+        req_builder = req_builder.query(&[("period", &param_value.to_string())]);
+    }
+    if let Some(ref param_value) = params.num_runs {
+        req_builder = req_builder.query(&[("num_runs", &param_value.to_string())]);
+    }
+    if let Some(ref param_value) = params.status {
+        req_builder = match "csv" {
+            "multi" => req_builder.query(&param_value.into_iter().map(|p| ("status".to_owned(), p.to_string())).collect::<Vec<(std::string::String, std::string::String)>>()),
+            _ => req_builder.query(&[("status", &param_value.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(",").to_string())]),
+        };
     }
     if let Some(ref user_agent) = configuration.user_agent {
         req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());

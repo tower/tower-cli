@@ -28,11 +28,11 @@ All URIs are relative to *http://localhost:8081/v1*
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 *DefaultApi* | [**accept_invitation**](docs/DefaultApi.md#accept_invitation) | **POST** /accounts/invite | Accept an invitation code
+*DefaultApi* | [**claim_device_login_ticket**](docs/DefaultApi.md#claim_device_login_ticket) | **POST** /login/device/claim | Claim a device login ticket
 *DefaultApi* | [**create_account**](docs/DefaultApi.md#create_account) | **POST** /accounts | Create account
 *DefaultApi* | [**create_api_key**](docs/DefaultApi.md#create_api_key) | **POST** /api-keys | Create API Key
 *DefaultApi* | [**create_apps**](docs/DefaultApi.md#create_apps) | **POST** /apps | Create app
-*DefaultApi* | [**create_device_login**](docs/DefaultApi.md#create_device_login) | **GET** /login/device | Create device login request
-*DefaultApi* | [**create_device_login_claim**](docs/DefaultApi.md#create_device_login_claim) | **POST** /login/device/claim | Create device login claim
+*DefaultApi* | [**create_device_login_ticket**](docs/DefaultApi.md#create_device_login_ticket) | **GET** /login/device | Create a device login ticket
 *DefaultApi* | [**create_secret**](docs/DefaultApi.md#create_secret) | **POST** /secrets | Create secret
 *DefaultApi* | [**create_session**](docs/DefaultApi.md#create_session) | **POST** /session | Create session
 *DefaultApi* | [**delete_api_key**](docs/DefaultApi.md#delete_api_key) | **DELETE** /api-keys | Delete API Key
@@ -41,10 +41,12 @@ Class | Method | HTTP request | Description
 *DefaultApi* | [**deploy_app**](docs/DefaultApi.md#deploy_app) | **POST** /apps/{name}/deploy | Deploy app
 *DefaultApi* | [**describe_app**](docs/DefaultApi.md#describe_app) | **GET** /apps/{name} | Describe app
 *DefaultApi* | [**describe_app_version**](docs/DefaultApi.md#describe_app_version) | **GET** /apps/{name}/versions/{num} | Describe app version
-*DefaultApi* | [**describe_device_login_claim**](docs/DefaultApi.md#describe_device_login_claim) | **GET** /login/device/{device_code} | Describe device login claim
+*DefaultApi* | [**describe_device_login_session**](docs/DefaultApi.md#describe_device_login_session) | **GET** /login/device/{device_code} | Describe device login session
 *DefaultApi* | [**describe_run**](docs/DefaultApi.md#describe_run) | **GET** /apps/{name}/runs/{seq} | Describe run
 *DefaultApi* | [**describe_secrets_key**](docs/DefaultApi.md#describe_secrets_key) | **GET** /secrets/key | Describe encryption key
 *DefaultApi* | [**describe_session**](docs/DefaultApi.md#describe_session) | **GET** /session | Describe session
+*DefaultApi* | [**generate_app_statistics**](docs/DefaultApi.md#generate_app_statistics) | **GET** /stats/apps | Generate app statistics
+*DefaultApi* | [**generate_run_statistics**](docs/DefaultApi.md#generate_run_statistics) | **GET** /stats/runs | Generate run statistics
 *DefaultApi* | [**get_app_run_logs**](docs/DefaultApi.md#get_app_run_logs) | **GET** /apps/{name}/runs/{seq}/logs | Get logs for a specific app run.
 *DefaultApi* | [**list_api_keys**](docs/DefaultApi.md#list_api_keys) | **GET** /api-keys | List API Keys
 *DefaultApi* | [**list_app_environments**](docs/DefaultApi.md#list_app_environments) | **GET** /apps/{name}/environments | List app environments
@@ -63,8 +65,11 @@ Class | Method | HTTP request | Description
  - [AcceptInvitationResponse](docs/AcceptInvitationResponse.md)
  - [ApiKey](docs/ApiKey.md)
  - [App](docs/App.md)
+ - [AppStatistics](docs/AppStatistics.md)
  - [AppSummary](docs/AppSummary.md)
  - [AppVersion](docs/AppVersion.md)
+ - [ClaimDeviceLoginParams](docs/ClaimDeviceLoginParams.md)
+ - [ClaimDeviceLoginResponse](docs/ClaimDeviceLoginResponse.md)
  - [CreateAccountParams](docs/CreateAccountParams.md)
  - [CreateAccountParamsFlagsStruct](docs/CreateAccountParamsFlagsStruct.md)
  - [CreateAccountResponse](docs/CreateAccountResponse.md)
@@ -72,9 +77,7 @@ Class | Method | HTTP request | Description
  - [CreateApiKeyResponse](docs/CreateApiKeyResponse.md)
  - [CreateAppParams](docs/CreateAppParams.md)
  - [CreateAppResponse](docs/CreateAppResponse.md)
- - [CreateDeviceLoginClaimParams](docs/CreateDeviceLoginClaimParams.md)
- - [CreateDeviceLoginClaimResponse](docs/CreateDeviceLoginClaimResponse.md)
- - [CreateDeviceLoginResponse](docs/CreateDeviceLoginResponse.md)
+ - [CreateDeviceLoginTicketResponse](docs/CreateDeviceLoginTicketResponse.md)
  - [CreateSecretParams](docs/CreateSecretParams.md)
  - [CreateSecretResponse](docs/CreateSecretResponse.md)
  - [CreateSessionParams](docs/CreateSessionParams.md)
@@ -85,13 +88,15 @@ Class | Method | HTTP request | Description
  - [DeployAppResponse](docs/DeployAppResponse.md)
  - [DescribeAppResponse](docs/DescribeAppResponse.md)
  - [DescribeAppVersionResponse](docs/DescribeAppVersionResponse.md)
- - [DescribeDeviceLoginClaimResponse](docs/DescribeDeviceLoginClaimResponse.md)
+ - [DescribeDeviceLoginSessionResponse](docs/DescribeDeviceLoginSessionResponse.md)
  - [DescribeRunResponse](docs/DescribeRunResponse.md)
  - [DescribeSecretsKeyResponse](docs/DescribeSecretsKeyResponse.md)
  - [DescribeSessionResponse](docs/DescribeSessionResponse.md)
  - [ErrorDetail](docs/ErrorDetail.md)
  - [ErrorModel](docs/ErrorModel.md)
  - [EventMessage](docs/EventMessage.md)
+ - [GenerateAppStatisticsResponse](docs/GenerateAppStatisticsResponse.md)
+ - [GenerateRunStatisticsResponse](docs/GenerateRunStatisticsResponse.md)
  - [GetRunLogLine](docs/GetRunLogLine.md)
  - [GetRunLogsOutputBody](docs/GetRunLogsOutputBody.md)
  - [ListApiKeysResponse](docs/ListApiKeysResponse.md)
@@ -106,8 +111,12 @@ Class | Method | HTTP request | Description
  - [Run](docs/Run.md)
  - [RunAppParams](docs/RunAppParams.md)
  - [RunAppResponse](docs/RunAppResponse.md)
+ - [RunResults](docs/RunResults.md)
+ - [RunStatistics](docs/RunStatistics.md)
  - [Secret](docs/Secret.md)
+ - [SeriesPoint](docs/SeriesPoint.md)
  - [Session](docs/Session.md)
+ - [StatisticsSettings](docs/StatisticsSettings.md)
  - [StreamAppRunLogs200ResponseInner](docs/StreamAppRunLogs200ResponseInner.md)
  - [Token](docs/Token.md)
  - [UpdateUserParams](docs/UpdateUserParams.md)
