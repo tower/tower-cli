@@ -17,7 +17,7 @@ use tower_api::apis::{
     }
 };
 
-use tower_api::models;
+use tower_api::models::{Run,CreateAppParams};
 
 use crate::output;
 
@@ -137,7 +137,7 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
                     "Elapsed Time".yellow().to_string(),
                 ];
 
-                let rows = runs.iter().map(|run| {
+                let rows = runs.iter().map(|run: &Run| {
                     let status = &run.status;
 
                     // Format start time
@@ -189,7 +189,11 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
         },
         Err(err) => {
             if let tower_api::apis::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content));
+                if err.status == 404 {
+                    output::failure(&format!("The app name {} was not found!", name));
+                } else {
+                    output::failure(&format!("{}: {}", err.status, err.content));
+                }
             } else {
                 output::failure(&format!("Unexpected error: {}", err));
             }
@@ -240,7 +244,7 @@ pub async fn do_create_app(_config: Config, configuration: &Configuration, args:
     let mut spinner = output::Spinner::new("Creating app".to_string());
     
     match default_api::create_apps(configuration, CreateAppsParams {
-        create_app_params: models::CreateAppParams {
+        create_app_params: CreateAppParams {
             schema: None,
             name: name.clone(),
             short_description: Some(description.clone()),
