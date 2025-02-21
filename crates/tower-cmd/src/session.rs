@@ -34,30 +34,7 @@ pub async fn do_login(config: Config, configuration: &Configuration) {
         Ok(response) => {
             spinner.success();
             if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response.entity.unwrap() {
-                // Now claim the ticket with the user_code from the login response
-                match default_api::claim_device_login_ticket(
-                    &api_config,
-                    default_api::ClaimDeviceLoginTicketParams {
-                        claim_device_login_ticket_params: tower_api::models::ClaimDeviceLoginTicketParams {
-                            schema: None,
-                            user_code: login_claim.user_code.clone(),
-                        }
-                    }
-                ).await {
-                    Ok(claim_response) => {
-                        if let ClaimDeviceLoginTicketSuccess::Status200(_claim) = claim_response.entity.unwrap() {
-                            handle_device_login(&config, &api_config, login_claim).await;
-                        }
-                    },
-                    Err(err) => {
-                        spinner.failure();
-                        if let tower_api::apis::Error::ResponseError(err) = err {
-                            output::failure(&format!("{}: {}", err.status, err.content));
-                        } else {
-                            output::failure(&format!("Unexpected error: {}", err));
-                        }
-                    }
-                }
+                handle_device_login(&config, &api_config, login_claim).await;
             }
         },
         Err(err) => {
