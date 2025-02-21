@@ -5,7 +5,6 @@ use tower_api::apis::{
     default_api::{
         self,
         CreateDeviceLoginTicketSuccess,
-        ClaimDeviceLoginTicketSuccess,
         DescribeDeviceLoginSessionParams,
         DescribeDeviceLoginSessionSuccess
     }
