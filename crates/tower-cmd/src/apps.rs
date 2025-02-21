@@ -143,12 +143,12 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
                     // Format start time
                     let start_time = if let Some(started_at) = &run.started_at {
                         if !started_at.is_empty() {
-                            started_at.clone()
+                            started_at.to_string()
                         } else {
-                            format!("Scheduled at {}", run.scheduled_at)
+                            format!("Scheduled at {}", &run.scheduled_at)
                         }
                     } else {
-                        format!("Scheduled at {}", run.scheduled_at)
+                        format!("Scheduled at {}", &run.scheduled_at)
                     };
 
                     // Calculate elapsed time
