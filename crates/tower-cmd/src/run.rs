@@ -185,13 +185,23 @@ fn get_run_parameters(
 }
 
 /// Parses `--parameter` arguments into a HashMap of key-value pairs.
+/// Handles format like "--parameter key=value"
 fn parse_parameters(args: &ArgMatches) -> HashMap<String, String> {
     let mut param_map = HashMap::new();
 
     if let Some(parameters) = args.get_many::<String>("parameters") {
         for param in parameters {
-            if let Some((key, value)) = param.split_once('=') {
-                param_map.insert(key.to_string(), value.to_string());
+            match param.split_once('=') {
+                Some((key, value)) => {
+                    if key.is_empty() {
+                        output::failure(&format!("Invalid parameter format: '{}'. Key cannot be empty.", param));
+                        continue;
+                    }
+                    param_map.insert(key.to_string(), value.to_string());
+                },
+                None => {
+                    output::failure(&format!("Invalid parameter format: '{}'. Expected 'key=value'.", param));
+                }
             }
         }
     }
