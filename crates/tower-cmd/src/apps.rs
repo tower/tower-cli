@@ -130,12 +130,10 @@ pub async fn do_show_app(_config: Config, configuration: &Configuration, cmd: Op
                 let line = format!("{}\n", "Recent runs:".bold().green());
                 output::write(&line);
         
-                let headers = vec![
-                    "#".yellow().to_string(),
-                    "Status".yellow().to_string(),
-                    "Start Time".yellow().to_string(),
-                    "Elapsed Time".yellow().to_string(),
-                ];
+                let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
+                    .into_iter()
+                    .map(|h| h.yellow().to_string())
+                    .collect();
 
                 let rows = runs.iter().map(|run: &Run| {
                     let status = &run.status;
