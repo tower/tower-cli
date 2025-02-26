@@ -1,16 +1,16 @@
 use anyhow::Result;
-use clap::{Arg, Command, value_parser};
-use config::{Config, Session};
+use clap::{value_parser, Arg, Command};
 use colored::*;
+use config::{Config, Session};
 
 mod apps;
+mod deploy;
+pub mod output;
+mod run;
 mod secrets;
 mod session;
-mod deploy;
-mod run;
-mod version;
-pub mod output;
 mod util;
+mod version;
 
 pub struct App {
     session: Option<Session>,
@@ -34,12 +34,9 @@ impl App {
         let matches = self.cmd.get_matches();
 
         let mut config = Config::from_arg_matches(&matches);
-        
+
         // Init the configuration for the new API client
         config.init_api_configuration(self.session.as_ref());
-
-        // Get a reference to the configuration
-        let configuration = config.get_api_configuration().unwrap();
 
         // Setup logging
         simple_logger::SimpleLogger::new()
@@ -59,9 +56,18 @@ impl App {
             let current_version = tower_version::current_version();
             // Compare versions
             if latest_version != current_version {
-                eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
-                    latest_version, current_version).yellow());
-                eprintln!("{}", "To upgrade, run: pip install --upgrade tower-cli\n".yellow());
+                eprintln!(
+                    "{}",
+                    format!(
+                        "\nA newer version of tower-cli is available: {} (you have {})",
+                        latest_version, current_version
+                    )
+                    .yellow()
+                );
+                eprintln!(
+                    "{}",
+                    "To upgrade, run: pip install --upgrade tower-cli\n".yellow()
+                );
             }
         }
 
@@ -78,36 +84,34 @@ impl App {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(config, configuration).await,
-                    Some(("show", args)) => apps::do_show_app(config, configuration, args.subcommand()).await,
-                    Some(("logs", args)) => apps::do_logs_app(config, configuration, args.subcommand()).await,
-                    Some(("create", args)) => apps::do_create_app(config, configuration, args).await,
-                    Some(("delete", args)) => apps::do_delete_app(config, configuration, args.subcommand()).await,
+                    Some(("list", _)) => apps::do_list_apps(config).await,
+                    Some(("show", args)) => apps::do_show_app(config, args.subcommand()).await,
+                    Some(("logs", args)) => apps::do_logs_app(config, args.subcommand()).await,
+                    Some(("create", args)) => apps::do_create_app(config, args).await,
+                    Some(("delete", args)) => apps::do_delete_app(config, args.subcommand()).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
                     }
                 }
-            },
+            }
             Some(("secrets", sub_matches)) => {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => secrets::do_list_secrets(config, configuration, args).await,
-                    Some(("create", args)) => secrets::do_create_secret(config, configuration, args).await,
-                    Some(("delete", args)) => secrets::do_delete_secret(config, configuration, args.subcommand()).await,
+                    Some(("list", args)) => secrets::do_list_secrets(config, args).await,
+                    Some(("create", args)) => secrets::do_create_secret(config, args).await,
+                    Some(("delete", args)) => {
+                        secrets::do_delete_secret(config, args.subcommand()).await
+                    }
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
                         std::process::exit(2);
                     }
                 }
-            },
-            Some(("deploy", args)) => {
-                deploy::do_deploy(config, configuration, args).await
-            },
-            Some(("run", args)) => {
-                run::do_run(config, configuration, args, args.subcommand()).await
-            },
+            }
+            Some(("deploy", args)) => deploy::do_deploy(config, args).await,
+            Some(("run", args)) => run::do_run(config, args, args.subcommand()).await,
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
@@ -124,7 +128,7 @@ fn root_cmd() -> Command {
                 .short('d')
                 .long("debug")
                 .hide(true)
-                .action(clap::ArgAction::SetTrue)
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("tower_url")
@@ -132,7 +136,7 @@ fn root_cmd() -> Command {
                 .long("tower-url")
                 .hide(true)
                 .value_parser(value_parser!(String))
-                .action(clap::ArgAction::Set)
+                .action(clap::ArgAction::Set),
         )
         .subcommand_required(false)
         .arg_required_else_help(false)
