@@ -33,18 +33,13 @@ impl App {
         let mut cmd_clone = self.cmd.clone();
         let matches = self.cmd.get_matches();
 
-        let config = Config::from_arg_matches(&matches);
+        let mut config = Config::from_arg_matches(&matches);
         
-        // Create the configuration for the new API client
-        let mut configuration = tower_api::apis::configuration::Configuration::new();
-        
-        // Set the base URL from config
-        configuration.base_path = config.tower_url.clone().to_string();
-        
-        // Add session token if available
-        if let Some(session) = &self.session {
-            configuration.bearer_access_token = Some(session.token.clone().jwt);
-        }
+        // Init the configuration for the new API client
+        config.init_api_configuration(self.session.as_ref());
+
+        // Get a reference to the configuration
+        let configuration = config.get_api_configuration().unwrap();
 
         // Setup logging
         simple_logger::SimpleLogger::new()
@@ -77,17 +72,17 @@ impl App {
         }
 
         match matches.subcommand() {
-            Some(("login", _)) => session::do_login(config, &configuration).await,
-            Some(("version", _)) => version::do_version(config, &configuration).await,
+            Some(("login", _)) => session::do_login(config).await,
+            Some(("version", _)) => version::do_version().await,
             Some(("apps", sub_matches)) => {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(config, &configuration).await,
-                    Some(("show", args)) => apps::do_show_app(config, &configuration, args.subcommand()).await,
-                    Some(("logs", args)) => apps::do_logs_app(config, &configuration, args.subcommand()).await,
-                    Some(("create", args)) => apps::do_create_app(config, &configuration, args).await,
-                    Some(("delete", args)) => apps::do_delete_app(config, &configuration, args.subcommand()).await,
+                    Some(("list", _)) => apps::do_list_apps(config, configuration).await,
+                    Some(("show", args)) => apps::do_show_app(config, configuration, args.subcommand()).await,
+                    Some(("logs", args)) => apps::do_logs_app(config, configuration, args.subcommand()).await,
+                    Some(("create", args)) => apps::do_create_app(config, configuration, args).await,
+                    Some(("delete", args)) => apps::do_delete_app(config, configuration, args.subcommand()).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -98,9 +93,9 @@ impl App {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => secrets::do_list_secrets(config, &configuration, args).await,
-                    Some(("create", args)) => secrets::do_create_secret(config, &configuration, args).await,
-                    Some(("delete", args)) => secrets::do_delete_secret(config, &configuration, args.subcommand()).await,
+                    Some(("list", args)) => secrets::do_list_secrets(config, configuration, args).await,
+                    Some(("create", args)) => secrets::do_create_secret(config, configuration, args).await,
+                    Some(("delete", args)) => secrets::do_delete_secret(config, configuration, args.subcommand()).await,
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -111,7 +106,7 @@ impl App {
                 deploy::do_deploy(config, configuration, args).await
             },
             Some(("run", args)) => {
-                run::do_run(config, &configuration, args, args.subcommand()).await
+                run::do_run(config, configuration, args, args.subcommand()).await
             },
             _ => {
                 cmd_clone.print_help().unwrap();
