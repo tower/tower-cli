@@ -5,8 +5,8 @@ use crypto::encrypt;
 use rsa::pkcs1::DecodeRsaPublicKey;
 
 use tower_api::{
-    apis::{configuration::Configuration, default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams}},
-    models::{api_key, CreateSecretParams as ApiCreateSecretParams},
+    apis::default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams},
+    models::CreateSecretParams as CreateSecretParamsModel,
 };
 
 use crate::output;
@@ -164,10 +164,10 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
                         let preview = create_preview(value);
 
                         let create_params = CreateSecretParams {
-                            create_secret_params: ApiCreateSecretParams {
+                            create_secret_params: CreateSecretParamsModel {
                                 schema: None,
                                 name: name.clone(),
-                                encrypted_value: encrypted_value,
+                                encrypted_value,
                                 environment: environment.clone(),
                                 preview,
                             }
