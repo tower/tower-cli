@@ -56,6 +56,12 @@ pub struct CreateSessionParams {
     pub create_session_params: models::CreateSessionParams
 }
 
+/// struct for passing parameters to the method [`create_team`]
+#[derive(Clone, Debug)]
+pub struct CreateTeamParams {
+    pub create_team_params: models::CreateTeamParams
+}
+
 /// struct for passing parameters to the method [`delete_api_key`]
 #[derive(Clone, Debug)]
 pub struct DeleteApiKeyParams {
@@ -76,6 +82,20 @@ pub struct DeleteSecretParams {
     pub name: String,
     /// The environment of the secret to delete.
     pub environment: Option<String>
+}
+
+/// struct for passing parameters to the method [`delete_team`]
+#[derive(Clone, Debug)]
+pub struct DeleteTeamParams {
+    pub delete_team_params: models::DeleteTeamParams
+}
+
+/// struct for passing parameters to the method [`delete_team_invitation`]
+#[derive(Clone, Debug)]
+pub struct DeleteTeamInvitationParams {
+    /// The slug of the team to remove someone from
+    pub slug: String,
+    pub delete_team_invitation_params: models::DeleteTeamInvitationParams
 }
 
 /// struct for passing parameters to the method [`deploy_app`]
@@ -144,6 +164,21 @@ pub struct GetAppRunLogsParams {
     pub seq: i64
 }
 
+/// struct for passing parameters to the method [`invite_team_member`]
+#[derive(Clone, Debug)]
+pub struct InviteTeamMemberParams {
+    /// The slug of the team to invite someone to
+    pub slug: String,
+    pub invite_team_member_params: models::InviteTeamMemberParams
+}
+
+/// struct for passing parameters to the method [`leave_team`]
+#[derive(Clone, Debug)]
+pub struct LeaveTeamParams {
+    /// The slug of the team to leave
+    pub slug: String
+}
+
 /// struct for passing parameters to the method [`list_app_environments`]
 #[derive(Clone, Debug)]
 pub struct ListAppEnvironmentsParams {
@@ -192,6 +227,36 @@ pub struct ListSecretsParams {
     pub page_size: Option<i64>
 }
 
+/// struct for passing parameters to the method [`list_team_invitations`]
+#[derive(Clone, Debug)]
+pub struct ListTeamInvitationsParams {
+    /// The slug of the team to list members for
+    pub slug: String
+}
+
+/// struct for passing parameters to the method [`list_team_members`]
+#[derive(Clone, Debug)]
+pub struct ListTeamMembersParams {
+    /// The slug of the team to list members for
+    pub slug: String
+}
+
+/// struct for passing parameters to the method [`remove_team_member`]
+#[derive(Clone, Debug)]
+pub struct RemoveTeamMemberParams {
+    /// The slug of the team to remove someone from
+    pub slug: String,
+    pub remove_team_member_params: models::RemoveTeamMemberParams
+}
+
+/// struct for passing parameters to the method [`resend_team_invitation`]
+#[derive(Clone, Debug)]
+pub struct ResendTeamInvitationParams {
+    /// The slug of the team to invite someone to
+    pub slug: String,
+    pub resend_team_invitation_params: models::ResendTeamInvitationParams
+}
+
 /// struct for passing parameters to the method [`run_app`]
 #[derive(Clone, Debug)]
 pub struct RunAppParams {
@@ -207,6 +272,20 @@ pub struct StreamAppRunLogsParams {
     pub name: String,
     /// The sequence number of the run to get logs for.
     pub seq: i64
+}
+
+/// struct for passing parameters to the method [`update_my_team_invitation`]
+#[derive(Clone, Debug)]
+pub struct UpdateMyTeamInvitationParams {
+    pub update_my_team_invitation_params: models::UpdateMyTeamInvitationParams
+}
+
+/// struct for passing parameters to the method [`update_team`]
+#[derive(Clone, Debug)]
+pub struct UpdateTeamParams {
+    /// The slug of the team to update
+    pub slug: String,
+    pub update_team_params: models::UpdateTeamParams
 }
 
 /// struct for passing parameters to the method [`update_user`]
@@ -280,6 +359,14 @@ pub enum CreateSessionSuccess {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed successes of method [`create_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CreateTeamSuccess {
+    Status200(models::CreateTeamResponse),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed successes of method [`delete_api_key`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -301,6 +388,22 @@ pub enum DeleteAppSuccess {
 #[serde(untagged)]
 pub enum DeleteSecretSuccess {
     Status204(),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`delete_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DeleteTeamSuccess {
+    Status200(models::DeleteTeamResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`delete_team_invitation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DeleteTeamInvitationSuccess {
+    Status200(models::DeleteTeamInvitationResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -384,6 +487,22 @@ pub enum GetAppRunLogsSuccess {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed successes of method [`invite_team_member`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum InviteTeamMemberSuccess {
+    Status200(models::InviteTeamMemberResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`leave_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LeaveTeamSuccess {
+    Status200(models::LeaveTeamResponse),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed successes of method [`list_api_keys`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -405,6 +524,14 @@ pub enum ListAppEnvironmentsSuccess {
 #[serde(untagged)]
 pub enum ListAppsSuccess {
     Status200(models::ListAppsResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`list_my_team_invitations`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListMyTeamInvitationsSuccess {
+    Status200(models::ListMyTeamInvitationsResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -432,6 +559,54 @@ pub enum ListSecretsSuccess {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed successes of method [`list_team_invitations`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListTeamInvitationsSuccess {
+    Status200(models::ListTeamInvitationsResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`list_team_members`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListTeamMembersSuccess {
+    Status200(models::ListTeamMembersResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`list_teams`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListTeamsSuccess {
+    Status200(models::ListTeamsResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`refresh_session`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RefreshSessionSuccess {
+    Status200(models::RefreshSessionResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`remove_team_member`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RemoveTeamMemberSuccess {
+    Status200(models::RemoveTeamMemberResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`resend_team_invitation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ResendTeamInvitationSuccess {
+    Status200(models::ResendTeamInvitationResponse),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed successes of method [`run_app`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -445,6 +620,22 @@ pub enum RunAppSuccess {
 #[serde(untagged)]
 pub enum StreamAppRunLogsSuccess {
     Status200(Vec<models::StreamAppRunLogs200ResponseInner>),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`update_my_team_invitation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateMyTeamInvitationSuccess {
+    Status200(models::UpdateMyTeamInvitationResponse),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed successes of method [`update_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateTeamSuccess {
+    Status200(models::UpdateTeamResponse),
     UnknownValue(serde_json::Value),
 }
 
@@ -520,6 +711,14 @@ pub enum CreateSessionError {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed errors of method [`create_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CreateTeamError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed errors of method [`delete_api_key`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -540,6 +739,22 @@ pub enum DeleteAppError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DeleteSecretError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`delete_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DeleteTeamError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`delete_team_invitation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DeleteTeamInvitationError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -626,6 +841,22 @@ pub enum GetAppRunLogsError {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed errors of method [`invite_team_member`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum InviteTeamMemberError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`leave_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LeaveTeamError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed errors of method [`list_api_keys`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -646,6 +877,14 @@ pub enum ListAppEnvironmentsError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ListAppsError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`list_my_team_invitations`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListMyTeamInvitationsError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -674,6 +913,54 @@ pub enum ListSecretsError {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed errors of method [`list_team_invitations`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListTeamInvitationsError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`list_team_members`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListTeamMembersError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`list_teams`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListTeamsError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`refresh_session`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RefreshSessionError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`remove_team_member`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RemoveTeamMemberError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`resend_team_invitation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ResendTeamInvitationError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed errors of method [`run_app`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -686,6 +973,22 @@ pub enum RunAppError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StreamAppRunLogsError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`update_my_team_invitation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateMyTeamInvitationError {
+    DefaultResponse(models::ErrorModel),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`update_team`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateTeamError {
     DefaultResponse(models::ErrorModel),
     UnknownValue(serde_json::Value),
 }
@@ -928,6 +1231,36 @@ pub async fn create_session(configuration: &configuration::Configuration, params
     }
 }
 
+/// Create a new team
+pub async fn create_team(configuration: &configuration::Configuration, params: CreateTeamParams) -> Result<ResponseContent<CreateTeamSuccess>, Error<CreateTeamError>> {
+
+    let uri_str = format!("{}/teams", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.create_team_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<CreateTeamSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<CreateTeamError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
 pub async fn delete_api_key(configuration: &configuration::Configuration, params: DeleteApiKeyParams) -> Result<ResponseContent<DeleteApiKeySuccess>, Error<DeleteApiKeyError>> {
 
     let uri_str = format!("{}/api-keys", configuration.base_path);
@@ -1014,6 +1347,66 @@ pub async fn delete_secret(configuration: &configuration::Configuration, params:
     } else {
         let content = resp.text().await?;
         let entity: Option<DeleteSecretError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Delete a new team
+pub async fn delete_team(configuration: &configuration::Configuration, params: DeleteTeamParams) -> Result<ResponseContent<DeleteTeamSuccess>, Error<DeleteTeamError>> {
+
+    let uri_str = format!("{}/teams", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::DELETE, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.delete_team_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<DeleteTeamSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<DeleteTeamError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Delete a pending team invitation that you have previously sent
+pub async fn delete_team_invitation(configuration: &configuration::Configuration, params: DeleteTeamInvitationParams) -> Result<ResponseContent<DeleteTeamInvitationSuccess>, Error<DeleteTeamInvitationError>> {
+
+    let uri_str = format!("{}/teams/{slug}/invites", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::DELETE, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.delete_team_invitation_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<DeleteTeamInvitationSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<DeleteTeamInvitationError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
@@ -1317,6 +1710,65 @@ pub async fn get_app_run_logs(configuration: &configuration::Configuration, para
     }
 }
 
+/// Invite a new team
+pub async fn invite_team_member(configuration: &configuration::Configuration, params: InviteTeamMemberParams) -> Result<ResponseContent<InviteTeamMemberSuccess>, Error<InviteTeamMemberError>> {
+
+    let uri_str = format!("{}/teams/{slug}/invites", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.invite_team_member_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<InviteTeamMemberSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<InviteTeamMemberError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Remove yourself from a team, if that's something you'd like to do for whatever reason. If you're the last member of a team, you cannot remove yourself. You should delete the team instead.
+pub async fn leave_team(configuration: &configuration::Configuration, params: LeaveTeamParams) -> Result<ResponseContent<LeaveTeamSuccess>, Error<LeaveTeamError>> {
+
+    let uri_str = format!("{}/teams/{slug}/leave", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<LeaveTeamSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<LeaveTeamError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
 /// List all the API keys associated with your current account.
 pub async fn list_api_keys(configuration: &configuration::Configuration) -> Result<ResponseContent<ListApiKeysSuccess>, Error<ListApiKeysError>> {
 
@@ -1421,6 +1873,35 @@ pub async fn list_apps(configuration: &configuration::Configuration, params: Lis
     } else {
         let content = resp.text().await?;
         let entity: Option<ListAppsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// List your pending invitations for teams
+pub async fn list_my_team_invitations(configuration: &configuration::Configuration) -> Result<ResponseContent<ListMyTeamInvitationsSuccess>, Error<ListMyTeamInvitationsError>> {
+
+    let uri_str = format!("{}/team-invites", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<ListMyTeamInvitationsSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ListMyTeamInvitationsError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
@@ -1530,6 +2011,182 @@ pub async fn list_secrets(configuration: &configuration::Configuration, params: 
     }
 }
 
+/// List the pending invitations for a team
+pub async fn list_team_invitations(configuration: &configuration::Configuration, params: ListTeamInvitationsParams) -> Result<ResponseContent<ListTeamInvitationsSuccess>, Error<ListTeamInvitationsError>> {
+
+    let uri_str = format!("{}/teams/{slug}/invites", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<ListTeamInvitationsSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ListTeamInvitationsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// List the members of a team
+pub async fn list_team_members(configuration: &configuration::Configuration, params: ListTeamMembersParams) -> Result<ResponseContent<ListTeamMembersSuccess>, Error<ListTeamMembersError>> {
+
+    let uri_str = format!("{}/teams/{slug}/members", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<ListTeamMembersSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ListTeamMembersError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// List all the teams that the user is a member of.
+pub async fn list_teams(configuration: &configuration::Configuration) -> Result<ResponseContent<ListTeamsSuccess>, Error<ListTeamsError>> {
+
+    let uri_str = format!("{}/teams", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<ListTeamsSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ListTeamsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Returns a new session based on the supplied authentication context. This is helpful when clients want to use POST instead of GET to check session information.
+pub async fn refresh_session(configuration: &configuration::Configuration) -> Result<ResponseContent<RefreshSessionSuccess>, Error<RefreshSessionError>> {
+
+    let uri_str = format!("{}/session/refresh", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<RefreshSessionSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<RefreshSessionError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Remove a new team
+pub async fn remove_team_member(configuration: &configuration::Configuration, params: RemoveTeamMemberParams) -> Result<ResponseContent<RemoveTeamMemberSuccess>, Error<RemoveTeamMemberError>> {
+
+    let uri_str = format!("{}/teams/{slug}/members", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::DELETE, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.remove_team_member_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<RemoveTeamMemberSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<RemoveTeamMemberError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Resend a team invitation to a user if they need a reminder or if they lost it
+pub async fn resend_team_invitation(configuration: &configuration::Configuration, params: ResendTeamInvitationParams) -> Result<ResponseContent<ResendTeamInvitationSuccess>, Error<ResendTeamInvitationError>> {
+
+    let uri_str = format!("{}/teams/{slug}/invites/resend", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.resend_team_invitation_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<ResendTeamInvitationSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ResendTeamInvitationError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
 /// Runs an app with the supplied parameters.
 pub async fn run_app(configuration: &configuration::Configuration, params: RunAppParams) -> Result<ResponseContent<RunAppSuccess>, Error<RunAppError>> {
 
@@ -1585,6 +2242,66 @@ pub async fn stream_app_run_logs(configuration: &configuration::Configuration, p
     } else {
         let content = resp.text().await?;
         let entity: Option<StreamAppRunLogsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Update a team invitation that you have pending
+pub async fn update_my_team_invitation(configuration: &configuration::Configuration, params: UpdateMyTeamInvitationParams) -> Result<ResponseContent<UpdateMyTeamInvitationSuccess>, Error<UpdateMyTeamInvitationError>> {
+
+    let uri_str = format!("{}/team-invites", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::PUT, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.update_my_team_invitation_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<UpdateMyTeamInvitationSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<UpdateMyTeamInvitationError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+/// Update a team with a new name or slug. Note that updating the team with a new slug will cause all your URLs to change!
+pub async fn update_team(configuration: &configuration::Configuration, params: UpdateTeamParams) -> Result<ResponseContent<UpdateTeamSuccess>, Error<UpdateTeamError>> {
+
+    let uri_str = format!("{}/teams/{slug}", configuration.base_path, slug=crate::apis::urlencode(params.slug));
+    let mut req_builder = configuration.client.request(reqwest::Method::PUT, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+    req_builder = req_builder.json(&params.update_team_params);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        let entity: Option<UpdateTeamSuccess> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<UpdateTeamError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }

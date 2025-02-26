@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Session {
+    #[serde(rename = "teams")]
+    pub teams: Vec<models::Team>,
     #[serde(rename = "token")]
     pub token: Box<models::Token>,
     #[serde(rename = "user")]
@@ -20,8 +22,9 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(token: models::Token, user: models::User) -> Session {
+    pub fn new(teams: Vec<models::Team>, token: models::Token, user: models::User) -> Session {
         Session {
+            teams,
             token: Box::new(token),
             user: Box::new(user),
         }

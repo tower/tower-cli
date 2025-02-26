@@ -12,24 +12,24 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CreateAppParams {
+pub struct UpdateMyTeamInvitationParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    /// The name of the app.
-    #[serde(rename = "name")]
-    pub name: String,
-    /// A description of the app.
-    #[serde(rename = "short_description", skip_serializing_if = "Option::is_none")]
-    pub short_description: Option<String>,
+    /// Whether or not the invitation was accepted. If false, it's considered rejected.
+    #[serde(rename = "accepted")]
+    pub accepted: bool,
+    /// The slug of the team invitation to update
+    #[serde(rename = "slug")]
+    pub slug: String,
 }
 
-impl CreateAppParams {
-    pub fn new(name: String) -> CreateAppParams {
-        CreateAppParams {
+impl UpdateMyTeamInvitationParams {
+    pub fn new(accepted: bool, slug: String) -> UpdateMyTeamInvitationParams {
+        UpdateMyTeamInvitationParams {
             schema: None,
-            name,
-            short_description: None,
+            accepted,
+            slug,
         }
     }
 }

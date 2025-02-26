@@ -12,24 +12,24 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CreateAppParams {
+pub struct CreateTeamParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    /// The name of the app.
+    /// The name of the team to create
     #[serde(rename = "name")]
     pub name: String,
-    /// A description of the app.
-    #[serde(rename = "short_description", skip_serializing_if = "Option::is_none")]
-    pub short_description: Option<String>,
+    /// The slug of the team to create
+    #[serde(rename = "slug")]
+    pub slug: String,
 }
 
-impl CreateAppParams {
-    pub fn new(name: String) -> CreateAppParams {
-        CreateAppParams {
+impl CreateTeamParams {
+    pub fn new(name: String, slug: String) -> CreateTeamParams {
+        CreateTeamParams {
             schema: None,
             name,
-            short_description: None,
+            slug,
         }
     }
 }

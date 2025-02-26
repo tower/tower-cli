@@ -35,9 +35,12 @@ Class | Method | HTTP request | Description
 *DefaultApi* | [**create_device_login_ticket**](docs/DefaultApi.md#create_device_login_ticket) | **GET** /login/device | Create a device login ticket
 *DefaultApi* | [**create_secret**](docs/DefaultApi.md#create_secret) | **POST** /secrets | Create secret
 *DefaultApi* | [**create_session**](docs/DefaultApi.md#create_session) | **POST** /session | Create session
+*DefaultApi* | [**create_team**](docs/DefaultApi.md#create_team) | **POST** /teams | Create Team
 *DefaultApi* | [**delete_api_key**](docs/DefaultApi.md#delete_api_key) | **DELETE** /api-keys | Delete API Key
 *DefaultApi* | [**delete_app**](docs/DefaultApi.md#delete_app) | **DELETE** /apps/{name} | Delete app
 *DefaultApi* | [**delete_secret**](docs/DefaultApi.md#delete_secret) | **DELETE** /secrets/{name} | Delete a secret.
+*DefaultApi* | [**delete_team**](docs/DefaultApi.md#delete_team) | **DELETE** /teams | Delete Team
+*DefaultApi* | [**delete_team_invitation**](docs/DefaultApi.md#delete_team_invitation) | **DELETE** /teams/{slug}/invites | Delete Team Invitation
 *DefaultApi* | [**deploy_app**](docs/DefaultApi.md#deploy_app) | **POST** /apps/{name}/deploy | Deploy app
 *DefaultApi* | [**describe_app**](docs/DefaultApi.md#describe_app) | **GET** /apps/{name} | Describe app
 *DefaultApi* | [**describe_app_version**](docs/DefaultApi.md#describe_app_version) | **GET** /apps/{name}/versions/{num} | Describe app version
@@ -48,14 +51,25 @@ Class | Method | HTTP request | Description
 *DefaultApi* | [**generate_app_statistics**](docs/DefaultApi.md#generate_app_statistics) | **GET** /stats/apps | Generate app statistics
 *DefaultApi* | [**generate_run_statistics**](docs/DefaultApi.md#generate_run_statistics) | **GET** /stats/runs | Generate run statistics
 *DefaultApi* | [**get_app_run_logs**](docs/DefaultApi.md#get_app_run_logs) | **GET** /apps/{name}/runs/{seq}/logs | Get logs for a specific app run.
+*DefaultApi* | [**invite_team_member**](docs/DefaultApi.md#invite_team_member) | **POST** /teams/{slug}/invites | Invite Team Member
+*DefaultApi* | [**leave_team**](docs/DefaultApi.md#leave_team) | **POST** /teams/{slug}/leave | Leave Team
 *DefaultApi* | [**list_api_keys**](docs/DefaultApi.md#list_api_keys) | **GET** /api-keys | List API Keys
 *DefaultApi* | [**list_app_environments**](docs/DefaultApi.md#list_app_environments) | **GET** /apps/{name}/environments | List app environments
 *DefaultApi* | [**list_apps**](docs/DefaultApi.md#list_apps) | **GET** /apps | List apps
+*DefaultApi* | [**list_my_team_invitations**](docs/DefaultApi.md#list_my_team_invitations) | **GET** /team-invites | List My Team Invitations
 *DefaultApi* | [**list_runs**](docs/DefaultApi.md#list_runs) | **GET** /apps/{name}/runs | List runs
 *DefaultApi* | [**list_secret_environments**](docs/DefaultApi.md#list_secret_environments) | **GET** /secrets/environments | List secret environments
 *DefaultApi* | [**list_secrets**](docs/DefaultApi.md#list_secrets) | **GET** /secrets | List secrets
+*DefaultApi* | [**list_team_invitations**](docs/DefaultApi.md#list_team_invitations) | **GET** /teams/{slug}/invites | List Team Invitations
+*DefaultApi* | [**list_team_members**](docs/DefaultApi.md#list_team_members) | **GET** /teams/{slug}/members | List Team Members
+*DefaultApi* | [**list_teams**](docs/DefaultApi.md#list_teams) | **GET** /teams | List Teams
+*DefaultApi* | [**refresh_session**](docs/DefaultApi.md#refresh_session) | **POST** /session/refresh | Refresh session
+*DefaultApi* | [**remove_team_member**](docs/DefaultApi.md#remove_team_member) | **DELETE** /teams/{slug}/members | Remove Team Member
+*DefaultApi* | [**resend_team_invitation**](docs/DefaultApi.md#resend_team_invitation) | **POST** /teams/{slug}/invites/resend | Resend Team Invitation
 *DefaultApi* | [**run_app**](docs/DefaultApi.md#run_app) | **POST** /apps/{name}/runs | Run app
 *DefaultApi* | [**stream_app_run_logs**](docs/DefaultApi.md#stream_app_run_logs) | **GET** /apps/{name}/runs/{seq}/logs/stream | Stream logs for a specific app run
+*DefaultApi* | [**update_my_team_invitation**](docs/DefaultApi.md#update_my_team_invitation) | **PUT** /team-invites | Update My Team Invitation
+*DefaultApi* | [**update_team**](docs/DefaultApi.md#update_team) | **PUT** /teams/{slug} | Update Team
 *DefaultApi* | [**update_user**](docs/DefaultApi.md#update_user) | **PUT** /user | Update user profile
 
 
@@ -82,9 +96,15 @@ Class | Method | HTTP request | Description
  - [CreateSecretResponse](docs/CreateSecretResponse.md)
  - [CreateSessionParams](docs/CreateSessionParams.md)
  - [CreateSessionResponse](docs/CreateSessionResponse.md)
+ - [CreateTeamParams](docs/CreateTeamParams.md)
+ - [CreateTeamResponse](docs/CreateTeamResponse.md)
  - [DeleteApiKeyParams](docs/DeleteApiKeyParams.md)
  - [DeleteApiKeyResponse](docs/DeleteApiKeyResponse.md)
  - [DeleteAppResponse](docs/DeleteAppResponse.md)
+ - [DeleteTeamInvitationParams](docs/DeleteTeamInvitationParams.md)
+ - [DeleteTeamInvitationResponse](docs/DeleteTeamInvitationResponse.md)
+ - [DeleteTeamParams](docs/DeleteTeamParams.md)
+ - [DeleteTeamResponse](docs/DeleteTeamResponse.md)
  - [DeployAppResponse](docs/DeployAppResponse.md)
  - [DescribeAppResponse](docs/DescribeAppResponse.md)
  - [DescribeAppVersionResponse](docs/DescribeAppVersionResponse.md)
@@ -99,15 +119,27 @@ Class | Method | HTTP request | Description
  - [GenerateRunStatisticsResponse](docs/GenerateRunStatisticsResponse.md)
  - [GetRunLogLine](docs/GetRunLogLine.md)
  - [GetRunLogsOutputBody](docs/GetRunLogsOutputBody.md)
+ - [InviteTeamMemberParams](docs/InviteTeamMemberParams.md)
+ - [InviteTeamMemberResponse](docs/InviteTeamMemberResponse.md)
+ - [LeaveTeamResponse](docs/LeaveTeamResponse.md)
  - [ListApiKeysResponse](docs/ListApiKeysResponse.md)
  - [ListAppEnvironmentsResponse](docs/ListAppEnvironmentsResponse.md)
  - [ListAppsResponse](docs/ListAppsResponse.md)
+ - [ListMyTeamInvitationsResponse](docs/ListMyTeamInvitationsResponse.md)
  - [ListRunsResponse](docs/ListRunsResponse.md)
  - [ListSecretEnvironmentsResponse](docs/ListSecretEnvironmentsResponse.md)
  - [ListSecretsResponse](docs/ListSecretsResponse.md)
+ - [ListTeamInvitationsResponse](docs/ListTeamInvitationsResponse.md)
+ - [ListTeamMembersResponse](docs/ListTeamMembersResponse.md)
+ - [ListTeamsResponse](docs/ListTeamsResponse.md)
  - [LogLine](docs/LogLine.md)
  - [Pagination](docs/Pagination.md)
  - [Parameter](docs/Parameter.md)
+ - [RefreshSessionResponse](docs/RefreshSessionResponse.md)
+ - [RemoveTeamMemberParams](docs/RemoveTeamMemberParams.md)
+ - [RemoveTeamMemberResponse](docs/RemoveTeamMemberResponse.md)
+ - [ResendTeamInvitationParams](docs/ResendTeamInvitationParams.md)
+ - [ResendTeamInvitationResponse](docs/ResendTeamInvitationResponse.md)
  - [Run](docs/Run.md)
  - [RunAppParams](docs/RunAppParams.md)
  - [RunAppResponse](docs/RunAppResponse.md)
@@ -118,7 +150,13 @@ Class | Method | HTTP request | Description
  - [Session](docs/Session.md)
  - [StatisticsSettings](docs/StatisticsSettings.md)
  - [StreamAppRunLogs200ResponseInner](docs/StreamAppRunLogs200ResponseInner.md)
+ - [Team](docs/Team.md)
+ - [TeamInvitation](docs/TeamInvitation.md)
  - [Token](docs/Token.md)
+ - [UpdateMyTeamInvitationParams](docs/UpdateMyTeamInvitationParams.md)
+ - [UpdateMyTeamInvitationResponse](docs/UpdateMyTeamInvitationResponse.md)
+ - [UpdateTeamParams](docs/UpdateTeamParams.md)
+ - [UpdateTeamResponse](docs/UpdateTeamResponse.md)
  - [UpdateUserParams](docs/UpdateUserParams.md)
  - [UpdateUserResponse](docs/UpdateUserResponse.md)
  - [User](docs/User.md)
