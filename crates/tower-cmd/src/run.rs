@@ -1,14 +1,14 @@
+use clap::{Arg, ArgMatches, Command};
+use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use config::{Config, Towerfile};
-use clap::{Arg, Command, ArgMatches};
 use tower_api::apis::{
     configuration::Configuration,
     default_api::{self, ListSecretsParams, RunAppParams},
 };
 use tower_api::models;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{AppLauncher, App, OutputChannel, local::LocalApp};
+use tower_runtime::{local::LocalApp, App, AppLauncher, OutputChannel};
 
 use crate::output;
 
@@ -20,28 +20,28 @@ pub fn run_cmd() -> Command {
                 .long("dir")
                 .short('d')
                 .help("The directory containing the Towerfile")
-                .default_value(".")
+                .default_value("."),
         )
         .arg(
             Arg::new("local")
                 .long("local")
                 .default_value("false")
                 .help("Run this app locally")
-                .action(clap::ArgAction::SetTrue)
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("environment")
                 .short('e')
                 .long("environment")
                 .help("The environment to invoke the app in")
-                .default_value("default")
+                .default_value("default"),
         )
         .arg(
             Arg::new("parameters")
                 .short('p')
                 .long("parameter")
                 .help("Parameters (key=value) to pass to the app")
-                .action(clap::ArgAction::Append)
+                .action(clap::ArgAction::Append),
         )
         .about("Run your code in Tower or locally")
 }
@@ -53,7 +53,11 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 
     match res {
         Ok((local, path, params, app_name)) => {
-            log::debug!("Running app at {}, local: {}", path.to_str().unwrap(), local);
+            log::debug!(
+                "Running app at {}, local: {}",
+                path.to_str().unwrap(),
+                local
+            );
 
             if local {
                 // For the time being, we should report that we can't run an app by name locally.
@@ -69,7 +73,7 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 
                 do_run_remote(config, path, env, params, app_name).await;
             }
-        },
+        }
         Err(err) => {
             output::config_error(err);
         }
@@ -107,7 +111,6 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
         std::process::exit(1);
     }
 
-
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher.launch(package, env, secrets, params).await {
         output::runtime_error(err);
@@ -129,12 +132,17 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
     // internally.
     res1.unwrap();
     res2.unwrap();
-
 }
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(config: Config, path: PathBuf, env: &str, params: HashMap<String, String>, app_name: Option<String>) {
+async fn do_run_remote(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    params: HashMap<String, String>,
+    app_name: Option<String>,
+) {
     let api_config = config.get_api_configuration().unwrap();
     let mut spinner = output::spinner("Scheduling run...");
 
@@ -145,21 +153,31 @@ async fn do_run_remote(config: Config, path: PathBuf, env: &str, params: HashMap
         towerfile.app.name
     });
 
-    match default_api::run_app(api_config, RunAppParams {
-        name: app_name.clone(),
-        run_app_params: models::RunAppParams {
-            schema: None,
-            environment: env.to_string(),
-            parameters: params,
-        }
-    }).await {
+    match default_api::run_app(
+        api_config,
+        RunAppParams {
+            name: app_name.clone(),
+            run_app_params: models::RunAppParams {
+                schema: None,
+                environment: env.to_string(),
+                parameters: params,
+            },
+        },
+    )
+    .await
+    {
         Ok(response) => {
             spinner.success();
-            if let tower_api::apis::default_api::RunAppSuccess::Status200(run_response) = response.entity.unwrap() {
-                let line = format!("Run #{} for app `{}` has been scheduled", run_response.run.number, app_name);
+            if let tower_api::apis::default_api::RunAppSuccess::Status200(run_response) =
+                response.entity.unwrap()
+            {
+                let line = format!(
+                    "Run #{} for app `{}` has been scheduled",
+                    run_response.run.number, app_name
+                );
                 output::success(&line);
             }
-        },
+        }
         Err(err) => {
             spinner.failure();
             output::tower_error(err);
@@ -193,13 +211,19 @@ fn parse_parameters(args: &ArgMatches) -> HashMap<String, String> {
             match param.split_once('=') {
                 Some((key, value)) => {
                     if key.is_empty() {
-                        output::failure(&format!("Invalid parameter format: '{}'. Key cannot be empty.", param));
+                        output::failure(&format!(
+                            "Invalid parameter format: '{}'. Key cannot be empty.",
+                            param
+                        ));
                         continue;
                     }
                     param_map.insert(key.to_string(), value.to_string());
-                },
+                }
                 None => {
-                    output::failure(&format!("Invalid parameter format: '{}'. Expected 'key=value'.", param));
+                    output::failure(&format!(
+                        "Invalid parameter format: '{}'. Expected 'key=value'.",
+                        param
+                    ));
                 }
             }
         }
@@ -218,7 +242,7 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 }
 
 /// get_app_name is a helper function that will extract the app name from the `clap` arguments if
-fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String>{ 
+fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
     match cmd {
         Some((name, _)) if !name.is_empty() => Some(name.to_string()),
         _ => None,
@@ -229,22 +253,31 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String>{
 /// used by the local runtime during local app execution.
 async fn get_secrets(api_config: &Configuration, env: &str) -> HashMap<String, String> {
     let mut spinner = output::spinner("Getting secrets...");
-    match default_api::list_secrets(api_config, ListSecretsParams {
-        environment: Some(env.to_string()),
-        all: Some(false),
-        page: None,
-        page_size: None,
-    }).await {
+    match default_api::list_secrets(
+        api_config,
+        ListSecretsParams {
+            environment: Some(env.to_string()),
+            all: Some(false),
+            page: None,
+            page_size: None,
+        },
+    )
+    .await
+    {
         Ok(response) => {
             spinner.success();
-            if let tower_api::apis::default_api::ListSecretsSuccess::Status200(list_response) = response.entity.unwrap() {
-                list_response.secrets.into_iter()
+            if let tower_api::apis::default_api::ListSecretsSuccess::Status200(list_response) =
+                response.entity.unwrap()
+            {
+                list_response
+                    .secrets
+                    .into_iter()
                     .map(|secret| (secret.name, secret.preview))
                     .collect()
             } else {
                 HashMap::new()
             }
-        },
+        }
         Err(err) => {
             spinner.failure();
             log::debug!("Failed to export secrets for local execution: {}", err);
@@ -267,14 +300,14 @@ fn load_towerfile(path: &PathBuf) -> Towerfile {
 
 /// build_package manages the process of building a package in an interactive way for local app
 /// execution. If the pacakge fails to build for wahatever reason, the app will exit.
-async fn build_package(towerfile: &Towerfile) -> Package { 
+async fn build_package(towerfile: &Towerfile) -> Package {
     let mut spinner = output::spinner("Building package...");
     let package_spec = PackageSpec::from_towerfile(towerfile);
     match Package::build(package_spec).await {
         Ok(package) => {
             spinner.success();
             package
-        },
+        }
         Err(err) => {
             spinner.failure();
             log::debug!("Failed to build package: {}", err);
