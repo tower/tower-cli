@@ -48,7 +48,7 @@ pub fn run_cmd() -> Command {
 
 /// do_run is the primary entrypoint into running apps both locally and remotely in Tower. It will
 /// use the configuration to determine the requested way of running a Tower app.
-pub async fn do_run(config: Config, configuration: &Configuration, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
+pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     let res = get_run_parameters(args, cmd);
 
     match res {
@@ -60,14 +60,14 @@ pub async fn do_run(config: Config, configuration: &Configuration, args: &ArgMat
                 if app_name.is_some() {
                     output::die("Running apps by name locally is not supported yet.");
                 } else {
-                    do_run_local(config, configuration, path, params).await;
+                    do_run_local(config, path, params).await;
                 }
             } else {
                 // We always expect there to be an environmnt due to the fact that there is a
                 // default value.
                 let env = args.get_one::<String>("environment").unwrap();
 
-                do_run_remote(config, configuration, path, env, params, app_name).await;
+                do_run_remote(config, path, env, params, app_name).await;
             }
         },
         Err(err) => {
@@ -79,12 +79,13 @@ pub async fn do_run(config: Config, configuration: &Configuration, args: &ArgMat
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(_config: Config, configuration: &Configuration, path: PathBuf, mut params: HashMap<String, String>) {
+async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String, String>) {
+    let api_config = config.get_api_configuration().unwrap();
     // There is always an implicit `local` environment when running in a local context.
     let env = "local".to_string();
 
     // Load all the secrets from the server
-    let secrets = get_secrets(configuration, &env).await;
+    let secrets = get_secrets(api_config, &env).await;
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -113,7 +114,6 @@ async fn do_run_local(_config: Config, configuration: &Configuration, path: Path
         return;
     }
 
-    log::debug!("App launched successfully");
     output::success(&format!("App `{}` has been launched", towerfile.app.name));
 
     // Monitor app output and status concurrently
@@ -123,7 +123,6 @@ async fn do_run_local(_config: Config, configuration: &Configuration, path: Path
     let output_task = tokio::spawn(monitor_output(output));
     let status_task = tokio::spawn(monitor_status(app));
 
-    log::debug!("Waiting for app tasks to complete");
     let (res1, res2) = tokio::join!(output_task, status_task);
 
     // We have to unwrap both of these as a method for propagating any panics that happened
@@ -131,12 +130,12 @@ async fn do_run_local(_config: Config, configuration: &Configuration, path: Path
     res1.unwrap();
     res2.unwrap();
 
-    log::debug!("App terminated, shutting down");
 }
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(_config: Config, configuration: &Configuration, path: PathBuf, env: &str, params: HashMap<String, String>, app_name: Option<String>) {
+async fn do_run_remote(config: Config, path: PathBuf, env: &str, params: HashMap<String, String>, app_name: Option<String>) {
+    let api_config = config.get_api_configuration().unwrap();
     let mut spinner = output::spinner("Scheduling run...");
 
     let app_name = app_name.unwrap_or_else(|| {
@@ -146,7 +145,7 @@ async fn do_run_remote(_config: Config, configuration: &Configuration, path: Pat
         towerfile.app.name
     });
 
-    match default_api::run_app(configuration, RunAppParams {
+    match default_api::run_app(api_config, RunAppParams {
         name: app_name.clone(),
         run_app_params: models::RunAppParams {
             schema: None,
@@ -228,9 +227,9 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String>{
 
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
-async fn get_secrets(configuration: &Configuration, env: &str) -> HashMap<String, String> {
+async fn get_secrets(api_config: &Configuration, env: &str) -> HashMap<String, String> {
     let mut spinner = output::spinner("Getting secrets...");
-    match default_api::list_secrets(configuration, ListSecretsParams {
+    match default_api::list_secrets(api_config, ListSecretsParams {
         environment: Some(env.to_string()),
         all: Some(false),
         page: None,
