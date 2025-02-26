@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar
 
-from attrs import define as _attrs_define
+import attr
 
 if TYPE_CHECKING:
     from ..models.parameter import Parameter
@@ -9,31 +9,27 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="AppVersion")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class AppVersion:
     """
     Attributes:
-        parameters (Union[None, list['Parameter']]):
+        parameters (List['Parameter']):
         version (str):
     """
 
-    parameters: Union[None, list["Parameter"]]
+    parameters: List["Parameter"]
     version: str
 
-    def to_dict(self) -> dict[str, Any]:
-        parameters: Union[None, list[dict[str, Any]]]
-        if isinstance(self.parameters, list):
-            parameters = []
-            for parameters_type_0_item_data in self.parameters:
-                parameters_type_0_item = parameters_type_0_item_data.to_dict()
-                parameters.append(parameters_type_0_item)
+    def to_dict(self) -> Dict[str, Any]:
+        parameters = []
+        for parameters_item_data in self.parameters:
+            parameters_item = parameters_item_data.to_dict()
 
-        else:
-            parameters = self.parameters
+            parameters.append(parameters_item)
 
         version = self.version
 
-        field_dict: dict[str, Any] = {}
+        field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "parameters": parameters,
@@ -44,32 +40,16 @@ class AppVersion:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         from ..models.parameter import Parameter
 
         d = src_dict.copy()
+        parameters = []
+        _parameters = d.pop("parameters")
+        for parameters_item_data in _parameters:
+            parameters_item = Parameter.from_dict(parameters_item_data)
 
-        def _parse_parameters(data: object) -> Union[None, list["Parameter"]]:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                parameters_type_0 = []
-                _parameters_type_0 = data
-                for parameters_type_0_item_data in _parameters_type_0:
-                    parameters_type_0_item = Parameter.from_dict(
-                        parameters_type_0_item_data
-                    )
-
-                    parameters_type_0.append(parameters_type_0_item)
-
-                return parameters_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union[None, list["Parameter"]], data)
-
-        parameters = _parse_parameters(d.pop("parameters"))
+            parameters.append(parameters_item)
 
         version = d.pop("version")
 

@@ -1,80 +1,81 @@
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar
 
-from attrs import define as _attrs_define
+import attr
 
 if TYPE_CHECKING:
     from ..models.app import App
     from ..models.run import Run
+    from ..models.run_results import RunResults
 
 
 T = TypeVar("T", bound="AppSummary")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class AppSummary:
     """
     Attributes:
         app (App):
-        runs (Union[None, list['Run']]):
+        run_results (RunResults):
+        runs (List['Run']):
+        total_runs (int):
     """
 
     app: "App"
-    runs: Union[None, list["Run"]]
+    run_results: "RunResults"
+    runs: List["Run"]
+    total_runs: int
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         app = self.app.to_dict()
 
-        runs: Union[None, list[dict[str, Any]]]
-        if isinstance(self.runs, list):
-            runs = []
-            for runs_type_0_item_data in self.runs:
-                runs_type_0_item = runs_type_0_item_data.to_dict()
-                runs.append(runs_type_0_item)
+        run_results = self.run_results.to_dict()
 
-        else:
-            runs = self.runs
+        runs = []
+        for runs_item_data in self.runs:
+            runs_item = runs_item_data.to_dict()
 
-        field_dict: dict[str, Any] = {}
+            runs.append(runs_item)
+
+        total_runs = self.total_runs
+
+        field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "app": app,
+                "run_results": run_results,
                 "runs": runs,
+                "total_runs": total_runs,
             }
         )
 
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         from ..models.app import App
         from ..models.run import Run
+        from ..models.run_results import RunResults
 
         d = src_dict.copy()
         app = App.from_dict(d.pop("app"))
 
-        def _parse_runs(data: object) -> Union[None, list["Run"]]:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                runs_type_0 = []
-                _runs_type_0 = data
-                for runs_type_0_item_data in _runs_type_0:
-                    runs_type_0_item = Run.from_dict(runs_type_0_item_data)
+        run_results = RunResults.from_dict(d.pop("run_results"))
 
-                    runs_type_0.append(runs_type_0_item)
+        runs = []
+        _runs = d.pop("runs")
+        for runs_item_data in _runs:
+            runs_item = Run.from_dict(runs_item_data)
 
-                return runs_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union[None, list["Run"]], data)
+            runs.append(runs_item)
 
-        runs = _parse_runs(d.pop("runs"))
+        total_runs = d.pop("total_runs")
 
         app_summary = cls(
             app=app,
+            run_results=run_results,
             runs=runs,
+            total_runs=total_runs,
         )
 
         return app_summary

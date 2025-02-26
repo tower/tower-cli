@@ -1,11 +1,11 @@
-from typing import Any, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
-from attrs import define as _attrs_define
+import attr
 
 T = TypeVar("T", bound="Parameter")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class Parameter:
     """
     Attributes:
@@ -18,14 +18,12 @@ class Parameter:
     description: str
     name: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         default = self.default
-
         description = self.description
-
         name = self.name
 
-        field_dict: dict[str, Any] = {}
+        field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "default": default,
@@ -37,7 +35,7 @@ class Parameter:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         d = src_dict.copy()
         default = d.pop("default")
 
