@@ -1,13 +1,13 @@
 import datetime
-from typing import Any, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
-from attrs import define as _attrs_define
+import attr
 from dateutil.parser import isoparse
 
 T = TypeVar("T", bound="User")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class User:
     """
     Attributes:
@@ -30,24 +30,18 @@ class User:
     last_name: str
     profile_photo_url: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         company = self.company
-
         country = self.country
-
         created_at = self.created_at.isoformat()
 
         email = self.email
-
         first_name = self.first_name
-
         is_invitation_claimed = self.is_invitation_claimed
-
         last_name = self.last_name
-
         profile_photo_url = self.profile_photo_url
 
-        field_dict: dict[str, Any] = {}
+        field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "company": company,
@@ -64,7 +58,7 @@ class User:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         d = src_dict.copy()
         company = d.pop("company")
 

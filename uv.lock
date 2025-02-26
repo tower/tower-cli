@@ -577,7 +577,7 @@ wheels = [
 
 [[package]]
 name = "tower-cli"
-version = "0.1.20"
+version = "0.1.25"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },

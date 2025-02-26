@@ -1,11 +1,11 @@
-from typing import Any, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
-from attrs import define as _attrs_define
+import attr
 
 T = TypeVar("T", bound="Pagination")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class Pagination:
     """
     Attributes:
@@ -20,16 +20,13 @@ class Pagination:
     page_size: int
     total: int
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         num_pages = self.num_pages
-
         page = self.page
-
         page_size = self.page_size
-
         total = self.total
 
-        field_dict: dict[str, Any] = {}
+        field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "num_pages": num_pages,
@@ -42,7 +39,7 @@ class Pagination:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         d = src_dict.copy()
         num_pages = d.pop("num_pages")
 

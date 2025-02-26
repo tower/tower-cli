@@ -1,13 +1,13 @@
 import datetime
-from typing import Any, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
-from attrs import define as _attrs_define
+import attr
 from dateutil.parser import isoparse
 
 T = TypeVar("T", bound="Secret")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class Secret:
     """
     Attributes:
@@ -22,16 +22,14 @@ class Secret:
     name: str
     preview: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         created_at = self.created_at.isoformat()
 
         environment = self.environment
-
         name = self.name
-
         preview = self.preview
 
-        field_dict: dict[str, Any] = {}
+        field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "created_at": created_at,
@@ -44,7 +42,7 @@ class Secret:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         d = src_dict.copy()
         created_at = isoparse(d.pop("created_at"))
 

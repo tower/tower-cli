@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar, Union
 
-from attrs import define as _attrs_define
+import attr
 
 from ..types import UNSET, Unset
 
@@ -11,55 +11,49 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="ErrorModel")
 
 
-@_attrs_define
+@attr.s(auto_attribs=True)
 class ErrorModel:
     """
     Attributes:
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object.
-        detail (Union[Unset, str]): A human-readable explanation specific to this occurrence of the problem.
-        errors (Union[None, Unset, list['ErrorDetail']]): Optional list of individual error details
-        instance (Union[Unset, str]): A URI reference that identifies the specific occurrence of the problem.
-        status (Union[Unset, int]): HTTP status code
+        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+            http://localhost:8081/v1/schemas/ErrorModel.json.
+        detail (Union[Unset, str]): A human-readable explanation specific to this occurrence of the problem. Example:
+            Property foo is required but is missing..
+        errors (Union[Unset, List['ErrorDetail']]): Optional list of individual error details
+        instance (Union[Unset, str]): A URI reference that identifies the specific occurrence of the problem. Example:
+            https://example.com/error-log/abc123.
+        status (Union[Unset, int]): HTTP status code Example: 400.
         title (Union[Unset, str]): A short, human-readable summary of the problem type. This value should not change
-            between occurrences of the error.
-        type_ (Union[Unset, str]): A URI reference to human-readable documentation for the error. Default:
-            'about:blank'.
+            between occurrences of the error. Example: Bad Request.
+        type (Union[Unset, str]): A URI reference to human-readable documentation for the error. Default: 'about:blank'.
+            Example: https://example.com/errors/example.
     """
 
     schema: Union[Unset, str] = UNSET
     detail: Union[Unset, str] = UNSET
-    errors: Union[None, Unset, list["ErrorDetail"]] = UNSET
+    errors: Union[Unset, List["ErrorDetail"]] = UNSET
     instance: Union[Unset, str] = UNSET
     status: Union[Unset, int] = UNSET
     title: Union[Unset, str] = UNSET
-    type_: Union[Unset, str] = "about:blank"
+    type: Union[Unset, str] = "about:blank"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         schema = self.schema
-
         detail = self.detail
-
-        errors: Union[None, Unset, list[dict[str, Any]]]
-        if isinstance(self.errors, Unset):
-            errors = UNSET
-        elif isinstance(self.errors, list):
+        errors: Union[Unset, List[Dict[str, Any]]] = UNSET
+        if not isinstance(self.errors, Unset):
             errors = []
-            for errors_type_0_item_data in self.errors:
-                errors_type_0_item = errors_type_0_item_data.to_dict()
-                errors.append(errors_type_0_item)
+            for errors_item_data in self.errors:
+                errors_item = errors_item_data.to_dict()
 
-        else:
-            errors = self.errors
+                errors.append(errors_item)
 
         instance = self.instance
-
         status = self.status
-
         title = self.title
+        type = self.type
 
-        type_ = self.type_
-
-        field_dict: dict[str, Any] = {}
+        field_dict: Dict[str, Any] = {}
         field_dict.update({})
         if schema is not UNSET:
             field_dict["$schema"] = schema
@@ -73,13 +67,13 @@ class ErrorModel:
             field_dict["status"] = status
         if title is not UNSET:
             field_dict["title"] = title
-        if type_ is not UNSET:
-            field_dict["type"] = type_
+        if type is not UNSET:
+            field_dict["type"] = type
 
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         from ..models.error_detail import ErrorDetail
 
         d = src_dict.copy()
@@ -87,27 +81,12 @@ class ErrorModel:
 
         detail = d.pop("detail", UNSET)
 
-        def _parse_errors(data: object) -> Union[None, Unset, list["ErrorDetail"]]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                errors_type_0 = []
-                _errors_type_0 = data
-                for errors_type_0_item_data in _errors_type_0:
-                    errors_type_0_item = ErrorDetail.from_dict(errors_type_0_item_data)
+        errors = []
+        _errors = d.pop("errors", UNSET)
+        for errors_item_data in _errors or []:
+            errors_item = ErrorDetail.from_dict(errors_item_data)
 
-                    errors_type_0.append(errors_type_0_item)
-
-                return errors_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union[None, Unset, list["ErrorDetail"]], data)
-
-        errors = _parse_errors(d.pop("errors", UNSET))
+            errors.append(errors_item)
 
         instance = d.pop("instance", UNSET)
 
@@ -115,7 +94,7 @@ class ErrorModel:
 
         title = d.pop("title", UNSET)
 
-        type_ = d.pop("type", UNSET)
+        type = d.pop("type", UNSET)
 
         error_model = cls(
             schema=schema,
@@ -124,7 +103,7 @@ class ErrorModel:
             instance=instance,
             status=status,
             title=title,
-            type_=type_,
+            type=type,
         )
 
         return error_model
