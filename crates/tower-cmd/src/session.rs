@@ -18,7 +18,7 @@ pub fn login_cmd() -> Command {
 }
 
 pub async fn do_login(config: Config) {
-    // Create anonymous configuration (no bearer token)
+    // Get api config
     let api_config = config.get_api_configuration().unwrap();
 
     output::banner();
