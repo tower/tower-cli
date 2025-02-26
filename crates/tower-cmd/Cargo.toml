@@ -4,14 +4,14 @@ version = { workspace = true }
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.95"
+anyhow = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 cli-table = { workspace = true }
 colored = { workspace = true }
 config = { workspace = true }
 crypto = { workspace = true }
-http = "1.1"
+http = { workspace = true }
 indicatif = { workspace = true }
 log = { workspace = true }
 open = { workspace = true }
