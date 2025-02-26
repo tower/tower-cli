@@ -6,7 +6,7 @@ use rsa::pkcs1::DecodeRsaPublicKey;
 
 use tower_api::{
     apis::{configuration::Configuration, default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams}},
-    models::CreateSecretParams as ApiCreateSecretParams,
+    models::{api_key, CreateSecretParams as ApiCreateSecretParams},
 };
 
 use crate::output;
@@ -72,7 +72,8 @@ pub fn secrets_cmd() -> Command {
         )
 }
 
-pub async fn do_list_secrets(_config: Config, configuration: &Configuration, args: &ArgMatches) {
+pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
+    let api_config = config.get_api_configuration().unwrap();
     let show = args.get_one::<bool>("show").unwrap_or(&false);
     let env = args.get_one::<String>("environment").unwrap();
     let all = args.get_one::<bool>("all").unwrap_or(&false);
@@ -84,7 +85,7 @@ pub async fn do_list_secrets(_config: Config, configuration: &Configuration, arg
         page_size: None,
     };
 
-    match default_api::list_secrets(configuration, params).await {
+    match default_api::list_secrets(api_config, params).await {
         Ok(response) => {
             if let Some(list_response) = response.entity {
                 match list_response {
@@ -132,7 +133,8 @@ pub async fn do_list_secrets(_config: Config, configuration: &Configuration, arg
     }
 }
 
-pub async fn do_create_secret(_config: Config, configuration: &Configuration, args: &ArgMatches) {
+pub async fn do_create_secret(config: Config, args: &ArgMatches) {
+    let api_config = config.get_api_configuration().unwrap();
     let name = args.get_one::<String>("name").unwrap_or_else(|| {
         output::die("Secret name (--name) is required");
     });
@@ -146,7 +148,7 @@ pub async fn do_create_secret(_config: Config, configuration: &Configuration, ar
     let mut spinner = output::spinner("Creating secret...");
 
     // First get the secrets key
-    match default_api::describe_secrets_key(configuration, default_api::DescribeSecretsKeyParams {
+    match default_api::describe_secrets_key(api_config, default_api::DescribeSecretsKeyParams {
         format: None,
     }).await {
         Ok(key_response) => {
@@ -171,7 +173,7 @@ pub async fn do_create_secret(_config: Config, configuration: &Configuration, ar
                             }
                         };
 
-                        match default_api::create_secret(configuration, create_params).await {
+                        match default_api::create_secret(api_config, create_params).await {
                             Ok(create_response) => {
                                 if let Some(create_success) = create_response.entity {
                                     match create_success {
@@ -206,7 +208,8 @@ pub async fn do_create_secret(_config: Config, configuration: &Configuration, ar
     }
 }
 
-pub async fn do_delete_secret(_config: Config, configuration: &Configuration, cmd: Option<(&str, &ArgMatches)>) {
+pub async fn do_delete_secret(config: Config, cmd: Option<(&str, &ArgMatches)>) {
+    let api_config = config.get_api_configuration().unwrap();
     let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
         output::die("Secret name (e.g. tower secrets delete <name>) is required");
     });
@@ -218,7 +221,7 @@ pub async fn do_delete_secret(_config: Config, configuration: &Configuration, cm
         environment: None,
     };
 
-    match default_api::delete_secret(configuration, params).await {
+    match default_api::delete_secret(api_config, params).await {
         Ok(_) => {
             spinner.success();
             output::success(&format!("Secret \"{}\" was deleted", name));
