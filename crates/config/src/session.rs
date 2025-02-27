@@ -5,6 +5,12 @@ use url::Url;
 
 use crate::error::Error;
 
+const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
+
+pub fn default_tower_url() -> Url {
+    Url::parse(DEFAULT_TOWER_URL).unwrap()
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
     pub email: String,
@@ -16,10 +22,12 @@ pub struct Token {
     pub jwt: String,
 }
 
-const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
-
-pub fn default_tower_url() -> Url {
-    Url::parse(DEFAULT_TOWER_URL).unwrap()
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Team {
+    pub slug: String,
+    pub name: String,
+    pub token: Token,
+    pub team_type: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -32,6 +40,13 @@ pub struct Session {
 
     pub user: User,
     pub token: Token,
+
+    // The currently active team
+    pub active_team: Option<Team>,
+
+    // List of teams the user belongs to
+    #[serde(default)]
+    pub teams: Vec<Team>,
 }
 
 fn find_or_create_config_dir() -> Result<PathBuf, Error> {
@@ -51,11 +66,13 @@ fn find_or_create_config_dir() -> Result<PathBuf, Error> {
 }
 
 impl Session {
-    pub fn new(user: User, token: Token) -> Self {
+    pub fn new(user: User, token: Token, teams: Vec<Team>) -> Self {
         Self {
             tower_url: default_tower_url(),
             user,
             token,
+            active_team: None,
+            teams,
         }
     }
 
@@ -82,5 +99,30 @@ impl Session {
         fs::write(session_file, session)?;
 
         Ok(())
+    }
+
+    /// Sets the active team based on a JWT token
+    /// Returns true if a matching team was found and set as active, false otherwise
+    pub fn set_active_team_by_jwt(&mut self, jwt: &str) -> bool {
+        // Find the team with the matching JWT
+        if let Some(team) = self.teams.iter().find(|team| team.token.jwt == jwt) {
+            self.active_team = Some(team.clone());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Gets the currently active team
+    /// Returns the active team if it exists, or the default team if no active team is found
+    pub fn get_active_team(&self) -> Option<&Team> {
+        // First check if we have an active team set
+        if let Some(active_team) = &self.active_team {
+            // If we do, return it
+            return Some(active_team);
+        }
+
+        // If no active team is set, return the personal team
+        self.teams.iter().find(|team| team.team_type == "personal")
     }
 }
