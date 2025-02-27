@@ -51,7 +51,7 @@ pub fn apps_cmd() -> Command {
 }
 
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let configuration = config.get_api_configuration().unwrap();
+    let api_config = config.get_api_configuration().unwrap();
     let (app_name, seq) = if let Some((name, _)) = cmd {
         if let Some((app, num)) = name.split_once('#') {
             (
@@ -70,7 +70,7 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     let mut spinner = output::spinner("Fetching logs...");
 
     match default_api::get_app_run_logs(
-        configuration,
+        api_config,
         GetAppRunLogsParams {
             name: app_name,
             seq,
@@ -98,13 +98,13 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 }
 
 pub async fn do_show_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let configuration = config.get_api_configuration().unwrap();
+    let api_config = config.get_api_configuration().unwrap();
     let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
         output::die("App name (e.g. tower apps show <app name>) is required");
     });
 
     match default_api::describe_app(
-        configuration,
+        api_config,
         DescribeAppParams {
             name: name.to_string(),
             runs: Some(5),
@@ -209,9 +209,9 @@ pub async fn do_show_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    let configuration = config.get_api_configuration().unwrap();
+    let api_config = config.get_api_configuration().unwrap();
     match default_api::list_apps(
-        configuration,
+        api_config,
         ListAppsParams {
             query: None,
             page: None,
@@ -252,7 +252,7 @@ pub async fn do_list_apps(config: Config) {
 }
 
 pub async fn do_create_app(config: Config, args: &ArgMatches) {
-    let configuration = config.get_api_configuration().unwrap();
+    let api_config = config.get_api_configuration().unwrap();
     let name = args.get_one::<String>("name").unwrap_or_else(|| {
         output::die("App name (--name) is required");
     });
@@ -262,7 +262,7 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
     let mut spinner = output::Spinner::new("Creating app".to_string());
 
     match default_api::create_apps(
-        configuration,
+        api_config,
         CreateAppsParams {
             create_app_params: CreateAppParams {
                 schema: None,
@@ -289,7 +289,7 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let configuration = config.get_api_configuration().unwrap();
+    let api_config = config.get_api_configuration().unwrap();
     let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
         output::die("App name (e.g. tower apps delete <app name>) is required");
     });
@@ -297,7 +297,7 @@ pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     let mut spinner = output::Spinner::new("Deleting app...".to_string());
 
     match default_api::delete_app(
-        configuration,
+        api_config,
         DeleteAppParams {
             name: name.to_string(),
         },
