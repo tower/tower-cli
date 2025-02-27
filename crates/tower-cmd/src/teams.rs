@@ -1,3 +1,4 @@
+use crate::output;
 use clap::Command;
 use colored::*;
 use config::Config;
@@ -24,14 +25,27 @@ pub async fn do_list_teams(config: Config) {
                 response.entity
             {
                 if list_teams_response.teams.is_empty() {
-                    println!("You don't belong to any teams.");
+                    let line =
+                        format!("{}\n", "You don't belong to any teams yet!".bold().yellow());
+                    output::write(&line);
                     return;
                 }
 
-                println!("Teams:");
-                for team in list_teams_response.teams {
-                    println!("  {} ({})", team.name, team.slug);
-                }
+                // Create headers for the table
+                let headers = vec!["Slug", "Team Name"]
+                    .into_iter()
+                    .map(|h| h.yellow().to_string())
+                    .collect();
+
+                // Create data rows for the table
+                let data: Vec<Vec<String>> = list_teams_response
+                    .teams
+                    .iter()
+                    .map(|team| vec![team.slug.clone(), team.name.clone()])
+                    .collect();
+
+                // Display the table using the existing table function
+                output::table(headers, data);
             } else {
                 eprintln!("{}", "Unexpected response format from server.".red());
                 std::process::exit(1);
