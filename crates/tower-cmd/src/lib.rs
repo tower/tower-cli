@@ -9,6 +9,7 @@ pub mod output;
 mod run;
 mod secrets;
 mod session;
+mod teams;
 mod util;
 mod version;
 
@@ -112,6 +113,17 @@ impl App {
             }
             Some(("deploy", args)) => deploy::do_deploy(config, args).await,
             Some(("run", args)) => run::do_run(config, args, args.subcommand()).await,
+            Some(("teams", sub_matches)) => {
+                let teams_command = sub_matches.subcommand();
+
+                match teams_command {
+                    Some(("list", _)) => teams::do_list_teams(config).await,
+                    _ => {
+                        teams::teams_cmd().print_help().unwrap();
+                        std::process::exit(2);
+                    }
+                }
+            },
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
@@ -146,4 +158,5 @@ fn root_cmd() -> Command {
         .subcommand(deploy::deploy_cmd())
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())
+        .subcommand(teams::teams_cmd())
 }
