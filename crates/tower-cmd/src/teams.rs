@@ -25,12 +25,6 @@ pub async fn do_list_teams(config: Config) {
                 response.entity
             {
                 output::newline();
-                if list_teams_response.teams.is_empty() {
-                    let line =
-                        format!("{}\n", "You don't belong to any teams yet!".bold().yellow());
-                    output::write(&line);
-                    return;
-                }
 
                 // Create headers for the table
                 let headers = vec!["Slug", "Team Name"]
@@ -38,15 +32,22 @@ pub async fn do_list_teams(config: Config) {
                     .map(|h| h.yellow().to_string())
                     .collect();
 
-                // Create data rows for the table
-                let data: Vec<Vec<String>> = list_teams_response
-                    .teams
-                    .iter()
-                    .map(|team| vec![team.slug.clone(), team.name.clone()])
-                    .collect();
+                // Add a default team to the list
+                let mut teams = vec![vec!["default".to_string(), "My Account".to_string()]];
+
+                if !list_teams_response.teams.is_empty() {
+                    // Add the actual teams from the response
+                    let response_teams: Vec<Vec<String>> = list_teams_response
+                        .teams
+                        .iter()
+                        .map(|team| vec![team.slug.clone(), team.name.clone()])
+                        .collect();
+                    // Combine default team with response teams
+                    teams.extend(response_teams);
+                }
 
                 // Display the table using the existing table function
-                output::table(headers, data);
+                output::table(headers, teams);
                 output::newline();
             } else {
                 eprintln!("{}", "Unexpected response format from server.".red());
