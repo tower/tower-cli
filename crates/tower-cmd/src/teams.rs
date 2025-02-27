@@ -24,6 +24,7 @@ pub async fn do_list_teams(config: Config) {
             if let Some(default_api::ListTeamsSuccess::Status200(list_teams_response)) =
                 response.entity
             {
+                output::newline();
                 if list_teams_response.teams.is_empty() {
                     let line =
                         format!("{}\n", "You don't belong to any teams yet!".bold().yellow());
@@ -46,6 +47,7 @@ pub async fn do_list_teams(config: Config) {
 
                 // Display the table using the existing table function
                 output::table(headers, data);
+                output::newline();
             } else {
                 eprintln!("{}", "Unexpected response format from server.".red());
                 std::process::exit(1);
