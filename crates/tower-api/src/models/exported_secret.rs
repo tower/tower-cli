@@ -12,23 +12,23 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ApiKey {
+pub struct ExportedSecret {
     #[serde(rename = "created_at")]
     pub created_at: String,
-    #[serde(rename = "identifier")]
-    pub identifier: String,
-    #[serde(rename = "last_used_at", deserialize_with = "Option::deserialize")]
-    pub last_used_at: Option<String>,
+    #[serde(rename = "encrypted_value")]
+    pub encrypted_value: String,
+    #[serde(rename = "environment")]
+    pub environment: String,
     #[serde(rename = "name")]
     pub name: String,
 }
 
-impl ApiKey {
-    pub fn new(created_at: String, identifier: String, last_used_at: Option<String>, name: String) -> ApiKey {
-        ApiKey {
+impl ExportedSecret {
+    pub fn new(created_at: String, encrypted_value: String, environment: String, name: String) -> ExportedSecret {
+        ExportedSecret {
             created_at,
-            identifier,
-            last_used_at,
+            encrypted_value,
+            environment,
             name,
         }
     }

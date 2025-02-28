@@ -5,8 +5,11 @@ use crypto::encrypt;
 use rsa::pkcs1::DecodeRsaPublicKey;
 
 use tower_api::{
-    apis::default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams},
-    models::CreateSecretParams as CreateSecretParamsModel,
+    apis::default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams, ExportSecretsParams},
+    models::{
+        CreateSecretParams as CreateSecretParamsModel,
+        ExportSecretsParams as ExportSecretsParamsModel
+    },
 };
 
 use crate::output;
@@ -77,35 +80,65 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
     let env = args.get_one::<String>("environment").unwrap();
     let all = args.get_one::<bool>("all").unwrap_or(&false);
 
-    let params = ListSecretsParams {
-        environment: Some(env.clone()),
-        all: Some(*all),
-        page: None,
-        page_size: None,
-    };
+    if *show {
+        let (private_key, public_key) = crypto::generate_key_pair();
 
-    match default_api::list_secrets(&config.into(), params).await {
-        Ok(response) => {
-            if let Some(list_response) = response.entity {
-                match list_response {
-                    default_api::ListSecretsSuccess::Status200(list_response) => {
-                        let (headers, data) = if *show {
-                            (
+        let params = ExportSecretsParams {
+            export_secrets_params: ExportSecretsParamsModel {
+                schema: None,
+                public_key: crypto::serialize_public_key(public_key),
+            },
+            environment: Some(env.clone()),
+            all: Some(*all),
+            page: None,
+            page_size: None,
+        };
+
+        match default_api::export_secrets(&config.into(), params).await {
+            Ok(response) => {
+                if let Some(list_response) = response.entity {
+                    match list_response {
+                        default_api::ExportSecretsSuccess::Status200(list_response) => {
+                            let headers = vec![
+                                "Secret".bold().yellow().to_string(),
+                                "Environment".bold().yellow().to_string(),
+                                "Value".bold().yellow().to_string(),
+                            ];
+                            let data = list_response.secrets.iter().map(|secret| {
+                                // now we decrypt the value and show it.
+                                let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.clone());
+
                                 vec![
-                                    "Secret".bold().yellow().to_string(),
-                                    "Environment".bold().yellow().to_string(),
-                                    "Value".bold().yellow().to_string(),
-                                ],
-                                list_response.secrets.iter().map(|secret| {
-                                    vec![
-                                        secret.name.clone(),
-                                        secret.environment.clone(),
-                                        secret.preview.clone(),
-                                    ]
-                                }).collect(),
-                            )
-                        } else {
-                            (
+                                    secret.name.clone(),
+                                    secret.environment.clone(),
+                                    decrypted_value,
+                                ]
+                            }).collect();
+                            output::table(headers, data);
+                        },
+                        default_api::ExportSecretsSuccess::UnknownValue(_) => {
+                            output::failure("Received unknown response format from server");
+                        }
+                    }
+                }
+            },
+            Err(err) => output::tower_error(err),
+        }
+
+    } else {
+        let params = ListSecretsParams {
+            environment: Some(env.clone()),
+            all: Some(*all),
+            page: None,
+            page_size: None,
+        };
+
+        match default_api::list_secrets(&config.into(), params).await {
+            Ok(response) => {
+                if let Some(list_response) = response.entity {
+                    match list_response {
+                        default_api::ListSecretsSuccess::Status200(list_response) => {
+                            let (headers, data) = (
                                 vec![
                                     "Secret".bold().yellow().to_string(),
                                     "Environment".bold().yellow().to_string(),
@@ -118,17 +151,18 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
                                         secret.preview.dimmed().to_string(),
                                     ]
                                 }).collect(),
-                            )
-                        };
-                        output::table(headers, data);
-                    },
-                    default_api::ListSecretsSuccess::UnknownValue(_) => {
-                        output::failure("Received unknown response format from server");
+                            );
+                            output::table(headers, data);
+                        },
+                        default_api::ListSecretsSuccess::UnknownValue(_) => {
+                            output::failure("Received unknown response format from server");
+                        }
                     }
                 }
-            }
-        },
-        Err(err) => output::tower_error(err),
+            },
+            Err(err) => output::tower_error(err),
+        }
+
     }
 }
 
