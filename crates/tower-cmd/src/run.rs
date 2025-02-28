@@ -3,7 +3,6 @@ use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::apis::{
-    configuration::Configuration,
     default_api::{self, ListSecretsParams, RunAppParams},
 };
 use tower_api::models;
@@ -84,12 +83,11 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
 async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String, String>) {
-    let api_config = config.get_api_configuration().unwrap();
     // There is always an implicit `local` environment when running in a local context.
     let env = "local".to_string();
 
     // Load all the secrets from the server
-    let secrets = get_secrets(api_config, &env).await;
+    let secrets = get_secrets(&config, &env).await;
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -143,7 +141,6 @@ async fn do_run_remote(
     params: HashMap<String, String>,
     app_name: Option<String>,
 ) {
-    let api_config = config.get_api_configuration().unwrap();
     let mut spinner = output::spinner("Scheduling run...");
 
     let app_name = app_name.unwrap_or_else(|| {
@@ -154,7 +151,7 @@ async fn do_run_remote(
     });
 
     match default_api::run_app(
-        api_config,
+        &config.into(),
         RunAppParams {
             name: app_name.clone(),
             run_app_params: models::RunAppParams {
@@ -251,10 +248,10 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
-async fn get_secrets(api_config: &Configuration, env: &str) -> HashMap<String, String> {
+async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
     let mut spinner = output::spinner("Getting secrets...");
     match default_api::list_secrets(
-        api_config,
+        &config.into(),
         ListSecretsParams {
             environment: Some(env.to_string()),
             all: Some(false),

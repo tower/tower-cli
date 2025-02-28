@@ -14,7 +14,7 @@ pub fn success(msg: &str) {
 }
 
 pub fn failure(msg: &str) {
-    let line = format!("{} {}\n", "Failure!".red(), msg);
+    let line = format!("{} {}\n", "Oh no!".red(), msg);
     write(&line);
 }
 
@@ -202,6 +202,20 @@ impl Spinner {
 /// want to demonstrate there's something happening.
 pub fn spinner(msg: &str) -> Spinner {
     Spinner::new(msg.into())
+}
+
+pub fn write_update_message(latest: &str, current: &str) {
+    let line = format!(
+        "{}\n{}\n",
+        format!(
+            "A newer version of tower-cli is available: {} (you have {})",
+            latest, current
+        )
+        .yellow(),
+        "To upgrade, run: pip install --upgrade tower-cli".yellow()
+    );
+
+    io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
 /// newline just outputs a newline. This is useful when you have a very specific formatting you

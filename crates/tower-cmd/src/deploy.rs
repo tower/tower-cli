@@ -27,7 +27,6 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 }
 
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
-    let api_config = config.get_api_configuration().unwrap();
     // Determine the directory to build the package from
     let dir = resolve_path(args);
     log::debug!("Building package from directory: {:?}", dir);
@@ -36,6 +35,8 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
 
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
+            let api_config = &config.into();
+
             // Add app existence check before proceeding
             if let Err(err) = util::apps::ensure_app_exists(
                 &api_config,

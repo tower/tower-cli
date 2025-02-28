@@ -2,11 +2,14 @@ use crate::output;
 use clap::Command;
 use config::Config;
 use tokio::{time, time::Duration};
-use tower_api::apis::{
-    configuration::Configuration,
-    default_api::{
-        self, CreateDeviceLoginTicketSuccess, DescribeDeviceLoginSessionParams,
-        DescribeDeviceLoginSessionSuccess,
+use tower_api::{
+    models::{
+        CreateDeviceLoginTicketResponse
+    },
+    apis::default_api::{
+        self,
+        CreateDeviceLoginTicketSuccess,
+        DescribeDeviceLoginSessionSuccess, DescribeDeviceLoginSessionParams, 
     },
 };
 
@@ -15,12 +18,10 @@ pub fn login_cmd() -> Command {
 }
 
 pub async fn do_login(config: Config) {
-    // Get api config
-    let api_config = config.get_api_configuration().unwrap();
-
     output::banner();
 
     let mut spinner = output::spinner("Starting device login...");
+    let api_config = config.clone().into();
 
     // Request device login code
     match default_api::create_device_login_ticket(&api_config).await {
@@ -28,7 +29,7 @@ pub async fn do_login(config: Config) {
             spinner.success();
             if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response.entity.unwrap()
             {
-                handle_device_login(&api_config, login_claim).await;
+                handle_device_login(config, login_claim).await;
             }
         }
         Err(err) => {
@@ -43,7 +44,7 @@ pub async fn do_login(config: Config) {
 }
 
 async fn handle_device_login(
-    api_config: &Configuration,
+    config: Config,
     claim: tower_api::models::CreateDeviceLoginTicketResponse,
 ) {
     // Try to open the login URL in browser
@@ -57,15 +58,15 @@ async fn handle_device_login(
 
     let mut spinner = output::spinner("Waiting for login...");
 
-    if !poll_for_login(api_config, &claim, &mut spinner).await {
+    if !poll_for_login(&config, &claim, &mut spinner).await {
         spinner.failure();
         output::failure("Login request expired. Please try again.");
     }
 }
 
 async fn poll_for_login(
-    api_config: &Configuration,
-    claim: &tower_api::models::CreateDeviceLoginTicketResponse,
+    config: &Config,
+    claim: &CreateDeviceLoginTicketResponse,
     spinner: &mut output::Spinner,
 ) -> bool {
     let interval_duration = Duration::from_secs(claim.interval as u64);
@@ -75,20 +76,24 @@ async fn poll_for_login(
     let expires_at = chrono::Utc::now() + expires_in;
 
     while chrono::Utc::now() < expires_at {
-        match default_api::describe_device_login_session(
-            api_config,
+        let resp = default_api::describe_device_login_session(
+            &config.into(),
             DescribeDeviceLoginSessionParams {
                 device_code: claim.device_code.clone(),
             },
-        )
-        .await
-        {
-            Ok(response) => {
-                if let DescribeDeviceLoginSessionSuccess::Status200(session_response) =
-                    response.entity.unwrap()
-                {
-                    finalize_session(&session_response, spinner);
+        ).await;
+
+        match resp {
+            Ok(resp) => {
+                let success = resp.entity.unwrap();
+
+                if let DescribeDeviceLoginSessionSuccess::Status200(response) = success {
+                    finalize_session(&response, spinner);
                     return true;
+                } else {
+                    spinner.failure();
+                    output::failure("The Tower API returned an unexpected response.");
+                    return false;
                 }
             }
             Err(err) => {

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::{value_parser, Arg, Command};
-use colored::*;
 use config::{Config, Session};
 
 mod apps;
@@ -36,8 +35,9 @@ impl App {
 
         let mut config = Config::from_arg_matches(&matches);
 
-        // Init the configuration for the new API client
-        config.init_api_configuration(self.session.as_ref());
+        if let Some(session) = self.session {
+            config = config.with_session(session);
+        }
 
         // Setup logging
         simple_logger::SimpleLogger::new()
@@ -53,35 +53,9 @@ impl App {
         }
 
         // Check for newer version only if we successfully get a latest version
-        if let Ok(Some(latest_version)) = Self::check_latest_version().await {
-            let current_version = tower_version::current_version();
-            // Compare versions
-            if latest_version != current_version {
-                eprintln!(
-                    "{}",
-                    format!(
-                        "\nA newer version of tower-cli is available: {} (you have {})",
-                        latest_version, current_version
-                    )
-                    .yellow()
-                );
-                eprintln!(
-                    "{}",
-                    "To upgrade, run: pip install --upgrade tower-cli\n".yellow()
-                );
-                eprintln!(
-                    "{}",
-                    format!(
-                        "\nA newer version of tower-cli is available: {} (you have {})",
-                        latest_version, current_version
-                    )
-                    .yellow()
-                );
-                eprintln!(
-                    "{}",
-                    "To upgrade, run: pip install --upgrade tower-cli\n".yellow()
-                );
-            }
+        if let Ok(Some(latest)) = Self::check_latest_version().await {
+            let current = tower_version::current_version();
+            output::write_update_message(&latest, &current);
         }
 
         // If no subcommand was provided, show help and exit
