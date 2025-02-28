@@ -2,8 +2,13 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tower_api::apis::{
-    default_api::{self, ListSecretsParams, RunAppParams},
+use tower_api::{
+    apis::{
+        default_api::{self, ExportSecretsParams, RunAppParams},
+    },
+    models::{
+        ExportSecretsParams as ExportSecretsParamsModel
+    },
 };
 use tower_api::models;
 use tower_package::{Package, PackageSpec};
@@ -250,9 +255,15 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 /// used by the local runtime during local app execution.
 async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
     let mut spinner = output::spinner("Getting secrets...");
-    match default_api::list_secrets(
+    let (private_key, public_key) = crypto::generate_key_pair();
+
+    match default_api::export_secrets(
         &config.into(),
-        ListSecretsParams {
+        ExportSecretsParams {
+            export_secrets_params: ExportSecretsParamsModel {
+                schema: None,
+                public_key: crypto::serialize_public_key(public_key),
+            },
             environment: Some(env.to_string()),
             all: Some(false),
             page: None,
@@ -263,13 +274,16 @@ async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
     {
         Ok(response) => {
             spinner.success();
-            if let tower_api::apis::default_api::ListSecretsSuccess::Status200(list_response) =
+            if let tower_api::apis::default_api::ExportSecretsSuccess::Status200(list_response) =
                 response.entity.unwrap()
             {
                 list_response
                     .secrets
                     .into_iter()
-                    .map(|secret| (secret.name, secret.preview))
+                    .map(|secret| {
+                        let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string());
+                        (secret.name, decrypted_value)
+                    })
                     .collect()
             } else {
                 HashMap::new()
