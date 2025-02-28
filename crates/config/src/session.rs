@@ -47,13 +47,6 @@ pub struct Session {
     // List of teams the user belongs to
     #[serde(default)]
     pub teams: Vec<Team>,
-
-    // The currently active team
-    pub active_team: Option<Team>,
-
-    // List of teams the user belongs to
-    #[serde(default)]
-    pub teams: Vec<Team>,
 }
 
 fn find_or_create_config_dir() -> Result<PathBuf, Error> {
@@ -74,13 +67,10 @@ fn find_or_create_config_dir() -> Result<PathBuf, Error> {
 
 impl Session {
     pub fn new(user: User, token: Token, teams: Vec<Team>) -> Self {
-    pub fn new(user: User, token: Token, teams: Vec<Team>) -> Self {
         Self {
             tower_url: default_tower_url(),
             user,
             token,
-            active_team: None,
-            teams,
             active_team: None,
             teams,
         }
