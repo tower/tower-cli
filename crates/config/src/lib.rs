@@ -60,7 +60,7 @@ impl Config {
     pub fn with_session(self, sess: Session) -> Config {
         Self {
             debug: self.debug,
-            tower_url: self.tower_url,
+            tower_url: sess.tower_url.clone(),
             session: Some(sess),
         }
     }
