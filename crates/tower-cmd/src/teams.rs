@@ -1,5 +1,5 @@
 use crate::output;
-use clap::Command;
+use clap::{Arg, Command};
 use colored::*;
 use config::Config;
 use tower_api::apis::default_api;
@@ -32,22 +32,30 @@ pub async fn do_list_teams(config: Config) {
                     .map(|h| h.yellow().to_string())
                     .collect();
 
-                // Add a default team to the list
-                let mut teams = vec![vec!["default".to_string(), "My Account".to_string()]];
+                // Get the current active team from the session
+                let active_team = config.get_active_team().unwrap_or(None);
+                let active_team_slug = active_team.map(|team| team.slug.clone());
 
-                if !list_teams_response.teams.is_empty() {
-                    // Add the actual teams from the response
-                    let response_teams: Vec<Vec<String>> = list_teams_response
-                        .teams
-                        .iter()
-                        .map(|team| vec![team.slug.clone(), team.name.clone()])
-                        .collect();
-                    // Combine default team with response teams
-                    teams.extend(response_teams);
-                }
+                // Format the teams data for the table
+                let teams_data: Vec<Vec<String>> = list_teams_response
+                    .teams
+                    .iter()
+                    .map(|team| {
+                        let team_name = if Some(&team.slug) == active_team_slug.as_ref() {
+                            format!("{} *", team.name)
+                        } else {
+                            team.name.clone()
+                        };
+                        vec![team.slug.clone(), team_name]
+                    })
+                    .collect();
 
                 // Display the table using the existing table function
-                output::table(headers, teams);
+                output::table(headers, teams_data);
+                output::newline();
+
+                // Add a legend for the asterisk
+                println!("{}", "* indicates currently active team".dimmed());
                 output::newline();
             } else {
                 eprintln!("{}", "Unexpected response format from server.".red());

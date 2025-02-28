@@ -123,7 +123,7 @@ impl App {
                         std::process::exit(2);
                     }
                 }
-            },
+            }
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
