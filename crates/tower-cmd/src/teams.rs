@@ -1,5 +1,5 @@
 use crate::output;
-use clap::Command;
+use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
 use config::Config;
 use tower_api::apis::default_api;
@@ -7,13 +7,17 @@ use tower_api::apis::default_api;
 pub fn teams_cmd() -> Command {
     Command::new("teams")
         .about("View information about team membership and switch between teams")
-        .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(list_cmd())
-}
-
-fn list_cmd() -> Command {
-    Command::new("list").about("List teams you belong to")
+        .subcommand(Command::new("list").about("List teams you belong to"))
+        .subcommand(
+            Command::new("switch")
+                .about("Switch context to a different team")
+                .arg(
+                    Arg::new("team_slug")
+                        .value_parser(value_parser!(String))
+                        .action(clap::ArgAction::Set),
+                ),
+        )
 }
 
 pub async fn do_list_teams(config: Config) {
@@ -70,6 +74,50 @@ pub async fn do_list_teams(config: Config) {
         Err(e) => {
             spinner.failure();
             eprintln!("{}", format!("Failed to refresh session: {}", e).red());
+            std::process::exit(1);
+        }
+    }
+}
+
+pub async fn do_switch_team(config: Config, args: &ArgMatches) {
+    let team_slug = args
+        .get_one::<String>("team_slug")
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| {
+            output::die("Team Slug (e.g. tower teams switch <team_slug>) is required");
+        });
+
+    // Get all available teams
+    let teams = match config.get_teams() {
+        Ok(teams) => teams,
+        Err(e) => {
+            output::failure(&format!("Failed to get teams: {}", e));
+            std::process::exit(1);
+        }
+    };
+
+    // Check if the provided team slug exists
+    let team = teams.iter().find(|team| team.slug == team_slug);
+
+    match team {
+        Some(team) => {
+            // Team found, set it as active
+            match config.set_active_team_by_slug(team_slug) {
+                Ok(_) => {
+                    output::success(&format!("Switched to team: {}", team.name));
+                }
+                Err(e) => {
+                    output::failure(&format!("Failed to switch team: {}", e));
+                    std::process::exit(1);
+                }
+            }
+        }
+        None => {
+            // Team not found
+            output::failure(&format!(
+                "Team '{}' not found. Use 'tower teams list' to see available teams.",
+                team_slug
+            ));
             std::process::exit(1);
         }
     }

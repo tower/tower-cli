@@ -1,7 +1,10 @@
-use std::io::{self, Write};
+pub use cli_table::{format::Justify, Cell};
+use cli_table::{
+    format::{Border, HorizontalLine, Separator},
+    print_stdout, Table,
+};
 use colored::Colorize;
-use cli_table::{print_stdout, Table, format::{Border, Separator, HorizontalLine}};
-pub use cli_table::{Cell, format::Justify};
+use std::io::{self, Write};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
@@ -38,12 +41,10 @@ pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
 
 pub fn package_error(err: tower_package::Error) {
     let msg = match err {
-        tower_package::Error::NoManifest => {
-            "No manifeset was found".to_string()
-        },
+        tower_package::Error::NoManifest => "No manifeset was found".to_string(),
         tower_package::Error::InvalidManifest => {
             "Invalid manifest was found or created".to_string()
-        },
+        }
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
@@ -62,23 +63,20 @@ pub fn paragraph(msg: &str) -> String {
 
 pub fn config_error(err: config::Error) {
     let msg = match err {
-        config::Error::ConfigDirNotFound => {
-            "No home directory found".to_string()
-        },
-        config::Error::NoHomeDir => {
-            "No home directory found".to_string()
-        },
-        config::Error::NoSession => {
-            "No session".to_string()
-        },
+        config::Error::ConfigDirNotFound => "No home directory found".to_string(),
+        config::Error::NoHomeDir => "No home directory found".to_string(),
+        config::Error::NoSession => "No session".to_string(),
         config::Error::InvalidTowerfile => {
             "Couldn't read the Towerfile in this directory".to_string()
-        },
+        }
         config::Error::MissingTowerfile => {
             "No Towerfile was found in the target directory".to_string()
-        },
+        }
         config::Error::MissingRequiredAppField { ref field } => {
             format!("Missing required app field `{}` in Towerfile", field)
+        }
+        config::Error::TeamNotFound { ref team_slug } => {
+            format!("Team with slug `{}` not found!", team_slug)
         }
     };
 
@@ -95,14 +93,16 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
-pub fn tower_error<T>(err: tower_api::apis::Error<T>) 
-where 
-    T: std::fmt::Debug + serde::de::DeserializeOwned
+pub fn tower_error<T>(err: tower_api::apis::Error<T>)
+where
+    T: std::fmt::Debug + serde::de::DeserializeOwned,
 {
     match err {
         tower_api::apis::Error::ResponseError(response) => {
             // Try to deserialize as ErrorModel first
-            if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&response.content) {
+            if let Ok(error_model) =
+                serde_json::from_str::<tower_api::models::ErrorModel>(&response.content)
+            {
                 // Show the main error message from the detail field
                 let detail = error_model.detail.as_deref().unwrap_or("Unknown error");
                 let line = format!("{} {}\n", "Error:".red(), detail);
@@ -113,29 +113,37 @@ where
                     if !errors.is_empty() {
                         writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
                         for error in errors {
-                            let msg = format!("  • {}", error.message.as_deref().unwrap_or("Unknown error"));
+                            let msg = format!(
+                                "  • {}",
+                                error.message.as_deref().unwrap_or("Unknown error")
+                            );
                             writeln!(io::stdout(), "{}", msg.red()).unwrap();
                         }
                     }
                 }
             } else {
                 // If it's not an ErrorModel, try to show the raw content
-                let line = format!("{} {}: {}\n", "Error:".red(), response.status, response.content);
+                let line = format!(
+                    "{} {}: {}\n",
+                    "Error:".red(),
+                    response.status,
+                    response.content
+                );
                 io::stdout().write_all(line.as_bytes()).unwrap();
             }
-        },
+        }
         tower_api::apis::Error::Reqwest(e) => {
             let line = format!("{} Network error: {}\n", "Error:".red(), e);
             io::stdout().write_all(line.as_bytes()).unwrap();
-        },
+        }
         tower_api::apis::Error::Serde(e) => {
             let line = format!("{} Data parsing error: {}\n", "Error:".red(), e);
             io::stdout().write_all(line.as_bytes()).unwrap();
-        },
+        }
         tower_api::apis::Error::Io(e) => {
             let line = format!("{} I/O error: {}\n", "Error:".red(), e);
             io::stdout().write_all(line.as_bytes()).unwrap();
-        },
+        }
     }
 }
 
@@ -144,11 +152,12 @@ pub fn table(headers: Vec<String>, data: Vec<Vec<String>>) {
         .title(Some(HorizontalLine::default()))
         .build();
 
-    let table = data.table()
+    let table = data
+        .table()
         .border(Border::builder().build())
         .separator(separator)
         .title(headers);
-        
+
     print_stdout(table).unwrap();
 }
 
@@ -167,7 +176,7 @@ pub fn banner() {
 
 pub struct Spinner {
     msg: String,
-    spinner: spinners::Spinner, 
+    spinner: spinners::Spinner,
 }
 
 impl Spinner {
@@ -178,12 +187,14 @@ impl Spinner {
 
     pub fn success(&mut self) {
         let sym = "✔".bold().green().to_string();
-        self.spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
+        self.spinner
+            .stop_and_persist(&sym, format!("{} Done!", self.msg));
     }
 
     pub fn failure(&mut self) {
         let sym = "✘".bold().red().to_string();
-        self.spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
+        self.spinner
+            .stop_and_persist(&sym, format!("{} Failed!", self.msg));
     }
 }
 
@@ -221,7 +232,7 @@ impl ProgressBar {
 
         ProgressBar { inner: pb }
     }
-    
+
     pub fn finish(&self) {
         self.inner.finish();
     }

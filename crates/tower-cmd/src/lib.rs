@@ -134,6 +134,7 @@ impl App {
 
                 match teams_command {
                     Some(("list", _)) => teams::do_list_teams(config).await,
+                    Some(("switch", args)) => teams::do_switch_team(config, args).await,
                     _ => {
                         teams::teams_cmd().print_help().unwrap();
                         std::process::exit(2);

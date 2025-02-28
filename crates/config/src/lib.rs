@@ -99,6 +99,7 @@ impl Config {
                 .find(|team| team.team_type == "personal")
             {
                 session.active_team = Some(personal_team.clone());
+                session.save()?;
             }
         }
 
@@ -122,5 +123,43 @@ impl Config {
 
         // Return the active team's JWT token
         Ok(session.active_team.map(|team| team.token.jwt.clone()))
+    }
+
+    /// Sets the active team in the session and saves it
+    pub fn set_active_team(&self, team: Team) -> Result<(), Error> {
+        // Get the current session
+        let mut session = Session::from_config_dir()?;
+
+        // Set the active team
+        session.active_team = Some(team);
+
+        // Save the updated session
+        session.save()?;
+
+        Ok(())
+    }
+
+    /// Sets the active team in the session by team slug and saves it
+    pub fn set_active_team_by_slug(&self, team_slug: &str) -> Result<(), Error> {
+        // Get the current session
+        let mut session = Session::from_config_dir()?;
+
+        // Find the team with the matching slug
+        let team = session
+            .teams
+            .iter()
+            .find(|team| team.slug == team_slug)
+            .cloned()
+            .ok_or(Error::TeamNotFound {
+                team_slug: team_slug.to_string(),
+            })?;
+
+        // Set the active team
+        session.active_team = Some(team);
+
+        // Save the updated session
+        session.save()?;
+
+        Ok(())
     }
 }
