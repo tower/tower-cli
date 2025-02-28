@@ -1,13 +1,16 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
+use tower_api::apis::Error as ApiError;
+use std::future::Future;
 
-use tower_api::apis::default_api::{
-    self, CreateAppsParams, DeleteAppParams, DescribeAppParams, DescribeAppSuccess,
-    GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams, ListAppsSuccess,
+use tower_api::{
+    models::{CreateAppParams, Run},
+    apis::default_api::{
+        self, CreateAppsParams, DeleteAppParams, DescribeAppParams, DescribeAppSuccess,
+        GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams, ListAppsSuccess,
+    },
 };
-
-use tower_api::models::{CreateAppParams, Run};
 
 use crate::output;
 
@@ -51,47 +54,19 @@ pub fn apps_cmd() -> Command {
 }
 
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let (app_name, seq) = if let Some((name, _)) = cmd {
-        if let Some((app, num)) = name.split_once('#') {
-            (
-                app.to_string(),
-                num.parse::<i64>().unwrap_or_else(|_| {
-                    output::die("Run number must be a valid number");
-                }),
-            )
-        } else {
-            output::die("Run number is required (e.g. tower apps logs <app name>#<run number>)");
-        }
-    } else {
-        output::die("App name (e.g. tower apps logs <app name>#<run number>) is required");
-    };
+    let (app_name, seq) = extract_app_run(cmd);
+    
+    let response = with_spinner(
+        "Fetching logs...",
+        default_api::get_app_run_logs(
+            &config.into(),
+            GetAppRunLogsParams { name: app_name, seq },
+        )
+    ).await;
 
-    let mut spinner = output::spinner("Fetching logs...");
-
-    match default_api::get_app_run_logs(
-        &config.into(),
-        GetAppRunLogsParams {
-            name: app_name,
-            seq,
-        },
-    )
-    .await
-    {
-        Ok(response) => {
-            spinner.success();
-            if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
-                for line in logs.log_lines {
-                    output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
-                }
-            }
-        }
-        Err(err) => {
-            spinner.failure();
-            if let tower_api::apis::Error::ResponseError(err) = &err {
-                output::failure(&format!("{}: {}", err.status, err.content));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
+    if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
+        for line in logs.log_lines {
+            output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
         }
     }
 }
@@ -207,7 +182,7 @@ pub async fn do_show_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    match default_api::list_apps(
+    let resp =  handle_api_result(None, default_api::list_apps(
         &config.into(),
         ListAppsParams {
             query: None,
@@ -217,34 +192,25 @@ pub async fn do_list_apps(config: Config) {
             num_runs: None,
             status: None,
         },
-    )
-    .await
-    {
-        Ok(response) => {
-            if let ListAppsSuccess::Status200(list_response) = response.entity.unwrap() {
-                let items = list_response
-                    .apps
-                    .into_iter()
-                    .map(|app_summary| {
-                        let app = app_summary.app;
-                        let desc = if app.short_description.is_empty() {
-                            "No description".white().dimmed().italic()
-                        } else {
-                            app.short_description.normal().clear()
-                        };
-                        format!("{}\n{}", app.name.bold().green(), desc)
-                    })
-                    .collect();
-                output::list(items);
-            }
-        }
-        Err(err) => {
-            if let tower_api::apis::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
+    )).await;
+
+    if let ListAppsSuccess::Status200(list_response) = resp.entity.unwrap() {
+        let items = list_response
+            .apps
+            .into_iter()
+            .map(|app_summary| {
+                let app = app_summary.app;
+                let desc = if app.short_description.is_empty() {
+                    "No description".white().dimmed().italic()
+                } else {
+                    app.short_description.normal().clear()
+                };
+                format!("{}\n{}", app.name.bold().green(), desc)
+            })
+            .collect();
+        output::list(items);
+    } else {
+        output::failure("The Tower API returned an unexpected response.");
     }
 }
 
@@ -252,36 +218,23 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap_or_else(|| {
         output::die("App name (--name) is required");
     });
-
     let description = args.get_one::<String>("description").unwrap();
 
-    let mut spinner = output::Spinner::new("Creating app".to_string());
-
-    match default_api::create_apps(
-        &config.into(),
-        CreateAppsParams {
-            create_app_params: CreateAppParams {
-                schema: None,
-                name: name.clone(),
-                short_description: Some(description.clone()),
+    with_spinner(
+        "Creating app",
+        default_api::create_apps(
+            &config.into(),
+            CreateAppsParams {
+                create_app_params: CreateAppParams {
+                    schema: None,
+                    name: name.clone(),
+                    short_description: Some(description.clone()),
+                },
             },
-        },
-    )
-    .await
-    {
-        Ok(_) => {
-            spinner.success();
-            output::success(&format!("App '{}' created", name));
-        }
-        Err(err) => {
-            spinner.failure();
-            if let tower_api::apis::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
-    }
+        )
+    ).await;
+
+    output::success(&format!("App '{}' created", name));
 }
 
 pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
@@ -291,25 +244,83 @@ pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 
     let mut spinner = output::Spinner::new("Deleting app...".to_string());
 
-    match default_api::delete_app(
+    let _ = handle_api_result(Some(&mut spinner), default_api::delete_app(
         &config.into(),
         DeleteAppParams {
             name: name.to_string(),
         },
-    )
-    .await
-    {
-        Ok(_) => {
-            spinner.success();
-            output::success(&format!("App '{}' deleted", name));
-        }
+    ));
+
+    spinner.success();
+    output::success(&format!("App '{}' deleted", name));
+}
+
+/// Helper function to handle common API error patterns
+async fn handle_api_result<T, F, V>(spinner: Option<&mut output::Spinner>, operation: F) -> T 
+where
+    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
+{
+    match operation.await {
+        Ok(result) => result,
         Err(err) => {
-            spinner.failure();
-            if let tower_api::apis::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
+            if let Some(spinner) = spinner {
+                spinner.failure();
+            }
+
+            match err {
+                ApiError::ResponseError(err) => {
+                    output::failure(&format!("{}: {}", err.status, err.content));
+                    std::process::exit(1);
+                }
+                _ => {
+                    log::debug!("Unexpected error: {}", err);
+                    output::failure("The Tower API returned an unexpected error!");
+                    std::process::exit(1);
+                }
             }
         }
     }
+}
+
+/// Helper function to handle operations with spinner
+async fn with_spinner<T, F, V>(message: &str, operation: F) -> T 
+where
+    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
+{
+    let mut spinner = output::spinner(message);
+    match operation.await {
+        Ok(result) => {
+            spinner.success();
+            result
+        }
+        Err(err) => {
+            spinner.failure();
+            match err {
+                ApiError::ResponseError(err) => {
+                    output::failure(&format!("{}: {}", err.status, err.content));
+                    std::process::exit(1);
+                }
+                _ => {
+                    output::failure(&format!("Unexpected error: {}", err));
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+}
+
+/// Extract app name and run number from command
+fn extract_app_run(cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
+    if let Some((name, _)) = cmd {
+        if let Some((app, num)) = name.split_once('#') {
+            return (
+                app.to_string(),
+                num.parse::<i64>().unwrap_or_else(|_| {
+                    output::die("Run number must be a valid number");
+                }),
+            )
+        }
+        output::die("Run number is required (e.g. tower apps logs <app name>#<run number>)");
+    }
+    output::die("App name (e.g. tower apps logs <app name>#<run number>) is required");
 }

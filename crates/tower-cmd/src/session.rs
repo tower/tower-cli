@@ -164,14 +164,13 @@ fn finalize_session(
         spinner.failure();
         output::failure(&format!("Failed to save session: {}", err));
     } else {
-        log::debug!("Session saved successfully (Tower URL: {}, User: {})", session.tower_url, session.user.email);
         spinner.success();
         let message = format!("Hello, {}!", session_response.session.user.email.clone());
         output::success(&message);
     }
 }
 
-fn extract_api_error(err: &tower_api::apis::Error) -> Option<ApiErrorDetails> {
+fn extract_api_error<T>(err: &tower_api::apis::Error<T>) -> Option<ApiErrorDetails> {
     if let tower_api::apis::Error::ResponseError(err) = err {
         if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&err.content) {
             let is_incomplete_device_login = error_model.errors
@@ -182,7 +181,7 @@ fn extract_api_error(err: &tower_api::apis::Error) -> Option<ApiErrorDetails> {
                 .unwrap_or(false);
 
             return Some(ApiErrorDetails {
-                status: err.status,
+                status: u16::from(err.status),
                 content: err.content.clone(),
                 is_incomplete_device_login,
             });
