@@ -2,11 +2,9 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::convert::From;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-
-use tower_package::{Package, PackageSpec};
 
 use crate::{output, util};
+use tower_package::{Package, PackageSpec};
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")
