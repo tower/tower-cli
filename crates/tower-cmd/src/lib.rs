@@ -25,8 +25,9 @@ impl App {
         Self { cmd, session }
     }
 
-    async fn check_latest_version() -> Result<Option<String>> {
-        tower_version::check_latest_version().await
+    async fn check_latest_version() -> Option<String> {
+        let res = tower_version::check_latest_version().await;
+        res.unwrap_or(None)
     }
 
     pub async fn run(self) {
@@ -55,9 +56,12 @@ impl App {
         }
 
         // Check for newer version only if we successfully get a latest version
-        if let Ok(Some(latest)) = Self::check_latest_version().await {
+        if let Some(latest) = Self::check_latest_version().await {
             let current = tower_version::current_version();
-            output::write_update_message(&latest, &current);
+
+            if current != latest {
+                output::write_update_message(&latest, &current);
+            }
         }
 
         // If no subcommand was provided, show help and exit
