@@ -67,9 +67,15 @@ impl Config {
         // Set the base path from tower_url
         configuration.base_path = self.tower_url.clone().to_string();
 
-        // Add session token if available
+        // Add token if available - prioritize active team's token
         if let Some(session) = session {
-            configuration.bearer_access_token = Some(session.token.jwt.clone());
+            if let Some(active_team) = &session.active_team {
+                // Use the active team's JWT token
+                configuration.bearer_access_token = Some(active_team.token.jwt.clone());
+            } else {
+                // Fall back to session token if no active team
+                configuration.bearer_access_token = Some(session.token.jwt.clone());
+            }
         }
 
         // Store the configuration in self
