@@ -89,48 +89,31 @@ async fn poll_for_login(
 
         match resp {
             Ok(resp) => {
-                let success = resp.entity.unwrap();
-
-                if let DescribeDeviceLoginSessionSuccess::Status200(response) = success {
-                    finalize_session(config, &response, spinner);
-                    return true;
-                } else {
-                    spinner.failure();
-                    output::failure("The Tower API returned an unexpected response.");
-                    return false;
+                if let Some(success) = resp.entity {
+                    if let DescribeDeviceLoginSessionSuccess::Status200(response) = success {
+                        finalize_session(config, &response, spinner);
+                        return true;
+                    }
                 }
+
+                spinner.failure();
+                output::failure("The Tower API returned an unexpected response.");
+                return false;
             }
             Err(err) => {
-                if let tower_api::apis::Error::ResponseError(err) = err {
-                    // Try to parse the error content as an ErrorModel
-                    if let Ok(error_model) =
-                        serde_json::from_str::<tower_api::models::ErrorModel>(&err.content)
-                    {
-                        // Check if any error detail has "incomplete_device_login" in its location
-                        // FIXME: Ugly, but I don't have a better option currently.
-                        let is_incomplete_login = error_model
-                            .errors
-                            .as_ref()
-                            .and_then(|errors| errors.first())
-                            .and_then(|error| error.location.as_ref())
-                            .map(|message| message.contains("incomplete_device_login"))
-                            .unwrap_or(false);
-
-                        // Continue polling only if it's a 404 with incomplete_device_login as True
-                        if err.status != 404 && !is_incomplete_login {
-                            output::failure(&format!("{}: {}", err.status, err.content));
-                            return false;
-                        }
-                    } else {
-                        output::failure(&format!("{}: {}", err.status, err.content));
+                if let Some(api_err) = extract_api_error(&err) {
+                    if api_err.status != 404 && !api_err.is_incomplete_device_login {
+                        output::failure(&format!("{}", api_err.content));
                         return false;
                     }
                 } else {
-                    output::failure(&format!("Unexpected error: {}", err));
+                    output::failure(&format!("An unexpected error happened! Error: {}", err));
                     return false;
                 }
             }
         }
+
+        // Keep waiting...
         ticker.tick().await;
     }
     false
@@ -186,4 +169,31 @@ fn finalize_session(
         let message = format!("Hello, {}!", session_response.session.user.email.clone());
         output::success(&message);
     }
+}
+
+fn extract_api_error(err: &tower_api::apis::Error) -> Option<ApiErrorDetails> {
+    if let tower_api::apis::Error::ResponseError(err) = err {
+        if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&err.content) {
+            let is_incomplete_device_login = error_model.errors
+                .as_ref()
+                .and_then(|errors| errors.first())
+                .and_then(|error| error.location.as_ref())
+                .map(|message| message.contains("incomplete_device_login"))
+                .unwrap_or(false);
+
+            return Some(ApiErrorDetails {
+                status: err.status,
+                content: err.content.clone(),
+                is_incomplete_device_login,
+            });
+        }
+    }
+    None
+}
+
+// Struct to store extracted error details
+struct ApiErrorDetails {
+    status: u16,
+    content: String,
+    is_incomplete_device_login: bool,
 }
