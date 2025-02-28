@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Downloading OpenAPI specification..." && \
-curl -s -O http://localhost:8081/v1/openapi.json && \
+curl -s -O https://api.tower.dev/v1/openapi.json && \
 
 echo "Generating API code..." && \
 podman run --rm \
