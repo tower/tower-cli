@@ -35,7 +35,7 @@ impl App {
 
         let mut config = Config::from_arg_matches(&matches);
 
-        let session_config = if let Some(session) = self.session {
+        let sessionized_config = if let Some(session) = self.session {
             config.clone().with_session(session)
         } else {
             config.clone()
@@ -73,11 +73,11 @@ impl App {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(session_config).await,
-                    Some(("show", args)) => apps::do_show_app(session_config, args.subcommand()).await,
-                    Some(("logs", args)) => apps::do_logs_app(session_config, args.subcommand()).await,
-                    Some(("create", args)) => apps::do_create_app(session_config, args).await,
-                    Some(("delete", args)) => apps::do_delete_app(session_config, args.subcommand()).await,
+                    Some(("list", _)) => apps::do_list_apps(sessionized_config).await,
+                    Some(("show", args)) => apps::do_show_app(sessionized_config, args.subcommand()).await,
+                    Some(("logs", args)) => apps::do_logs_app(sessionized_config, args.subcommand()).await,
+                    Some(("create", args)) => apps::do_create_app(sessionized_config, args).await,
+                    Some(("delete", args)) => apps::do_delete_app(sessionized_config, args.subcommand()).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -88,10 +88,10 @@ impl App {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => secrets::do_list_secrets(session_config, args).await,
-                    Some(("create", args)) => secrets::do_create_secret(session_config, args).await,
+                    Some(("list", args)) => secrets::do_list_secrets(sessionized_config, args).await,
+                    Some(("create", args)) => secrets::do_create_secret(sessionized_config, args).await,
                     Some(("delete", args)) => {
-                        secrets::do_delete_secret(session_config, args.subcommand()).await
+                        secrets::do_delete_secret(sessionized_config, args.subcommand()).await
                     }
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
@@ -99,14 +99,14 @@ impl App {
                     }
                 }
             }
-            Some(("deploy", args)) => deploy::do_deploy(session_config, args).await,
-            Some(("run", args)) => run::do_run(session_config, args, args.subcommand()).await,
+            Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
+            Some(("run", args)) => run::do_run(sessionized_config, args, args.subcommand()).await,
             Some(("teams", sub_matches)) => {
                 let teams_command = sub_matches.subcommand();
 
                 match teams_command {
-                    Some(("list", _)) => teams::do_list_teams(session_config).await,
-                    Some(("switch", args)) => teams::do_switch_team(session_config, args).await,
+                    Some(("list", _)) => teams::do_list_teams(sessionized_config).await,
+                    Some(("switch", args)) => teams::do_switch_team(sessionized_config, args).await,
                     _ => {
                         teams::teams_cmd().print_help().unwrap();
                         std::process::exit(2);
