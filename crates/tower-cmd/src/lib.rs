@@ -38,10 +38,6 @@ impl App {
 
         // Init the configuration for the new API client
         config.init_api_configuration(self.session.as_ref());
-        let mut config = Config::from_arg_matches(&matches);
-
-        // Init the configuration for the new API client
-        config.init_api_configuration(self.session.as_ref());
 
         // Setup logging
         simple_logger::SimpleLogger::new()
