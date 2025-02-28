@@ -210,7 +210,7 @@ pub async fn do_list_apps(config: Config) {
             .collect();
         output::list(items);
     } else {
-        output::failure("The Tower API returned an unexpected response.");
+        // This is most likely the case that there are no apps! So do nothing at all.
     }
 }
 
