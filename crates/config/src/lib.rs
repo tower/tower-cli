@@ -83,10 +83,25 @@ impl Config {
     }
 
     /// Gets the currently active team from the session
-    /// Returns None if there's no session or no active team
+    /// Returns None if there's no session
     pub fn get_active_team(&self) -> Result<Option<Team>, Error> {
-        // Get the session
-        let session = Session::from_config_dir()?;
+        // Get the session, return None if no session exists
+        let mut session = match Session::from_config_dir() {
+            Ok(session) => session,
+            Err(Error::NoSession) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+
+        // If there's no active team, try to find and set a personal team
+        if session.active_team.is_none() {
+            if let Some(personal_team) = session
+                .teams
+                .iter()
+                .find(|team| team.team_type == "personal")
+            {
+                session.active_team = Some(personal_team.clone());
+            }
+        }
 
         // Return the active team
         Ok(session.active_team)
