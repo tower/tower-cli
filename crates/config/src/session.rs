@@ -11,18 +11,18 @@ pub fn default_tower_url() -> Url {
     Url::parse(DEFAULT_TOWER_URL).unwrap()
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct User {
     pub email: String,
     pub created_at: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Token {
     pub jwt: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Team {
     pub slug: String,
     pub name: String,
@@ -30,7 +30,7 @@ pub struct Team {
     pub team_type: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Session {
     // tower_url is the URL of the Tower API that this session was created with. This is useful
     // when the user is using multiple Tower instances. We don't want people to modify these on
@@ -111,18 +111,5 @@ impl Session {
         } else {
             false
         }
-    }
-
-    /// Gets the currently active team
-    /// Returns the active team if it exists, or the default team if no active team is found
-    pub fn get_active_team(&self) -> Option<&Team> {
-        // First check if we have an active team set
-        if let Some(active_team) = &self.active_team {
-            // If we do, return it
-            return Some(active_team);
-        }
-
-        // If no active team is set, return the personal team
-        self.teams.iter().find(|team| team.team_type == "personal")
     }
 }

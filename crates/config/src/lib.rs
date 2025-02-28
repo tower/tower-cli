@@ -87,18 +87,26 @@ impl Config {
     pub fn get_active_team(&self) -> Result<Option<Team>, Error> {
         // Get the session
         let session = Session::from_config_dir()?;
-        
+
         // Return the active team
-        Ok(session.get_active_team().cloned())
+        Ok(session.active_team)
     }
-    
+
+    pub fn get_teams(&self) -> Result<Vec<Team>, Error> {
+        // Get the session
+        let session = Session::from_config_dir()?;
+
+        // Return the active team
+        Ok(session.teams)
+    }
+
     /// Gets the JWT token for the active team
     /// Returns None if there's no session or no active team
     pub fn get_active_team_token(&self) -> Result<Option<String>, Error> {
         // Get the session
         let session = Session::from_config_dir()?;
-        
+
         // Return the active team's JWT token
-        Ok(session.get_active_team().map(|team| team.token.jwt.clone()))
+        Ok(session.active_team.map(|team| team.token.jwt.clone()))
     }
 }
