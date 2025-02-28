@@ -1,14 +1,9 @@
 use anyhow::Result;
 use clap::{value_parser, Arg, Command};
 use colored::*;
-use clap::{value_parser, Arg, Command};
-use colored::*;
 use config::{Config, Session};
 
 mod apps;
-mod deploy;
-pub mod output;
-mod run;
 mod deploy;
 pub mod output;
 mod run;
@@ -102,17 +97,10 @@ impl App {
         match matches.subcommand() {
             Some(("login", _)) => session::do_login(config).await,
             Some(("version", _)) => version::do_version().await,
-            Some(("login", _)) => session::do_login(config).await,
-            Some(("version", _)) => version::do_version().await,
             Some(("apps", sub_matches)) => {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(config).await,
-                    Some(("show", args)) => apps::do_show_app(config, args.subcommand()).await,
-                    Some(("logs", args)) => apps::do_logs_app(config, args.subcommand()).await,
-                    Some(("create", args)) => apps::do_create_app(config, args).await,
-                    Some(("delete", args)) => apps::do_delete_app(config, args.subcommand()).await,
                     Some(("list", _)) => apps::do_list_apps(config).await,
                     Some(("show", args)) => apps::do_show_app(config, args.subcommand()).await,
                     Some(("logs", args)) => apps::do_logs_app(config, args.subcommand()).await,
@@ -124,16 +112,10 @@ impl App {
                     }
                 }
             }
-            }
             Some(("secrets", sub_matches)) => {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => secrets::do_list_secrets(config, args).await,
-                    Some(("create", args)) => secrets::do_create_secret(config, args).await,
-                    Some(("delete", args)) => {
-                        secrets::do_delete_secret(config, args.subcommand()).await
-                    }
                     Some(("list", args)) => secrets::do_list_secrets(config, args).await,
                     Some(("create", args)) => secrets::do_create_secret(config, args).await,
                     Some(("delete", args)) => {
@@ -175,7 +157,6 @@ fn root_cmd() -> Command {
                 .long("debug")
                 .hide(true)
                 .action(clap::ArgAction::SetTrue),
-                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("tower_url")
@@ -183,7 +164,6 @@ fn root_cmd() -> Command {
                 .long("tower-url")
                 .hide(true)
                 .value_parser(value_parser!(String))
-                .action(clap::ArgAction::Set),
                 .action(clap::ArgAction::Set),
         )
         .subcommand_required(false)
