@@ -21,12 +21,12 @@ pub fn teams_cmd() -> Command {
 }
 
 pub async fn do_list_teams(config: Config) {
-    let api_config = config.get_api_configuration().unwrap();
+    let api_config = config.clone().into();
 
     // First refresh the session to ensure we have the latest data
     let mut spinner = output::Spinner::new("Refreshing session...".to_string());
 
-    match default_api::refresh_session(api_config).await {
+    match default_api::refresh_session(&api_config).await {
         Ok(response) => {
             if let Some(default_api::RefreshSessionSuccess::Status200(_session_response)) =
                 response.entity
