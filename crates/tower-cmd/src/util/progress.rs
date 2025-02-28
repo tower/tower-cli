@@ -1,22 +1,23 @@
-use std::{pin::Pin, task::{Context, Poll}};
 use futures_util::stream::Stream;
 use std::sync::{Arc, Mutex};
-
-use crate::TowerError;
-
-/// ProgressCallback is the callback type that is used for reporting overall progress to a process
-/// monitoring it overall.
-pub type ProgressCallback = Box<dyn Fn(u64, u64) + Send + Sync>;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 pub struct ProgressStream<R> {
     inner: R,
     progress: Arc<Mutex<u64>>,
-    progress_cb: ProgressCallback,
+    progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
     total_size: u64,
 }
 
 impl<R> ProgressStream<R> {
-    pub async fn new(inner: R, total_size: u64, progress_cb: ProgressCallback) -> Result<Self, TowerError> {
+    pub async fn new(
+        inner: R,
+        total_size: u64,
+        progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
+    ) -> Result<Self, std::io::Error> {
         Ok(Self {
             inner,
             progress_cb,

@@ -1,11 +1,10 @@
+use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
-use clap::{Command, ArgMatches, Arg};
+use std::convert::From;
 use std::path::PathBuf;
-use tower_api::Client;
-use tower_package::{Package, PackageSpec};
-use std::sync::{Arc, Mutex};
 
 use crate::{output, util};
+use tower_package::{Package, PackageSpec};
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")
@@ -14,7 +13,7 @@ pub fn deploy_cmd() -> Command {
                 .long("dir")
                 .short('d')
                 .help("The directory containing the app to deploy")
-                .default_value(".")
+                .default_value("."),
         )
         .about("Deploy your latest code to Tower")
 }
@@ -27,7 +26,7 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
     }
 }
 
-pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
+pub async fn do_deploy(config: Config, args: &ArgMatches) {
     // Determine the directory to build the package from
     let dir = resolve_path(args);
     log::debug!("Building package from directory: {:?}", dir);
@@ -36,8 +35,16 @@ pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
 
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
+            let api_config = &config.into();
+
             // Add app existence check before proceeding
-            if let Err(err) = util::ensure_app_exists(&client, &towerfile.app.name, &towerfile.app.description).await {
+            if let Err(err) = util::apps::ensure_app_exists(
+                &api_config,
+                &towerfile.app.name,
+                &towerfile.app.description,
+            )
+            .await
+            {
                 output::tower_error(err);
                 return;
             }
@@ -49,46 +56,33 @@ pub async fn do_deploy(_config: Config, client: Client, args: &ArgMatches) {
                 Ok(package) => {
                     spinner.success();
 
-                    let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
-
-                    let callback = Box::new({
-                        let progress_bar = Arc::clone(&progress_bar);
-                        move |progress, total| {
-                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
-                            progress_bar.set_length(total);
-                            progress_bar.set_position(progress);
-                        }
-                    });
-                    
-                    match client.upload_code(&towerfile.app.name, package, Some(callback)).await {
-                        Err(err) => {
-
-                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
-                            progress_bar.finish();
-
-                            output::newline();
-                            output::tower_error(err);
-                        }
-                        Ok(code) => {
-                            let progress_bar = progress_bar.lock().unwrap(); // Lock the Mutex to get mutable access
-                            progress_bar.finish();
-
-                            output::newline();
-
-                            let line = format!("Version `{}` of your code has been deployed to Tower!", code.version);
+                    match util::deploy::deploy_app_package(
+                        &api_config,
+                        &towerfile.app.name,
+                        package,
+                    )
+                    .await
+                    {
+                        Ok(version) => {
+                            let line = format!(
+                                "Version `{}` of your code has been deployed to Tower!",
+                                version
+                            );
                             output::success(&line);
                         }
+                        Err(err) => {
+                            output::failure(&format!("Failed to deploy: {}", err));
+                        }
                     }
-                },
+                }
                 Err(err) => {
                     spinner.failure();
                     output::package_error(err);
                 }
             }
-        },
+        }
         Err(err) => {
             output::config_error(err);
         }
     }
 }
-

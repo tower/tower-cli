@@ -1,17 +1,16 @@
 use anyhow::Result;
-use clap::{Arg, Command, value_parser};
+use clap::{value_parser, Arg, Command};
 use config::{Config, Session};
-use colored::*;
-use tower_api::Client;
 
 mod apps;
+mod deploy;
+pub mod output;
+mod run;
 mod secrets;
 mod session;
-mod deploy;
-mod run;
-mod version;
-pub mod output;
+mod teams;
 mod util;
+mod version;
 
 pub struct App {
     session: Option<Session>,
@@ -35,8 +34,12 @@ impl App {
         let matches = self.cmd.get_matches();
 
         let config = Config::from_arg_matches(&matches);
-        let client = Client::from_config(&config)
-            .with_optional_session(self.session);
+
+        let sessionized_config = if let Some(session) = self.session {
+            config.clone().with_session(session)
+        } else {
+            config.clone()
+        };
 
         // Setup logging
         simple_logger::SimpleLogger::new()
@@ -52,14 +55,9 @@ impl App {
         }
 
         // Check for newer version only if we successfully get a latest version
-        if let Ok(Some(latest_version)) = Self::check_latest_version().await {
-            let current_version = tower_version::current_version();
-            // Compare versions
-            if latest_version != current_version {
-                eprintln!("{}", format!("\nA newer version of tower-cli is available: {} (you have {})", 
-                    latest_version, current_version).yellow());
-                eprintln!("{}", "To upgrade, run: pip install --upgrade tower-cli\n".yellow());
-            }
+        if let Ok(Some(latest)) = Self::check_latest_version().await {
+            let current = tower_version::current_version();
+            output::write_update_message(&latest, &current);
         }
 
         // If no subcommand was provided, show help and exit
@@ -69,42 +67,52 @@ impl App {
         }
 
         match matches.subcommand() {
-            Some(("login", _)) => session::do_login(config, client).await,
-            Some(("version", _)) => version::do_version(config, client).await,
+            Some(("login", _)) => session::do_login(config).await,
+            Some(("version", _)) => version::do_version().await,
             Some(("apps", sub_matches)) => {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(config, client).await,
-                    Some(("show", args)) => apps::do_show_app(config, client, args.subcommand()).await,
-                    Some(("logs", args)) => apps::do_logs_app(config, client, args.subcommand()).await,
-                    Some(("create", args)) => apps::do_create_app(config, client, args).await,
-                    Some(("delete", args)) => apps::do_delete_app(config, client, args.subcommand()).await,
+                    Some(("list", _)) => apps::do_list_apps(sessionized_config).await,
+                    Some(("show", args)) => apps::do_show_app(sessionized_config, args.subcommand()).await,
+                    Some(("logs", args)) => apps::do_logs_app(sessionized_config, args.subcommand()).await,
+                    Some(("create", args)) => apps::do_create_app(sessionized_config, args).await,
+                    Some(("delete", args)) => apps::do_delete_app(sessionized_config, args.subcommand()).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
                     }
                 }
-            },
+            }
             Some(("secrets", sub_matches)) => {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => secrets::do_list_secrets(config, client, args).await,
-                    Some(("create", args)) => secrets::do_create_secret(config, client, args).await,
-                    Some(("delete", args)) => secrets::do_delete_secret(config, client, args.subcommand()).await,
+                    Some(("list", args)) => secrets::do_list_secrets(sessionized_config, args).await,
+                    Some(("create", args)) => secrets::do_create_secret(sessionized_config, args).await,
+                    Some(("delete", args)) => {
+                        secrets::do_delete_secret(sessionized_config, args.subcommand()).await
+                    }
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
                         std::process::exit(2);
                     }
                 }
-            },
-            Some(("deploy", args)) => {
-                deploy::do_deploy(config, client, args).await
-            },
-            Some(("run", args)) => {
-                run::do_run(config, client, args, args.subcommand()).await
-            },
+            }
+            Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
+            Some(("run", args)) => run::do_run(sessionized_config, args, args.subcommand()).await,
+            Some(("teams", sub_matches)) => {
+                let teams_command = sub_matches.subcommand();
+
+                match teams_command {
+                    Some(("list", _)) => teams::do_list_teams(sessionized_config).await,
+                    Some(("switch", args)) => teams::do_switch_team(sessionized_config, args).await,
+                    _ => {
+                        teams::teams_cmd().print_help().unwrap();
+                        std::process::exit(2);
+                    }
+                }
+            }
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
@@ -121,7 +129,7 @@ fn root_cmd() -> Command {
                 .short('d')
                 .long("debug")
                 .hide(true)
-                .action(clap::ArgAction::SetTrue)
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("tower_url")
@@ -129,7 +137,7 @@ fn root_cmd() -> Command {
                 .long("tower-url")
                 .hide(true)
                 .value_parser(value_parser!(String))
-                .action(clap::ArgAction::Set)
+                .action(clap::ArgAction::Set),
         )
         .subcommand_required(false)
         .arg_required_else_help(false)
@@ -139,4 +147,5 @@ fn root_cmd() -> Command {
         .subcommand(deploy::deploy_cmd())
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())
+        .subcommand(teams::teams_cmd())
 }

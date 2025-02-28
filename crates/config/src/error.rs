@@ -19,6 +19,9 @@ pub enum Error {
 
     #[snafu(display("Missing required app field `{}` in Towerfile", field))]
     MissingRequiredAppField { field: String },
+
+    #[snafu(display("Team with slug {} not found!", team_slug))]
+    TeamNotFound { team_slug: String },
 }
 
 impl From<std::io::Error> for Error {

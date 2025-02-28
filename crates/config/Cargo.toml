@@ -16,3 +16,4 @@ snafu = { workspace = true }
 toml = { workspace = true }
 testutils = { workspace = true }
 url = { workspace = true }
+tower-api = { workspace = true }
