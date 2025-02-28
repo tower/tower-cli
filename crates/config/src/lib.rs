@@ -6,9 +6,8 @@ mod error;
 mod session;
 mod towerfile;
 
-pub use session::{default_tower_url, Session, Team, Token, User};
-
 pub use error::Error;
+pub use session::{default_tower_url, Session, Team, Token, User};
 pub use towerfile::Towerfile;
 
 #[derive(Serialize, Deserialize)]
@@ -68,9 +67,15 @@ impl Config {
         // Set the base path from tower_url
         configuration.base_path = self.tower_url.clone().to_string();
 
-        // Add session token if available
+        // Add token if available - prioritize active team's token
         if let Some(session) = session {
-            configuration.bearer_access_token = Some(session.token.jwt.clone());
+            if let Some(active_team) = &session.active_team {
+                // Use the active team's JWT token
+                configuration.bearer_access_token = Some(active_team.token.jwt.clone());
+            } else {
+                // Fall back to session token if no active team
+                configuration.bearer_access_token = Some(session.token.jwt.clone());
+            }
         }
 
         // Store the configuration in self
@@ -83,22 +88,84 @@ impl Config {
     }
 
     /// Gets the currently active team from the session
-    /// Returns None if there's no session or no active team
+    /// Returns None if there's no session
     pub fn get_active_team(&self) -> Result<Option<Team>, Error> {
+        // Get the session, return None if no session exists
+        let mut session = match Session::from_config_dir() {
+            Ok(session) => session,
+            Err(Error::NoSession) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+
+        // If there's no active team, try to find and set a personal team
+        if session.active_team.is_none() {
+            if let Some(personal_team) = session
+                .teams
+                .iter()
+                .find(|team| team.team_type == "personal")
+            {
+                session.active_team = Some(personal_team.clone());
+                session.save()?;
+            }
+        }
+
+        // Return the active team
+        Ok(session.active_team)
+    }
+
+    pub fn get_teams(&self) -> Result<Vec<Team>, Error> {
         // Get the session
         let session = Session::from_config_dir()?;
-        
+
         // Return the active team
-        Ok(session.get_active_team().cloned())
+        Ok(session.teams)
     }
-    
+
     /// Gets the JWT token for the active team
     /// Returns None if there's no session or no active team
     pub fn get_active_team_token(&self) -> Result<Option<String>, Error> {
         // Get the session
         let session = Session::from_config_dir()?;
-        
+
         // Return the active team's JWT token
-        Ok(session.get_active_team().map(|team| team.token.jwt.clone()))
+        Ok(session.active_team.map(|team| team.token.jwt.clone()))
+    }
+
+    /// Sets the active team in the session and saves it
+    pub fn set_active_team(&self, team: Team) -> Result<(), Error> {
+        // Get the current session
+        let mut session = Session::from_config_dir()?;
+
+        // Set the active team
+        session.active_team = Some(team);
+
+        // Save the updated session
+        session.save()?;
+
+        Ok(())
+    }
+
+    /// Sets the active team in the session by team slug and saves it
+    pub fn set_active_team_by_slug(&self, team_slug: &str) -> Result<(), Error> {
+        // Get the current session
+        let mut session = Session::from_config_dir()?;
+
+        // Find the team with the matching slug
+        let team = session
+            .teams
+            .iter()
+            .find(|team| team.slug == team_slug)
+            .cloned()
+            .ok_or(Error::TeamNotFound {
+                team_slug: team_slug.to_string(),
+            })?;
+
+        // Set the active team
+        session.active_team = Some(team);
+
+        // Save the updated session
+        session.save()?;
+
+        Ok(())
     }
 }

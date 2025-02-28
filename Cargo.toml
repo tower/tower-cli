@@ -40,20 +40,20 @@ reqwest = { version = "0.12", features = [
 ] }
 rpassword = "7"
 rsa = "0.9"
-serde_json = "1.0"
 serde = "1"
+serde_json = "1.0"
 sha2 = "0.10"
 simple_logger = "5"
 snafu = "0.7"
 spinners = "4"
 testutils = { path = "crates/testutils" }
 tmpdir = "1.0"
-toml = "0.8"
 tokio = { version = "1", features = ["full"] }
 tokio-pipe = "0.2"
 tokio-stream = { version = "0.1.11", features = ["net"] }
 tokio-tar = "0.3"
 tokio-util = "0.7"
+toml = "0.8"
 tower-api = { path = "crates/tower-api" }
 tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }

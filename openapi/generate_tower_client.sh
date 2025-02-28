@@ -9,7 +9,7 @@ podman run --rm \
 -c /local/generator_config.yaml && \
 
 echo "Copying generated files to target directory..." && \
-rsync -av --exclude={'.gitignore','.openapi*','.travis.yml','*.sh'} tower-api/ ../crates/tower-api/ && \
+rsync -avm --delete --exclude={'.gitignore','.openapi*','.travis.yml','*.sh'} tower-api/ ../crates/tower-api/ && \
 
 echo "Cleaning up..." && \
 rm -r openapi.json tower-api
