@@ -1,8 +1,13 @@
 use colored::Colorize;
 use clap::{value_parser, Arg, ArgMatches, Command};
 use config::Config;
-use tower_api::Client;
 use crypto::encrypt;
+use rsa::pkcs1::DecodeRsaPublicKey;
+
+use tower_api::{
+    apis::default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams},
+    models::CreateSecretParams as CreateSecretParamsModel,
+};
 
 use crate::output;
 
@@ -67,61 +72,73 @@ pub fn secrets_cmd() -> Command {
         )
 }
 
-pub async fn do_list_secrets(_config: Config, client: Client, args: &ArgMatches) {
+pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
+    let api_config = config.get_api_configuration().unwrap();
     let show = args.get_one::<bool>("show").unwrap_or(&false);
-
-    // Since environment has a default value, it is a big problem if it's not defined.
     let env = args.get_one::<String>("environment").unwrap();
-
     let all = args.get_one::<bool>("all").unwrap_or(&false);
 
-    let (headers, data) = if *show {
-        match client.export_secrets(*all, Some(env.to_string())).await {
-            Ok(secrets) => (
-                vec![
-                    "Secret".bold().yellow().to_string(),
-                    "Environment".bold().yellow().to_string(),
-                    "Value".bold().yellow().to_string(),
-                ],
-                secrets.iter().map(|sum| {
-                    vec![
-                        sum.name.clone(),
-                        sum.environment.clone(),
-                        sum.value.dimmed().to_string(),
-                    ]
-                }).collect(),
-            ),
-            Err(err) => return output::tower_error(err),
-        }
-    } else {
-        match client.list_secrets(*all, Some(env.to_string())).await {
-            Ok(secrets) => (
-                vec![
-                    "Secret".bold().yellow().to_string(),
-                    "Environment".bold().yellow().to_string(),
-                    "Preview".bold().yellow().to_string(),
-                ],
-                secrets.iter().map(|sum| {
-                    vec![
-                        sum.name.clone(),
-                        sum.environment.clone(),
-                        sum.preview.dimmed().to_string(),
-                    ]
-                }).collect(),
-            ),
-            Err(err) => return output::tower_error(err),
-        }
+    let params = ListSecretsParams {
+        environment: Some(env.clone()),
+        all: Some(*all),
+        page: None,
+        page_size: None,
     };
 
-    output::table(headers, data);
+    match default_api::list_secrets(api_config, params).await {
+        Ok(response) => {
+            if let Some(list_response) = response.entity {
+                match list_response {
+                    default_api::ListSecretsSuccess::Status200(list_response) => {
+                        let (headers, data) = if *show {
+                            (
+                                vec![
+                                    "Secret".bold().yellow().to_string(),
+                                    "Environment".bold().yellow().to_string(),
+                                    "Value".bold().yellow().to_string(),
+                                ],
+                                list_response.secrets.iter().map(|secret| {
+                                    vec![
+                                        secret.name.clone(),
+                                        secret.environment.clone(),
+                                        secret.preview.clone(),
+                                    ]
+                                }).collect(),
+                            )
+                        } else {
+                            (
+                                vec![
+                                    "Secret".bold().yellow().to_string(),
+                                    "Environment".bold().yellow().to_string(),
+                                    "Preview".bold().yellow().to_string(),
+                                ],
+                                list_response.secrets.iter().map(|secret| {
+                                    vec![
+                                        secret.name.clone(),
+                                        secret.environment.clone(),
+                                        secret.preview.dimmed().to_string(),
+                                    ]
+                                }).collect(),
+                            )
+                        };
+                        output::table(headers, data);
+                    },
+                    default_api::ListSecretsSuccess::UnknownValue(_) => {
+                        output::failure("Received unknown response format from server");
+                    }
+                }
+            }
+        },
+        Err(err) => output::tower_error(err),
+    }
 }
 
-pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches) {
+pub async fn do_create_secret(config: Config, args: &ArgMatches) {
+    let api_config = config.get_api_configuration().unwrap();
     let name = args.get_one::<String>("name").unwrap_or_else(|| {
         output::die("Secret name (--name) is required");
     });
 
-    // Since environment has a default value, it is a big problem if it's not defined.
     let environment = args.get_one::<String>("environment").unwrap();
 
     let value = args.get_one::<String>("value").unwrap_or_else(|| {
@@ -130,21 +147,57 @@ pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches
 
     let mut spinner = output::spinner("Creating secret...");
 
-    match client.secrets_key().await {
-        Ok(public_key) => {
-            let encrypted_value = encrypt(public_key, value.to_string());
-            let preview = create_preview(value);
+    // First get the secrets key
+    match default_api::describe_secrets_key(api_config, default_api::DescribeSecretsKeyParams {
+        format: None,
+    }).await {
+        Ok(key_response) => {
+            if let Some(key_success) = key_response.entity {
+                match key_success {
+                    default_api::DescribeSecretsKeySuccess::Status200(key_response) => {
+                        let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
+                            .unwrap_or_else(|_| {
+                                spinner.failure();
+                                output::die("Failed to parse public key");
+                            });
+                        let encrypted_value = encrypt(public_key, value.to_string());
+                        let preview = create_preview(value);
 
-            match client.create_secret(&name, &encrypted_value, &preview, &environment).await {
-                Ok(secret) => {
-                    spinner.success();
+                        let create_params = CreateSecretParams {
+                            create_secret_params: CreateSecretParamsModel {
+                                schema: None,
+                                name: name.clone(),
+                                encrypted_value,
+                                environment: environment.clone(),
+                                preview,
+                            }
+                        };
 
-                    let line = format!("Secret \"{}\" was created", secret.name);
-                    output::success(&line);
-                },
-                Err(err) => {
-                    spinner.failure();
-                    output::tower_error(err);
+                        match default_api::create_secret(api_config, create_params).await {
+                            Ok(create_response) => {
+                                if let Some(create_success) = create_response.entity {
+                                    match create_success {
+                                        default_api::CreateSecretSuccess::Status200(response) => {
+                                            spinner.success();
+                                            output::success(&format!("Secret \"{}\" was created", response.secret.name));
+                                        },
+                                        default_api::CreateSecretSuccess::UnknownValue(_) => {
+                                            spinner.failure();
+                                            output::failure("Received unknown response format from server");
+                                        }
+                                    }
+                                }
+                            },
+                            Err(err) => {
+                                spinner.failure();
+                                output::tower_error(err);
+                            }
+                        }
+                    },
+                    default_api::DescribeSecretsKeySuccess::UnknownValue(_) => {
+                        spinner.failure();
+                        output::failure("Received unknown response format from server");
+                    }
                 }
             }
         },
@@ -155,23 +208,26 @@ pub async fn do_create_secret(_config: Config, client: Client, args: &ArgMatches
     }
 }
 
-pub async fn do_delete_secret(_config: Config, client: Client, cmd: Option<(&str, &ArgMatches)>) {
-    let opts = cmd.unwrap_or_else(|| {
+pub async fn do_delete_secret(config: Config, cmd: Option<(&str, &ArgMatches)>) {
+    let api_config = config.get_api_configuration().unwrap();
+    let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
         output::die("Secret name (e.g. tower secrets delete <name>) is required");
     });
 
     let mut spinner = output::spinner("Deleting secret...");
 
-    match client.delete_secret(&opts.0).await {
-        Ok(_app) => {
-            spinner.success();
+    let params = DeleteSecretParams {
+        name: name.to_string(),
+        environment: None,
+    };
 
-            let line = format!("Secret \"{}\" was deleted", &opts.0);
-            output::success(&line);
+    match default_api::delete_secret(api_config, params).await {
+        Ok(_) => {
+            spinner.success();
+            output::success(&format!("Secret \"{}\" was deleted", name));
         },
         Err(err) => {
             spinner.failure();
-
             output::tower_error(err);
         }
     }

@@ -20,20 +20,18 @@ pub enum LogLineType {
     Local,
 }
 
-fn format_timestamp(timesetamp: &chrono::DateTime<chrono::Utc>, t: LogLineType) -> String {
-    let timestamp = timesetamp.format("%Y-%m-%d %H:%M:%S")
-        .to_string()
-        .bold();
+fn format_timestamp(timestamp: &str, t: LogLineType) -> String {
+    let ts = timestamp.bold();
 
     let sep = "|".bold();
 
     match t {
-        LogLineType::Remote => format!("{} {}", timestamp.yellow(), sep.yellow()),
-        LogLineType::Local => format!("{} {}", timestamp.green(), sep.green()),
+        LogLineType::Remote => format!("{} {}", ts.yellow(), sep.yellow()),
+        LogLineType::Local => format!("{} {}", ts.green(), sep.green()),
     }
 }
 
-pub fn log_line(timestamp: &chrono::DateTime<chrono::Utc>, message: &str, t: LogLineType) {
+pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
     let line = format!("{} {}\n", format_timestamp(timestamp, t), message);
     write(&line);
 }
@@ -97,17 +95,47 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
-pub fn tower_error(err: tower_api::TowerError) {
-    let line = format!("{} {}\n", "Error:".red(), err.description.friendly);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+pub fn tower_error<T>(err: tower_api::apis::Error<T>) 
+where 
+    T: std::fmt::Debug + serde::de::DeserializeOwned
+{
+    match err {
+        tower_api::apis::Error::ResponseError(response) => {
+            // Try to deserialize as ErrorModel first
+            if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&response.content) {
+                // Show the main error message from the detail field
+                let detail = error_model.detail.as_deref().unwrap_or("Unknown error");
+                let line = format!("{} {}\n", "Error:".red(), detail);
+                io::stdout().write_all(line.as_bytes()).unwrap();
 
-    // Handle any nested validation errors if present
-    if let Some(items) = err.items {
-        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
-        for (field, error) in items {
-            let msg = format!("  • {}: {}", field, error.description.friendly);
-            writeln!(io::stdout(), "{}", msg.red()).unwrap();
-        }
+                // Show any additional error details from the errors field
+                if let Some(errors) = &error_model.errors {
+                    if !errors.is_empty() {
+                        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+                        for error in errors {
+                            let msg = format!("  • {}", error.message.as_deref().unwrap_or("Unknown error"));
+                            writeln!(io::stdout(), "{}", msg.red()).unwrap();
+                        }
+                    }
+                }
+            } else {
+                // If it's not an ErrorModel, try to show the raw content
+                let line = format!("{} {}: {}\n", "Error:".red(), response.status, response.content);
+                io::stdout().write_all(line.as_bytes()).unwrap();
+            }
+        },
+        tower_api::apis::Error::Reqwest(e) => {
+            let line = format!("{} Network error: {}\n", "Error:".red(), e);
+            io::stdout().write_all(line.as_bytes()).unwrap();
+        },
+        tower_api::apis::Error::Serde(e) => {
+            let line = format!("{} Data parsing error: {}\n", "Error:".red(), e);
+            io::stdout().write_all(line.as_bytes()).unwrap();
+        },
+        tower_api::apis::Error::Io(e) => {
+            let line = format!("{} I/O error: {}\n", "Error:".red(), e);
+            io::stdout().write_all(line.as_bytes()).unwrap();
+        },
     }
 }
 

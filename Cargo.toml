@@ -12,7 +12,8 @@ license = "MIT"
 repository = "https://github.com/tower/tower-cli"
 
 [workspace.dependencies]
-async-compression  = { version = "0.4", features = ["tokio", "gzip"] }
+anyhow = "1.0.95"
+async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 base64 = "0.22"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
@@ -25,13 +26,18 @@ dirs = "5"
 env_logger = "*"
 futures-util = "0.3"
 glob = "0.3"
+http = "1.1"
 indicatif = "0.17"
 log = "0.4"
 open = "5"
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
-reqwest = { version = "0.12", features = ["json", "native-tls-vendored", "stream"] }
+reqwest = { version = "0.12", features = [
+    "json",
+    "native-tls-vendored",
+    "stream",
+] }
 rpassword = "7"
 rsa = "0.9"
 serde_json = "1.0"
