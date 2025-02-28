@@ -33,7 +33,7 @@ impl App {
         let mut cmd_clone = self.cmd.clone();
         let matches = self.cmd.get_matches();
 
-        let mut config = Config::from_arg_matches(&matches);
+        let config = Config::from_arg_matches(&matches);
 
         let sessionized_config = if let Some(session) = self.session {
             config.clone().with_session(session)
