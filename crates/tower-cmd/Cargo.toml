@@ -5,12 +5,14 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+anyhow = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 cli-table = { workspace = true }
 colored = { workspace = true }
 config = { workspace = true }
 crypto = { workspace = true }
+http = { workspace = true }
 http = { workspace = true }
 indicatif = { workspace = true }
 log = { workspace = true }
@@ -22,11 +24,16 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 simple_logger = { workspace = true }
 spinners = { workspace = true }
+rsa = { workspace = true }
 tokio = { workspace = true }
 tower-api = { workspace = true }
 tower-package = { workspace = true }
 tower-runtime = { workspace = true }
 tower-version = { path = "../tower-version" }
+reqwest = { workspace = true }
+futures-util = { workspace = true }
+tokio-util = { workspace = true }
+bytes = { workspace = true }
 reqwest = { workspace = true }
 futures-util = { workspace = true }
 tokio-util = { workspace = true }

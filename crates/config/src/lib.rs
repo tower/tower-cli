@@ -1,11 +1,14 @@
 use serde::{Deserialize, Serialize};
 use tower_api::apis::configuration::Configuration;
+use tower_api::apis::configuration::Configuration;
+use url::Url;
 use url::Url;
 
 mod error;
 mod session;
 mod towerfile;
 
+pub use session::{default_tower_url, Session, Team, Token, User};
 pub use session::{default_tower_url, Session, Team, Token, User};
 
 pub use error::Error;
@@ -17,6 +20,8 @@ pub struct Config {
     pub tower_url: Url,
     #[serde(skip_serializing, skip_deserializing)]
     pub api_configuration: Option<Configuration>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub api_configuration: Option<Configuration>,
 }
 
 impl Config {
@@ -24,6 +29,7 @@ impl Config {
         Self {
             debug: false,
             tower_url: default_tower_url(),
+            api_configuration: None,
             api_configuration: None,
         }
     }
@@ -39,6 +45,7 @@ impl Config {
         Self {
             debug,
             tower_url,
+            api_configuration: None,
             api_configuration: None,
         }
     }
