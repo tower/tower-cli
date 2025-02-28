@@ -7,7 +7,7 @@ use tower_api::{
         CreateDeviceLoginTicketResponse
     },
     apis::default_api::{
-        self,
+        self as api,
         CreateDeviceLoginTicketSuccess,
         DescribeDeviceLoginSessionSuccess, DescribeDeviceLoginSessionParams, 
     },
@@ -24,12 +24,16 @@ pub async fn do_login(config: Config) {
     let api_config = config.clone().into();
 
     // Request device login code
-    match default_api::create_device_login_ticket(&api_config).await {
+    match api::create_device_login_ticket(&api_config).await {
         Ok(response) => {
-            spinner.success();
-            if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response.entity.unwrap()
-            {
+            let response = response.entity.unwrap();
+
+            if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response {
+                spinner.success();
                 handle_device_login(config, login_claim).await;
+            } else {
+                spinner.failure();
+                output::failure("The Tower API returned an unexpected response.");
             }
         }
         Err(err) => {
@@ -76,7 +80,7 @@ async fn poll_for_login(
     let expires_at = chrono::Utc::now() + expires_in;
 
     while chrono::Utc::now() < expires_at {
-        let resp = default_api::describe_device_login_session(
+        let resp = api::describe_device_login_session(
             &config.into(),
             DescribeDeviceLoginSessionParams {
                 device_code: claim.device_code.clone(),
@@ -88,7 +92,7 @@ async fn poll_for_login(
                 let success = resp.entity.unwrap();
 
                 if let DescribeDeviceLoginSessionSuccess::Status200(response) = success {
-                    finalize_session(&response, spinner);
+                    finalize_session(config, &response, spinner);
                     return true;
                 } else {
                     spinner.failure();
@@ -133,6 +137,7 @@ async fn poll_for_login(
 }
 
 fn finalize_session(
+    config: &Config,
     session_response: &tower_api::models::DescribeDeviceLoginSessionResponse,
     spinner: &mut output::Spinner,
 ) {
@@ -166,6 +171,9 @@ fn finalize_session(
         teams,
     );
 
+    // we have to copy in the tower URL so that we save it for later on!
+    session.tower_url = config.tower_url.clone();
+
     // Set the active team to the one matching the main session JWT
     let _ = session.set_active_team_by_jwt(&session_response.session.token.jwt);
 
@@ -173,6 +181,7 @@ fn finalize_session(
         spinner.failure();
         output::failure(&format!("Failed to save session: {}", err));
     } else {
+        log::debug!("Session saved successfully (Tower URL: {}, User: {})", session.tower_url, session.user.email);
         spinner.success();
         let message = format!("Hello, {}!", session_response.session.user.email.clone());
         output::success(&message);
