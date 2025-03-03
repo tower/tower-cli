@@ -3,14 +3,11 @@ use clap::Command;
 use config::Config;
 use tokio::{time, time::Duration};
 use tower_api::{
-    models::{
-        CreateDeviceLoginTicketResponse
-    },
     apis::default_api::{
-        self as api,
-        CreateDeviceLoginTicketSuccess,
-        DescribeDeviceLoginSessionSuccess, DescribeDeviceLoginSessionParams, 
+        self as api, CreateDeviceLoginTicketSuccess, DescribeDeviceLoginSessionParams,
+        DescribeDeviceLoginSessionSuccess,
     },
+    models::{session, CreateDeviceLoginTicketResponse},
 };
 
 pub fn login_cmd() -> Command {
@@ -85,7 +82,8 @@ async fn poll_for_login(
             DescribeDeviceLoginSessionParams {
                 device_code: claim.device_code.clone(),
             },
-        ).await;
+        )
+        .await;
 
         match resp {
             Ok(resp) => {
@@ -147,6 +145,8 @@ fn finalize_session(
         config::User {
             email: session_response.session.user.email.clone(),
             created_at: session_response.session.user.created_at.clone(),
+            first_name: session_response.session.user.first_name.clone(),
+            last_name: session_response.session.user.first_name.clone(),
         },
         config::Token {
             jwt: session_response.session.token.jwt.clone(),
@@ -172,8 +172,10 @@ fn finalize_session(
 
 fn extract_api_error<T>(err: &tower_api::apis::Error<T>) -> Option<ApiErrorDetails> {
     if let tower_api::apis::Error::ResponseError(err) = err {
-        if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&err.content) {
-            let is_incomplete_device_login = error_model.errors
+        if let Ok(error_model) = serde_json::from_str::<tower_api::models::ErrorModel>(&err.content)
+        {
+            let is_incomplete_device_login = error_model
+                .errors
                 .as_ref()
                 .and_then(|errors| errors.first())
                 .and_then(|error| error.location.as_ref())
