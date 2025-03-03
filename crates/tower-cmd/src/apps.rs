@@ -242,16 +242,16 @@ pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
         output::die("App name (e.g. tower apps delete <app name>) is required");
     });
 
-    let mut spinner = output::Spinner::new("Deleting app...".to_string());
+    with_spinner(
+        "Deleting app...",
+        default_api::delete_app(
+            &config.into(),
+            DeleteAppParams {
+                name: name.to_string(),
+            },
+        )
+    ).await;
 
-    let _ = handle_api_result(Some(&mut spinner), default_api::delete_app(
-        &config.into(),
-        DeleteAppParams {
-            name: name.to_string(),
-        },
-    ));
-
-    spinner.success();
     output::success(&format!("App '{}' deleted", name));
 }
 
