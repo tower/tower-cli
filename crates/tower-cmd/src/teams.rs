@@ -56,8 +56,23 @@ pub async fn do_list_teams(config: Config) {
 
                         // Check if team name is blank and use user's name instead
                         let display_name = if team.name.trim().is_empty() {
-                            // It's a personal team, indicate as such
-                            format!("Personal Team")
+                            // Get the user's first and last name from the session
+                            if let Some(session) = &config.session {
+                                let user = &session.user;
+                                let first_name = user.first_name.trim();
+                                let last_name = user.last_name.trim();
+
+                                if !first_name.is_empty() || !last_name.is_empty() {
+                                    // Use first and last name if available
+                                    format!("{} {}", first_name, last_name).trim().to_string()
+                                } else {
+                                    // Fall back to "Personal Workspace" if both names are empty
+                                    "Personal Workspace".to_string()
+                                }
+                            } else {
+                                // Fall back to "Personal Workspace" if no session
+                                "Personal Workspace".to_string()
+                            }
                         } else {
                             team.name.clone()
                         };
