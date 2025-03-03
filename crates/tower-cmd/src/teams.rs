@@ -53,7 +53,16 @@ pub async fn do_list_teams(config: Config) {
                         } else {
                             team.slug.clone()
                         };
-                        vec![slug_display, team.name.clone()]
+
+                        // Check if team name is blank and use user's name instead
+                        let display_name = if team.name.trim().is_empty() {
+                            // It's a personal team, indicate as such
+                            format!("Personal Team")
+                        } else {
+                            team.name.clone()
+                        };
+
+                        vec![slug_display, display_name]
                     })
                     .collect();
 
