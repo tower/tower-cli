@@ -7,7 +7,7 @@ use tower_api::{
         self as api, CreateDeviceLoginTicketSuccess, DescribeDeviceLoginSessionParams,
         DescribeDeviceLoginSessionSuccess,
     },
-    models::{session, CreateDeviceLoginTicketResponse},
+    models::CreateDeviceLoginTicketResponse,
 };
 
 pub fn login_cmd() -> Command {
