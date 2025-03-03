@@ -1,4 +1,3 @@
-use anyhow::Result;
 use clap::{value_parser, Arg, Command};
 use config::{Config, Session};
 
