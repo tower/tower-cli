@@ -146,7 +146,7 @@ fn finalize_session(
             email: session_response.session.user.email.clone(),
             created_at: session_response.session.user.created_at.clone(),
             first_name: session_response.session.user.first_name.clone(),
-            last_name: session_response.session.user.first_name.clone(),
+            last_name: session_response.session.user.last_name.clone(),
         },
         config::Token {
             jwt: session_response.session.token.jwt.clone(),
