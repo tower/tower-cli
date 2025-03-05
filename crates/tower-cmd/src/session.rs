@@ -131,11 +131,7 @@ fn finalize_session(
             name: t.name.clone(),
             team_type: t.r#type.clone(),
             token: config::Token {
-                jwt: t
-                    .token
-                    .as_ref()
-                    .map(|token| token.jwt.clone())
-                    .unwrap_or_default(),
+                jwt: t.token.clone().unwrap().jwt.clone(),
             },
         })
         .collect();
