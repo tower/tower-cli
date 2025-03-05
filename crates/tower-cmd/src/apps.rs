@@ -60,8 +60,9 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
         "Fetching logs...",
         default_api::get_app_run_logs(
             &config.into(),
-            GetAppRunLogsParams { name: app_name, seq },
-        )
+            GetAppRunLogsParams { name: app_name.clone(), seq },
+        ),
+        Some(&app_name)
     ).await;
 
     if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
@@ -231,7 +232,8 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
                     short_description: Some(description.clone()),
                 },
             },
-        )
+        ),
+        Some(name)
     ).await;
 
     output::success(&format!("App '{}' created", name));
@@ -242,16 +244,17 @@ pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
         output::die("App name (e.g. tower apps delete <app name>) is required");
     });
 
-    let mut spinner = output::Spinner::new("Deleting app...".to_string());
+    with_spinner(
+        "Deleting app...",
+        default_api::delete_app(
+            &config.into(),
+            DeleteAppParams {
+                name: name.to_string(),
+            },
+        ),
+        Some(name)
+    ).await;
 
-    let _ = handle_api_result(Some(&mut spinner), default_api::delete_app(
-        &config.into(),
-        DeleteAppParams {
-            name: name.to_string(),
-        },
-    ));
-
-    spinner.success();
     output::success(&format!("App '{}' deleted", name));
 }
 
@@ -283,7 +286,11 @@ where
 }
 
 /// Helper function to handle operations with spinner
-async fn with_spinner<T, F, V>(message: &str, operation: F) -> T 
+async fn with_spinner<T, F, V>(
+    message: &str, 
+    operation: F,
+    resource_name: Option<&str>
+) -> T 
 where
     F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
 {
@@ -297,7 +304,24 @@ where
             spinner.failure();
             match err {
                 ApiError::ResponseError(err) => {
-                    output::failure(&format!("{}: {}", err.status, err.content));
+                    // Check for 404 Not Found errors and provide a more user-friendly message
+                    if err.status == 404 {
+                        // Extract the resource type from the message
+                        let resource_type = message
+                            .trim_end_matches("...")
+                            .trim_start_matches("Fetching ")
+                            .trim_start_matches("Creating ")
+                            .trim_start_matches("Updating ")
+                            .trim_start_matches("Deleting ");
+                        
+                        if let Some(name) = resource_name {
+                            output::failure(&format!("{} '{}' not found", resource_type, name));
+                        } else {
+                            output::failure(&format!("The {} was not found", resource_type));
+                        }
+                    } else {
+                        output::failure(&format!("{}: {}", err.status, err.content));
+                    }
                     std::process::exit(1);
                 }
                 _ => {

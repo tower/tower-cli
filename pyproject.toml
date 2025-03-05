@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "tower-cli"
-version = "0.3.1"
+version = "0.3.2"
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
 readme = "README.md"
@@ -48,4 +48,12 @@ exclude = [
 ]
 include = [
   "rust-toolchain.toml"
+]
+
+[tool.uv.sources]
+tower-cli = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "tower-cli",
 ]

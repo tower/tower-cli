@@ -14,6 +14,8 @@ pub fn default_tower_url() -> Url {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct User {
     pub email: String,
+    pub first_name: String,
+    pub last_name: String,
     pub created_at: String,
 }
 

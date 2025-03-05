@@ -38,7 +38,7 @@ pub async fn do_list_teams(config: Config) {
                 let active_team_slug = active_team.map(|team| team.slug.clone());
 
                 // Create headers for the table
-                let headers = vec!["Slug", "Team Name"]
+                let headers = vec!["", "Slug", "Team Name"]
                     .into_iter()
                     .map(|h| h.yellow().to_string())
                     .collect();
@@ -48,12 +48,40 @@ pub async fn do_list_teams(config: Config) {
                 let teams_data: Vec<Vec<String>> = teams
                     .iter()
                     .map(|team| {
-                        let slug_display = if Some(&team.slug) == active_team_slug.as_ref() {
-                            format!("* {}", team.slug)
+                        // Create the active indicator in its own column
+                        let active_indicator = if Some(&team.slug) == active_team_slug.as_ref() {
+                            "*".to_string()
                         } else {
-                            team.slug.clone()
+                            "".to_string()
                         };
-                        vec![slug_display, team.name.clone()]
+
+                        // Use the plain slug without asterisk
+                        let slug_display = team.slug.clone();
+
+                        // Check if team name is blank and use user's name instead
+                        let display_name = if team.name.trim().is_empty() {
+                            // Get the user's first and last name from the session
+                            if let Some(session) = &config.session {
+                                let user = &session.user;
+                                let first_name = user.first_name.trim();
+                                let last_name = user.last_name.trim();
+
+                                if !first_name.is_empty() || !last_name.is_empty() {
+                                    // Use first and last name if available
+                                    format!("{} {}", first_name, last_name).trim().to_string()
+                                } else {
+                                    // Fall back to "Personal Workspace" if both names are empty
+                                    "Personal Workspace".to_string()
+                                }
+                            } else {
+                                // Fall back to "Personal Workspace" if no session
+                                "Personal Workspace".to_string()
+                            }
+                        } else {
+                            team.name.clone()
+                        };
+
+                        vec![active_indicator, slug_display, display_name]
                     })
                     .collect();
 
