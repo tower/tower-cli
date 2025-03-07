@@ -1,18 +1,17 @@
+use crate::{output, util::spinner::with_spinner};
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
-use tower_api::apis::Error as ApiError;
 use std::future::Future;
+use tower_api::apis::Error as ApiError;
 
 use tower_api::{
-    models::{CreateAppParams, Run},
     apis::default_api::{
         self, CreateAppsParams, DeleteAppParams, DescribeAppParams, DescribeAppSuccess,
         GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams, ListAppsSuccess,
     },
+    models::{CreateAppParams, Run},
 };
-
-use crate::output;
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
@@ -55,15 +54,19 @@ pub fn apps_cmd() -> Command {
 
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     let (app_name, seq) = extract_app_run(cmd);
-    
+
     let response = with_spinner(
         "Fetching logs...",
         default_api::get_app_run_logs(
             &config.into(),
-            GetAppRunLogsParams { name: app_name.clone(), seq },
+            GetAppRunLogsParams {
+                name: app_name.clone(),
+                seq,
+            },
         ),
-        Some(&app_name)
-    ).await;
+        Some(&app_name),
+    )
+    .await;
 
     if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
         for line in logs.log_lines {
@@ -183,17 +186,21 @@ pub async fn do_show_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    let resp =  handle_api_result(None, default_api::list_apps(
-        &config.into(),
-        ListAppsParams {
-            query: None,
-            page: None,
-            page_size: None,
-            period: None,
-            num_runs: None,
-            status: None,
-        },
-    )).await;
+    let resp = handle_api_result(
+        None,
+        default_api::list_apps(
+            &config.into(),
+            ListAppsParams {
+                query: None,
+                page: None,
+                page_size: None,
+                period: None,
+                num_runs: None,
+                status: None,
+            },
+        ),
+    )
+    .await;
 
     if let ListAppsSuccess::Status200(list_response) = resp.entity.unwrap() {
         let items = list_response
@@ -233,8 +240,9 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
                 },
             },
         ),
-        Some(name)
-    ).await;
+        Some(name),
+    )
+    .await;
 
     output::success(&format!("App '{}' created", name));
 }
@@ -252,14 +260,15 @@ pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
                 name: name.to_string(),
             },
         ),
-        Some(name)
-    ).await;
+        Some(name),
+    )
+    .await;
 
     output::success(&format!("App '{}' deleted", name));
 }
 
 /// Helper function to handle common API error patterns
-async fn handle_api_result<T, F, V>(spinner: Option<&mut output::Spinner>, operation: F) -> T 
+async fn handle_api_result<T, F, V>(spinner: Option<&mut output::Spinner>, operation: F) -> T
 where
     F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
 {
@@ -285,54 +294,6 @@ where
     }
 }
 
-/// Helper function to handle operations with spinner
-async fn with_spinner<T, F, V>(
-    message: &str, 
-    operation: F,
-    resource_name: Option<&str>
-) -> T 
-where
-    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
-{
-    let mut spinner = output::spinner(message);
-    match operation.await {
-        Ok(result) => {
-            spinner.success();
-            result
-        }
-        Err(err) => {
-            spinner.failure();
-            match err {
-                ApiError::ResponseError(err) => {
-                    // Check for 404 Not Found errors and provide a more user-friendly message
-                    if err.status == 404 {
-                        // Extract the resource type from the message
-                        let resource_type = message
-                            .trim_end_matches("...")
-                            .trim_start_matches("Fetching ")
-                            .trim_start_matches("Creating ")
-                            .trim_start_matches("Updating ")
-                            .trim_start_matches("Deleting ");
-                        
-                        if let Some(name) = resource_name {
-                            output::failure(&format!("{} '{}' not found", resource_type, name));
-                        } else {
-                            output::failure(&format!("The {} was not found", resource_type));
-                        }
-                    } else {
-                        output::failure(&format!("{}: {}", err.status, err.content));
-                    }
-                    std::process::exit(1);
-                }
-                _ => {
-                    output::failure(&format!("Unexpected error: {}", err));
-                    std::process::exit(1);
-                }
-            }
-        }
-    }
-}
-
 /// Extract app name and run number from command
 fn extract_app_run(cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
     if let Some((name, _)) = cmd {
@@ -342,7 +303,7 @@ fn extract_app_run(cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
                 num.parse::<i64>().unwrap_or_else(|_| {
                     output::die("Run number must be a valid number");
                 }),
-            )
+            );
         }
         output::die("Run number is required (e.g. tower apps logs <app name>#<run number>)");
     }
