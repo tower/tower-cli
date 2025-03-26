@@ -38,7 +38,6 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
-    "attrs>=24.2.0",
     "httpx>=0.23.3",
     "python-dateutil>=2.9.0.post0",
 ]
