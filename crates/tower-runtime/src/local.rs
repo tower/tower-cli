@@ -247,15 +247,16 @@ impl App for LocalApp {
                 let res = waiter.try_recv();
                 let res = match res {
                     Err(TryRecvError::Empty) => Status::Running,
-                    Err(TryRecvError::Closed) => Status::Crashed,
+                    Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
                     Ok(t) => {
                         // We save this for the next time this gets called.
                         if t == 0 {
                             self.status = Some(Status::Exited);
                             Status::Exited
                         } else {
-                            self.status = Some(Status::Crashed);
-                            Status::Crashed
+                            let status = Status::Crashed { code: t };
+                            self.status = Some(status);
+                            status
                         }
                     }
                 };
