@@ -233,7 +233,8 @@ jobs:
                 fi
             else
                 # If we're running on debian-based system.
-                sudo apt update -y && apt-get install -y libssl-dev openssl pkg-config
+                sudo apt update -y
+                sudo apt-get install -y libssl-dev openssl pkg-config
             fi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
@@ -313,7 +314,8 @@ jobs:
                 fi
             else
                 # If we're running on debian-based system.
-                sudo apt update -y && apt-get install -y libssl-dev openssl pkg-config
+                sudo apt update -y
+                sudo apt-get install -y libssl-dev openssl pkg-config
             fi
       - uses: uraimo/run-on-arch-action@v2
         if: matrix.platform.arch != 'ppc64'
