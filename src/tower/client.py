@@ -45,16 +45,21 @@ def _env_client() -> AuthenticatedClient:
 def run_app(
     name: str,
     environment: Optional[str] = None,
-    params: Optional[Dict[str, str]] = None,
+    parameters: Optional[Dict[str, str]] = None,
 ) -> Run:
+    """
+    `run_app` invokes an app based on the configured environment. You can
+    supply an optional `environment` override, and an optional dict
+    `parameters` to pass into the app.
+    """
     client = _env_client()
     run_params = RunAppParamsParameters()
 
     if not environment:
         environment = os.getenv("TOWER_ENVIRONMENT", DEFAULT_TOWER_ENVIRONMENT)
 
-    if params:
-        run_params.update(params)
+    if parameters:
+        run_params = RunAppParamsParameters.from_dict(parameters)
 
     input_body = RunAppParams(
         environment=environment,
@@ -75,7 +80,14 @@ def run_app(
 
 
 def wait_for_run(run: Run) -> None:
+    """
+    `wait_for_run` waits for a run to reach a terminal state by polling the
+    Tower API every 2 seconds for the latest status. If the app returns a
+    terminal status (`exited`, `errored`, `cancelled`, or `crashed`) then this
+    function returns.
+    """
     client = _env_client()
+
     while True:
         output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(
             name=run.app_name,
