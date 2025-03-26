@@ -378,7 +378,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          manylinux: musllinux_1_2
+          manylinux: auto
           args: --release --locked --out dist
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -439,7 +439,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          manylinux: musllinux_1_2
+          manylinux: auto
           args: --release --locked --out dist
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - uses: uraimo/run-on-arch-action@v2
