@@ -84,23 +84,6 @@ jobs:
         with:
           name: wheels-macos-x86_64
           path: dist
-      - name: "Archive binary"
-        run: |
-          TARGET=x86_64-apple-darwin
-          ARCHIVE_NAME=tower-cli-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-macos-x86_64
-          path: |
-            *.tar.gz
-            *.sha256
 
   macos-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
@@ -128,23 +111,6 @@ jobs:
         with:
           name: wheels-aarch64-apple-darwin
           path: dist
-      - name: "Archive binary"
-        run: |
-          TARGET=aarch64-apple-darwin
-          ARCHIVE_NAME=tower-cli-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-aarch64-apple-darwin
-          path: |
-            *.tar.gz
-            *.sha256
 
   windows:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
@@ -186,19 +152,6 @@ jobs:
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          ARCHIVE_FILE=${{ env.EXECUTABLE_NAME }}-${{ matrix.platform.target }}.zip
-          7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/${{ env.EXECUTABLE_NAME }}.exe
-          sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.platform.target }}
-          path: |
-            *.zip
-            *.sha256
 
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
@@ -247,26 +200,6 @@ jobs:
         with:
           name: wheels-${{ matrix.target }}
           path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TARGET=${{ matrix.target }}
-          ARCHIVE_NAME=tower-cli-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.target }}
-          path: |
-            *.tar.gz
-            *.sha256
 
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
@@ -336,26 +269,6 @@ jobs:
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TARGET=${{ matrix.platform.target }}
-          ARCHIVE_NAME=tower-cli-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.platform.target }}
-          path: |
-            *.tar.gz
-            *.sha256
 
   musllinux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
@@ -396,26 +309,6 @@ jobs:
         with:
           name: wheels-${{ matrix.target }}
           path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TARGET=${{ matrix.target }}
-          ARCHIVE_NAME=tower-cli-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.target }}
-          path: |
-            *.tar.gz
-            *.sha256
 
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
@@ -459,23 +352,3 @@ jobs:
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TARGET=${{ matrix.platform.target }}
-          ARCHIVE_NAME=tower-cli-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/${{ env.EXECUTABLE_NAME }} $ARCHIVE_NAME/${{ env.EXECUTABLE_NAME }}
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.platform.target }}
-          path: |
-            *.tar.gz
-            *.sha256
