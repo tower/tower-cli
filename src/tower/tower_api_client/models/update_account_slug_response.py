@@ -1,32 +1,37 @@
-from typing import Any, Dict, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, Union
 
 import attr
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="CreateDeviceLoginClaimResponse")
+if TYPE_CHECKING:
+    from ..models.account import Account
+
+
+T = TypeVar("T", bound="UpdateAccountSlugResponse")
 
 
 @attr.s(auto_attribs=True)
-class CreateDeviceLoginClaimResponse:
+class UpdateAccountSlugResponse:
     """
     Attributes:
-        claimed (bool): Whether the code was successfully claimed.
+        account (Account):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/CreateDeviceLoginClaimResponse.json.
+            http://localhost:8081/v1/schemas/UpdateAccountSlugResponse.json.
     """
 
-    claimed: bool
+    account: "Account"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> Dict[str, Any]:
-        claimed = self.claimed
+        account = self.account.to_dict()
+
         schema = self.schema
 
         field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
-                "claimed": claimed,
+                "account": account,
             }
         )
         if schema is not UNSET:
@@ -36,14 +41,16 @@ class CreateDeviceLoginClaimResponse:
 
     @classmethod
     def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+        from ..models.account import Account
+
         d = src_dict.copy()
-        claimed = d.pop("claimed")
+        account = Account.from_dict(d.pop("account"))
 
         schema = d.pop("$schema", UNSET)
 
-        create_device_login_claim_response = cls(
-            claimed=claimed,
+        update_account_slug_response = cls(
+            account=account,
             schema=schema,
         )
 
-        return create_device_login_claim_response
+        return update_account_slug_response

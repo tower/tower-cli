@@ -25,6 +25,7 @@ class App:
         next_run_at (Optional[datetime.datetime]): The next time this app will run as part of it's schedule, null if
             none.
         schedule (Optional[str]): The schedule associated with this app, null if none.
+        status (Union[Unset, str]): The status of the app
         version (Optional[str]): The current version of this app, null if none.
     """
 
@@ -36,6 +37,7 @@ class App:
     schedule: Optional[str]
     version: Optional[str]
     last_run: Union[Unset, "Run"] = UNSET
+    status: Union[Unset, str] = UNSET
 
     def to_dict(self) -> Dict[str, Any]:
         created_at = self.created_at.isoformat()
@@ -50,6 +52,7 @@ class App:
         next_run_at = self.next_run_at.isoformat() if self.next_run_at else None
 
         schedule = self.schedule
+        status = self.status
         version = self.version
 
         field_dict: Dict[str, Any] = {}
@@ -66,6 +69,8 @@ class App:
         )
         if last_run is not UNSET:
             field_dict["last_run"] = last_run
+        if status is not UNSET:
+            field_dict["status"] = status
 
         return field_dict
 
@@ -98,6 +103,8 @@ class App:
 
         schedule = d.pop("schedule")
 
+        status = d.pop("status", UNSET)
+
         version = d.pop("version")
 
         app = cls(
@@ -108,6 +115,7 @@ class App:
             last_run=last_run,
             next_run_at=next_run_at,
             schedule=schedule,
+            status=status,
             version=version,
         )
 

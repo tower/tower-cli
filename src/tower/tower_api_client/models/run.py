@@ -13,6 +13,7 @@ class Run:
     Attributes:
         app_name (str):
         created_at (datetime.datetime):
+        environment (str):
         number (int):
         run_id (str):
         scheduled_at (datetime.datetime):
@@ -25,6 +26,7 @@ class Run:
 
     app_name: str
     created_at: datetime.datetime
+    environment: str
     number: int
     run_id: str
     scheduled_at: datetime.datetime
@@ -38,6 +40,7 @@ class Run:
         app_name = self.app_name
         created_at = self.created_at.isoformat()
 
+        environment = self.environment
         number = self.number
         run_id = self.run_id
         scheduled_at = self.scheduled_at.isoformat()
@@ -55,6 +58,7 @@ class Run:
             {
                 "app_name": app_name,
                 "created_at": created_at,
+                "environment": environment,
                 "number": number,
                 "run_id": run_id,
                 "scheduled_at": scheduled_at,
@@ -74,6 +78,8 @@ class Run:
         app_name = d.pop("app_name")
 
         created_at = isoparse(d.pop("created_at"))
+
+        environment = d.pop("environment")
 
         number = d.pop("number")
 
@@ -109,6 +115,7 @@ class Run:
         run = cls(
             app_name=app_name,
             created_at=created_at,
+            environment=environment,
             number=number,
             run_id=run_id,
             scheduled_at=scheduled_at,

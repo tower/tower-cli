@@ -4,17 +4,18 @@ from typing import Any, Dict, Optional
 import httpx
 
 from ...client import AuthenticatedClient
-from ...models.create_device_login_claim_params import CreateDeviceLoginClaimParams
-from ...models.create_device_login_claim_response import CreateDeviceLoginClaimResponse
+from ...models.invite_team_member_params import InviteTeamMemberParams
+from ...models.invite_team_member_response import InviteTeamMemberResponse
 from ...types import Response
 
 
 def _get_kwargs(
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: CreateDeviceLoginClaimParams,
+    json_body: InviteTeamMemberParams,
 ) -> Dict[str, Any]:
-    url = "{}/login/device/claim".format(client.base_url)
+    url = "{}/teams/{slug}/invites".format(client.base_url, slug=slug)
 
     headers: Dict[str, str] = client.get_headers()
     cookies: Dict[str, Any] = client.get_cookies()
@@ -31,19 +32,15 @@ def _get_kwargs(
     }
 
 
-def _parse_response(
-    *, response: httpx.Response
-) -> Optional[CreateDeviceLoginClaimResponse]:
+def _parse_response(*, response: httpx.Response) -> Optional[InviteTeamMemberResponse]:
     if response.status_code == 200:
-        response_200 = CreateDeviceLoginClaimResponse.from_dict(response.json())
+        response_200 = InviteTeamMemberResponse.from_dict(response.json())
 
         return response_200
     return None
 
 
-def _build_response(
-    *, response: httpx.Response
-) -> Response[CreateDeviceLoginClaimResponse]:
+def _build_response(*, response: httpx.Response) -> Response[InviteTeamMemberResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -53,22 +50,25 @@ def _build_response(
 
 
 def sync_detailed(
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: CreateDeviceLoginClaimParams,
-) -> Response[CreateDeviceLoginClaimResponse]:
-    """Create device login claim
+    json_body: InviteTeamMemberParams,
+) -> Response[InviteTeamMemberResponse]:
+    """Invite Team Member
 
-     Claims a device login code for the authenticated user.
+     Invite a new team
 
     Args:
-        json_body (CreateDeviceLoginClaimParams):
+        slug (str): The slug of the team to invite someone to
+        json_body (InviteTeamMemberParams):
 
     Returns:
-        Response[CreateDeviceLoginClaimResponse]
+        Response[InviteTeamMemberResponse]
     """
 
     kwargs = _get_kwargs(
+        slug=slug,
         client=client,
         json_body=json_body,
     )
@@ -82,44 +82,50 @@ def sync_detailed(
 
 
 def sync(
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: CreateDeviceLoginClaimParams,
-) -> Optional[CreateDeviceLoginClaimResponse]:
-    """Create device login claim
+    json_body: InviteTeamMemberParams,
+) -> Optional[InviteTeamMemberResponse]:
+    """Invite Team Member
 
-     Claims a device login code for the authenticated user.
+     Invite a new team
 
     Args:
-        json_body (CreateDeviceLoginClaimParams):
+        slug (str): The slug of the team to invite someone to
+        json_body (InviteTeamMemberParams):
 
     Returns:
-        Response[CreateDeviceLoginClaimResponse]
+        Response[InviteTeamMemberResponse]
     """
 
     return sync_detailed(
+        slug=slug,
         client=client,
         json_body=json_body,
     ).parsed
 
 
 async def asyncio_detailed(
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: CreateDeviceLoginClaimParams,
-) -> Response[CreateDeviceLoginClaimResponse]:
-    """Create device login claim
+    json_body: InviteTeamMemberParams,
+) -> Response[InviteTeamMemberResponse]:
+    """Invite Team Member
 
-     Claims a device login code for the authenticated user.
+     Invite a new team
 
     Args:
-        json_body (CreateDeviceLoginClaimParams):
+        slug (str): The slug of the team to invite someone to
+        json_body (InviteTeamMemberParams):
 
     Returns:
-        Response[CreateDeviceLoginClaimResponse]
+        Response[InviteTeamMemberResponse]
     """
 
     kwargs = _get_kwargs(
+        slug=slug,
         client=client,
         json_body=json_body,
     )
@@ -131,23 +137,26 @@ async def asyncio_detailed(
 
 
 async def asyncio(
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: CreateDeviceLoginClaimParams,
-) -> Optional[CreateDeviceLoginClaimResponse]:
-    """Create device login claim
+    json_body: InviteTeamMemberParams,
+) -> Optional[InviteTeamMemberResponse]:
+    """Invite Team Member
 
-     Claims a device login code for the authenticated user.
+     Invite a new team
 
     Args:
-        json_body (CreateDeviceLoginClaimParams):
+        slug (str): The slug of the team to invite someone to
+        json_body (InviteTeamMemberParams):
 
     Returns:
-        Response[CreateDeviceLoginClaimResponse]
+        Response[InviteTeamMemberResponse]
     """
 
     return (
         await asyncio_detailed(
+            slug=slug,
             client=client,
             json_body=json_body,
         )

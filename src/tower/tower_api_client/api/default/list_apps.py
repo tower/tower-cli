@@ -5,6 +5,7 @@ import httpx
 
 from ...client import AuthenticatedClient
 from ...models.list_apps_response import ListAppsResponse
+from ...models.list_apps_status_item import ListAppsStatusItem
 from ...types import UNSET, Response, Unset
 
 
@@ -16,7 +17,7 @@ def _get_kwargs(
     page_size: Union[Unset, None, int] = UNSET,
     period: Union[Unset, None, str] = UNSET,
     num_runs: Union[Unset, None, int] = 20,
-    status: Union[Unset, None, List[str]] = UNSET,
+    status: Union[Unset, None, List[ListAppsStatusItem]] = UNSET,
 ) -> Dict[str, Any]:
     url = "{}/apps".format(client.base_url)
 
@@ -39,7 +40,11 @@ def _get_kwargs(
         if status is None:
             json_status = None
         else:
-            json_status = status
+            json_status = []
+            for status_item_data in status:
+                status_item = status_item_data.value
+
+                json_status.append(status_item)
 
     params["status"] = json_status
 
@@ -80,7 +85,7 @@ def sync_detailed(
     page_size: Union[Unset, None, int] = UNSET,
     period: Union[Unset, None, str] = UNSET,
     num_runs: Union[Unset, None, int] = 20,
-    status: Union[Unset, None, List[str]] = UNSET,
+    status: Union[Unset, None, List[ListAppsStatusItem]] = UNSET,
 ) -> Response[ListAppsResponse]:
     """List apps
 
@@ -93,8 +98,8 @@ def sync_detailed(
         period (Union[Unset, None, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, None, int]): Number of recent runs to fetch (-1 for all runs,
             defaults to 20) Default: 20.
-        status (Union[Unset, None, List[str]]): Filter apps by status(es). Valid values: active,
-            failed, disabled etc.
+        status (Union[Unset, None, List[ListAppsStatusItem]]): Filter apps by status(es) (comma
+            separated for multiple). Valid values: active, failed, disabled etc.
 
     Returns:
         Response[ListAppsResponse]
@@ -126,7 +131,7 @@ def sync(
     page_size: Union[Unset, None, int] = UNSET,
     period: Union[Unset, None, str] = UNSET,
     num_runs: Union[Unset, None, int] = 20,
-    status: Union[Unset, None, List[str]] = UNSET,
+    status: Union[Unset, None, List[ListAppsStatusItem]] = UNSET,
 ) -> Optional[ListAppsResponse]:
     """List apps
 
@@ -139,8 +144,8 @@ def sync(
         period (Union[Unset, None, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, None, int]): Number of recent runs to fetch (-1 for all runs,
             defaults to 20) Default: 20.
-        status (Union[Unset, None, List[str]]): Filter apps by status(es). Valid values: active,
-            failed, disabled etc.
+        status (Union[Unset, None, List[ListAppsStatusItem]]): Filter apps by status(es) (comma
+            separated for multiple). Valid values: active, failed, disabled etc.
 
     Returns:
         Response[ListAppsResponse]
@@ -165,7 +170,7 @@ async def asyncio_detailed(
     page_size: Union[Unset, None, int] = UNSET,
     period: Union[Unset, None, str] = UNSET,
     num_runs: Union[Unset, None, int] = 20,
-    status: Union[Unset, None, List[str]] = UNSET,
+    status: Union[Unset, None, List[ListAppsStatusItem]] = UNSET,
 ) -> Response[ListAppsResponse]:
     """List apps
 
@@ -178,8 +183,8 @@ async def asyncio_detailed(
         period (Union[Unset, None, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, None, int]): Number of recent runs to fetch (-1 for all runs,
             defaults to 20) Default: 20.
-        status (Union[Unset, None, List[str]]): Filter apps by status(es). Valid values: active,
-            failed, disabled etc.
+        status (Union[Unset, None, List[ListAppsStatusItem]]): Filter apps by status(es) (comma
+            separated for multiple). Valid values: active, failed, disabled etc.
 
     Returns:
         Response[ListAppsResponse]
@@ -209,7 +214,7 @@ async def asyncio(
     page_size: Union[Unset, None, int] = UNSET,
     period: Union[Unset, None, str] = UNSET,
     num_runs: Union[Unset, None, int] = 20,
-    status: Union[Unset, None, List[str]] = UNSET,
+    status: Union[Unset, None, List[ListAppsStatusItem]] = UNSET,
 ) -> Optional[ListAppsResponse]:
     """List apps
 
@@ -222,8 +227,8 @@ async def asyncio(
         period (Union[Unset, None, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, None, int]): Number of recent runs to fetch (-1 for all runs,
             defaults to 20) Default: 20.
-        status (Union[Unset, None, List[str]]): Filter apps by status(es). Valid values: active,
-            failed, disabled etc.
+        status (Union[Unset, None, List[ListAppsStatusItem]]): Filter apps by status(es) (comma
+            separated for multiple). Valid values: active, failed, disabled etc.
 
     Returns:
         Response[ListAppsResponse]

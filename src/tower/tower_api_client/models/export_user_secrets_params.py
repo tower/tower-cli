@@ -4,29 +4,29 @@ import attr
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="CreateDeviceLoginClaimParams")
+T = TypeVar("T", bound="ExportUserSecretsParams")
 
 
 @attr.s(auto_attribs=True)
-class CreateDeviceLoginClaimParams:
+class ExportUserSecretsParams:
     """
     Attributes:
-        user_code (str): The user code to claim.
+        public_key (str):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/CreateDeviceLoginClaimParams.json.
+            http://localhost:8081/v1/schemas/ExportUserSecretsParams.json.
     """
 
-    user_code: str
+    public_key: str
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> Dict[str, Any]:
-        user_code = self.user_code
+        public_key = self.public_key
         schema = self.schema
 
         field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
-                "user_code": user_code,
+                "public_key": public_key,
             }
         )
         if schema is not UNSET:
@@ -37,13 +37,13 @@ class CreateDeviceLoginClaimParams:
     @classmethod
     def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         d = src_dict.copy()
-        user_code = d.pop("user_code")
+        public_key = d.pop("public_key")
 
         schema = d.pop("$schema", UNSET)
 
-        create_device_login_claim_params = cls(
-            user_code=user_code,
+        export_user_secrets_params = cls(
+            public_key=public_key,
             schema=schema,
         )
 
-        return create_device_login_claim_params
+        return export_user_secrets_params

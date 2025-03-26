@@ -1,6 +1,8 @@
+import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar
 
 import attr
+from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
     from ..models.parameter import Parameter
@@ -13,14 +15,18 @@ T = TypeVar("T", bound="AppVersion")
 class AppVersion:
     """
     Attributes:
+        created_at (datetime.datetime):
         parameters (List['Parameter']):
         version (str):
     """
 
+    created_at: datetime.datetime
     parameters: List["Parameter"]
     version: str
 
     def to_dict(self) -> Dict[str, Any]:
+        created_at = self.created_at.isoformat()
+
         parameters = []
         for parameters_item_data in self.parameters:
             parameters_item = parameters_item_data.to_dict()
@@ -32,6 +38,7 @@ class AppVersion:
         field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
+                "created_at": created_at,
                 "parameters": parameters,
                 "version": version,
             }
@@ -44,6 +51,8 @@ class AppVersion:
         from ..models.parameter import Parameter
 
         d = src_dict.copy()
+        created_at = isoparse(d.pop("created_at"))
+
         parameters = []
         _parameters = d.pop("parameters")
         for parameters_item_data in _parameters:
@@ -54,6 +63,7 @@ class AppVersion:
         version = d.pop("version")
 
         app_version = cls(
+            created_at=created_at,
             parameters=parameters,
             version=version,
         )

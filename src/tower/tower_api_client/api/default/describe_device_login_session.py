@@ -4,8 +4,8 @@ from typing import Any, Dict, Optional
 import httpx
 
 from ...client import Client
-from ...models.describe_device_login_claim_response import (
-    DescribeDeviceLoginClaimResponse,
+from ...models.describe_device_login_session_response import (
+    DescribeDeviceLoginSessionResponse,
 )
 from ...types import Response
 
@@ -33,9 +33,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, response: httpx.Response
-) -> Optional[DescribeDeviceLoginClaimResponse]:
+) -> Optional[DescribeDeviceLoginSessionResponse]:
     if response.status_code == 200:
-        response_200 = DescribeDeviceLoginClaimResponse.from_dict(response.json())
+        response_200 = DescribeDeviceLoginSessionResponse.from_dict(response.json())
 
         return response_200
     return None
@@ -43,7 +43,7 @@ def _parse_response(
 
 def _build_response(
     *, response: httpx.Response
-) -> Response[DescribeDeviceLoginClaimResponse]:
+) -> Response[DescribeDeviceLoginSessionResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,8 +56,8 @@ def sync_detailed(
     device_code: str,
     *,
     client: Client,
-) -> Response[DescribeDeviceLoginClaimResponse]:
-    """Describe device login claim
+) -> Response[DescribeDeviceLoginSessionResponse]:
+    """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
 
@@ -65,7 +65,7 @@ def sync_detailed(
         device_code (str): The device code to check.
 
     Returns:
-        Response[DescribeDeviceLoginClaimResponse]
+        Response[DescribeDeviceLoginSessionResponse]
     """
 
     kwargs = _get_kwargs(
@@ -85,8 +85,8 @@ def sync(
     device_code: str,
     *,
     client: Client,
-) -> Optional[DescribeDeviceLoginClaimResponse]:
-    """Describe device login claim
+) -> Optional[DescribeDeviceLoginSessionResponse]:
+    """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
 
@@ -94,7 +94,7 @@ def sync(
         device_code (str): The device code to check.
 
     Returns:
-        Response[DescribeDeviceLoginClaimResponse]
+        Response[DescribeDeviceLoginSessionResponse]
     """
 
     return sync_detailed(
@@ -107,8 +107,8 @@ async def asyncio_detailed(
     device_code: str,
     *,
     client: Client,
-) -> Response[DescribeDeviceLoginClaimResponse]:
-    """Describe device login claim
+) -> Response[DescribeDeviceLoginSessionResponse]:
+    """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
 
@@ -116,7 +116,7 @@ async def asyncio_detailed(
         device_code (str): The device code to check.
 
     Returns:
-        Response[DescribeDeviceLoginClaimResponse]
+        Response[DescribeDeviceLoginSessionResponse]
     """
 
     kwargs = _get_kwargs(
@@ -134,8 +134,8 @@ async def asyncio(
     device_code: str,
     *,
     client: Client,
-) -> Optional[DescribeDeviceLoginClaimResponse]:
-    """Describe device login claim
+) -> Optional[DescribeDeviceLoginSessionResponse]:
+    """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
 
@@ -143,7 +143,7 @@ async def asyncio(
         device_code (str): The device code to check.
 
     Returns:
-        Response[DescribeDeviceLoginClaimResponse]
+        Response[DescribeDeviceLoginSessionResponse]
     """
 
     return (

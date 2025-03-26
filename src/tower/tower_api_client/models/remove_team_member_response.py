@@ -8,34 +8,30 @@ if TYPE_CHECKING:
     from ..models.user import User
 
 
-T = TypeVar("T", bound="DescribeDeviceLoginClaimResponse")
+T = TypeVar("T", bound="RemoveTeamMemberResponse")
 
 
 @attr.s(auto_attribs=True)
-class DescribeDeviceLoginClaimResponse:
+class RemoveTeamMemberResponse:
     """
     Attributes:
-        token (str): The JWT token.
-        user (User):
+        team_member (User):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/DescribeDeviceLoginClaimResponse.json.
+            http://localhost:8081/v1/schemas/RemoveTeamMemberResponse.json.
     """
 
-    token: str
-    user: "User"
+    team_member: "User"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> Dict[str, Any]:
-        token = self.token
-        user = self.user.to_dict()
+        team_member = self.team_member.to_dict()
 
         schema = self.schema
 
         field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
-                "token": token,
-                "user": user,
+                "team_member": team_member,
             }
         )
         if schema is not UNSET:
@@ -48,16 +44,13 @@ class DescribeDeviceLoginClaimResponse:
         from ..models.user import User
 
         d = src_dict.copy()
-        token = d.pop("token")
-
-        user = User.from_dict(d.pop("user"))
+        team_member = User.from_dict(d.pop("team_member"))
 
         schema = d.pop("$schema", UNSET)
 
-        describe_device_login_claim_response = cls(
-            token=token,
-            user=user,
+        remove_team_member_response = cls(
+            team_member=team_member,
             schema=schema,
         )
 
-        return describe_device_login_claim_response
+        return remove_team_member_response

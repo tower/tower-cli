@@ -1,28 +1,27 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar, Union
 
 import attr
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.team import Team
-    from ..models.token import Token
-    from ..models.user import User
 
 
-T = TypeVar("T", bound="Session")
+T = TypeVar("T", bound="ListTeamsResponse")
 
 
 @attr.s(auto_attribs=True)
-class Session:
+class ListTeamsResponse:
     """
     Attributes:
-        teams (List['Team']):
-        token (Token):
-        user (User):
+        teams (List['Team']): List of teams
+        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+            http://localhost:8081/v1/schemas/ListTeamsResponse.json.
     """
 
     teams: List["Team"]
-    token: "Token"
-    user: "User"
+    schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> Dict[str, Any]:
         teams = []
@@ -31,26 +30,22 @@ class Session:
 
             teams.append(teams_item)
 
-        token = self.token.to_dict()
-
-        user = self.user.to_dict()
+        schema = self.schema
 
         field_dict: Dict[str, Any] = {}
         field_dict.update(
             {
                 "teams": teams,
-                "token": token,
-                "user": user,
             }
         )
+        if schema is not UNSET:
+            field_dict["$schema"] = schema
 
         return field_dict
 
     @classmethod
     def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
         from ..models.team import Team
-        from ..models.token import Token
-        from ..models.user import User
 
         d = src_dict.copy()
         teams = []
@@ -60,14 +55,11 @@ class Session:
 
             teams.append(teams_item)
 
-        token = Token.from_dict(d.pop("token"))
+        schema = d.pop("$schema", UNSET)
 
-        user = User.from_dict(d.pop("user"))
-
-        session = cls(
+        list_teams_response = cls(
             teams=teams,
-            token=token,
-            user=user,
+            schema=schema,
         )
 
-        return session
+        return list_teams_response

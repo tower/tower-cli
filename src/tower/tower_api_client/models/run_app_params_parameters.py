@@ -7,7 +7,7 @@ T = TypeVar("T", bound="RunAppParamsParameters")
 
 @attr.s(auto_attribs=True)
 class RunAppParamsParameters:
-    """ """
+    """The parameters to pass into this app."""
 
     additional_properties: Dict[str, str] = attr.ib(init=False, factory=dict)
 
