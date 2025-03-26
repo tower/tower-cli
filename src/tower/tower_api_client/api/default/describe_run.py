@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import httpx
 
 from ...client import AuthenticatedClient
 from ...models.describe_run_response import DescribeRunResponse
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -28,15 +29,27 @@ def _get_kwargs(
     }
 
 
-def _parse_response(*, response: httpx.Response) -> Optional[DescribeRunResponse]:
+def _parse_response(
+    *, response: httpx.Response
+) -> Optional[Union[DescribeRunResponse, ErrorModel]]:
     if response.status_code == 200:
         response_200 = DescribeRunResponse.from_dict(response.json())
 
         return response_200
+    if response.status_code == 401:
+        response_401 = ErrorModel.from_dict(response.json())
+
+        return response_401
+    if response.status_code == 404:
+        response_404 = ErrorModel.from_dict(response.json())
+
+        return response_404
     return None
 
 
-def _build_response(*, response: httpx.Response) -> Response[DescribeRunResponse]:
+def _build_response(
+    *, response: httpx.Response
+) -> Response[Union[DescribeRunResponse, ErrorModel]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -50,7 +63,7 @@ def sync_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[DescribeRunResponse]:
+) -> Response[Union[DescribeRunResponse, ErrorModel]]:
     """Describe run
 
      Describe a run of an app.
@@ -60,7 +73,7 @@ def sync_detailed(
         seq (int): The number of the run to fetch.
 
     Returns:
-        Response[DescribeRunResponse]
+        Response[Union[DescribeRunResponse, ErrorModel]]
     """
 
     kwargs = _get_kwargs(
@@ -82,7 +95,7 @@ def sync(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[DescribeRunResponse]:
+) -> Optional[Union[DescribeRunResponse, ErrorModel]]:
     """Describe run
 
      Describe a run of an app.
@@ -92,7 +105,7 @@ def sync(
         seq (int): The number of the run to fetch.
 
     Returns:
-        Response[DescribeRunResponse]
+        Response[Union[DescribeRunResponse, ErrorModel]]
     """
 
     return sync_detailed(
@@ -107,7 +120,7 @@ async def asyncio_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[DescribeRunResponse]:
+) -> Response[Union[DescribeRunResponse, ErrorModel]]:
     """Describe run
 
      Describe a run of an app.
@@ -117,7 +130,7 @@ async def asyncio_detailed(
         seq (int): The number of the run to fetch.
 
     Returns:
-        Response[DescribeRunResponse]
+        Response[Union[DescribeRunResponse, ErrorModel]]
     """
 
     kwargs = _get_kwargs(
@@ -137,7 +150,7 @@ async def asyncio(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[DescribeRunResponse]:
+) -> Optional[Union[DescribeRunResponse, ErrorModel]]:
     """Describe run
 
      Describe a run of an app.
@@ -147,7 +160,7 @@ async def asyncio(
         seq (int): The number of the run to fetch.
 
     Returns:
-        Response[DescribeRunResponse]
+        Response[Union[DescribeRunResponse, ErrorModel]]
     """
 
     return (

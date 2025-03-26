@@ -1,13 +1,18 @@
 import os
+import time
 from typing import Dict, Optional
 
 from .tower_api_client import AuthenticatedClient
+from .tower_api_client.api.default import describe_run as describe_run_api
 from .tower_api_client.api.default import run_app as run_app_api
 from .tower_api_client.models import (
+    DescribeRunResponse,
+    Run,
     RunAppParams,
     RunAppParamsParameters,
     RunAppResponse,
 )
+from .tower_api_client.models.error_model import ErrorModel
 
 # DEFAULT_TOWER_URL is the default tower URL to use when connecting back to
 # Tower.
@@ -16,12 +21,6 @@ DEFAULT_TOWER_URL = "https://api.tower.dev"
 # DEFAULT_TOWER_ENVIRONMENT is the default environment to use when running an
 # app somewhere.
 DEFAULT_TOWER_ENVIRONMENT = "default"
-
-
-class Run:
-    def __init__(self, app_name: str, number: int):
-        self.app_name = name
-        self.number = number
 
 
 def _env_client() -> AuthenticatedClient:
@@ -47,7 +46,7 @@ def run_app(
     name: str,
     environment: Optional[str] = None,
     params: Optional[Dict[str, str]] = None,
-) -> None:
+) -> Run:
     client = _env_client()
     run_params = RunAppParamsParameters()
 
@@ -62,7 +61,43 @@ def run_app(
         parameters=run_params,
     )
 
-    output: Optional[RunAppResponse] = run_app_api.sync(
+    output: Optional[Union[ErrorModel, RunAppResponse]] = run_app_api.sync(
         name=name, client=client, json_body=input_body
     )
-    print("Output:", output)
+
+    if output is None:
+        raise RuntimeError("Error running app")
+    else:
+        if isinstance(output, ErrorModel):
+            raise RuntimeError(f"Error running app: {output.title}")
+        else:
+            return output.run
+
+
+def wait_for_run(run: Run) -> None:
+    client = _env_client()
+    while True:
+        output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(
+            name=run.app_name,
+            seq=run.number,
+            client=client
+        )
+
+        if output is None:
+            raise RuntimeError("Error fetching run")
+        else:
+            if isinstance(output, ErrorModel):
+                raise RuntimeError(f"Error fetching run: {output.title}")
+            else:
+                desc = output.run
+
+                if desc.status == "exited":
+                    return
+                elif desc.status == "failed":
+                    return
+                elif desc.status == "canceled":
+                    return
+                elif desc.status == "errored":
+                    return
+                else:
+                    time.sleep(2)

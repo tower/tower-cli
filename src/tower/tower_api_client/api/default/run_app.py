@@ -40,6 +40,10 @@ def _parse_response(
         response_200 = RunAppResponse.from_dict(response.json())
 
         return response_200
+    if response.status_code == 201:
+        response_201 = RunAppResponse.from_dict(response.json())
+
+        return response_201
     if response.status_code == 401:
         response_401 = ErrorModel.from_dict(response.json())
 
