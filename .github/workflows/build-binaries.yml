@@ -209,6 +209,9 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
+            # see https://github.com/astral-sh/ruff/issues/3791
+            # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
           - target: arm-unknown-linux-musleabihf
@@ -227,43 +230,31 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
+          target: ${{ matrix.platform.target }}
+          manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
-          before-script-linux: |
-            # If we're running on rhel centos, install needed packages.
-            if command -v yum &> /dev/null; then
-                sudo yum update -y && yum install -y perl-core openssl openssl-devel pkgconfig libatomic
-
-                # If we're running on i686 we need to symlink libatomic
-                # in order to build openssl with -latomic flag.
-                if [[ ! -d "/usr/lib64" ]]; then
-                    sudo ln -s /usr/lib/libatomic.so.1 /usr/lib/libatomic.so
-                fi
-            else
-                # If we're running on debian-based system.
-                sudo apt update -y
-                sudo apt-get install -y libssl-dev openssl pkg-config
-            fi
       - uses: uraimo/run-on-arch-action@v2
-        if: matrix.platform.arch != 'ppc64'
+        if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
           distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu20.04' }}
           githubToken: ${{ github.token }}
           install: |
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends python3 python3-pip
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
-             ${{ env.EXECUTABLE_NAME }} --help
+            ${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
