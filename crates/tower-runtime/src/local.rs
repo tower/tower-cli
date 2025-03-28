@@ -245,21 +245,21 @@ impl App for LocalApp {
         } else {
             if let Some(waiter) = &mut self.waiter {
                 let res = waiter.try_recv();
-                let res = match res {
-                    Err(TryRecvError::Empty) => Status::Running,
-                    Err(TryRecvError::Closed) => Status::Crashed,
+                match res {
+                    Err(TryRecvError::Empty) => Ok(Status::Running),
+                    Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
                     Ok(t) => {
                         // We save this for the next time this gets called.
                         if t == 0 {
                             self.status = Some(Status::Exited);
-                            Status::Exited
+                            Ok(Status::Exited)
                         } else {
-                            self.status = Some(Status::Crashed);
-                            Status::Crashed
+                            let status = Status::Crashed { code: t };
+                            self.status = Some(status);
+                            Ok(status)
                         }
                     }
-                };
-                Ok(res)
+                }
             } else {
                 Ok(Status::None)
             }

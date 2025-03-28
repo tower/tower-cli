@@ -352,7 +352,7 @@ async fn monitor_status(mut app: LocalApp) {
                     output::success("Your app exited cleanly.");
                     break;
                 }
-                tower_runtime::Status::Crashed => {
+                tower_runtime::Status::Crashed { .. } => {
                     output::failure("Your app crashed!");
                     break;
                 }

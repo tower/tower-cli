@@ -54,7 +54,10 @@ pub enum Error {
     MissingBash,
 
     #[snafu(display("failed to create a virtual environment"))]
-    VirtualEnvCreationFailed
+    VirtualEnvCreationFailed,
+
+    #[snafu(display("watier channel closed unexpectedly when polled"))]
+    WaiterClosed,
 }
 
 impl From<std::io::Error> for Error {

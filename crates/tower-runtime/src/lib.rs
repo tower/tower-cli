@@ -30,7 +30,7 @@ pub enum Status {
     None,
     Running,
     Exited,
-    Crashed,
+    Crashed { code: i32 },
 }
 
 type SharedReceiver<T> = Arc<Mutex<Receiver<T>>>;
