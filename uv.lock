@@ -576,8 +576,8 @@ wheels = [
 ]
 
 [[package]]
-name = "tower-cli"
-version = "0.3.2"
+name = "tower"
+version = "0.3.3"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -588,7 +588,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "openapi-python-client" },
-    { name = "tower-cli" },
+    { name = "tower" },
 ]
 
 [package.metadata]
@@ -601,7 +601,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "openapi-python-client", specifier = ">=0.12.1" },
-    { name = "tower-cli", editable = "." },
+    { name = "tower", editable = "." },
 ]
 
 [[package]]

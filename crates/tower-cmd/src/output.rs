@@ -208,11 +208,11 @@ pub fn write_update_message(latest: &str, current: &str) {
     let line = format!(
         "{}\n{}\n",
         format!(
-            "A newer version of tower-cli is available: {} (you have {})",
+            "A newer version of tower is available: {} (you have {})",
             latest, current
         )
         .yellow(),
-        "To upgrade, run: pip install --upgrade tower-cli".yellow()
+        "To upgrade, run: pip install --upgrade tower".yellow()
     );
 
     io::stdout().write_all(line.as_bytes()).unwrap();

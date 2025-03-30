@@ -1,5 +1,5 @@
 [package]
-name = "tower-cli"
+name = "tower"
 publish = true
 version = { workspace = true }
 authors = { workspace = true }
