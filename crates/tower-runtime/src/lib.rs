@@ -3,7 +3,10 @@ use std::future::Future;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{
+    UnboundedReceiver,
+    UnboundedSender,
+};
 use chrono::{DateTime, Utc};
 
 use tower_package::Package;
@@ -19,7 +22,18 @@ pub enum FD {
     Stderr,
 }
 
+#[derive(Copy, Clone)]
+pub enum Channel {
+    // Setup channel is used for messages that pertain to environmental setup (e.g. installing
+    // dependencies with pip)
+    Setup,
+
+    // Program channel is used for messages that pertain to the program's actual output.
+    Program,
+}
+
 pub struct Output {
+    pub channel: Channel,
     pub time: DateTime<Utc>,
     pub fd: FD,
     pub line: String,
@@ -33,9 +47,13 @@ pub enum Status {
     Crashed { code: i32 },
 }
 
-type SharedReceiver<T> = Arc<Mutex<Receiver<T>>>;
+type SharedReceiver<T> = Arc<Mutex<UnboundedReceiver<T>>>;
 
-pub type OutputChannel = SharedReceiver<Output>;
+type SharedSender<T> = Arc<Mutex<UnboundedSender<T>>>;
+
+pub type OutputReceiver = SharedReceiver<Output>;
+
+pub type OutputSender = SharedSender<Output>;
 
 pub trait App {
     // start will start the process
@@ -50,7 +68,7 @@ pub trait App {
 
     // output returns a reader that contains a combination of the stdout and stderr messages from
     // the child process
-    fn output(&self) -> impl Future<Output = Result<OutputChannel, Error>> + Send;
+    fn output(&self) -> impl Future<Output = Result<OutputReceiver, Error>> + Send;
 }
 
 #[derive(Default)]
