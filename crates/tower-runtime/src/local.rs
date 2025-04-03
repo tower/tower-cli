@@ -207,6 +207,9 @@ impl App for LocalApp {
 
             let res = Command::new(pip_path)
                 .current_dir(&working_dir)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .arg("install")
                 .arg("-r")
                 .arg(package_path.join("requirements.txt"))
@@ -220,6 +223,8 @@ impl App for LocalApp {
 
                 let stderr = child.stderr.take().expect("no stderr");
                 tokio::spawn(drain_output(FD::Stderr, Channel::Setup, output_sender.clone(), BufReader::new(stderr)));
+
+                log::debug!("waiting for dependency installation to complete");
 
                 // Wait for the child to complete entirely.
                 child.wait().await.expect("child failed to exit");
