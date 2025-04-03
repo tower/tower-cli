@@ -45,6 +45,9 @@ pub fn package_error(err: tower_package::Error) {
         tower_package::Error::InvalidManifest => {
             "Invalid manifest was found or created".to_string()
         }
+        tower_package::Error::InvalidPath => {
+            "There was a problem determining exactly where your Towerfile was stored on disk".to_string()
+        }
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);

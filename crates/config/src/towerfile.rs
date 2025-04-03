@@ -1,6 +1,6 @@
 use crate::Error;
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct Parameter{
@@ -34,10 +34,10 @@ pub struct App {
 
 #[derive(Deserialize)]
 pub struct Towerfile {
-    /// base_dir is the directory in which the Towerfile is located. It's always populated by the
+    /// file_path is the path to where this file was read on disk. It's always populated by the
     /// parser/application, never by the data.
     #[serde(skip_deserializing)]
-    pub base_dir: PathBuf,
+    pub file_path: PathBuf,
 
     pub app: App,
 
@@ -48,7 +48,7 @@ pub struct Towerfile {
 impl Towerfile {
     pub fn default() -> Self {
         Self {
-            base_dir: PathBuf::new(),
+            file_path: PathBuf::new(),
             parameters: vec![],
             app: App {
                 name: String::from(""),
@@ -79,8 +79,7 @@ impl Towerfile {
         }
 
         let mut towerfile = Self::from_toml(&std::fs::read_to_string(path.to_path_buf())?)?;
-        let parent = path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-        towerfile.base_dir = parent;
+        towerfile.file_path = path;
 
         Ok(towerfile)
     }

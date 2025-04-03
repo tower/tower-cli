@@ -50,6 +50,9 @@ impl Manifest {
 
 // PackageSpec describes how to build a package.
 pub struct PackageSpec {
+    // towerfile_path is the path to the Towerfile that was used to build this package.
+    pub towerfile_path: PathBuf,
+
     // invoke is the file to invoke when the package is run.
     pub invoke: String,
 
@@ -80,7 +83,11 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
 
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
-        let base_dir = towerfile.base_dir.clone();
+        let towerfile_path = towerfile.file_path.clone();
+        let base_dir = towerfile_path
+            .parent()
+            .expect("Towerfile must have a parent directory")
+            .to_path_buf();
         let schedule = if towerfile.app.schedule.is_empty() {
             None
         } else {
@@ -89,6 +96,7 @@ impl PackageSpec {
 
         Self {
             schedule,
+            towerfile_path,
             base_dir,
             invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
@@ -147,7 +155,11 @@ impl Package {
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
        // We expand the base_dir because handling the paths as absolute paths is easier than
        // handling them as relative paths.
-       let base_dir = spec.base_dir.canonicalize().unwrap();
+       let base_dir = spec.towerfile_path.
+           canonicalize()?.
+           parent().
+           ok_or(Error::InvalidPath)?.
+           to_path_buf();
 
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
