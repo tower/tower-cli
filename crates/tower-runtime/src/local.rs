@@ -383,16 +383,23 @@ fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<S
     // If we're in a virtual environment, we need to add the bin directory to the PATH so that we
     // can find any executables that were installed there.
     if is_virtualenv {
-        let venv_path = cwd.join(".venv")
-            .join("bin")
+        let venv_dir = cwd.join(".venv");
+        let venv_path = venv_dir
+            .to_string_lossy()
+            .to_string();
+
+        let bin_path = venv_dir.join("bin")
             .to_string_lossy()
             .to_string();
 
         if let Ok(path) =  std::env::var("PATH") {
-            res.insert("PATH".to_string(), format!("{}:{}", venv_path, path));
+            res.insert("PATH".to_string(), format!("{}:{}", bin_path, path));
         } else {
-            res.insert("PATH".to_string(), venv_path);
+            res.insert("PATH".to_string(), bin_path);
         }
+
+        // We also insert a VIRTUAL_ENV path such that we can 
+        res.insert("VIRTUAL_ENV".to_string(), venv_path);
     }
 
     // We also need a PYTHONPATH that is set to the current working directory to help with the
