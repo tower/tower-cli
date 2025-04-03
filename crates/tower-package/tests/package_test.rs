@@ -20,12 +20,14 @@ async fn it_creates_package() {
     let _ = env_logger::try_init();
 
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "requirements.txt", "requests==2.25.1").await;
 
     let spec = PackageSpec {
         invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["*.py".to_string()],
         parameters: vec![],
         schedule: None,
@@ -52,6 +54,7 @@ async fn it_respects_complex_file_globs() {
     let _ = env_logger::try_init();
 
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
@@ -59,6 +62,7 @@ async fn it_respects_complex_file_globs() {
     let spec = PackageSpec {
         invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec![
             "*.py".to_string(),
             "**/*.py".to_string(),
@@ -93,7 +97,12 @@ async fn building_package_spec_from_towerfile() {
         schedule = "0 0 * * *"
     "#;
 
-    let towerfile = Towerfile::from_toml(toml).unwrap();
+    let mut towerfile = Towerfile::from_toml(toml).unwrap();
+
+    // we have to set the file_path on the Towerfile otherwise we can't build a package spec from
+    // it.
+    towerfile.file_path = PathBuf::from("./Towerfile");
+
     let spec = PackageSpec::from_towerfile(&towerfile);
 
     assert_eq!(spec.invoke, "./script.py");

@@ -209,6 +209,12 @@ impl Package {
        write_manifest_to_file(&manifest_path, &manifest).await?;
        builder.append_path_with_name(manifest_path, "MANIFEST").await?;
 
+       // Let's also package the Towerfile along with it.
+       builder.append_path_with_name(
+           spec.towerfile_path,
+           "Towerfile",
+       ).await?;
+
        // consume the builder to close it, then close the underlying gzip stream
        let mut file = builder.into_inner().await?;
        file.shutdown().await?;

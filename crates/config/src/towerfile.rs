@@ -190,7 +190,7 @@ mod test {
         file.write_all(toml.as_bytes()).unwrap();
 
         let towerfile = crate::Towerfile::from_local_file().expect("Failed to parse Towerfile");
-        assert_eq!(towerfile.base_dir, PathBuf::from("."));
+        assert_eq!(towerfile.file_path, PathBuf::from("./Towerfile"));
 
         // explicitly drop this file so it's cleaned up when other test cases run.
         drop(tempfile);
@@ -214,7 +214,7 @@ mod test {
         file.write_all(toml.as_bytes()).unwrap();
 
         let towerfile = crate::Towerfile::from_path(towerfile_path.clone()).unwrap();
-        assert_eq!(towerfile.base_dir, temp_dir);
+        assert_eq!(towerfile.file_path, temp_dir.join("Towerfile"));
 
         // explicitly drop this file so it's cleaned up when other test cases run.
         drop(tempfile);
