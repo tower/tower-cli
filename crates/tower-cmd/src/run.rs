@@ -12,7 +12,7 @@ use tower_api::{
 };
 use tower_api::models;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{local::LocalApp, App, AppLauncher, OutputChannel};
+use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 
 use crate::output;
 
@@ -330,7 +330,7 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 
 /// monitor_output is a helper function that will monitor the output of a given output channel and
 /// plops it down on stdout.
-async fn monitor_output(output: OutputChannel) {
+async fn monitor_output(output: OutputReceiver) {
     loop {
         if let Some(line) = output.lock().await.recv().await {
             let ts = &line.time;

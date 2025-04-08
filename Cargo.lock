@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "clap",
  "dirs",
@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "crypto"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "base64",
  "pem",
@@ -2207,7 +2207,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "pem",
  "rsa",
@@ -2438,8 +2438,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower"
+version = "0.3.4"
+dependencies = [
+ "tokio",
+ "tower-api",
+ "tower-cmd",
+]
+
+[[package]]
 name = "tower-cmd"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2472,7 +2481,7 @@ dependencies = [
 
 [[package]]
 name = "tower-package"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-compression",
  "config",
@@ -2490,7 +2499,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "chrono",
  "log",
@@ -2507,7 +2516,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tower-version"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "log",
