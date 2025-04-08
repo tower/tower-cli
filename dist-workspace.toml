@@ -28,3 +28,9 @@ local-artifacts-jobs = ["./build-binaries"]
 
 [dist.github-custom-runners]
 global = "ubuntu-22.04"
+
+[dist.github-custom-runners.x86_64-unknown-linux-gnu]
+runner = "ubuntu-latest"
+
+[dist.github-custom-runners.aarch64-unknown-linux-gnu]
+runner = "ubuntu-latest"
