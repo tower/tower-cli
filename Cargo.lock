@@ -2417,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "tokio",
  "tower-api",
@@ -2435,15 +2435,6 @@ dependencies = [
  "serde_with",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "tower"
-version = "0.3.4"
-dependencies = [
- "tokio",
- "tower-api",
- "tower-cmd",
 ]
 
 [[package]]
