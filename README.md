@@ -9,7 +9,7 @@ your code locally or remotely in the Tower cloud.
 The main way to install the CLI is using the `pip` package manager.
 
 ```bash
-$ pip install -U tower-cli
+$ pip install -U tower
 ```
 
 You can also download the CLI directly from one of our [releases](https://github.com/tower/tower-cli/releases/latest).
