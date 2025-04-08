@@ -27,4 +27,4 @@ pr-run-mode = "skip"
 local-artifacts-jobs = ["./build-binaries"]
 
 [dist.github-custom-runners]
-global = "ubuntu-latest"
+global = "ubuntu-22.04"
