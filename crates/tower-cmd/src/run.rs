@@ -115,7 +115,7 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
     }
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    if let Err(err) = launcher.launch(package, env, secrets, params).await {
+    if let Err(err) = launcher.launch(package, env, secrets, params, HashMap::new()).await {
         output::runtime_error(err);
         return;
     }
