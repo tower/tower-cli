@@ -239,14 +239,16 @@ impl App for LocalApp {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
+            let other_env_vars = opts.env_vars;
 
-            Self::execute_bash_program(&environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params).await
+            Self::execute_bash_program(&environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params, other_env_vars).await
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
+            let other_env_vars = opts.env_vars;
 
-            Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params).await
+            Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
         };
 
         if let Ok(child) = res {
@@ -339,6 +341,7 @@ impl LocalApp {
         manifest: &Manifest,
         secrets: HashMap<String, String>,
         params: HashMap<String, String>,
+        other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
         log::debug!(" - python script {}", manifest.invoke);
 
@@ -349,7 +352,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params))
+            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -364,6 +367,7 @@ impl LocalApp {
         manifest: &Manifest,
         secrets: HashMap<String, String>,
         params: HashMap<String, String>,
+        other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
         let bash_path = find_bash().await?;
         log::debug!("using bash at {:?}", bash_path);
@@ -376,7 +380,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params))
+            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -393,7 +397,7 @@ fn make_env_var_key(src: &str) -> String {
     }
 }
 
-fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
     log::debug!("converting {} env variables", (params.len() + secs.len()));
@@ -405,6 +409,11 @@ fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<S
 
     for (key, value) in params.into_iter() {
         log::debug!("adding key {}", make_env_var_key(&key));
+        res.insert(key.to_string(), value.to_string());
+    }
+
+    for (key, value) in other_env_vars.into_iter() {
+        log::debug!("adding key {}", &key);
         res.insert(key.to_string(), value.to_string());
     }
 

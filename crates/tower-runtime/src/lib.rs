@@ -83,6 +83,7 @@ impl<A: App> AppLauncher<A> {
         environment: String,
         secrets: HashMap<String, String>,
         parameters: HashMap<String, String>,
+        env_vars: HashMap<String, String>,
     ) -> Result<(), Error> {
         let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
 
@@ -92,6 +93,7 @@ impl<A: App> AppLauncher<A> {
             secrets,
             parameters,
             package,
+            env_vars,
         };
 
         // NOTE: This is a really awful hack to force any existing app to drop itself. Not certain
@@ -131,6 +133,7 @@ pub struct StartOptions {
     pub environment: String,
     pub secrets: HashMap<String, String>,
     pub parameters: HashMap<String, String>,
+    pub env_vars: HashMap<String, String>,
 }
 
 pub struct ExecuteOptions {
