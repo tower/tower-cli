@@ -76,7 +76,10 @@ pub async fn deploy_app_package(
     });
 
     // Get the package file path
-    let package_path = package.package_file_path.ok_or("No package file path")?;
+    let package_path = package.package_file_path.unwrap_or_else(|| {
+        log::debug!("No package file path found");
+        output::die("An error happened in Tower CLI that it couldn't recover from.");
+    });
 
     // Create the URL for the API endpoint
     let base_url = &api_config.base_path;

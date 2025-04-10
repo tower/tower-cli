@@ -6,7 +6,7 @@ use tower_api::{
     models::{CreateAppParams, Run},
     apis::default_api::{
         self, CreateAppsParams, DeleteAppParams, DescribeAppParams,
-        GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams,
+        GetAppRunLogsParams, ListAppsParams,
     },
 };
 
@@ -68,10 +68,8 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
         ),
     ).await;
 
-    if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
-        for line in logs.log_lines {
-            output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
-        }
+    for line in response.log_lines {
+        output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
     }
 }
 
