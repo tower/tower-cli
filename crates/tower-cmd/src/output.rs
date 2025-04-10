@@ -96,10 +96,7 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
-pub fn tower_error<T>(err: tower_api::apis::Error<T>)
-where
-    T: std::fmt::Debug + serde::de::DeserializeOwned,
-{
+pub fn tower_error<T>(err: tower_api::apis::Error<T>) {
     match err {
         tower_api::apis::Error::ResponseError(response) => {
             // Try to deserialize as ErrorModel first

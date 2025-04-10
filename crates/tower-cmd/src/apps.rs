@@ -7,13 +7,19 @@ use tower_api::apis::Error as ApiError;
 
 use tower_api::{
     apis::default_api::{
-        self, CreateAppsParams, DeleteAppParams, DescribeAppParams, DescribeAppSuccess,
-        GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams, ListAppsSuccess,
+        self, CreateAppsParams, DeleteAppParams, DescribeAppParams,
+        GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams,
     },
     models::{CreateAppParams, Run},
 };
 
-use crate::{output, api};
+use crate::{
+    output,
+    api::{
+        handle_api_response,
+        with_spinner,
+    }
+};
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
@@ -74,8 +80,8 @@ pub fn apps_cmd() -> Command {
 
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     let (app_name, seq) = extract_app_run(cmd);
-
-    let response = api::with_spinner(
+    
+    let response = with_spinner(
         "Fetching logs...",
         default_api::get_app_run_logs(
             &config.into(),
@@ -84,9 +90,7 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
                 seq,
             },
         ),
-        Some(&app_name),
-    )
-    .await;
+    ).await;
 
     if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
         for line in logs.log_lines {
@@ -98,151 +102,146 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 pub async fn do_show_app(config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap();
 
-    match default_api::describe_app(
-        &config.into(),
-        DescribeAppParams {
-            name: name.to_string(),
-            runs: Some(5),
-        },
-    )
-    .await
-    {
-        Ok(response) => {
-            if let DescribeAppSuccess::Status200(app_response) = response.entity.unwrap() {
-                let app = app_response.app;
-                let runs = app_response.runs;
+    let api_config = &config.into();
 
-                let line = format!("{} {}\n", "Name:".bold().green(), app.name);
-                output::write(&line);
+    let params = DescribeAppParams {
+        name: name.to_string(),
+        runs: Some(5),
+    };
 
-                let line = format!("{}\n", "Description:".bold().green());
-                output::write(&line);
+    let resp = handle_api_response(|| default_api::describe_app(&api_config, params)).await;
 
-                let line = output::paragraph(&app.short_description);
-                output::write(&line);
+    match resp {
+        Ok(app_response) => {
+            let app = app_response.app;
+            let runs = app_response.runs;
 
-                output::newline();
-                output::newline();
+            let line = format!("{} {}\n", "Name:".bold().green(), app.name);
+            output::write(&line);
 
-                let line = format!("{}\n", "Recent runs:".bold().green());
-                output::write(&line);
+            let line = format!("{}\n", "Description:".bold().green());
+            output::write(&line);
 
-                let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
-                    .into_iter()
-                    .map(|h| h.yellow().to_string())
-                    .collect();
+            let line = output::paragraph(&app.short_description);
+            output::write(&line);
 
-                let rows = runs
-                    .iter()
-                    .map(|run: &Run| {
-                        let status = &run.status;
+            output::newline();
+            output::newline();
 
-                        // Format start time
-                        let start_time = if let Some(started_at) = &run.started_at {
-                            if !started_at.is_empty() {
-                                started_at.to_string()
-                            } else {
-                                format!("Scheduled at {}", &run.scheduled_at)
-                            }
+            let line = format!("{}\n", "Recent runs:".bold().green());
+            output::write(&line);
+
+            let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
+                .into_iter()
+                .map(|h| h.yellow().to_string())
+                .collect();
+
+            let rows = runs
+                .iter()
+                .map(|run: &Run| {
+                    let status = &run.status;
+
+                    // Format start time
+                    let start_time = if let Some(started_at) = &run.started_at {
+                        if !started_at.is_empty() {
+                            started_at.to_string()
                         } else {
                             format!("Scheduled at {}", &run.scheduled_at)
-                        };
+                        }
+                    } else {
+                        format!("Scheduled at {}", &run.scheduled_at)
+                    };
 
-                        // Calculate elapsed time
-                        let elapsed_time = if let Some(ended_at) = &run.ended_at {
-                            if !ended_at.is_empty() {
-                                if let (Some(started_at), Some(ended_at)) =
-                                    (&run.started_at, &run.ended_at)
-                                {
-                                    let start =
-                                        started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                    let end =
-                                        ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                    if let (Some(start), Some(end)) = (start, end) {
-                                        format!("{:.1}s", (end - start).num_seconds())
-                                    } else {
-                                        "Invalid time".into()
-                                    }
+                    // Calculate elapsed time
+                    let elapsed_time = if let Some(ended_at) = &run.ended_at {
+                        if !ended_at.is_empty() {
+                            if let (Some(started_at), Some(ended_at)) =
+                                (&run.started_at, &run.ended_at)
+                            {
+                                let start =
+                                    started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                let end =
+                                    ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                if let (Some(start), Some(end)) = (start, end) {
+                                    format!("{:.1}s", (end - start).num_seconds())
                                 } else {
                                     "Invalid time".into()
                                 }
-                            } else if run.started_at.is_some() {
-                                "Running".into()
                             } else {
-                                "Pending".into()
+                                "Invalid time".into()
                             }
                         } else if run.started_at.is_some() {
                             "Running".into()
                         } else {
                             "Pending".into()
-                        };
+                        }
+                    } else if run.started_at.is_some() {
+                        "Running".into()
+                    } else {
+                        "Pending".into()
+                    };
 
-                        // Use the Debug implementation to get a string representation
-                        let status_str = format!("{:?}", status);
-                        vec![run.number.to_string(), status_str, start_time, elapsed_time]
-                    })
-                    .collect();
+                    vec![
+                        run.number.to_string(),
+                        status.to_string(),
+                        start_time,
+                        elapsed_time,
+                    ]
+                })
+                .collect();
 
-                output::table(headers, rows);
-            }
+            output::table(headers, rows);
         }
         Err(err) => {
-            if let tower_api::apis::Error::ResponseError(err) = err {
-                if err.status == 404 {
-                    output::failure(&format!("The app name {} was not found!", name));
-                } else {
-                    output::failure(&format!("{}: {}", err.status, err.content));
-                }
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
+            output::tower_error(err);
         }
     }
 }
 
 pub async fn do_list_apps(config: Config) {
-    let resp = handle_api_result(
-        None,
-        default_api::list_apps(
-            &config.into(),
-            ListAppsParams {
-                query: None,
-                page: None,
-                page_size: None,
-                period: None,
-                num_runs: None,
-                status: None,
-            },
-        ),
-    )
-    .await;
+    let api_config = &config.into();
+    let params = ListAppsParams {
+        query: None,
+        page: None,
+        page_size: None,
+        period: None,
+        num_runs: None,
+        status: None,
+    };
 
-    if let ListAppsSuccess::Status200(list_response) = resp.entity.unwrap() {
-        let items = list_response
-            .apps
-            .into_iter()
-            .map(|app_summary| {
-                let app = app_summary.app;
-                let desc = if app.short_description.is_empty() {
-                    "No description".white().dimmed().italic()
-                } else {
-                    app.short_description.normal().clear()
-                };
-                format!("{}\n{}", app.name.bold().green(), desc)
-            })
-            .collect();
-        output::list(items);
-    } else {
-        // This is most likely the case that there are no apps! So do nothing at all.
-        output::write("No apps found! \n");
+    let resp = handle_api_response(|| default_api::list_apps(&api_config, params)).await;
+
+    match resp {
+        Ok(resp) => {
+            let items = resp
+                .apps
+                .into_iter()
+                .map(|app_summary| {
+                    let app = app_summary.app;
+                    let desc = if app.short_description.is_empty() {
+                        "No description".white().dimmed().italic()
+                    } else {
+                        app.short_description.normal().clear()
+                    };
+                    format!("{}\n{}", app.name.bold().green(), desc)
+                })
+                .collect();
+            output::list(items);
+        },
+        Err(err) => {
+            output::tower_error(err);
+        }
     }
 }
 
 pub async fn do_create_app(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap();
+    let name = args.get_one::<String>("name").unwrap_or_else(|| {
+        output::die("App name (--name) is required");
+    });
+
     let description = args.get_one::<String>("description").unwrap();
 
-    api::with_spinner(
+    with_spinner(
         "Creating app",
         default_api::create_apps(
             &config.into(),
@@ -254,7 +253,6 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
                 },
             },
         ),
-        Some(name),
     )
     .await;
 
@@ -264,7 +262,7 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 pub async fn do_delete_app(config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap();
 
-    api::with_spinner(
+    with_spinner(
         "Deleting app...",
         default_api::delete_app(
             &config.into(),
@@ -272,38 +270,9 @@ pub async fn do_delete_app(config: Config, args: &ArgMatches) {
                 name: name.to_string(),
             },
         ),
-        Some(name),
-    )
-    .await;
+    ).await;
 
     output::success(&format!("App '{}' deleted", name));
-}
-
-/// Helper function to handle common API error patterns
-async fn handle_api_result<T, F, V>(spinner: Option<&mut output::Spinner>, operation: F) -> T
-where
-    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
-{
-    match operation.await {
-        Ok(result) => result,
-        Err(err) => {
-            if let Some(spinner) = spinner {
-                spinner.failure();
-            }
-
-            match err {
-                ApiError::ResponseError(err) => {
-                    output::failure(&format!("{}: {}", err.status, err.content));
-                    std::process::exit(1);
-                }
-                _ => {
-                    log::debug!("Unexpected error: {}", err);
-                    output::failure("The Tower API returned an unexpected error!");
-                    std::process::exit(1);
-                }
-            }
-        }
-    }
 }
 
 /// Extract app name and run number from command

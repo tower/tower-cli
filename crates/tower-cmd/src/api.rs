@@ -1,4 +1,8 @@
 use tower_api::apis::Error;
+use http::StatusCode;
+use std::future::Future;
+
+use crate::output;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -46,6 +50,28 @@ where
     }
 }
 
+/// Helper function to handle operations with spinner
+pub async fn with_spinner<T, F, V>(
+    message: &str, 
+    operation: F,
+) -> T 
+where
+    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
+{
+    let mut spinner = output::spinner(message);
+    match operation.await {
+        Ok(result) => {
+            spinner.success();
+            result
+        }
+        Err(err) => {
+            spinner.failure();
+            output::tower_error(err);
+            std::process::exit(1);
+        }
+    }
+}
+
 // Implement ResponseEntity for the specific API response types
 impl ResponseEntity for tower_api::apis::default_api::ListSecretsSuccess {
     type Data = tower_api::models::ListSecretsResponse;
@@ -90,71 +116,25 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeSecretsKeySuccess 
         }
     }
 }
-use http::StatusCode;
-use tower_api::apis::Error as ApiError;
-use std::future::Future;
 
-use crate::output;
+impl ResponseEntity for tower_api::apis::default_api::ListAppsSuccess {
+    type Data = tower_api::models::ListAppsResponse;
 
-/// Helper function to handle operations with spinner
-pub async fn with_spinner<T, F, V>(
-    message: &str, 
-    operation: F,
-    resource_name: Option<&str>
-) -> T 
-where
-    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
-{
-    let mut spinner = output::spinner(message);
-    match operation.await {
-        Ok(result) => {
-            spinner.success();
-            result
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
         }
-        Err(err) => {
-            spinner.failure();
-            match err {
-                ApiError::ResponseError(err) => {
-                    match err.status {
-                        StatusCode::NOT_FOUND => {
-                            // Extract the resource type from the message
-                            let resource_type = message
-                                .trim_end_matches("...")
-                                .trim_start_matches("Fetching ")
-                                .trim_start_matches("Creating ")
-                                .trim_start_matches("Updating ")
-                                .trim_start_matches("Deleting ");
-                            
-                            if let Some(name) = resource_name {
-                                output::failure(&format!("{} '{}' not found", resource_type, name));
-                            } else {
-                                output::failure(&format!("The {} was not found", resource_type));
-                            }
-                        },
-                        StatusCode::BAD_REQUEST => {
-                            output::failure("Something went wrong while talking to Tower. You might need to upgrade your Tower CLI.");
-                        },
-                        StatusCode::UNAUTHORIZED => {
-                            output::failure("You need to login! Try running `tower login` and then trying again.");
-                        },
-                        StatusCode::FORBIDDEN => {
-                            output::failure("You are not authorized to perform this action.");
-                        },
-                        StatusCode::INTERNAL_SERVER_ERROR => {
-                            output::failure("It looks like Tower is having a problem. Try again later on.");
-                        },
-                        _ => {
-                            log::debug!("Unexpected error: {}", err.content);
-                            output::failure("Something went wrong while talking to Tower. Try again in a bit.");
-                        }
-                    }
-                    std::process::exit(1);
-                }
-                _ => {
-                    output::failure(&format!("Unexpected error: {}", err));
-                    std::process::exit(1);
-                }
-            }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeAppSuccess {
+    type Data = tower_api::models::DescribeAppResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
         }
     }
 }
