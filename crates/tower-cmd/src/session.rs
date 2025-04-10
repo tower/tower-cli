@@ -4,10 +4,15 @@ use config::Config;
 use tokio::{time, time::Duration};
 use tower_api::{
     apis::default_api::{
-        self as api, CreateDeviceLoginTicketSuccess, DescribeDeviceLoginSessionParams,
-        DescribeDeviceLoginSessionSuccess,
+        self,
+        DescribeDeviceLoginSessionParams,
     },
     models::CreateDeviceLoginTicketResponse,
+};
+
+use crate::api::{
+    with_spinner,
+    handle_api_response,
 };
 
 pub fn login_cmd() -> Command {
@@ -17,36 +22,21 @@ pub fn login_cmd() -> Command {
 pub async fn do_login(config: Config) {
     output::banner();
 
-    let mut spinner = output::spinner("Starting device login...");
     let api_config = config.clone().into();
 
     // Request device login code
-    match api::create_device_login_ticket(&api_config).await {
-        Ok(response) => {
-            let response = response.entity.unwrap();
+    //
+    let resp = with_spinner(
+        "Starting device login...",
+        default_api::create_device_login_ticket(&api_config),
+    ).await;
 
-            if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response {
-                spinner.success();
-                handle_device_login(config, login_claim).await;
-            } else {
-                spinner.failure();
-                output::failure("The Tower API returned an unexpected response.");
-            }
-        }
-        Err(err) => {
-            spinner.failure();
-            if let tower_api::apis::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
-    }
+    handle_device_login(config, resp).await;
 }
 
 async fn handle_device_login(
     config: Config,
-    claim: tower_api::models::CreateDeviceLoginTicketResponse,
+    claim: CreateDeviceLoginTicketResponse,
 ) {
     // Try to open the login URL in browser
     if let Err(_) = open::that(&claim.login_url) {
@@ -77,27 +67,22 @@ async fn poll_for_login(
     let expires_at = chrono::Utc::now() + expires_in;
 
     while chrono::Utc::now() < expires_at {
-        let resp = api::describe_device_login_session(
-            &config.into(),
-            DescribeDeviceLoginSessionParams {
-                device_code: claim.device_code.clone(),
-            },
-        )
-        .await;
+        let api_config = &config.into();
+
+        let resp = handle_api_response(||
+            default_api::describe_device_login_session(
+                &api_config,
+                DescribeDeviceLoginSessionParams {
+                    device_code: claim.device_code.clone(),
+                },
+            ),
+        ).await;
 
         match resp {
             Ok(resp) => {
-                if let Some(success) = resp.entity {
-                    if let DescribeDeviceLoginSessionSuccess::Status200(response) = success {
-                        finalize_session(config, &response, spinner);
-                        return true;
-                    }
-                }
-
-                spinner.failure();
-                output::failure("The Tower API returned an unexpected response.");
-                return false;
-            }
+                finalize_session(config, &resp, spinner);
+                return true;
+            },
             Err(err) => {
                 if let Some(api_err) = extract_api_error(&err) {
                     if api_err.status != 404 && !api_err.is_incomplete_device_login {

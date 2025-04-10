@@ -207,3 +207,25 @@ impl ResponseEntity for tower_api::apis::default_api::CreateAppsSuccess {
         }
     }
 }
+
+impl ResponseEntity for tower_api::apis::default_api::CreateDeviceLoginTicketSuccess {
+    type Data = tower_api::models::CreateDeviceLoginTicketResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeDeviceLoginSessionSuccess {
+    type Data = tower_api::models::DescribeDeviceLoginSessionResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
