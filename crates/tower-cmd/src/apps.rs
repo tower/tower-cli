@@ -13,6 +13,8 @@ use tower_api::{
     models::{CreateAppParams, Run},
 };
 
+use crate::{output, api};
+
 pub fn apps_cmd() -> Command {
     Command::new("apps")
         .about("Interact with the apps that you own")
@@ -73,7 +75,7 @@ pub fn apps_cmd() -> Command {
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     let (app_name, seq) = extract_app_run(cmd);
 
-    let response = with_spinner(
+    let response = api::with_spinner(
         "Fetching logs...",
         default_api::get_app_run_logs(
             &config.into(),
@@ -240,7 +242,7 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap();
     let description = args.get_one::<String>("description").unwrap();
 
-    with_spinner(
+    api::with_spinner(
         "Creating app",
         default_api::create_apps(
             &config.into(),
@@ -262,7 +264,7 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 pub async fn do_delete_app(config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap();
 
-    with_spinner(
+    api::with_spinner(
         "Deleting app...",
         default_api::delete_app(
             &config.into(),
