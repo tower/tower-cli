@@ -12,7 +12,7 @@ use tower_api::{
     },
 };
 
-use crate::output;
+use crate::{output, api};
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
@@ -56,7 +56,7 @@ pub fn apps_cmd() -> Command {
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     let (app_name, seq) = extract_app_run(cmd);
     
-    let response = with_spinner(
+    let response = api::with_spinner(
         "Fetching logs...",
         default_api::get_app_run_logs(
             &config.into(),
@@ -221,7 +221,7 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
     });
     let description = args.get_one::<String>("description").unwrap();
 
-    with_spinner(
+    api::with_spinner(
         "Creating app",
         default_api::create_apps(
             &config.into(),
@@ -244,7 +244,7 @@ pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
         output::die("App name (e.g. tower apps delete <app name>) is required");
     });
 
-    with_spinner(
+    api::with_spinner(
         "Deleting app...",
         default_api::delete_app(
             &config.into(),
@@ -278,54 +278,6 @@ where
                 _ => {
                     log::debug!("Unexpected error: {}", err);
                     output::failure("The Tower API returned an unexpected error!");
-                    std::process::exit(1);
-                }
-            }
-        }
-    }
-}
-
-/// Helper function to handle operations with spinner
-async fn with_spinner<T, F, V>(
-    message: &str, 
-    operation: F,
-    resource_name: Option<&str>
-) -> T 
-where
-    F: Future<Output = Result<T, tower_api::apis::Error<V>>>,
-{
-    let mut spinner = output::spinner(message);
-    match operation.await {
-        Ok(result) => {
-            spinner.success();
-            result
-        }
-        Err(err) => {
-            spinner.failure();
-            match err {
-                ApiError::ResponseError(err) => {
-                    // Check for 404 Not Found errors and provide a more user-friendly message
-                    if err.status == 404 {
-                        // Extract the resource type from the message
-                        let resource_type = message
-                            .trim_end_matches("...")
-                            .trim_start_matches("Fetching ")
-                            .trim_start_matches("Creating ")
-                            .trim_start_matches("Updating ")
-                            .trim_start_matches("Deleting ");
-                        
-                        if let Some(name) = resource_name {
-                            output::failure(&format!("{} '{}' not found", resource_type, name));
-                        } else {
-                            output::failure(&format!("The {} was not found", resource_type));
-                        }
-                    } else {
-                        output::failure(&format!("{}: {}", err.status, err.content));
-                    }
-                    std::process::exit(1);
-                }
-                _ => {
-                    output::failure(&format!("Unexpected error: {}", err));
                     std::process::exit(1);
                 }
             }
