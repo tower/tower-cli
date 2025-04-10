@@ -3,12 +3,8 @@ use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::{
-    apis::{
-        default_api::{self, ExportSecretsParams, RunAppParams},
-    },
-    models::{
-        ExportSecretsParams as ExportSecretsParamsModel
-    },
+    models::ExportSecretsParams as ExportSecretsParamsModel,
+    apis::default_api::{self, ExportSecretsParams, RunAppParams},
 };
 use tower_api::models;
 use tower_package::{Package, PackageSpec};

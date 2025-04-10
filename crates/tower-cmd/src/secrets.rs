@@ -182,7 +182,6 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
     with_spinner(
         "Creating secret...",
         encrypt_and_create_secret(config, name.clone(), value.clone(), environment.clone()),
-        Some(&name),
     ).await;
 }
 
@@ -199,7 +198,6 @@ pub async fn do_delete_secret(config: Config, cmd: Option<(&str, &ArgMatches)>) 
     with_spinner(
         "Deleting secret...",
         default_api::delete_secret(&config.into(), params),
-        Some(&name),
     ).await;
 }
 
