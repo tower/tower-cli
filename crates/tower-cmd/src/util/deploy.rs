@@ -6,13 +6,19 @@ use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use tower_package::Package;
 
+use tower_api::apis::configuration::Configuration;
+use tower_api::apis::ResponseContent;
+use tower_api::models::DeployAppResponse;
+use tower_api::apis::default_api::DeployAppError;
+use tower_api::apis::Error;
+
 pub async fn upload_file_with_progress(
-    api_config: &tower_api::apis::configuration::Configuration,
+    api_config: &Configuration,
     endpoint_url: String,
     file_path: PathBuf,
     content_type: &str,
     progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
-) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+) -> Result<DeployAppResponse, Error<DeployAppError>> {
     // Get the file and its metadata
     let file = File::open(file_path).await?;
     let metadata = file.metadata().await?;
@@ -40,10 +46,16 @@ pub async fn upload_file_with_progress(
 
     // Handle the response
     if response.status().is_success() {
-        let json: serde_json::Value = response.json().await?;
-        Ok(json)
+        let resp: DeployAppResponse = response.json().await?;
+        Ok(resp)
     } else {
-        Err(format!("Error: {}", response.status()).into())
+        // NOTE: I just kind of lifted this out of the generated client to figure out how to
+        // deserialize this type into something that is useful and resembles the original/generated
+        // stuff.
+        let status = response.status();
+        let content = response.text().await?;
+        let entity: Option<DeployAppError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
 
@@ -51,7 +63,7 @@ pub async fn deploy_app_package(
     api_config: &tower_api::apis::configuration::Configuration,
     app_name: &str,
     package: Package,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
     let progress_callback = Box::new({
@@ -85,11 +97,5 @@ pub async fn deploy_app_package(
     progress_bar.finish();
     output::newline();
 
-    // Extract the version
-    let version = response["version"]["version"]
-        .as_str()
-        .ok_or("Version not found in response")?
-        .to_string();
-
-    Ok(version)
+    Ok(response)
 }

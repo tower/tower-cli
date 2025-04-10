@@ -78,15 +78,18 @@ async fn do_deploy_package(api_config: Configuration, package: Package, towerfil
     ).await;
 
     match res {
-        Ok(version) => {
+        Ok(resp) => {
+            let version = resp.version;
+
             let line = format!(
-                "Version `{}` of your code has been deployed to Tower!",
-                version
+                "Version `{}` has been deployed to Tower!",
+                version.version
             );
+
             output::success(&line);
         }
         Err(err) => {
-            output::failure(&format!("Failed to deploy: {}", err));
+            output::tower_error(err);
         }
     }
 }
