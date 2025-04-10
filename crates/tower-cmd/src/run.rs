@@ -10,7 +10,10 @@ use tower_api::{
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 
-use crate::output;
+use crate::{
+    output,
+    api::with_spinner,
+};
 
 pub fn run_cmd() -> Command {
     Command::new("run")
@@ -145,8 +148,6 @@ async fn do_run_remote(
     params: HashMap<String, String>,
     app_name: Option<String>,
 ) {
-    let mut spinner = output::spinner("Scheduling run...");
-
     let app_name = app_name.unwrap_or_else(|| {
         // Load the Towerfile
         let towerfile_path = path.join("Towerfile");
@@ -154,37 +155,29 @@ async fn do_run_remote(
         towerfile.app.name
     });
 
-    match default_api::run_app(
-        &config.into(),
-        RunAppParams {
-            name: app_name.clone(),
-            run_app_params: models::RunAppParams {
-                parent_run_id: None,
-                schema: None,
-                environment: env.to_string(),
-                parameters: params,
-            },
+    let params = RunAppParams {
+        name: app_name.clone(),
+        run_app_params: models::RunAppParams {
+            schema: None,
+            environment: env.to_string(),
+            parameters: params,
+            parent_run_id: None,
         },
-    )
-    .await
-    {
-        Ok(response) => {
-            spinner.success();
-            if let tower_api::apis::default_api::RunAppSuccess::Status200(run_response) =
-                response.entity.unwrap()
-            {
-                let line = format!(
-                    "Run #{} for app `{}` has been scheduled",
-                    run_response.run.number, app_name
-                );
-                output::success(&line);
-            }
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error(err);
-        }
-    }
+    };
+
+    let res = with_spinner(
+        "Scheduling run...",
+        default_api::run_app(
+            &config.into(),
+            params,
+        ),
+    ).await;
+
+    let line = format!(
+        "Run #{} for app `{}` has been scheduled",
+        res.run.number, app_name
+    );
+    output::success(&line);
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`

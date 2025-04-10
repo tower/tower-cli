@@ -8,7 +8,7 @@ use tower_api::apis::Error as ApiError;
 use tower_api::{
     apis::default_api::{
         self, CreateAppsParams, DeleteAppParams, DescribeAppParams,
-        GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams,
+        GetAppRunLogsParams, ListAppsParams,
     },
     models::{CreateAppParams, Run},
 };
@@ -92,10 +92,8 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
         ),
     ).await;
 
-    if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
-        for line in logs.log_lines {
-            output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
-        }
+    for line in response.log_lines {
+        output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
     }
 }
 
