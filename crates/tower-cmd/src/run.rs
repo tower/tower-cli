@@ -247,51 +247,34 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
 async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
-    let mut spinner = output::spinner("Getting secrets...");
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    match default_api::export_secrets(
-        &config.into(),
-        ExportSecretsParams {
-            export_user_secrets_params: ExportUserSecretsParams {
-                schema: None,
-                public_key: crypto::serialize_public_key(public_key),
-            },
-            environment: Some(env.to_string()),
-            all: Some(false),
-            page: None,
-            page_size: None,
+    let params = ExportSecretsParams {
+        export_user_secrets_params: ExportUserSecretsParams {
+            schema: None,
+            public_key: crypto::serialize_public_key(public_key),
         },
-    )
-    .await
-    {
-        Ok(response) => {
-            spinner.success();
-            if let tower_api::apis::default_api::ExportSecretsSuccess::Status200(list_response) =
-                response.entity.unwrap()
-            {
-                list_response
-                    .secrets
-                    .into_iter()
-                    .map(|secret| {
-                        let decrypted_value = crypto::decrypt(
-                            private_key.clone(),
-                            secret.encrypted_value.to_string(),
-                        );
-                        (secret.name, decrypted_value)
-                    })
-                    .collect()
-            } else {
-                HashMap::new()
-            }
-        }
-        Err(err) => {
-            spinner.failure();
-            log::debug!("Failed to export secrets for local execution: {}", err);
-            output::tower_error(err);
-            std::process::exit(1);
-        }
-    }
+        environment: Some(env.to_string()),
+        all: Some(false),
+        page: None,
+        page_size: None,
+    };
+
+    let res = with_spinner(
+        "Getting secrets...",
+        default_api::export_secrets(
+            &config.into(),
+            params
+        ),
+    ).await;
+
+    res.secrets
+        .into_iter()
+        .map(|secret| {
+            let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string());
+            (secret.name, decrypted_value)
+        })
+        .collect()
 }
 
 /// load_towerfile manages the process of loading a Towerfile from a given path in an interactive
