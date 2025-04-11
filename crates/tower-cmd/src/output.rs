@@ -3,8 +3,16 @@ use cli_table::{
     format::{Border, HorizontalLine, Separator},
     print_stdout, Table,
 };
+use http::StatusCode;
 use colored::Colorize;
 use std::io::{self, Write};
+use tower_api::{
+    apis::{
+        Error as ApiError,
+        ResponseContent,
+    },
+    models::ErrorModel,
+};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
@@ -91,58 +99,90 @@ pub fn write(msg: &str) {
     io::stdout().write_all(msg.as_bytes()).unwrap();
 }
 
+pub fn error(msg: &str) {
+    let line = format!("{} {}\n", "Oh no!".red(), msg);
+    io::stdout().write_all(line.as_bytes()).unwrap();
+}
+
 pub fn runtime_error(err: tower_runtime::errors::Error) {
     let line = format!("{} {}\n", "Runtime Error:".red(), err.to_string());
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
-pub fn tower_error<T>(err: tower_api::apis::Error<T>) {
-    match err {
-        tower_api::apis::Error::ResponseError(response) => {
-            // Try to deserialize as ErrorModel first
-            if let Ok(error_model) =
-                serde_json::from_str::<tower_api::models::ErrorModel>(&response.content)
-            {
-                // Show the main error message from the detail field
-                let detail = error_model.detail.as_deref().unwrap_or("Unknown error");
-                let line = format!("{} {}\n", "Error:".red(), detail);
-                io::stdout().write_all(line.as_bytes()).unwrap();
+fn output_response_content_error<T>(err: ResponseContent<T>) {
+    // we blindly unwrap this here because if we don't get a valid ErrorModel then something bad
+    // happened.
+    let error_model: ErrorModel = serde_json::from_str(&err.content).unwrap();
+    log::debug!("Error model (status: {}): {:?}", err.status, error_model);
 
-                // Show any additional error details from the errors field
-                if let Some(errors) = &error_model.errors {
-                    if !errors.is_empty() {
-                        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
-                        for error in errors {
-                            let msg = format!(
-                                "  • {}",
-                                error.message.as_deref().unwrap_or("Unknown error")
-                            );
-                            writeln!(io::stdout(), "{}", msg.red()).unwrap();
-                        }
+    match err.status {
+        StatusCode::CONFLICT => {
+            // Show the main error message from the detail field
+            error("There was a conflict while trying to do that!");
+
+            // Show any additional error details from the errors field
+            if let Some(errors) = &error_model.errors {
+                if !errors.is_empty() {
+                    writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+                    for error in errors {
+                        let msg = format!(
+                            "  • {}",
+                            error.message.as_deref().unwrap_or("Unknown error")
+                        );
+                        writeln!(io::stdout(), "{}", msg.red()).unwrap();
                     }
                 }
-            } else {
-                // If it's not an ErrorModel, try to show the raw content
-                let line = format!(
-                    "{} {}: {}\n",
-                    "Error:".red(),
-                    response.status,
-                    response.content
-                );
-                io::stdout().write_all(line.as_bytes()).unwrap();
             }
-        }
-        tower_api::apis::Error::Reqwest(e) => {
-            let line = format!("{} Network error: {}\n", "Error:".red(), e);
+            
+        },
+        StatusCode::UNPROCESSABLE_ENTITY => {
+            // Show the main error message from the detail field
+            let line = format!("{} {}\n", "Validation error:".red(), "You need to fix one or more validation errors");
             io::stdout().write_all(line.as_bytes()).unwrap();
+
+            // Show any additional error details from the errors field
+            if let Some(errors) = &error_model.errors {
+                if !errors.is_empty() {
+                    writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+                    for error in errors {
+                        let msg = format!(
+                            "  • {}",
+                            error.message.as_deref().unwrap_or("Unknown error")
+                        );
+                        writeln!(io::stdout(), "{}", msg.red()).unwrap();
+                    }
+                }
+            }
+        },
+        StatusCode::INTERNAL_SERVER_ERROR => {
+            error("The Tower API encountered an internal error. Maybe try again later on.");
+        },
+        StatusCode::UNAUTHORIZED => {
+            error("You aren't authorized to do that! Are you logged in? Run `tower login` to login.");
+        },
+        _ => {
+            error("The Tower API returned an error that the Tower CLI doesn't know what to do with! Maybe try again in a bit.");
         }
-        tower_api::apis::Error::Serde(e) => {
-            let line = format!("{} Data parsing error: {}\n", "Error:".red(), e);
-            io::stdout().write_all(line.as_bytes()).unwrap();
+    }
+}
+
+
+pub fn tower_error<T>(err: ApiError<T>) {
+    match err {
+        ApiError::ResponseError(resp) => {
+            output_response_content_error(resp);
         }
-        tower_api::apis::Error::Io(e) => {
-            let line = format!("{} I/O error: {}\n", "Error:".red(), e);
-            io::stdout().write_all(line.as_bytes()).unwrap();
+        ApiError::Reqwest(e) => {
+            log::debug!("Reqwest error: {:?}", e);
+            error("The Tower CLI wasn't able to talk to the Tower API! Are you offline? Try again later.");
+        }
+        ApiError::Serde(e) => {
+            log::debug!("Serde error: {:?}", e);
+            error("The Tower API returned something that the Tower CLI didn't understand. Maybe you need to upgrade Tower CLI?");
+        }
+        ApiError::Io(e) => {
+            log::debug!("Io error: {:?}", e);
+            error("An error happened while talking to the Tower API. You can try that again in a bit.");
         }
     }
 }
