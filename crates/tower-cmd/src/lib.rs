@@ -4,6 +4,7 @@ use config::{Config, Session};
 mod apps;
 mod deploy;
 pub mod output;
+pub mod api;
 mod run;
 mod secrets;
 mod session;
