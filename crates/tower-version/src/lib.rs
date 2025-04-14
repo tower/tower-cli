@@ -11,7 +11,7 @@ pub async fn check_latest_version() -> Result<Option<String>> {
     let client = reqwest::Client::new();
     let pypi_url = std::env::var("TOWER_PYPI_URL")
         .unwrap_or_else(|_| "https://pypi.org".to_string());
-    let url = format!("{}/pypi/tower-cli/json", pypi_url);
+    let url = format!("{}/pypi/tower/json", pypi_url);
     
     let resp = client
         .get(url)

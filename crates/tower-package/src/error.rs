@@ -7,6 +7,9 @@ pub enum Error {
 
     #[snafu(display("Invalid manifest"))]
     InvalidManifest,
+
+    #[snafu(display("Invalid path"))]
+    InvalidPath,
 }
 
 impl From<std::io::Error> for Error {

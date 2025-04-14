@@ -3,8 +3,8 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "tower-cli"
-version = "0.3.2"
+name = "tower"
+version = "0.3.5"
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
 readme = "README.md"
@@ -37,12 +37,17 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
+dependencies = [
+    "attrs>=24.2.0",
+    "httpx>=0.23.3",
+    "python-dateutil>=2.9.0.post0",
+]
 
 [tool.maturin]
 bindings = "bin"
-manifest-path = "crates/tower-cli/Cargo.toml"
+manifest-path = "crates/tower/Cargo.toml"
 module-name = "tower"
-python-source = "python"
+python-source = "src"
 strip = true
 exclude = [
 ]
@@ -51,9 +56,10 @@ include = [
 ]
 
 [tool.uv.sources]
-tower-cli = { workspace = true }
+tower = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "tower-cli",
+    "tower",
+    "openapi-python-client>=0.12.1",
 ]

@@ -45,6 +45,9 @@ pub fn package_error(err: tower_package::Error) {
         tower_package::Error::InvalidManifest => {
             "Invalid manifest was found or created".to_string()
         }
+        tower_package::Error::InvalidPath => {
+            "There was a problem determining exactly where your Towerfile was stored on disk".to_string()
+        }
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
@@ -208,11 +211,11 @@ pub fn write_update_message(latest: &str, current: &str) {
     let line = format!(
         "{}\n{}\n",
         format!(
-            "A newer version of tower-cli is available: {} (you have {})",
+            "A newer version of tower is available: {} (you have {})",
             latest, current
         )
         .yellow(),
-        "To upgrade, run: pip install --upgrade tower-cli".yellow()
+        "To upgrade, run: pip install --upgrade tower".yellow()
     );
 
     io::stdout().write_all(line.as_bytes()).unwrap();

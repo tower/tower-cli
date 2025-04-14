@@ -12,7 +12,7 @@ use tower_api::{
 };
 use tower_api::models;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{local::LocalApp, App, AppLauncher, OutputChannel};
+use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 
 use crate::output;
 
@@ -115,7 +115,7 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
     }
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    if let Err(err) = launcher.launch(package, env, secrets, params).await {
+    if let Err(err) = launcher.launch(package, env, secrets, params, HashMap::new()).await {
         output::runtime_error(err);
         return;
     }
@@ -330,7 +330,7 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 
 /// monitor_output is a helper function that will monitor the output of a given output channel and
 /// plops it down on stdout.
-async fn monitor_output(output: OutputChannel) {
+async fn monitor_output(output: OutputReceiver) {
     loop {
         if let Some(line) = output.lock().await.recv().await {
             let ts = &line.time;
@@ -352,7 +352,7 @@ async fn monitor_status(mut app: LocalApp) {
                     output::success("Your app exited cleanly.");
                     break;
                 }
-                tower_runtime::Status::Crashed => {
+                tower_runtime::Status::Crashed { .. } => {
                     output::failure("Your app crashed!");
                     break;
                 }

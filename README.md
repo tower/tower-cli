@@ -9,7 +9,7 @@ your code locally or remotely in the Tower cloud.
 The main way to install the CLI is using the `pip` package manager.
 
 ```bash
-$ pip install -U tower-cli
+$ pip install -U tower
 ```
 
 You can also download the CLI directly from one of our [releases](https://github.com/tower/tower-cli/releases/latest).
@@ -21,7 +21,7 @@ runtime environment for the Tower cloud. We host the runtime in this repository
 and pull it in to our internal code because we want to ensure that the
 environments behave *exactly the same* locally and in our cloud!
 
-### Using the CLi
+### Using the CLI
 
 It's pretty straight forward! But here's what it looks like right now.
 
@@ -63,3 +63,19 @@ the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information.
 
 All contributions must abide by our code of conduct. Please see
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for more information.
+
+## Development
+
+Here are a few handy tips and common workflows when developing the Tower CLI.
+
+### Python SDK development
+
+We use `uv` for all development. You can spawn a REPL in context using `uv` very
+easily. Then you can `import tower` and you're off to the races!
+
+```bash
+uv run python
+```
+
+If you need to get the latest OpenAPI SDK, you can run
+`./scripts/generate-python-api-client.sh`.

@@ -16,7 +16,10 @@ use crate::{
 use tokio::{
     sync::oneshot,
     sync::oneshot::error::TryRecvError,
-    sync::mpsc::channel,
+    sync::mpsc::{
+        UnboundedSender,
+        unbounded_channel,
+    },
     process::Command,
 };
 
@@ -25,7 +28,6 @@ use tokio::{
     io::{AsyncRead, BufReader, AsyncBufReadExt},
     time::{timeout, Duration},
     sync::Mutex,
-    sync::mpsc::Sender,
     process::Child, 
 };
 
@@ -33,9 +35,11 @@ use tower_package::{Manifest, Package};
 
 use crate::{
     FD,
+    Channel,
     App,
     Output,
-    OutputChannel,
+    OutputSender,
+    OutputReceiver,
 };
 
 pub struct LocalApp {
@@ -48,15 +52,22 @@ pub struct LocalApp {
     child: Option<Arc<Mutex<Child>>>,
     status: Option<Status>,
     waiter: Option<oneshot::Receiver<i32>>,
+
+    output_sender: OutputSender,
+    output_receiver: OutputReceiver,
 }
 
 impl Default for LocalApp {
     fn default() -> Self {
+        let (sender, receiver) = unbounded_channel::<Output>();
+
         Self {
             package: None,
             child: None,
             status: None,
             waiter: None,
+            output_sender: Arc::new(Mutex::new(sender)),
+            output_receiver: Arc::new(Mutex::new(receiver)),
         }
     }
 }
@@ -140,6 +151,11 @@ async fn find_bash() -> Result<PathBuf, Error> {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
+        let (sender, receiver) = unbounded_channel::<Output>();
+
+        let output_sender = Arc::new(Mutex::new(sender));
+        let output_receiver = Arc::new(Mutex::new(receiver));
+
         let package = opts.package;
         let environment = opts.environment;
         let package_path = package.unpacked_path
@@ -191,6 +207,9 @@ impl App for LocalApp {
 
             let res = Command::new(pip_path)
                 .current_dir(&working_dir)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .arg("install")
                 .arg("-r")
                 .arg(package_path.join("requirements.txt"))
@@ -198,6 +217,15 @@ impl App for LocalApp {
                 .spawn();
 
             if let Ok(mut child) = res {
+                // Let's also send our logs to this output channel.
+                let stdout = child.stdout.take().expect("no stdout");
+                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, output_sender.clone(), BufReader::new(stdout)));
+
+                let stderr = child.stderr.take().expect("no stderr");
+                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, output_sender.clone(), BufReader::new(stderr)));
+
+                log::debug!("waiting for dependency installation to complete");
+
                 // Wait for the child to complete entirely.
                 child.wait().await.expect("child failed to exit");
             }
@@ -211,14 +239,16 @@ impl App for LocalApp {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
+            let other_env_vars = opts.env_vars;
 
-            Self::execute_bash_program(&environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params).await
+            Self::execute_bash_program(&environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params, other_env_vars).await
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
+            let other_env_vars = opts.env_vars;
 
-            Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params).await
+            Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
         };
 
         if let Ok(child) = res {
@@ -228,6 +258,8 @@ impl App for LocalApp {
             tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
 
             Ok(Self {
+                output_sender,
+                output_receiver,
                 package: Some(package),
                 child: Some(child),
                 waiter: Some(rx),
@@ -245,21 +277,21 @@ impl App for LocalApp {
         } else {
             if let Some(waiter) = &mut self.waiter {
                 let res = waiter.try_recv();
-                let res = match res {
-                    Err(TryRecvError::Empty) => Status::Running,
-                    Err(TryRecvError::Closed) => Status::Crashed,
+                match res {
+                    Err(TryRecvError::Empty) => Ok(Status::Running),
+                    Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
                     Ok(t) => {
                         // We save this for the next time this gets called.
                         if t == 0 {
                             self.status = Some(Status::Exited);
-                            Status::Exited
+                            Ok(Status::Exited)
                         } else {
-                            self.status = Some(Status::Crashed);
-                            Status::Crashed
+                            let status = Status::Crashed { code: t };
+                            self.status = Some(status);
+                            Ok(status)
                         }
                     }
-                };
-                Ok(res)
+                }
             } else {
                 Ok(Status::None)
             }
@@ -282,19 +314,17 @@ impl App for LocalApp {
         }
     }
 
-    async fn output(&self) -> Result<OutputChannel, Error> {
+    async fn output(&self) -> Result<OutputReceiver, Error> {
         if let Some(proc) = &self.child {
             let mut child = proc.lock().await;
 
-            let (sx, rx) = channel::<Output>(1);
-
             let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, sx.clone(), BufReader::new(stdout)));
+            tokio::spawn(drain_output(FD::Stdout, Channel::Program, self.output_sender.clone(), BufReader::new(stdout)));
 
             let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, sx.clone(), BufReader::new(stderr)));
+            tokio::spawn(drain_output(FD::Stderr, Channel::Program, self.output_sender.clone(), BufReader::new(stderr)));
 
-            Ok(Arc::new(Mutex::new(rx)))
+            Ok(self.output_receiver.clone())
         } else {
             Err(Error::NoRunningApp)
         }
@@ -311,6 +341,7 @@ impl LocalApp {
         manifest: &Manifest,
         secrets: HashMap<String, String>,
         params: HashMap<String, String>,
+        other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
         log::debug!(" - python script {}", manifest.invoke);
 
@@ -321,7 +352,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params))
+            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -336,6 +367,7 @@ impl LocalApp {
         manifest: &Manifest,
         secrets: HashMap<String, String>,
         params: HashMap<String, String>,
+        other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
         let bash_path = find_bash().await?;
         log::debug!("using bash at {:?}", bash_path);
@@ -348,7 +380,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params))
+            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -365,7 +397,7 @@ fn make_env_var_key(src: &str) -> String {
     }
 }
 
-fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
     log::debug!("converting {} env variables", (params.len() + secs.len()));
@@ -380,19 +412,31 @@ fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<S
         res.insert(key.to_string(), value.to_string());
     }
 
+    for (key, value) in other_env_vars.into_iter() {
+        log::debug!("adding key {}", &key);
+        res.insert(key.to_string(), value.to_string());
+    }
+
     // If we're in a virtual environment, we need to add the bin directory to the PATH so that we
     // can find any executables that were installed there.
     if is_virtualenv {
-        let venv_path = cwd.join(".venv")
-            .join("bin")
+        let venv_dir = cwd.join(".venv");
+        let venv_path = venv_dir
+            .to_string_lossy()
+            .to_string();
+
+        let bin_path = venv_dir.join("bin")
             .to_string_lossy()
             .to_string();
 
         if let Ok(path) =  std::env::var("PATH") {
-            res.insert("PATH".to_string(), format!("{}:{}", venv_path, path));
+            res.insert("PATH".to_string(), format!("{}:{}", bin_path, path));
         } else {
-            res.insert("PATH".to_string(), venv_path);
+            res.insert("PATH".to_string(), bin_path);
         }
+
+        // We also insert a VIRTUAL_ENV path such that we can 
+        res.insert("VIRTUAL_ENV".to_string(), venv_path);
     }
 
     // We also need a PYTHONPATH that is set to the current working directory to help with the
@@ -434,15 +478,18 @@ async fn wait_for_process(sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
     let _ = sx.send(code);
 }
 
-async fn drain_output<R: AsyncRead + Unpin>(fd: FD, output: Sender<Output>, input: BufReader<R>) {
+async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Arc<Mutex<UnboundedSender<Output>>>, input: BufReader<R>) {
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
+        let output = output.lock().await;
+
         let _ = output.send(Output{ 
+            channel,
             fd,
             line,
             time: chrono::Utc::now(),
-        }).await;
+        });
     }
 }
 
