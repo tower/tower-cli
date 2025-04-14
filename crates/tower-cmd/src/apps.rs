@@ -216,6 +216,7 @@ pub async fn do_list_apps(config: Config) {
         output::list(items);
     } else {
         // This is most likely the case that there are no apps! So do nothing at all.
+        output::write("No apps found! \n");
     }
 }
 
