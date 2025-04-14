@@ -159,12 +159,9 @@ pub async fn do_show_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
                             "Pending".into()
                         };
 
-                        vec![
-                            run.number.to_string(),
-                            status.to_string(),
-                            start_time,
-                            elapsed_time,
-                        ]
+                        // Use the Debug implementation to get a string representation
+                        let status_str = format!("{:?}", status);
+                        vec![run.number.to_string(), status_str, start_time, elapsed_time]
                     })
                     .collect();
 
