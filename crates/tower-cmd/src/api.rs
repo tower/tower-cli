@@ -229,3 +229,25 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeDeviceLoginSession
         }
     }
 }
+
+impl ResponseEntity for tower_api::apis::default_api::RefreshSessionSuccess {
+    type Data = tower_api::models::RefreshSessionResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeSessionSuccess {
+    type Data = tower_api::models::DescribeSessionResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}

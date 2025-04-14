@@ -1,6 +1,6 @@
 use crate::output;
 use clap::Command;
-use config::Config;
+use config::{Config, Session};
 use tokio::{time, time::Duration};
 use tower_api::{
     apis::default_api::{
@@ -107,39 +107,10 @@ fn finalize_session(
     session_response: &tower_api::models::DescribeDeviceLoginSessionResponse,
     spinner: &mut output::Spinner,
 ) {
-    let teams = session_response
-        .session
-        .teams
-        .iter()
-        .map(|t| config::Team {
-            slug: t.slug.clone(),
-            name: t.name.clone(),
-            team_type: t.r#type.clone(),
-            token: config::Token {
-                jwt: t.token.clone().unwrap().jwt.clone(),
-            },
-        })
-        .collect();
-
-    // Create and save the session
-    let mut session = config::Session::new(
-        config::User {
-            email: session_response.session.user.email.clone(),
-            created_at: session_response.session.user.created_at.clone(),
-            first_name: session_response.session.user.first_name.clone(),
-            last_name: session_response.session.user.last_name.clone(),
-        },
-        config::Token {
-            jwt: session_response.session.token.jwt.clone(),
-        },
-        teams,
-    );
+    let mut session = Session::from_api_session(&session_response.session);
 
     // we have to copy in the tower URL so that we save it for later on!
     session.tower_url = config.tower_url.clone();
-
-    // Set the active team to the one matching the main session JWT
-    let _ = session.set_active_team_by_jwt(&session_response.session.token.jwt);
 
     if let Err(err) = session.save() {
         spinner.failure();

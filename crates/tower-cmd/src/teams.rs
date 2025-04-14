@@ -1,8 +1,12 @@
-use crate::{output, util::spinner::with_spinner};
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
-use config::Config;
+use config::{Config, Session};
 use tower_api::apis::default_api;
+
+use crate::{
+    output,
+    api::with_spinner,
+};
 
 pub fn teams_cmd() -> Command {
     Command::new("teams")
@@ -42,7 +46,6 @@ async fn refresh_session(config: &Config) -> config::Session {
     let response = with_spinner(
         "Refreshing session...",
         default_api::refresh_session(&api_config, refresh_params),
-        None,
     )
     .await;
 
@@ -153,7 +156,7 @@ pub async fn do_switch_team(config: Config, args: &ArgMatches) {
         None => {
             // Team not found
             output::failure(&format!(
-                "Team '{}' not found. Use 'tower teams list' to see available teams.",
+                "Team '{}' not found. Use 'tower teams list' to see all your teams.",
                 team_slug
             ));
             std::process::exit(1);
