@@ -34,9 +34,14 @@ async fn refresh_session(config: &Config) -> config::Session {
     // Then refresh it with the API
     let api_config = config.clone().into();
 
+    // Create the required refresh_session_params
+    let refresh_params = default_api::RefreshSessionParams {
+        refresh_session_params: tower_api::models::RefreshSessionParams::new(),
+    };
+
     let response = with_spinner(
         "Refreshing session...",
-        default_api::refresh_session(&api_config),
+        default_api::refresh_session(&api_config, refresh_params),
         None,
     )
     .await;
