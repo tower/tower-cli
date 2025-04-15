@@ -256,7 +256,7 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
+            apt-get install -y --no-install-recommends python3 python3-pip cargo
             pip3 install -U pip
           run: |
             pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
@@ -298,7 +298,7 @@ jobs:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            apk add python3 py3-pip
+            apk add python3 py3-pip rust
             python -m venv .venv
             .venv/bin/pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
@@ -341,7 +341,7 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add python3 py3-pip
+            apk add python3 py3-pip rust
           run: |
             python -m venv .venv
             .venv/bin/pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
