@@ -1,15 +1,14 @@
-use colored::Colorize;
 use clap::{value_parser, Arg, ArgMatches, Command};
+use colored::Colorize;
 use config::Config;
 use crypto::encrypt;
 use rsa::pkcs1::DecodeRsaPublicKey;
 
 use tower_api::{
-    apis::default_api::{self, CreateSecretParams, DeleteSecretParams, ListSecretsParams, ExportSecretsParams},
-    models::{
-        CreateSecretParams as CreateSecretParamsModel,
-        ExportSecretsParams as ExportSecretsParamsModel
+    apis::default_api::{
+        self, CreateSecretParams, DeleteSecretParams, ExportSecretsParams, ListSecretsParams,
     },
+    models::{CreateSecretParams as CreateSecretParamsModel, ExportUserSecretsParams},
 };
 
 use crate::output;
@@ -24,7 +23,7 @@ pub fn secrets_cmd() -> Command {
                     Arg::new("show")
                         .short('s')
                         .long("show")
-                        .action(clap::ArgAction::SetTrue)
+                        .action(clap::ArgAction::SetTrue),
                 )
                 .arg(
                     Arg::new("environment")
@@ -32,15 +31,15 @@ pub fn secrets_cmd() -> Command {
                         .long("environment")
                         .default_value("default")
                         .value_parser(value_parser!(String))
-                        .action(clap::ArgAction::Set)
+                        .action(clap::ArgAction::Set),
                 )
                 .arg(
                     Arg::new("all")
                         .short('a')
                         .long("all")
-                        .action(clap::ArgAction::SetTrue)
+                        .action(clap::ArgAction::SetTrue),
                 )
-                .about("List all of your secrets")
+                .about("List all of your secrets"),
         )
         .subcommand(
             Command::new("create")
@@ -49,7 +48,7 @@ pub fn secrets_cmd() -> Command {
                         .short('n')
                         .long("name")
                         .value_parser(value_parser!(String))
-                        .action(clap::ArgAction::Set)
+                        .action(clap::ArgAction::Set),
                 )
                 .arg(
                     Arg::new("environment")
@@ -57,21 +56,21 @@ pub fn secrets_cmd() -> Command {
                         .long("environment")
                         .default_value("default")
                         .value_parser(value_parser!(String))
-                        .action(clap::ArgAction::Set)
+                        .action(clap::ArgAction::Set),
                 )
                 .arg(
                     Arg::new("value")
                         .short('v')
                         .long("value")
                         .value_parser(value_parser!(String))
-                        .action(clap::ArgAction::Set)
+                        .action(clap::ArgAction::Set),
                 )
-                .about("Create a new secret in your Tower account")
+                .about("Create a new secret in your Tower account"),
         )
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
-                .about("Delete a secret in Tower")
+                .about("Delete a secret in Tower"),
         )
 }
 
@@ -84,7 +83,7 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
         let (private_key, public_key) = crypto::generate_key_pair();
 
         let params = ExportSecretsParams {
-            export_secrets_params: ExportSecretsParamsModel {
+            export_user_secrets_params: ExportUserSecretsParams {
                 schema: None,
                 public_key: crypto::serialize_public_key(public_key),
             },
@@ -104,27 +103,33 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
                                 "Environment".bold().yellow().to_string(),
                                 "Value".bold().yellow().to_string(),
                             ];
-                            let data = list_response.secrets.iter().map(|secret| {
-                                // now we decrypt the value and show it.
-                                let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.clone());
+                            let data = list_response
+                                .secrets
+                                .iter()
+                                .map(|secret| {
+                                    // now we decrypt the value and show it.
+                                    let decrypted_value = crypto::decrypt(
+                                        private_key.clone(),
+                                        secret.encrypted_value.clone(),
+                                    );
 
-                                vec![
-                                    secret.name.clone(),
-                                    secret.environment.clone(),
-                                    decrypted_value,
-                                ]
-                            }).collect();
+                                    vec![
+                                        secret.name.clone(),
+                                        secret.environment.clone(),
+                                        decrypted_value,
+                                    ]
+                                })
+                                .collect();
                             output::table(headers, data);
-                        },
+                        }
                         default_api::ExportSecretsSuccess::UnknownValue(_) => {
                             output::failure("Received unknown response format from server");
                         }
                     }
                 }
-            },
+            }
             Err(err) => output::tower_error(err),
         }
-
     } else {
         let params = ListSecretsParams {
             environment: Some(env.clone()),
@@ -144,25 +149,28 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
                                     "Environment".bold().yellow().to_string(),
                                     "Preview".bold().yellow().to_string(),
                                 ],
-                                list_response.secrets.iter().map(|secret| {
-                                    vec![
-                                        secret.name.clone(),
-                                        secret.environment.clone(),
-                                        secret.preview.dimmed().to_string(),
-                                    ]
-                                }).collect(),
+                                list_response
+                                    .secrets
+                                    .iter()
+                                    .map(|secret| {
+                                        vec![
+                                            secret.name.clone(),
+                                            secret.environment.clone(),
+                                            secret.preview.dimmed().to_string(),
+                                        ]
+                                    })
+                                    .collect(),
                             );
                             output::table(headers, data);
-                        },
+                        }
                         default_api::ListSecretsSuccess::UnknownValue(_) => {
                             output::failure("Received unknown response format from server");
                         }
                     }
                 }
-            },
+            }
             Err(err) => output::tower_error(err),
         }
-
     }
 }
 
@@ -181,18 +189,22 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
     let api_config = config.into();
 
     // First get the secrets key
-    match default_api::describe_secrets_key(&api_config, default_api::DescribeSecretsKeyParams {
-        format: None,
-    }).await {
+    match default_api::describe_secrets_key(
+        &api_config,
+        default_api::DescribeSecretsKeyParams { format: None },
+    )
+    .await
+    {
         Ok(key_response) => {
             if let Some(key_success) = key_response.entity {
                 match key_success {
                     default_api::DescribeSecretsKeySuccess::Status200(key_response) => {
-                        let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
-                            .unwrap_or_else(|_| {
-                                spinner.failure();
-                                output::die("Failed to parse public key");
-                            });
+                        let public_key =
+                            rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
+                                .unwrap_or_else(|_| {
+                                    spinner.failure();
+                                    output::die("Failed to parse public key");
+                                });
                         let encrypted_value = encrypt(public_key, value.to_string());
                         let preview = create_preview(value);
 
@@ -203,7 +215,7 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
                                 encrypted_value,
                                 environment: environment.clone(),
                                 preview,
-                            }
+                            },
                         };
 
                         match default_api::create_secret(&api_config, create_params).await {
@@ -212,28 +224,33 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
                                     match create_success {
                                         default_api::CreateSecretSuccess::Status200(response) => {
                                             spinner.success();
-                                            output::success(&format!("Secret \"{}\" was created", response.secret.name));
-                                        },
+                                            output::success(&format!(
+                                                "Secret \"{}\" was created",
+                                                response.secret.name
+                                            ));
+                                        }
                                         default_api::CreateSecretSuccess::UnknownValue(_) => {
                                             spinner.failure();
-                                            output::failure("Received unknown response format from server");
+                                            output::failure(
+                                                "Received unknown response format from server",
+                                            );
                                         }
                                     }
                                 }
-                            },
+                            }
                             Err(err) => {
                                 spinner.failure();
                                 output::tower_error(err);
                             }
                         }
-                    },
+                    }
                     default_api::DescribeSecretsKeySuccess::UnknownValue(_) => {
                         spinner.failure();
                         output::failure("Received unknown response format from server");
                     }
                 }
             }
-        },
+        }
         Err(err) => {
             spinner.failure();
             output::tower_error(err);
@@ -257,7 +274,7 @@ pub async fn do_delete_secret(config: Config, cmd: Option<(&str, &ArgMatches)>) 
         Ok(_) => {
             spinner.success();
             output::success(&format!("Secret \"{}\" was deleted", name));
-        },
+        }
         Err(err) => {
             spinner.failure();
             output::tower_error(err);

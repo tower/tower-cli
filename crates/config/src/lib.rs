@@ -147,6 +147,12 @@ impl Config {
         Ok(())
     }
 
+    /// Gets the current session from the config directory
+    /// Returns Error if no session exists or there's an issue loading it
+    pub fn get_current_session(&self) -> Result<Session, Error> {
+        Session::from_config_dir()
+    }
+
     /// make_api_configuration takes the current Tower configuration and returns a configuration
     /// that can be used by the API. It's mostly just used in converting to/from a Configuration.
     fn make_api_configuration(&self) -> Configuration {
