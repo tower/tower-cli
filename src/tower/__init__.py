@@ -3,6 +3,11 @@ from ._client import (
     wait_for_run,
 )
 
-from ._llm import (
+from ._llms import (
     llms
+)
+
+from ._tables import (
+    create_table,
+    load_table,
 )
