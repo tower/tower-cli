@@ -104,7 +104,7 @@ impl App {
                         secrets::do_create_secret(sessionized_config, args).await
                     }
                     Some(("delete", args)) => {
-                        secrets::do_delete_secret(sessionized_config, args.subcommand()).await
+                        secrets::do_delete_secret(sessionized_config, args).await
                     }
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
