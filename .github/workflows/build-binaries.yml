@@ -30,7 +30,7 @@ env:
   PACKAGE_NAME: tower
   MODULE_NAME: tower
   EXECUTABLE_NAME: tower
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.9"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -252,7 +252,7 @@ jobs:
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
-          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu20.04' }}
+          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu-latest' }}
           githubToken: ${{ github.token }}
           install: |
             apt-get update
