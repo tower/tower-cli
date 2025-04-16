@@ -256,7 +256,7 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip curl
+            apt-get install -y --no-install-recommends python3 python3-pip curl libatomic1
             pip3 install -U pip
             curl https://sh.rustup.rs -sSf | sh -s -- -y
           run: |
@@ -299,8 +299,9 @@ jobs:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            apk add python3 py3-pip  curl
+            apk add python3 py3-pip curl
             curl https://sh.rustup.rs -sSf | sh -s -- -y
+            export PATH="$HOME/.cargo/bin:$PATH"
             python -m venv .venv
             .venv/bin/pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
@@ -346,6 +347,7 @@ jobs:
             apk add python3 py3-pip curl
             curl https://sh.rustup.rs -sSf | sh -s -- -y
           run: |
+            export PATH="$HOME/.cargo/bin:$PATH"
             python -m venv .venv
             .venv/bin/pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
