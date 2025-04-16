@@ -320,8 +320,9 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-musl
             arch: aarch64
-          - target: armv7-unknown-linux-musleabihf
-            arch: armv7
+          # NOTE: This isn't currently supported by the Rust toolchain, so we can't use it here.
+          #- target: armv7-unknown-linux-musleabihf
+          #  arch: armv7
 
     steps:
       - uses: actions/checkout@v4
