@@ -38,15 +38,16 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
-    "attrs>=24.2.0",
-    "httpx>=0.23.3",
-    "huggingface-hub>=0.30.2",
-    "ollama>=0.4.7",
-    "polars>=1.27.1",
-    "pyarrow>=19.0.1",
-    "pyiceberg>=0.9.0",
-    "python-dateutil>=2.9.0.post0",
+  "attrs>=24.2.0",
+  "httpx>=0.23.3",
+  "python-dateutil>=2.9.0.post0",
 ]
+
+[project.optional-dependencies]
+ai = ["huggingface-hub>=0.30.2", "ollama>=0.4.7"]
+iceberg = ["polars>=1.27.1", "pyarrow>=19.0.1", "pyiceberg>=0.9.0"]
+all = ["tower[ai,iceberg]"]
+dev = ["openapi-python-client>=0.12.1"]
 
 [tool.maturin]
 bindings = "bin"
@@ -54,17 +55,8 @@ manifest-path = "crates/tower/Cargo.toml"
 module-name = "tower"
 python-source = "src"
 strip = true
-exclude = [
-]
-include = [
-  "rust-toolchain.toml"
-]
+exclude = []
+include = ["rust-toolchain.toml"]
 
 [tool.uv.sources]
 tower = { workspace = true }
-
-[dependency-groups]
-dev = [
-    "tower",
-    "openapi-python-client>=0.12.1",
-]
