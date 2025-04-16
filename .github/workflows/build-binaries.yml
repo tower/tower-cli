@@ -123,10 +123,12 @@ jobs:
         platform:
           - target: x86_64-pc-windows-msvc
             arch: x64
-          - target: i686-pc-windows-msvc
-            arch: x86
           - target: aarch64-pc-windows-msvc
             arch: x64
+          # NOTE: Disabling this target due to poor support in PyArrow and
+          # friends.
+          #- target: i686-pc-windows-msvc
+          #  arch: x86
     steps:
       - uses: actions/checkout@v4
         with:
@@ -256,7 +258,7 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip curl libatomic1
+            apt-get install -y --no-install-recommends python3 python3-pip curl libatomic1 build-essential
             pip3 install -U pip
             curl https://sh.rustup.rs -sSf | sh -s -- -y
           run: |
