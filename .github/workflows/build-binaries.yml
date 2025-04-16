@@ -260,6 +260,7 @@ jobs:
             pip3 install -U pip
             curl https://sh.rustup.rs -sSf | sh -s -- -y
           run: |
+            export PATH="$HOME/.cargo/bin:$PATH"
             pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
             ${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
@@ -299,7 +300,7 @@ jobs:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            apk add python3 py3-pip curl
+            apk add python3 py3-pip curl alpine-sdk
             curl https://sh.rustup.rs -sSf | sh -s -- -y
             export PATH="$HOME/.cargo/bin:$PATH"
             python -m venv .venv
@@ -344,7 +345,7 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add python3 py3-pip curl
+            apk add python3 py3-pip curl alpine-sdk
             curl https://sh.rustup.rs -sSf | sh -s -- -y
           run: |
             export PATH="$HOME/.cargo/bin:$PATH"
