@@ -3,11 +3,13 @@ from ._client import (
     wait_for_run,
 )
 
-from ._llms import (
-    llms
-)
+from ._features import enabled_features
 
-from ._tables import (
-    create_table,
-    load_table,
-)
+if enabled_features.get("ai"):
+    from ._llms import llms
+
+if enabled_features.get("iceberg"):
+    from ._tables import (
+        create_table,
+        load_table,
+    )
