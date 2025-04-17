@@ -110,9 +110,16 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
 }
 
 fn output_response_content_error<T>(err: ResponseContent<T>) {
-    // we blindly unwrap this here because if we don't get a valid ErrorModel then something bad
-    // happened.
-    let error_model: ErrorModel = serde_json::from_str(&err.content).unwrap();
+    // Attempt to deserialize the error content into an ErrorModel.
+    let error_model: ErrorModel = match serde_json::from_str(&err.content) {
+        Ok(model) => model,
+        Err(e) => {
+            log::error!("Failed to parse error content as JSON: {}", e);
+            log::debug!("Raw error content: {}", err.content);
+            error("An unexpected error occurred while processing the response.");
+            return;
+        }
+    };
     log::debug!("Error model (status: {}): {:?}", err.status, error_model);
 
     match err.status {
