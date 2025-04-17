@@ -146,8 +146,15 @@ impl Session {
             .map(|team_api| Team {
                 slug: team_api.slug.clone(),
                 name: team_api.name.clone(),
-                token: Token {
-                    jwt: team_api.token.clone().unwrap().jwt.clone(),
+                token: if let Some(token) = &team_api.token {
+                    Token {
+                        jwt: token.jwt.clone(),
+                    }
+                } else {
+                    // Handle the None case: skip the team or provide a default token
+                    Token {
+                        jwt: String::new(), // Default to an empty string or handle as needed
+                    }
                 },
                 team_type: team_api.r#type.clone(),
             })
