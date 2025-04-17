@@ -208,41 +208,36 @@ jobs:
           name: wheels-${{ matrix.target }}
           path: dist
 
-  # NOTE: For the time being, we're disabling the cross-compiled versions of
-  # this build. We have to distribute this as source anyway and we've got
-  # support for all the major platforms.
-  #
-  #linux-cross:
-  #  if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-  #  runs-on: ubuntu-latest
-  #  strategy:
-  #    matrix:
-  #      platform:
-  #        - target: aarch64-unknown-linux-gnu
-  #          arch: aarch64
-  #          # see https://github.com/astral-sh/ruff/issues/3791
-  #          # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-  #          maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
-  #        - target: armv7-unknown-linux-gnueabihf
-  #          arch: armv7
-  #        - target: arm-unknown-linux-musleabihf
-  #          arch: arm
-  #        # NOTE: Removing this to eliminate transient release failures.
-  #        # - target: powerpc64le-unknown-linux-gnu
-  #        #   arch: ppc64le
-  #        # - target: powerpc64-unknown-linux-gnu
-  #        #   arch: ppc64
-  #        # NOTE: Removing this for now, as it's not supported by OpenSSL in
-  #        # particular. Probably need a new version?
-  #        #- target: s390x-unknown-linux-gnu
-  #        #  arch: s390x
+  linux-cross:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - target: aarch64-unknown-linux-gnu
+            arch: aarch64
+            # see https://github.com/astral-sh/ruff/issues/3791
+            # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+          - target: armv7-unknown-linux-gnueabihf
+            arch: armv7
+          - target: arm-unknown-linux-musleabihf
+            arch: arm
+          # NOTE: Removing this to eliminate transient release failures.
+          # - target: powerpc64le-unknown-linux-gnu
+          #   arch: ppc64le
+          # - target: powerpc64-unknown-linux-gnu
+          #   arch: ppc64
+          # NOTE: Removing this for now, as it's not supported by OpenSSL in
+          # particular. Probably need a new version?
+          #- target: s390x-unknown-linux-gnu
+          #  arch: s390x
 
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -288,7 +283,6 @@ jobs:
       - uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
-      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -317,23 +311,20 @@ jobs:
           name: wheels-${{ matrix.target }}
           path: dist
 
-  #musllinux-cross:
-  #  if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-  #  runs-on: ubuntu-latest
-  #  strategy:
-  #    matrix:
-  #      platform:
-  #        - target: aarch64-unknown-linux-musl
-  #          arch: aarch64
-  #        # NOTE: This isn't currently supported by the Rust toolchain, so we can't use it here.
-  #        #- target: armv7-unknown-linux-musleabihf
-  #        #  arch: armv7
-
+  musllinux-cross:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - target: aarch64-unknown-linux-musl
+            arch: aarch64
+          - target: armv7-unknown-linux-musleabihf
+            arch: armv7
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
-      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
