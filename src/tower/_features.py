@@ -39,7 +39,7 @@ _module_cache: Dict[str, Any] = {}
 # Define feature modules and their exports
 _feature_modules: Dict[str, tuple[str, List[str]]] = {
     "ai": ("_llms", ["llms"]),
-    "iceberg": ("_tables", ["create_table", "load_table"]),
+    "iceberg": ("_tables", ["tables"]),
 }
 
 
