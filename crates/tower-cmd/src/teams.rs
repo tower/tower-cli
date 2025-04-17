@@ -1,4 +1,4 @@
-use crate::output;
+use crate::{output, util::spinner::with_spinner};
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
 use config::Config;
@@ -20,91 +20,107 @@ pub fn teams_cmd() -> Command {
         )
 }
 
-pub async fn do_list_teams(config: Config) {
-    let api_config = config.clone().into();
-
-    // First refresh the session to ensure we have the latest data
-    let mut spinner = output::Spinner::new("Refreshing session...".to_string());
-
-    match default_api::refresh_session(&api_config).await {
-        Ok(response) => {
-            if let Some(default_api::RefreshSessionSuccess::Status200(_session_response)) =
-                response.entity
-            {
-                spinner.success();
-
-                // Get the current active team from the session
-                let active_team = config.get_active_team().unwrap_or(None);
-                let active_team_slug = active_team.map(|team| team.slug.clone());
-
-                // Create headers for the table
-                let headers = vec!["", "Slug", "Team Name"]
-                    .into_iter()
-                    .map(|h| h.yellow().to_string())
-                    .collect();
-
-                // Format the teams data for the table
-                let teams = config.get_teams().unwrap_or_default();
-                let teams_data: Vec<Vec<String>> = teams
-                    .iter()
-                    .map(|team| {
-                        // Create the active indicator in its own column
-                        let active_indicator = if Some(&team.slug) == active_team_slug.as_ref() {
-                            "*".to_string()
-                        } else {
-                            "".to_string()
-                        };
-
-                        // Use the plain slug without asterisk
-                        let slug_display = team.slug.clone();
-
-                        // Check if team name is blank and use user's name instead
-                        let display_name = if team.name.trim().is_empty() {
-                            // Get the user's first and last name from the session
-                            if let Some(session) = &config.session {
-                                let user = &session.user;
-                                let first_name = user.first_name.trim();
-                                let last_name = user.last_name.trim();
-
-                                if !first_name.is_empty() || !last_name.is_empty() {
-                                    // Use first and last name if available
-                                    format!("{} {}", first_name, last_name).trim().to_string()
-                                } else {
-                                    // Fall back to "Personal Workspace" if both names are empty
-                                    "Personal Workspace".to_string()
-                                }
-                            } else {
-                                // Fall back to "Personal Workspace" if no session
-                                "Personal Workspace".to_string()
-                            }
-                        } else {
-                            team.name.clone()
-                        };
-
-                        vec![active_indicator, slug_display, display_name]
-                    })
-                    .collect();
-
-                output::newline();
-                // Display the table using the existing table function
-                output::table(headers, teams_data);
-                output::newline();
-
-                // Add a legend for the asterisk
-                println!("{}", "* indicates currently active team".dimmed());
-                output::newline();
-            } else {
-                spinner.failure();
-                eprintln!("{}", "Unexpected response format from server.".red());
-                std::process::exit(1);
-            }
-        }
+/// Refreshes the session with the Tower API and returns the updated session
+async fn refresh_session(config: &Config) -> config::Session {
+    // First get the current session
+    let current_session = match config.get_current_session() {
+        Ok(session) => session,
         Err(e) => {
-            spinner.failure();
-            eprintln!("{}", format!("Failed to refresh session: {}", e).red());
+            output::config_error(e);
             std::process::exit(1);
         }
+    };
+
+    // Then refresh it with the API
+    let api_config = config.clone().into();
+
+    // Create the required refresh_session_params
+    let refresh_params = default_api::RefreshSessionParams {
+        refresh_session_params: tower_api::models::RefreshSessionParams::new(),
+    };
+
+    let response = with_spinner(
+        "Refreshing session...",
+        default_api::refresh_session(&api_config, refresh_params),
+        None,
+    )
+    .await;
+
+    if let Some(default_api::RefreshSessionSuccess::Status200(session_response)) = response.entity {
+        // Create a mutable copy of the session to update
+        let mut session = current_session;
+
+        // Update it with the API response
+        if let Err(e) = session.update_from_api_response(&session_response) {
+            output::config_error(e);
+            std::process::exit(1);
+        }
+
+        session
+    } else {
+        output::die("Unexpected response format from server.");
     }
+}
+
+pub async fn do_list_teams(config: Config) {
+    // Refresh the session and get the updated data
+    let session = refresh_session(&config).await;
+
+    // Get the current active team from the session
+    let active_team = session.active_team.clone();
+    let active_team_slug = active_team.map(|team| team.slug.clone());
+
+    // Create headers for the table
+    let headers = vec!["", "Slug", "Team Name"]
+        .into_iter()
+        .map(|h| h.yellow().to_string())
+        .collect();
+
+    // Format the teams data for the table
+    let teams = session.teams.clone();
+    let teams_data: Vec<Vec<String>> = teams
+        .iter()
+        .map(|team| {
+            // Create the active indicator in its own column
+            let active_indicator = if Some(&team.slug) == active_team_slug.as_ref() {
+                "*".to_string()
+            } else {
+                "".to_string()
+            };
+
+            // Use the plain slug without asterisk
+            let slug_display = team.slug.clone();
+
+            // Check if team name is blank and use user's name instead
+            let display_name = if team.name.trim().is_empty() {
+                // Get the user's first and last name from the session
+                let user = &session.user;
+                let first_name = user.first_name.trim();
+                let last_name = user.last_name.trim();
+
+                if !first_name.is_empty() || !last_name.is_empty() {
+                    // Use first and last name if available
+                    format!("{} {}", first_name, last_name).trim().to_string()
+                } else {
+                    // Fall back to "Personal Workspace" if both names are empty
+                    "Personal Workspace".to_string()
+                }
+            } else {
+                team.name.clone()
+            };
+
+            vec![active_indicator, slug_display, display_name]
+        })
+        .collect();
+
+    output::newline();
+    // Display the table using the existing table function
+    output::table(headers, teams_data);
+    output::newline();
+
+    // Add a legend for the asterisk
+    println!("{}", "* indicates currently active team".dimmed());
+    output::newline();
 }
 
 pub async fn do_switch_team(config: Config, args: &ArgMatches) {
@@ -115,17 +131,11 @@ pub async fn do_switch_team(config: Config, args: &ArgMatches) {
             output::die("Team Slug (e.g. tower teams switch <team_slug>) is required");
         });
 
-    // Get all available teams
-    let teams = match config.get_teams() {
-        Ok(teams) => teams,
-        Err(e) => {
-            output::failure(&format!("Failed to get teams: {}", e));
-            std::process::exit(1);
-        }
-    };
+    // Refresh the session first to ensure we have the latest teams data
+    let session = refresh_session(&config).await;
 
-    // Check if the provided team slug exists
-    let team = teams.iter().find(|team| team.slug == team_slug);
+    // Check if the provided team slug exists in the refreshed session
+    let team = session.teams.iter().find(|team| team.slug == team_slug);
 
     match team {
         Some(team) => {
@@ -135,7 +145,7 @@ pub async fn do_switch_team(config: Config, args: &ArgMatches) {
                     output::success(&format!("Switched to team: {}", team.name));
                 }
                 Err(e) => {
-                    output::failure(&format!("Failed to switch team: {}", e));
+                    output::config_error(e);
                     std::process::exit(1);
                 }
             }

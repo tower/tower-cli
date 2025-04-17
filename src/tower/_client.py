@@ -2,6 +2,7 @@ import os
 import time
 from typing import Dict, Optional
 
+from ._context import TowerContext
 from .tower_api_client import AuthenticatedClient
 from .tower_api_client.api.default import describe_run as describe_run_api
 from .tower_api_client.api.default import run_app as run_app_api
@@ -23,9 +24,8 @@ DEFAULT_TOWER_URL = "https://api.tower.dev"
 DEFAULT_TOWER_ENVIRONMENT = "default"
 
 
-def _env_client() -> AuthenticatedClient:
-    api_key = os.getenv("TOWER_API_KEY")
-    tower_url = os.getenv("TOWER_URL", DEFAULT_TOWER_URL)
+def _env_client(ctx: TowerContext) -> AuthenticatedClient:
+    tower_url = ctx.tower_url
 
     if not tower_url.endswith("/v1"):
         if tower_url.endswith("/"):
@@ -36,7 +36,7 @@ def _env_client() -> AuthenticatedClient:
     return AuthenticatedClient(
         verify_ssl=False,
         base_url=tower_url,
-        token=api_key,
+        token=ctx.api_key,
         auth_header_name="X-API-Key",
         prefix="",
     )
@@ -52,11 +52,12 @@ def run_app(
     supply an optional `environment` override, and an optional dict
     `parameters` to pass into the app.
     """
-    client = _env_client()
+    ctx = TowerContext.build()
+    client = _env_client(ctx)
     run_params = RunAppParamsParameters()
 
     if not environment:
-        environment = os.getenv("TOWER_ENVIRONMENT", DEFAULT_TOWER_ENVIRONMENT)
+        environment = ctx.environment
 
     if parameters:
         run_params = RunAppParamsParameters.from_dict(parameters)
@@ -86,7 +87,8 @@ def wait_for_run(run: Run) -> None:
     terminal status (`exited`, `errored`, `cancelled`, or `crashed`) then this
     function returns.
     """
-    client = _env_client()
+    ctx = TowerContext.build()
+    client = _env_client(ctx)
 
     while True:
         output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(

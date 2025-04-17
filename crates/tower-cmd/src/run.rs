@@ -2,15 +2,11 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tower_api::{
-    apis::{
-        default_api::{self, ExportSecretsParams, RunAppParams},
-    },
-    models::{
-        ExportSecretsParams as ExportSecretsParamsModel
-    },
-};
 use tower_api::models;
+use tower_api::{
+    apis::default_api::{self, ExportSecretsParams, RunAppParams},
+    models::ExportUserSecretsParams,
+};
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 
@@ -115,7 +111,10 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
     }
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    if let Err(err) = launcher.launch(package, env, secrets, params, HashMap::new()).await {
+    if let Err(err) = launcher
+        .launch(package, env, secrets, params, HashMap::new())
+        .await
+    {
         output::runtime_error(err);
         return;
     }
@@ -160,6 +159,7 @@ async fn do_run_remote(
         RunAppParams {
             name: app_name.clone(),
             run_app_params: models::RunAppParams {
+                parent_run_id: None,
                 schema: None,
                 environment: env.to_string(),
                 parameters: params,
@@ -260,7 +260,7 @@ async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
     match default_api::export_secrets(
         &config.into(),
         ExportSecretsParams {
-            export_secrets_params: ExportSecretsParamsModel {
+            export_user_secrets_params: ExportUserSecretsParams {
                 schema: None,
                 public_key: crypto::serialize_public_key(public_key),
             },
@@ -281,7 +281,10 @@ async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
                     .secrets
                     .into_iter()
                     .map(|secret| {
-                        let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string());
+                        let decrypted_value = crypto::decrypt(
+                            private_key.clone(),
+                            secret.encrypted_value.to_string(),
+                        );
                         (secret.name, decrypted_value)
                     })
                     .collect()

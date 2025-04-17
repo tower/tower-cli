@@ -114,4 +114,71 @@ impl Session {
             false
         }
     }
+
+    /// Updates the session with data from the API response
+    pub fn update_from_api_response(
+        &mut self,
+        refresh_response: &tower_api::models::RefreshSessionResponse,
+    ) -> Result<(), Error> {
+        // The session data is inside the session field of the refresh response
+        let session_response = &refresh_response.session;
+
+        // Update user information
+        self.user = User {
+            email: session_response.user.email.clone(),
+            first_name: session_response.user.first_name.clone(),
+            last_name: session_response.user.last_name.clone(),
+            created_at: session_response.user.created_at.clone(),
+        };
+
+        // Update token
+        self.token = Token {
+            jwt: session_response.token.jwt.clone(),
+        };
+
+        // Remember the current active team's JWT if there is one
+        let active_team_jwt = self.active_team.as_ref().map(|team| team.token.jwt.clone());
+
+        // Update teams
+        self.teams = session_response
+            .teams
+            .iter()
+            .map(|team_api| Team {
+                slug: team_api.slug.clone(),
+                name: team_api.name.clone(),
+                token: if let Some(token) = &team_api.token {
+                    Token {
+                        jwt: token.jwt.clone(),
+                    }
+                } else {
+                    // Handle the None case: skip the team or provide a default token
+                    Token {
+                        jwt: String::new(), // Default to an empty string or handle as needed
+                    }
+                },
+                team_type: team_api.r#type.clone(),
+            })
+            .collect();
+
+        // Try to restore the active team based on the JWT
+        let jwt_match_found = if let Some(jwt) = active_team_jwt {
+            self.set_active_team_by_jwt(&jwt)
+        } else {
+            false
+        };
+
+        // If no active team was set by JWT, fall back to a personal team
+        if !jwt_match_found && self.active_team.is_none() {
+            // Find a team with team_type="personal"
+            if let Some(personal_team) = self.teams.iter().find(|team| team.team_type == "personal")
+            {
+                self.active_team = Some(personal_team.clone());
+            }
+        }
+
+        // Save the updated session
+        self.save()?;
+
+        Ok(())
+    }
 }
