@@ -47,62 +47,72 @@ class Table:
         """
         self._table.append(data)
 
-def create_table(
-    catalog_name: str,
+class TableReference:
+    def __init__(self, ctx: TowerContext, catalog_name: str, name: str, namespace: Optional[str] = None):
+        self._context = ctx
+        self._catalog = load_catalog(catalog_name)
+        self._name = name
+        self._namespace = namespace
+
+    def load(self) -> Table:
+        namespace = namespace_or_default(self._namespace)
+        table_name = make_table_name(self._name, namespace)
+        table = self._catalog.load_table(table_name)
+        return Table(self._context, table)
+
+    def create(self, schema: pa.Schema) -> Table:
+        namespace = namespace_or_default(self._namespace)
+        table_name = make_table_name(self._name, namespace)
+
+        # We need to create the relevant namespace if it's missing from the
+        # resolved namespace.
+        self._catalog.create_namespace_if_not_exists(namespace)
+
+        # Now that we're certain the namespace exists, we can create the
+        # underlying table. This will return an error if something went wrong
+        # along the way.
+        table = self._catalog.create_table(
+            identifier=table_name,
+            schema=convert_pyarrow_schema(schema),
+        )
+
+        return Table(self._context, table)
+
+    def create_if_not_exists(self, schema: pa.Schema) -> Table:
+        namespace = namespace_or_default(self._namespace)
+        table_name = make_table_name(self._name, namespace)
+
+        # We need to create the relevant namespace if it's missing from the
+        # resolved namespace.
+        self._catalog.create_namespace_if_not_exists(namespace)
+
+        # We have the catalog, so let's attempt to create the table. It should
+        # not return an error and instead just return the table if it already
+        # exists.
+        table = self._catalog.create_table_if_not_exists(
+            identifier=table_name,
+            schema=convert_pyarrow_schema(schema),
+        )
+
+        return Table(self._context, table)
+
+
+def tables(
     name: str,
-    schema: pa.Schema,
+    catalog: str = "default",
     namespace: Optional[str] = None
-) -> Table:
+) -> TableReference:
     """
-    `create_table` creates a new Iceberg table with the name `name` and the
-    supplied schema in the catalog `catalog_name`. The schema is expressed as a
-    PyArrow schema.
+    `tables` creates a reference to an Iceberg table with the name `name` from
+    the catalog with name `catalog_name`.
 
     Args:
-        catalog_name (str): The name of the catalog to use.
-        name (str): The name of the table to create.
-        schema (pa.Schema): The schema of the table to create.
-        namespace (Optional[str]): The namespace in which to create the table.
-
-    Returns:
-        Table: The created table
-    """
-    ctx = TowerContext.build()
-    catalog = load_catalog(catalog_name)
-    namespace = namespace_or_default(namespace)
-
-    # We need to create the relevant namespace if it's missing from the
-    # resolved namespace.
-    catalog.create_namespace_if_not_exists(namespace)
-
-    # Now that we 
-    table = catalog.create_table(
-        identifier=make_table_name(name, namespace),
-        schema=convert_pyarrow_schema(schema),
-    )
-    return Table(ctx, table)
-
-
-def load_table(
-    catalog_name: str,
-    name: str,
-    namespace: Optional[str] = None
-) -> Table:
-    """
-    `load_table` loads an Iceberg table with the name `name` from the catalog
-    with name `catalog_name`.
-
-    Args:
-        `catalog_name` (str): The name of the catalog to use.
         `name` (str): The name of the table to load.
+        `catalog` (str): The name of the catalog to use. "default" by default.
         `namespace` (Optional[str]): The namespace in which to load the table.
 
     Returns:
-        Table: The table
+        TableReference: A reference to a table to be resolved with `create` or `load`
     """
     ctx = TowerContext.build()
-    namespace = namespace_or_default(namespace)
-    catalog = load_catalog(catalog_name)
-    table = catalog.load_table(make_table_name(name, namespace))
-
-    return Table(ctx, table)
+    return TableReference(ctx, catalog, name, namespace)

@@ -21,6 +21,14 @@ pub fn apps_cmd() -> Command {
         .subcommand(
             Command::new("show")
                 .allow_external_subcommands(true)
+                .arg(
+                    Arg::new("name")
+                        .short('n')
+                        .long("name")
+                        .value_parser(value_parser!(String))
+                        .required(true)
+                        .action(clap::ArgAction::Set),
+                )
                 .about("Show the details about an app in Tower"),
         )
         .subcommand(
@@ -32,8 +40,10 @@ pub fn apps_cmd() -> Command {
             Command::new("create")
                 .arg(
                     Arg::new("name")
+                        .short('n')
                         .long("name")
                         .value_parser(value_parser!(String))
+                        .required(true)
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -48,6 +58,14 @@ pub fn apps_cmd() -> Command {
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
+                .arg(
+                    Arg::new("name")
+                        .short('n')
+                        .long("name")
+                        .value_parser(value_parser!(String))
+                        .required(true)
+                        .action(clap::ArgAction::Set),
+                )
                 .about("Delete an app in Tower"),
         )
 }
@@ -75,10 +93,8 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     }
 }
 
-pub async fn do_show_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
-        output::die("App name (e.g. tower apps show <app name>) is required");
-    });
+pub async fn do_show_app(config: Config, args: &ArgMatches) {
+    let name = args.get_one::<String>("name").unwrap();
 
     match default_api::describe_app(
         &config.into(),
@@ -221,9 +237,7 @@ pub async fn do_list_apps(config: Config) {
 }
 
 pub async fn do_create_app(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap_or_else(|| {
-        output::die("App name (--name) is required");
-    });
+    let name = args.get_one::<String>("name").unwrap();
     let description = args.get_one::<String>("description").unwrap();
 
     with_spinner(
@@ -245,10 +259,8 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
     output::success(&format!("App '{}' created", name));
 }
 
-pub async fn do_delete_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
-        output::die("App name (e.g. tower apps delete <app name>) is required");
-    });
+pub async fn do_delete_app(config: Config, args: &ArgMatches) {
+    let name = args.get_one::<String>("name").unwrap();
 
     with_spinner(
         "Deleting app...",
