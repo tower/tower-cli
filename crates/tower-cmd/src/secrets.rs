@@ -48,6 +48,7 @@ pub fn secrets_cmd() -> Command {
                         .short('n')
                         .long("name")
                         .value_parser(value_parser!(String))
+                        .required(true)
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -63,6 +64,7 @@ pub fn secrets_cmd() -> Command {
                         .short('v')
                         .long("value")
                         .value_parser(value_parser!(String))
+                        .required(true)
                         .action(clap::ArgAction::Set),
                 )
                 .about("Create a new secret in your Tower account"),
@@ -70,6 +72,24 @@ pub fn secrets_cmd() -> Command {
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
+                .arg(
+                    Arg::new("name")
+                        .short('n')
+                        .long("name")
+                        .value_parser(value_parser!(String))
+                        .required(true)
+                        .help("Name of the secret to delete")
+                        .action(clap::ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .action(clap::ArgAction::Set)
+                        .help("Environment the secret belongs to"),
+                )
                 .about("Delete a secret in Tower"),
         )
 }
@@ -175,15 +195,9 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_create_secret(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap_or_else(|| {
-        output::die("Secret name (--name) is required");
-    });
-
+    let name = args.get_one::<String>("name").unwrap();
     let environment = args.get_one::<String>("environment").unwrap();
-
-    let value = args.get_one::<String>("value").unwrap_or_else(|| {
-        output::die("Secret value (--value) is required");
-    });
+    let value = args.get_one::<String>("value").unwrap();
 
     let mut spinner = output::spinner("Creating secret...");
     let api_config = config.into();
@@ -258,16 +272,18 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
     }
 }
 
-pub async fn do_delete_secret(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let name = cmd.map(|(name, _)| name).unwrap_or_else(|| {
-        output::die("Secret name (e.g. tower secrets delete <name>) is required");
-    });
+pub async fn do_delete_secret(config: Config, args: &ArgMatches) {
+    let env_default = "default".to_string();
+    let name = args.get_one::<String>("name").unwrap();
+    let environment = args
+        .get_one::<String>("environment")
+        .unwrap_or(&env_default);
 
     let mut spinner = output::spinner("Deleting secret...");
 
     let params = DeleteSecretParams {
         name: name.to_string(),
-        environment: None,
+        environment: Some(environment.to_string()),
     };
 
     match default_api::delete_secret(&config.into(), params).await {
