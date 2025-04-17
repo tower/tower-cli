@@ -8,6 +8,5 @@ from ._llms import (
 )
 
 from ._tables import (
-    create_table,
-    load_table,
+    tables,
 )
