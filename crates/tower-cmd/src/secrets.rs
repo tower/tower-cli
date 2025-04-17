@@ -19,10 +19,9 @@ use tower_api::{
         },
     },
     models::{
+        ExportUserSecretsParams,
         CreateSecretParams as CreateSecretParamsModel,
-        ExportSecretsParams as ExportSecretsParamsModel
     },
-    models::{CreateSecretParams as CreateSecretParamsModel, ExportUserSecretsParams},
 };
 
 use crate::{

@@ -1,9 +1,6 @@
-use crate::{output, util::spinner::with_spinner};
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
-use std::future::Future;
-use tower_api::apis::Error as ApiError;
 
 use tower_api::{
     apis::default_api::{
@@ -138,6 +135,7 @@ pub async fn do_show_app(config: Config, args: &ArgMatches) {
                 .iter()
                 .map(|run: &Run| {
                     let status = &run.status;
+                    let status_str = format!("{:?}", status);
 
                     // Format start time
                     let start_time = if let Some(started_at) = &run.started_at {
@@ -181,7 +179,7 @@ pub async fn do_show_app(config: Config, args: &ArgMatches) {
 
                     vec![
                         run.number.to_string(),
-                        status.to_string(),
+                        status_str,
                         start_time,
                         elapsed_time,
                     ]
