@@ -259,4 +259,19 @@ mod test {
         assert_eq!(towerfile.parameters[0].name, "my_first_param");
         assert_eq!(towerfile.parameters[1].name, "my_second_param");
     }
+
+    #[test]
+    fn test_parsing_workspaces() {
+        let toml = r#"
+            [app]
+            name = "my-app"
+            script = "my-app/script.py"
+            source = ["*.py"]
+            workspace = "../"
+        "#;
+
+        // All we want need to do is to ensure that the workspace is set accordingly.
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.workspace, PathBuf::from("../"));
+    }
 }
