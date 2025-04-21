@@ -181,4 +181,38 @@ impl Session {
 
         Ok(())
     }
+
+    pub fn from_api_session(session: &tower_api::models::Session) -> Self {
+        let teams = session
+            .teams
+            .iter()
+            .map(|t| Team {
+                slug: t.slug.clone(),
+                name: t.name.clone(),
+                team_type: t.r#type.clone(),
+                token: Token {
+                    jwt: t.token.clone().unwrap().jwt.clone(),
+                },
+            })
+            .collect();
+
+        // Create and save the session
+        let mut next_session = Session::new(
+            User {
+                email: session.user.email.clone(),
+                created_at: session.user.created_at.clone(),
+                first_name: session.user.first_name.clone(),
+                last_name: session.user.last_name.clone(),
+            },
+            Token {
+                jwt: session.token.jwt.clone(),
+            },
+            teams,
+        );
+
+        // Set the active team to the one matching the main session JWT
+        let _ = next_session.set_active_team_by_jwt(&session.token.jwt);
+
+        return next_session;
+    }
 }

@@ -1,13 +1,18 @@
 use crate::output;
 use clap::Command;
-use config::Config;
+use config::{Config, Session};
 use tokio::{time, time::Duration};
 use tower_api::{
     apis::default_api::{
-        self as api, CreateDeviceLoginTicketSuccess, DescribeDeviceLoginSessionParams,
-        DescribeDeviceLoginSessionSuccess,
+        self,
+        DescribeDeviceLoginSessionParams,
     },
     models::CreateDeviceLoginTicketResponse,
+};
+
+use crate::api::{
+    with_spinner,
+    handle_api_response,
 };
 
 pub fn login_cmd() -> Command {
@@ -17,36 +22,21 @@ pub fn login_cmd() -> Command {
 pub async fn do_login(config: Config) {
     output::banner();
 
-    let mut spinner = output::spinner("Starting device login...");
     let api_config = config.clone().into();
 
     // Request device login code
-    match api::create_device_login_ticket(&api_config).await {
-        Ok(response) => {
-            let response = response.entity.unwrap();
+    //
+    let resp = with_spinner(
+        "Starting device login...",
+        default_api::create_device_login_ticket(&api_config),
+    ).await;
 
-            if let CreateDeviceLoginTicketSuccess::Status200(login_claim) = response {
-                spinner.success();
-                handle_device_login(config, login_claim).await;
-            } else {
-                spinner.failure();
-                output::failure("The Tower API returned an unexpected response.");
-            }
-        }
-        Err(err) => {
-            spinner.failure();
-            if let tower_api::apis::Error::ResponseError(err) = err {
-                output::failure(&format!("{}: {}", err.status, err.content));
-            } else {
-                output::failure(&format!("Unexpected error: {}", err));
-            }
-        }
-    }
+    handle_device_login(config, resp).await;
 }
 
 async fn handle_device_login(
     config: Config,
-    claim: tower_api::models::CreateDeviceLoginTicketResponse,
+    claim: CreateDeviceLoginTicketResponse,
 ) {
     // Try to open the login URL in browser
     if let Err(_) = open::that(&claim.login_url) {
@@ -77,27 +67,22 @@ async fn poll_for_login(
     let expires_at = chrono::Utc::now() + expires_in;
 
     while chrono::Utc::now() < expires_at {
-        let resp = api::describe_device_login_session(
-            &config.into(),
-            DescribeDeviceLoginSessionParams {
-                device_code: claim.device_code.clone(),
-            },
-        )
-        .await;
+        let api_config = &config.into();
+
+        let resp = handle_api_response(||
+            default_api::describe_device_login_session(
+                &api_config,
+                DescribeDeviceLoginSessionParams {
+                    device_code: claim.device_code.clone(),
+                },
+            ),
+        ).await;
 
         match resp {
             Ok(resp) => {
-                if let Some(success) = resp.entity {
-                    if let DescribeDeviceLoginSessionSuccess::Status200(response) = success {
-                        finalize_session(config, &response, spinner);
-                        return true;
-                    }
-                }
-
-                spinner.failure();
-                output::failure("The Tower API returned an unexpected response.");
-                return false;
-            }
+                finalize_session(config, &resp, spinner);
+                return true;
+            },
             Err(err) => {
                 if let Some(api_err) = extract_api_error(&err) {
                     if api_err.status != 404 && !api_err.is_incomplete_device_login {
@@ -122,39 +107,10 @@ fn finalize_session(
     session_response: &tower_api::models::DescribeDeviceLoginSessionResponse,
     spinner: &mut output::Spinner,
 ) {
-    let teams = session_response
-        .session
-        .teams
-        .iter()
-        .map(|t| config::Team {
-            slug: t.slug.clone(),
-            name: t.name.clone(),
-            team_type: t.r#type.clone(),
-            token: config::Token {
-                jwt: t.token.clone().unwrap().jwt.clone(),
-            },
-        })
-        .collect();
-
-    // Create and save the session
-    let mut session = config::Session::new(
-        config::User {
-            email: session_response.session.user.email.clone(),
-            created_at: session_response.session.user.created_at.clone(),
-            first_name: session_response.session.user.first_name.clone(),
-            last_name: session_response.session.user.last_name.clone(),
-        },
-        config::Token {
-            jwt: session_response.session.token.jwt.clone(),
-        },
-        teams,
-    );
+    let mut session = Session::from_api_session(&session_response.session);
 
     // we have to copy in the tower URL so that we save it for later on!
     session.tower_url = config.tower_url.clone();
-
-    // Set the active team to the one matching the main session JWT
-    let _ = session.set_active_team_by_jwt(&session_response.session.token.jwt);
 
     if let Err(err) = session.save() {
         spinner.failure();
