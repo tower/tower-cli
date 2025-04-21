@@ -84,10 +84,8 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
         let towerfile_path = towerfile.file_path.clone();
-        let base_dir = towerfile_path
-            .parent()
-            .expect("Towerfile must have a parent directory")
-            .to_path_buf();
+        let base_dir = towerfile.app.workspace.clone();
+
         let schedule = if towerfile.app.schedule.is_empty() {
             None
         } else {
@@ -153,13 +151,9 @@ impl Package {
    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
    // GZip'd.
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
-       // We expand the base_dir because handling the paths as absolute paths is easier than
-       // handling them as relative paths.
-       let base_dir = spec.towerfile_path.
-           canonicalize()?.
-           parent().
-           ok_or(Error::InvalidPath)?.
-           to_path_buf();
+       // we canonicalize this because we want to treat all paths in the same keyspace more or
+       // less.
+       let base_dir = spec.base_dir.canonicalize()?;
 
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
