@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use crate::{output, util};
 use tower_package::{Package, PackageSpec};
+use tower_api::apis::configuration::Configuration;
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")
@@ -35,7 +36,7 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
 
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
-            let api_config = &config.into();
+            let api_config = config.into();
 
             // Add app existence check before proceeding
             if let Err(err) = util::apps::ensure_app_exists(
@@ -55,25 +56,7 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
             match Package::build(spec).await {
                 Ok(package) => {
                     spinner.success();
-
-                    match util::deploy::deploy_app_package(
-                        &api_config,
-                        &towerfile.app.name,
-                        package,
-                    )
-                    .await
-                    {
-                        Ok(version) => {
-                            let line = format!(
-                                "Version `{}` of your code has been deployed to Tower!",
-                                version
-                            );
-                            output::success(&line);
-                        }
-                        Err(err) => {
-                            output::failure(&format!("Failed to deploy: {}", err));
-                        }
-                    }
+                    do_deploy_package(api_config, package, &towerfile).await;
                 }
                 Err(err) => {
                     spinner.failure();
@@ -83,6 +66,30 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
         }
         Err(err) => {
             output::config_error(err);
+        }
+    }
+}
+
+async fn do_deploy_package(api_config: Configuration, package: Package, towerfile: &Towerfile) {
+    let res = util::deploy::deploy_app_package(
+        &api_config,
+        &towerfile.app.name,
+        package,
+    ).await;
+
+    match res {
+        Ok(resp) => {
+            let version = resp.version;
+
+            let line = format!(
+                "Version `{}` has been deployed to Tower!",
+                version.version
+            );
+
+            output::success(&line);
+        }
+        Err(err) => {
+            output::tower_error(err);
         }
     }
 }

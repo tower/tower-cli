@@ -4,6 +4,7 @@ use config::{Config, Session};
 mod apps;
 mod deploy;
 pub mod output;
+pub mod api;
 mod run;
 mod secrets;
 mod session;
@@ -77,16 +78,12 @@ impl App {
 
                 match apps_command {
                     Some(("list", _)) => apps::do_list_apps(sessionized_config).await,
-                    Some(("show", args)) => {
-                        apps::do_show_app(sessionized_config, args.subcommand()).await
-                    }
+                    Some(("show", args)) => apps::do_show_app(sessionized_config, args).await,
                     Some(("logs", args)) => {
                         apps::do_logs_app(sessionized_config, args.subcommand()).await
                     }
                     Some(("create", args)) => apps::do_create_app(sessionized_config, args).await,
-                    Some(("delete", args)) => {
-                        apps::do_delete_app(sessionized_config, args.subcommand()).await
-                    }
+                    Some(("delete", args)) => apps::do_delete_app(sessionized_config, args).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -104,7 +101,7 @@ impl App {
                         secrets::do_create_secret(sessionized_config, args).await
                     }
                     Some(("delete", args)) => {
-                        secrets::do_delete_secret(sessionized_config, args.subcommand()).await
+                        secrets::do_delete_secret(sessionized_config, args).await
                     }
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();

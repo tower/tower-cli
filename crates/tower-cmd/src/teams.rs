@@ -1,8 +1,12 @@
-use crate::{output, util::spinner::with_spinner};
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
 use config::Config;
 use tower_api::apis::default_api;
+
+use crate::{
+    output,
+    api::with_spinner,
+};
 
 pub fn teams_cmd() -> Command {
     Command::new("teams")
@@ -42,24 +46,19 @@ async fn refresh_session(config: &Config) -> config::Session {
     let response = with_spinner(
         "Refreshing session...",
         default_api::refresh_session(&api_config, refresh_params),
-        None,
     )
     .await;
 
-    if let Some(default_api::RefreshSessionSuccess::Status200(session_response)) = response.entity {
-        // Create a mutable copy of the session to update
-        let mut session = current_session;
+    // Create a mutable copy of the session to update
+    let mut session = current_session;
 
-        // Update it with the API response
-        if let Err(e) = session.update_from_api_response(&session_response) {
-            output::config_error(e);
-            std::process::exit(1);
-        }
-
-        session
-    } else {
-        output::die("Unexpected response format from server.");
+    // Update it with the API response
+    if let Err(e) = session.update_from_api_response(&response) {
+        output::config_error(e);
+        std::process::exit(1);
     }
+
+    session
 }
 
 pub async fn do_list_teams(config: Config) {
@@ -153,7 +152,7 @@ pub async fn do_switch_team(config: Config, args: &ArgMatches) {
         None => {
             // Team not found
             output::failure(&format!(
-                "Team '{}' not found. Use 'tower teams list' to see available teams.",
+                "Team '{}' not found. Use 'tower teams list' to see all your teams.",
                 team_slug
             ));
             std::process::exit(1);

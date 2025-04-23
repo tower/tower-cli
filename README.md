@@ -2,7 +2,7 @@
 
 The Tower CLI is one of the main ways to interact with the Tower environment.
 You can do basically everything you need inside the Tower CLI, including run
-your code locally or remotely in the Tower cloud. 
+your code locally or remotely in the Tower cloud.
 
 ## Installing the Tower CLI
 
@@ -19,7 +19,7 @@ You can also download the CLI directly from one of our [releases](https://github
 There are two big components in the Tower CLI reposiory: The CLI itself and the
 runtime environment for the Tower cloud. We host the runtime in this repository
 and pull it in to our internal code because we want to ensure that the
-environments behave *exactly the same* locally and in our cloud!
+environments behave _exactly the same_ locally and in our cloud!
 
 ### Using the CLI
 
@@ -42,6 +42,52 @@ Commands:
 
 Options:
   -h, --help                   Print help
+```
+
+### Optional Features
+
+Tower supports several optional features that can be installed as needed:
+
+#### AI/LLM Support
+
+```bash
+pip install tower[ai]
+```
+
+Provides integration with language models through:
+
+- `tower.llms`: Access to language model functionality
+
+#### Apache Iceberg Support
+
+```bash
+pip install tower[iceberg]
+```
+
+Provides Apache Iceberg table support:
+
+- `tower.create_table`: Create Iceberg tables
+- `tower.load_table`: Load data from Iceberg tables
+
+#### Install All Optional Features
+
+```bash
+pip install tower[all]
+```
+
+#### Check Available Features
+
+You can check which features are available in your installation:
+
+```python
+import tower
+import pprint
+
+# Print information about all features
+pprint.pprint(tower.get_available_features())
+
+# Check if a specific feature is enabled
+print(tower.is_feature_enabled("ai"))
 ```
 
 ### About the runtime environment

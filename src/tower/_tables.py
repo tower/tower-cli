@@ -1,24 +1,17 @@
 from typing import Optional
 
+import polars as pl
+import pyarrow as pa
+
 from pyiceberg.catalog import load_catalog
 from pyiceberg.table import Table as IcebergTable
-from pyiceberg.schema import Schema as IcebergSchema
-from pyiceberg.types import (
-    BooleanType, IntegerType, LongType, FloatType, DoubleType, StringType,
-    DateType, TimestampType, BinaryType, DecimalType, ListType, MapType, StructType,
-    NestedField
-)
 
+from ._context import TowerContext
 from .utils.pyarrow import convert_pyarrow_schema
 from .utils.tables import (
     make_table_name,
     namespace_or_default,
 )
-
-import polars as pl
-import pyarrow as pa
-
-from ._context import TowerContext
 
 class Table:
     """
