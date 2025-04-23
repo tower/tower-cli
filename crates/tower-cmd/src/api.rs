@@ -187,8 +187,8 @@ impl ResponseEntity for tower_api::apis::default_api::DeleteSecretSuccess {
     }
 }
 
-impl ResponseEntity for tower_api::apis::default_api::GetAppRunLogsSuccess {
-    type Data = tower_api::models::GetRunLogsOutputBody;
+impl ResponseEntity for tower_api::apis::default_api::DescribeRunLogsSuccess {
+    type Data = tower_api::models::DescribeRunLogsResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
@@ -198,7 +198,7 @@ impl ResponseEntity for tower_api::apis::default_api::GetAppRunLogsSuccess {
     }
 }
 
-impl ResponseEntity for tower_api::apis::default_api::CreateAppsSuccess {
+impl ResponseEntity for tower_api::apis::default_api::CreateAppSuccess {
     type Data = tower_api::models::CreateAppResponse;
 
     fn extract_data(self) -> Option<Self::Data> {

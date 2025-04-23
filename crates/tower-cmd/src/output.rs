@@ -114,7 +114,7 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
     let error_model: ErrorModel = match serde_json::from_str(&err.content) {
         Ok(model) => model,
         Err(e) => {
-            log::error!("Failed to parse error content as JSON: {}", e);
+            log::debug!("Failed to parse error content as JSON: {}", e);
             log::debug!("Raw error content: {}", err.content);
             error("An unexpected error occurred while processing the response.");
             return;

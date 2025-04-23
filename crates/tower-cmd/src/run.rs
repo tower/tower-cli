@@ -148,7 +148,7 @@ async fn do_run_remote(
     params: HashMap<String, String>,
     app_name: Option<String>,
 ) {
-    let app_name = app_name.unwrap_or_else(|| {
+    let app_slug = app_name.unwrap_or_else(|| {
         // Load the Towerfile
         let towerfile_path = path.join("Towerfile");
         let towerfile = load_towerfile(&towerfile_path);
@@ -156,7 +156,7 @@ async fn do_run_remote(
     });
 
     let params = RunAppParams {
-        name: app_name.clone(),
+        slug: app_slug.clone(),
         run_app_params: models::RunAppParams {
             schema: None,
             environment: env.to_string(),
@@ -175,7 +175,7 @@ async fn do_run_remote(
 
     let line = format!(
         "Run #{} for app `{}` has been scheduled",
-        res.run.number, app_name
+        res.run.number, app_slug
     );
     output::success(&line);
 }

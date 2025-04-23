@@ -4,10 +4,10 @@ use config::Config;
 
 use tower_api::{
     apis::default_api::{
-        self, CreateAppsParams, DeleteAppParams, DescribeAppParams,
-        GetAppRunLogsParams, ListAppsParams,
+        self, CreateAppParams, DeleteAppParams, DescribeAppParams,
+        DescribeRunLogsParams, ListAppsParams,
     },
-    models::{CreateAppParams, Run},
+    models::{CreateAppParams as CreateAppParamsModel, Run},
 };
 
 use crate::{
@@ -52,6 +52,14 @@ pub fn apps_cmd() -> Command {
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
+                    Arg::new("slug")
+                        .short('s')
+                        .long("slug")
+                        .value_parser(value_parser!(String))
+                        .default_value("")
+                        .action(clap::ArgAction::Set),
+                )
+                .arg(
                     Arg::new("description")
                         .long("description")
                         .value_parser(value_parser!(String))
@@ -64,9 +72,9 @@ pub fn apps_cmd() -> Command {
             Command::new("delete")
                 .allow_external_subcommands(true)
                 .arg(
-                    Arg::new("name")
+                    Arg::new("slug")
                         .short('n')
-                        .long("name")
+                        .long("slug")
                         .value_parser(value_parser!(String))
                         .required(true)
                         .action(clap::ArgAction::Set),
@@ -76,14 +84,14 @@ pub fn apps_cmd() -> Command {
 }
 
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let (app_name, seq) = extract_app_run(cmd);
+    let (app_slug, seq) = extract_app_run(cmd);
     
     let response = with_spinner(
         "Fetching logs...",
-        default_api::get_app_run_logs(
+        default_api::describe_run_logs(
             &config.into(),
-            GetAppRunLogsParams {
-                name: app_name.clone(),
+            DescribeRunLogsParams {
+                slug: app_slug.clone(),
                 seq,
             },
         ),
@@ -95,12 +103,12 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 }
 
 pub async fn do_show_app(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap();
+    let slug = args.get_one::<String>("slug").unwrap();
 
     let api_config = &config.into();
 
     let params = DescribeAppParams {
-        name: name.to_string(),
+        slug: slug.to_string(),
         runs: Some(5),
     };
 
@@ -235,14 +243,25 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
         output::die("App name (--name) is required");
     });
 
+    let slug = if let Some(slug) = args.get_one::<String>("slug") {
+        if slug.is_empty() {
+            None
+        } else {
+            Some(slug.to_string())
+        }
+    } else {
+        None
+    };
+
     let description = args.get_one::<String>("description").unwrap();
 
     with_spinner(
         "Creating app",
-        default_api::create_apps(
+        default_api::create_app(
             &config.into(),
-            CreateAppsParams {
-                create_app_params: CreateAppParams {
+            CreateAppParams {
+                create_app_params: CreateAppParamsModel {
+                    slug,
                     schema: None,
                     name: name.clone(),
                     short_description: Some(description.clone()),
@@ -256,27 +275,25 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete_app(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap();
+    let slug = args.get_one::<String>("slug").unwrap();
 
     with_spinner(
         "Deleting app...",
         default_api::delete_app(
             &config.into(),
             DeleteAppParams {
-                name: name.to_string(),
+                slug: slug.to_string(),
             },
         ),
     ).await;
-
-    output::success(&format!("App '{}' deleted", name));
 }
 
 /// Extract app name and run number from command
 fn extract_app_run(cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
-    if let Some((name, _)) = cmd {
-        if let Some((app, num)) = name.split_once('#') {
+    if let Some((slug, _)) = cmd {
+        if let Some((slug, num)) = slug.split_once('#') {
             return (
-                app.to_string(),
+                slug.to_string(),
                 num.parse::<i64>().unwrap_or_else(|_| {
                     output::die("Run number must be a valid number");
                 }),
