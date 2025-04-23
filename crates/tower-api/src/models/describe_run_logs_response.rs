@@ -12,19 +12,19 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ExportUserSecretsParams {
+pub struct DescribeRunLogsResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    #[serde(rename = "public_key")]
-    pub public_key: String,
+    #[serde(rename = "log_lines")]
+    pub log_lines: Vec<models::RunLogLine>,
 }
 
-impl ExportUserSecretsParams {
-    pub fn new(public_key: String) -> ExportUserSecretsParams {
-        ExportUserSecretsParams {
+impl DescribeRunLogsResponse {
+    pub fn new(log_lines: Vec<models::RunLogLine>) -> DescribeRunLogsResponse {
+        DescribeRunLogsResponse {
             schema: None,
-            public_key,
+            log_lines,
         }
     }
 }
