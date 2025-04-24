@@ -21,7 +21,7 @@ pub async fn describe_app(config: &Config, slug: &str) -> Result<tower_api::mode
         runs: None,
     };
 
-    handle_api_response(tower_api::apis::default_api::describe_app(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_app(api_config, params)).await
 }
 
 pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsResponse, Error<tower_api::apis::default_api::ListAppsError>> {
@@ -36,7 +36,7 @@ pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsRes
         status: None,
     };
 
-    handle_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
 }
 
 pub async fn create_app(config: &Config, name: &str, slug: &str, description: &str) -> Result<tower_api::models::CreateAppResponse, Error<tower_api::apis::default_api::CreateAppError>> {
@@ -51,7 +51,7 @@ pub async fn create_app(config: &Config, name: &str, slug: &str, description: &s
         },
     };
 
-    handle_api_response(tower_api::apis::default_api::create_app(api_config, params)).await 
+    unwrap_api_response(tower_api::apis::default_api::create_app(api_config, params)).await 
 }
 
 pub async fn delete_app(config: &Config, slug: &str) -> Result<tower_api::models::DeleteAppResponse, Error<tower_api::apis::default_api::DeleteAppError>> {
@@ -61,7 +61,7 @@ pub async fn delete_app(config: &Config, slug: &str) -> Result<tower_api::models
         slug: slug.to_string(),
     };
 
-    handle_api_response(tower_api::apis::default_api::delete_app(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::delete_app(api_config, params)).await
 }
 
 pub async fn describe_run_logs(config: &Config, slug: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
@@ -72,7 +72,7 @@ pub async fn describe_run_logs(config: &Config, slug: &str, seq: i64) -> Result<
         seq,
     };
 
-    handle_api_response(tower_api::apis::default_api::describe_run_logs(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_run_logs(api_config, params)).await
 }
 
 pub async fn run_app(config: &Config, slug: &str, env: &str, params: HashMap<String, String>) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
@@ -88,7 +88,7 @@ pub async fn run_app(config: &Config, slug: &str, env: &str, params: HashMap<Str
         },
     };
 
-    handle_api_response(tower_api::apis::default_api::run_app(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::run_app(api_config, params)).await
 }
 
 pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: rsa::RsaPublicKey) -> Result<tower_api::models::ExportSecretsResponse, Error<tower_api::apis::default_api::ExportSecretsError>> {
@@ -105,7 +105,7 @@ pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: r
         page_size: None,
     };
 
-    handle_api_response(tower_api::apis::default_api::export_secrets(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::export_secrets(api_config, params)).await
 } 
 
 pub async fn list_secrets(config: &Config, env: &str, all: bool) -> Result<tower_api::models::ListSecretsResponse, Error<tower_api::apis::default_api::ListSecretsError>> {
@@ -118,7 +118,7 @@ pub async fn list_secrets(config: &Config, env: &str, all: bool) -> Result<tower
         page_size: None,
     };
 
-    handle_api_response(tower_api::apis::default_api::list_secrets(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::list_secrets(api_config, params)).await
 }
 
 pub async fn create_secret(config: &Config, name: &str, env: &str, encrypted_value: &str, preview: &str) -> Result<tower_api::models::CreateSecretResponse, Error<tower_api::apis::default_api::CreateSecretError>> {
@@ -134,7 +134,7 @@ pub async fn create_secret(config: &Config, name: &str, env: &str, encrypted_val
         },
     };
 
-    handle_api_response(tower_api::apis::default_api::create_secret(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::create_secret(api_config, params)).await
 }
 
 pub async fn describe_secrets_key(config: &Config) -> Result<tower_api::models::DescribeSecretsKeyResponse, Error<tower_api::apis::default_api::DescribeSecretsKeyError>> {
@@ -144,7 +144,7 @@ pub async fn describe_secrets_key(config: &Config) -> Result<tower_api::models::
         format: None,
     };
 
-    handle_api_response(tower_api::apis::default_api::describe_secrets_key(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_secrets_key(api_config, params)).await
 }
 
 pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<(), Error<tower_api::apis::default_api::DeleteSecretError>> {
@@ -155,12 +155,12 @@ pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<(),
         environment: Some(env.to_string()),
     };
 
-    handle_api_response(tower_api::apis::default_api::delete_secret(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::delete_secret(api_config, params)).await
 }
 
 pub async fn create_device_login_ticket(config: &Config) -> Result<tower_api::models::CreateDeviceLoginTicketResponse, Error<tower_api::apis::default_api::CreateDeviceLoginTicketError>> {
     let api_config = &config.into();
-    handle_api_response(tower_api::apis::default_api::create_device_login_ticket(api_config)).await
+    unwrap_api_response(tower_api::apis::default_api::create_device_login_ticket(api_config)).await
 }
 
 pub async fn describe_device_login_session(config: &Config, device_code: &str) -> Result<tower_api::models::DescribeDeviceLoginSessionResponse, Error<tower_api::apis::default_api::DescribeDeviceLoginSessionError>> {
@@ -170,7 +170,7 @@ pub async fn describe_device_login_session(config: &Config, device_code: &str) -
         device_code: device_code.to_string(),
     };
 
-    handle_api_response(tower_api::apis::default_api::describe_device_login_session(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_device_login_session(api_config, params)).await
 }
 
 pub async fn refresh_session(config: &Config) -> Result<tower_api::models::RefreshSessionResponse, Error<tower_api::apis::default_api::RefreshSessionError>> {
@@ -180,11 +180,11 @@ pub async fn refresh_session(config: &Config) -> Result<tower_api::models::Refre
         refresh_session_params: tower_api::models::RefreshSessionParams::new(),
     };
 
-    handle_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
 }
 
 /// Helper function to handle Tower API responses and extract the relevant data
-async fn handle_api_response<T, F, V>(api_call: F) -> Result<T::Data, Error<V>>
+async fn unwrap_api_response<T, F, V>(api_call: F) -> Result<T::Data, Error<V>>
 where
     F: std::future::Future<Output = Result<ResponseContent<T>, Error<V>>>,
     T: ResponseEntity,
