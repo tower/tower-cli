@@ -88,6 +88,41 @@ async fn it_respects_complex_file_globs() {
 }
 
 #[tokio::test]
+async fn it_respects_workspace_settings() {
+    let _ = env_logger::try_init();
+
+    let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "app/Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "app/main.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "shared/module/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "shared/module/test.py", "").await;
+
+    let spec = PackageSpec {
+        invoke: "app/main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("app").join("Towerfile").to_path_buf(),
+        file_globs: vec![
+            "**/*.py".to_string(),
+        ],
+        parameters: vec![],
+        schedule: None,
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+
+    assert_eq!(package.manifest.version, Some(1));
+    assert_eq!(package.manifest.invoke, "app/main.py");
+    assert_eq!(package.manifest.schedule, None);
+
+    let files = read_package_files(package).await;
+
+    assert!(files.contains_key("app/main.py"), "files {:?} was missing key app/main.py", files);
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
+    assert!(files.contains_key("shared/module/__init__.py"), "files {:?} was missing shared/module/__init__.py", files);
+    assert!(files.contains_key("shared/module/test.py"), "files {:?} was missing shared/module/test.py", files);
+}
+
+#[tokio::test]
 async fn building_package_spec_from_towerfile() {
     let toml = r#"
         [app]
@@ -117,6 +152,7 @@ async fn read_package_files(package: Package) -> HashMap<String, String> {
     let package_file_path = package.package_file_path.expect("Failed to get package file path");
     let file = File::open(package_file_path).await.expect("Failed to open package file");
     let buf = BufReader::new(file);
+
     // TODO: Re-enable this when we reintroduce gzip compression
     //let gzip = GzipDecoder::new(buf);
     //let mut archive = Archive::new(gzip);

@@ -12,19 +12,19 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct DeployAppResponse {
+pub struct UpdateAppResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    #[serde(rename = "version")]
-    pub version: Box<models::AppVersion>,
+    #[serde(rename = "App")]
+    pub app: Box<models::App>,
 }
 
-impl DeployAppResponse {
-    pub fn new(version: models::AppVersion) -> DeployAppResponse {
-        DeployAppResponse {
+impl UpdateAppResponse {
+    pub fn new(app: models::App) -> UpdateAppResponse {
+        UpdateAppResponse {
             schema: None,
-            version: Box::new(version),
+            app: Box::new(app),
         }
     }
 }

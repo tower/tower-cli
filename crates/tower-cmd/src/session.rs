@@ -2,18 +2,9 @@ use crate::output;
 use clap::Command;
 use config::{Config, Session};
 use tokio::{time, time::Duration};
-use tower_api::{
-    apis::default_api::{
-        self,
-        DescribeDeviceLoginSessionParams,
-    },
-    models::CreateDeviceLoginTicketResponse,
-};
+use tower_api::models::CreateDeviceLoginTicketResponse;
 
-use crate::api::{
-    with_spinner,
-    handle_api_response,
-};
+use crate::api;
 
 pub fn login_cmd() -> Command {
     Command::new("login").about("Create a session with Tower")
@@ -22,16 +13,18 @@ pub fn login_cmd() -> Command {
 pub async fn do_login(config: Config) {
     output::banner();
 
-    let api_config = config.clone().into();
+    let mut spinner = output::spinner("Starting device login...");
 
-    // Request device login code
-    //
-    let resp = with_spinner(
-        "Starting device login...",
-        default_api::create_device_login_ticket(&api_config),
-    ).await;
-
-    handle_device_login(config, resp).await;
+    match api::create_device_login_ticket(&config).await {
+        Ok(resp) => {
+            spinner.success();
+            handle_device_login(config, resp).await;
+        },
+        Err(err) => {
+            spinner.failure();
+            output::failure(&format!("Failed to create device login ticket: {}", err));
+        }
+    }
 }
 
 async fn handle_device_login(
@@ -67,18 +60,7 @@ async fn poll_for_login(
     let expires_at = chrono::Utc::now() + expires_in;
 
     while chrono::Utc::now() < expires_at {
-        let api_config = &config.into();
-
-        let resp = handle_api_response(||
-            default_api::describe_device_login_session(
-                &api_config,
-                DescribeDeviceLoginSessionParams {
-                    device_code: claim.device_code.clone(),
-                },
-            ),
-        ).await;
-
-        match resp {
+        match api::describe_device_login_session(&config, &claim.device_code).await {
             Ok(resp) => {
                 finalize_session(config, &resp, spinner);
                 return true;
