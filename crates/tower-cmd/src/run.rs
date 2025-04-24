@@ -157,7 +157,7 @@ async fn do_run_remote(
     match default_api::run_app(
         &config.into(),
         RunAppParams {
-            name: app_name.clone(),
+            slug: app_name.clone(),
             run_app_params: models::RunAppParams {
                 parent_run_id: None,
                 schema: None,
