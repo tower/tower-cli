@@ -7,29 +7,14 @@ use rsa::pkcs1::DecodeRsaPublicKey;
 use tower_api::{
     apis:: {
         Error,
-        ResponseContent,
-        default_api::{
-            self,
-            CreateSecretParams,
-            DeleteSecretParams,
-            ListSecretsParams,
-            ExportSecretsParams,
-            CreateSecretSuccess,
-            CreateSecretError,
-        },
+        default_api::CreateSecretError,
     },
-    models::{
-        ExportUserSecretsParams,
-        CreateSecretParams as CreateSecretParamsModel,
-    },
+    models::CreateSecretResponse,
 };
 
 use crate::{
     output,
-    api::{
-        with_spinner,
-        handle_api_response,
-    },
+    api,
 };
 
 pub fn secrets_cmd() -> Command {
@@ -121,20 +106,7 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
     if *show {
         let (private_key, public_key) = crypto::generate_key_pair();
 
-        let params = ExportSecretsParams {
-            export_user_secrets_params: ExportUserSecretsParams {
-                schema: None,
-                public_key: crypto::serialize_public_key(public_key),
-            },
-            environment: Some(env.clone()),
-            all: Some(*all),
-            page: None,
-            page_size: None,
-        };
-
-        let api_config = &config.into();
-
-        match handle_api_response(|| default_api::export_secrets(api_config, params)).await {
+        match api::export_secrets(&config, env, *all, public_key).await {
             Ok(list_response) => {
                 let headers = vec![
                     "Secret".bold().yellow().to_string(),
@@ -159,39 +131,24 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
             Err(err) => output::tower_error(err),
         }
     } else {
-        let params = ListSecretsParams {
-            environment: Some(env.clone()),
-            all: Some(*all),
-            page: None,
-            page_size: None,
-        };
-
-        let api_config = &config.into();
-
-        match handle_api_response(|| default_api::list_secrets(api_config, params)).await {
+        match api::list_secrets(&config, env, *all).await {
             Ok(list_response) => {
-                let (headers, data) = (
-                    vec![
+                let headers = vec![
                     "Secret".bold().yellow().to_string(),
                     "Environment".bold().yellow().to_string(),
                     "Preview".bold().yellow().to_string(),
-                    ],
-                    list_response
-                        .secrets
-                        .iter()
-                        .map(|secret| {
-                            vec![
-                                secret.name.clone(),
-                                secret.environment.clone(),
-                                secret.preview.dimmed().to_string(),
-                            ]
-                        })
-                        .collect(),
-                );
+                ];
+                let data = list_response.secrets.iter().map(|secret| {
+                    vec![
+                        secret.name.clone(),
+                        secret.environment.clone(),
+                        secret.preview.dimmed().to_string(),
+                    ]
+                }).collect();
                 output::table(headers, data);
             },
             Err(err) => output::tower_error(err),
-        };
+        }
     }
 }
 
@@ -200,10 +157,25 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
     let environment = args.get_one::<String>("environment").unwrap();
     let value = args.get_one::<String>("value").unwrap();
 
-    with_spinner(
-        "Creating secret...",
-        encrypt_and_create_secret(config, name.clone(), value.clone(), environment.clone()),
-    ).await;
+    let mut spinner = output::spinner("Creating secret...");
+
+    match encrypt_and_create_secret(&config, name, value, environment).await { 
+        Ok(_) => {
+            spinner.success();
+
+            let line = format!(
+                "Secret {} created in environment {}",
+                name,
+                environment,
+            );
+
+            output::success(&line);
+        },
+        Err(err) => {
+            log::debug!("Failed to create secrets: {}", err);
+            spinner.failure();
+        }
+    }
 }
 
 pub async fn do_delete_secret(config: Config, args: &ArgMatches) {
@@ -213,15 +185,14 @@ pub async fn do_delete_secret(config: Config, args: &ArgMatches) {
         .get_one::<String>("environment")
         .unwrap_or(&env_default);
 
-    let params = DeleteSecretParams {
-        name: name.to_string(),
-        environment: Some(environment.to_string()),
-    };
+    let mut spinner = output::spinner("Deleting secret...");
 
-    with_spinner(
-        "Deleting secret...",
-        default_api::delete_secret(&config.into(), params),
-    ).await;
+    if let Ok(_) = api::delete_secret(&config, name, environment).await {
+        spinner.success();
+    } else {
+        spinner.failure();
+        output::die("There was a problem with the Tower API! Please try again later.");
+    }
 }
 
 fn create_preview(value: &str) -> String {
@@ -238,53 +209,26 @@ fn create_preview(value: &str) -> String {
 }
 
 async fn encrypt_and_create_secret(
-    config: Config,
-    name: String,
-    value: String,
-    environment: String,
-) -> Result<ResponseContent<CreateSecretSuccess>, Error<CreateSecretError>> {
-    let api_config = &config.into();
-
-    match handle_api_response(|| default_api::describe_secrets_key(&api_config, default_api::DescribeSecretsKeyParams {
-        format: None,
-    })).await {
-        Ok(key_response) => {
-            let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
+    config: &Config,
+    name: &str,
+    value: &str,
+    environment: &str,
+) -> Result<CreateSecretResponse, Error<CreateSecretError>> {
+    match api::describe_secrets_key(config).await {
+        Ok(res) => {
+            let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&res.public_key)
                 .unwrap_or_else(|_| {
                     output::die("Failed to parse public key");
                 });
 
             let encrypted_value = encrypt(public_key, value.to_string());
-            let preview = create_preview(&value.clone());
+            let preview = create_preview(value);
 
-            let create_params = CreateSecretParams {
-                create_secret_params: CreateSecretParamsModel {
-                    schema: None,
-                    name: name.clone(),
-                    encrypted_value,
-                    environment: environment.clone(),
-                    preview,
-                }
-            };
-
-            default_api::create_secret(&api_config, create_params).await
+            api::create_secret(&config, name, environment, &encrypted_value, &preview).await
         },
         Err(err) => {
-            // Convert the DescribeSecretsKeyError into CreateSecretError
-            let converted_err = match err {
-                Error::ResponseError(response) => {
-                    Error::ResponseError(ResponseContent {
-                        status: response.status,
-                        content: response.content,
-                        entity: None, // CreateSecretError doesn't carry the same entity type
-                    })
-                }
-                Error::Reqwest(e) => Error::Reqwest(e),
-                Error::Serde(e) => Error::Serde(e),
-                Error::Io(e) => Error::Io(e),
-            };
-
-            Err(converted_err)
+            log::debug!("failed to talk to tower api: {}", err);
+            output::die("There was a problem with the Tower API! Please try again later.");
         }
     }
 }

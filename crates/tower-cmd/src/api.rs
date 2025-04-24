@@ -1,9 +1,8 @@
 use tower_api::apis::Error;
+use config::Config;
 use http::StatusCode;
-use std::future::Future;
+use std::collections::HashMap;
 use tower_api::apis::ResponseContent;
-
-use crate::output;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -14,8 +13,178 @@ pub trait ResponseEntity {
     fn extract_data(self) -> Option<Self::Data>;
 }
 
+pub async fn describe_app(config: &Config, slug: &str) -> Result<tower_api::models::DescribeAppResponse, Error<tower_api::apis::default_api::DescribeAppError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeAppParams {
+        slug: slug.to_string(),
+        runs: None,
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::describe_app(api_config, params)).await
+}
+
+pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsResponse, Error<tower_api::apis::default_api::ListAppsError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListAppsParams {
+        query: None,
+        page: None,
+        page_size: None,
+        period: None,
+        num_runs: None,
+        status: None,
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::list_apps(api_config, params)).await
+}
+
+pub async fn create_app(config: &Config, name: &str, slug: &str, description: &str) -> Result<tower_api::models::CreateAppResponse, Error<tower_api::apis::default_api::CreateAppError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::CreateAppParams {
+        create_app_params: tower_api::models::CreateAppParams{
+            name: name.to_string(),
+            slug: Some(slug.to_string()),
+            short_description: Some(description.to_string()),
+            schema: None,
+        },
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::create_app(api_config, params)).await 
+}
+
+pub async fn delete_app(config: &Config, slug: &str) -> Result<tower_api::models::DeleteAppResponse, Error<tower_api::apis::default_api::DeleteAppError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DeleteAppParams {
+        slug: slug.to_string(),
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::delete_app(api_config, params)).await
+}
+
+pub async fn describe_run_logs(config: &Config, slug: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeRunLogsParams {
+        slug: slug.to_string(),
+        seq,
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::describe_run_logs(api_config, params)).await
+}
+
+pub async fn run_app(config: &Config, slug: &str, env: &str, params: HashMap<String, String>) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::RunAppParams {
+        slug: slug.to_string(),
+        run_app_params: tower_api::models::RunAppParams {
+            schema: None,
+            environment: env.to_string(),
+            parameters: params,
+            parent_run_id: None,
+        },
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::run_app(api_config, params)).await
+}
+
+pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: rsa::RsaPublicKey) -> Result<tower_api::models::ExportSecretsResponse, Error<tower_api::apis::default_api::ExportSecretsError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ExportSecretsParams {
+        export_user_secrets_params: tower_api::models::ExportUserSecretsParams {
+            schema: None,
+            public_key: crypto::serialize_public_key(public_key),
+        },
+        environment: Some(env.to_string()),
+        all: Some(all),
+        page: None,
+        page_size: None,
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::export_secrets(api_config, params)).await
+} 
+
+pub async fn list_secrets(config: &Config, env: &str, all: bool) -> Result<tower_api::models::ListSecretsResponse, Error<tower_api::apis::default_api::ListSecretsError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListSecretsParams {
+        environment: Some(env.to_string()),
+        all: Some(all),
+        page: None,
+        page_size: None,
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::list_secrets(api_config, params)).await
+}
+
+pub async fn create_secret(config: &Config, name: &str, env: &str, encrypted_value: &str, preview: &str) -> Result<tower_api::models::CreateSecretResponse, Error<tower_api::apis::default_api::CreateSecretError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::CreateSecretParams {
+        create_secret_params: tower_api::models::CreateSecretParams {
+            name: name.to_string(),
+            environment: env.to_string(),
+            encrypted_value: encrypted_value.to_string(),
+            preview: preview.to_string(),
+            schema: None,
+        },
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::create_secret(api_config, params)).await
+}
+
+pub async fn describe_secrets_key(config: &Config) -> Result<tower_api::models::DescribeSecretsKeyResponse, Error<tower_api::apis::default_api::DescribeSecretsKeyError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeSecretsKeyParams {
+        format: None,
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::describe_secrets_key(api_config, params)).await
+}
+
+pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<(), Error<tower_api::apis::default_api::DeleteSecretError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DeleteSecretParams {
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::delete_secret(api_config, params)).await
+}
+
+pub async fn create_device_login_ticket(config: &Config) -> Result<tower_api::models::CreateDeviceLoginTicketResponse, Error<tower_api::apis::default_api::CreateDeviceLoginTicketError>> {
+    let api_config = &config.into();
+    handle_api_response(|| tower_api::apis::default_api::create_device_login_ticket(api_config)).await
+}
+
+pub async fn describe_device_login_session(config: &Config, device_code: &str) -> Result<tower_api::models::DescribeDeviceLoginSessionResponse, Error<tower_api::apis::default_api::DescribeDeviceLoginSessionError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeDeviceLoginSessionParams {
+        device_code: device_code.to_string(),
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::describe_device_login_session(api_config, params)).await
+}
+
+pub async fn refresh_session(config: &Config) -> Result<tower_api::models::RefreshSessionResponse, Error<tower_api::apis::default_api::RefreshSessionError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::RefreshSessionParams {
+        refresh_session_params: tower_api::models::RefreshSessionParams::new(),
+    };
+
+    handle_api_response(|| tower_api::apis::default_api::refresh_session(api_config, params)).await
+}
+
 /// Helper function to handle Tower API responses and extract the relevant data
-pub async fn handle_api_response<T, F, V, Fut>(api_call: F) -> Result<T::Data, Error<V>>
+async fn handle_api_response<T, F, V, Fut>(api_call: F) -> Result<T::Data, Error<V>>
 where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<ResponseContent<T>, Error<V>>>,
@@ -23,6 +192,8 @@ where
 {
     match api_call().await {
         Ok(response) => {
+            log::debug!("Response from server: {}", response.content);
+
             if let Some(entity) = response.entity {
                 if let Some(data) = entity.extract_data() {
                     Ok(data)
@@ -30,7 +201,7 @@ where
                     let err = Error::ResponseError(
                         tower_api::apis::ResponseContent {
                             status: StatusCode::NO_CONTENT,
-                            content: "Received an unknown response from the server".to_string(),
+                            content: "Received a response from the server that the CLI wasn't able to understand".to_string(),
                             entity: None,
                         },
                     );
@@ -48,41 +219,6 @@ where
             }
         }
         Err(err) => Err(err),
-    }
-}
-
-/// Helper function to handle operations with spinner
-pub async fn with_spinner<T, F, V>(
-    message: &str, 
-    operation: F,
-) -> T::Data
-where
-    F: Future<Output = Result<ResponseContent<T>, tower_api::apis::Error<V>>>,
-    T: ResponseEntity,
-{
-    let mut spinner = output::spinner(message);
-    match operation.await {
-        Ok(result) => {
-            if let Some(entity) = result.entity {
-                if let Some(data) = entity.extract_data() {
-                    spinner.success();
-                    data
-                } else {
-                    output::failure("The Tower CLI had something unexpected happen! Maybe try again later.");
-                    std::process::exit(1);
-                }
-            } else {
-                spinner.failure();
-
-                output::failure("The Tower API unexpectedly returned an empty response.");
-                std::process::exit(1);
-            }
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error(err);
-            std::process::exit(1);
-        }
     }
 }
 
@@ -187,8 +323,8 @@ impl ResponseEntity for tower_api::apis::default_api::DeleteSecretSuccess {
     }
 }
 
-impl ResponseEntity for tower_api::apis::default_api::GetAppRunLogsSuccess {
-    type Data = tower_api::models::GetRunLogsOutputBody;
+impl ResponseEntity for tower_api::apis::default_api::DescribeRunLogsSuccess {
+    type Data = tower_api::models::DescribeRunLogsResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
@@ -198,7 +334,7 @@ impl ResponseEntity for tower_api::apis::default_api::GetAppRunLogsSuccess {
     }
 }
 
-impl ResponseEntity for tower_api::apis::default_api::CreateAppsSuccess {
+impl ResponseEntity for tower_api::apis::default_api::CreateAppSuccess {
     type Data = tower_api::models::CreateAppResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
