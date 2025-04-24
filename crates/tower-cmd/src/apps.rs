@@ -7,10 +7,10 @@ use tower_api::apis::Error as ApiError;
 
 use tower_api::{
     apis::default_api::{
-        self, CreateAppsParams, DeleteAppParams, DescribeAppParams, DescribeAppSuccess,
-        GetAppRunLogsParams, GetAppRunLogsSuccess, ListAppsParams, ListAppsSuccess,
+        self, CreateAppParams, DeleteAppParams, DescribeAppParams, DescribeAppSuccess,
+        DescribeRunLogsParams, DescribeRunLogsSuccess, ListAppsParams, ListAppsSuccess,
     },
-    models::{CreateAppParams, Run},
+    models::{CreateAppParams as ModelCreateAppParams, Run},
 };
 
 pub fn apps_cmd() -> Command {
@@ -75,10 +75,10 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
 
     let response = with_spinner(
         "Fetching logs...",
-        default_api::get_app_run_logs(
+        default_api::describe_run_logs(
             &config.into(),
-            GetAppRunLogsParams {
-                name: app_name.clone(),
+            DescribeRunLogsParams {
+                slug: app_name.clone(),
                 seq,
             },
         ),
@@ -86,7 +86,7 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     )
     .await;
 
-    if let GetAppRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
+    if let DescribeRunLogsSuccess::Status200(logs) = response.entity.unwrap() {
         for line in logs.log_lines {
             output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
         }
@@ -99,7 +99,7 @@ pub async fn do_show_app(config: Config, args: &ArgMatches) {
     match default_api::describe_app(
         &config.into(),
         DescribeAppParams {
-            name: name.to_string(),
+            slug: name.to_string(),
             runs: Some(5),
         },
     )
@@ -242,13 +242,14 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 
     with_spinner(
         "Creating app",
-        default_api::create_apps(
+        default_api::create_app(
             &config.into(),
-            CreateAppsParams {
-                create_app_params: CreateAppParams {
+            CreateAppParams {
+                create_app_params: ModelCreateAppParams {
                     schema: None,
                     name: name.clone(),
                     short_description: Some(description.clone()),
+                    slug: None,
                 },
             },
         ),
@@ -260,21 +261,21 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete_app(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap();
+    let slug = args.get_one::<String>("slug").unwrap();
 
     with_spinner(
         "Deleting app...",
         default_api::delete_app(
             &config.into(),
             DeleteAppParams {
-                name: name.to_string(),
+                slug: slug.to_string(),
             },
         ),
-        Some(name),
+        Some(slug),
     )
     .await;
 
-    output::success(&format!("App '{}' deleted", name));
+    output::success(&format!("App '{}' deleted", slug));
 }
 
 /// Helper function to handle common API error patterns
