@@ -2,17 +2,12 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tower_api::models;
-use tower_api::{
-    apis::default_api::{self, ExportSecretsParams, RunAppParams},
-    models::ExportUserSecretsParams,
-};
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 
 use crate::{
     output,
-    api::with_spinner,
+    api,
 };
 
 pub fn run_cmd() -> Command {
@@ -155,29 +150,24 @@ async fn do_run_remote(
         towerfile.app.name
     });
 
-    let params = RunAppParams {
-        slug: app_slug.clone(),
-        run_app_params: models::RunAppParams {
-            schema: None,
-            environment: env.to_string(),
-            parameters: params,
-            parent_run_id: None,
-        },
-    };
+    let mut spinner = output::spinner("Scheduling run...");
 
-    let res = with_spinner(
-        "Scheduling run...",
-        default_api::run_app(
-            &config.into(),
-            params,
-        ),
-    ).await;
+    match api::run_app(&config, &app_slug, env, params).await {
+        Err(err) => {
+            spinner.failure();
+            log::debug!("Failed to schedule run: {}", err);
+            output::tower_error(err);
+        }, 
+        Ok(res) => {
+            spinner.success();
 
-    let line = format!(
-        "Run #{} for app `{}` has been scheduled",
-        res.run.number, app_slug
-    );
-    output::success(&line);
+            let line = format!(
+                "Run #{} for app `{}` has been scheduled",
+                res.run.number, app_slug
+            );
+            output::success(&line);
+        }
+    }
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
@@ -249,32 +239,25 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    let params = ExportSecretsParams {
-        export_user_secrets_params: ExportUserSecretsParams {
-            schema: None,
-            public_key: crypto::serialize_public_key(public_key),
+    let mut spinner = output::spinner("Getting secrets...");
+
+    match api::export_secrets(&config, env, false, public_key).await {
+        Ok(res) => {
+            spinner.success();
+            res.secrets
+                .into_iter()
+                .map(|secret| {
+                    let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string());
+                    (secret.name, decrypted_value)
+                })
+                .collect()
         },
-        environment: Some(env.to_string()),
-        all: Some(false),
-        page: None,
-        page_size: None,
-    };
-
-    let res = with_spinner(
-        "Getting secrets...",
-        default_api::export_secrets(
-            &config.into(),
-            params
-        ),
-    ).await;
-
-    res.secrets
-        .into_iter()
-        .map(|secret| {
-            let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string());
-            (secret.name, decrypted_value)
-        })
-        .collect()
+        Err(err) => {
+            spinner.failure();
+            output::tower_error(err);
+            HashMap::new()
+        }
+    }
 }
 
 /// load_towerfile manages the process of loading a Towerfile from a given path in an interactive

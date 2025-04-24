@@ -2,20 +2,11 @@ use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
 
-use tower_api::{
-    apis::default_api::{
-        self, CreateAppParams, DeleteAppParams, DescribeAppParams,
-        DescribeRunLogsParams, ListAppsParams,
-    },
-    models::{CreateAppParams as CreateAppParamsModel, Run},
-};
+use tower_api::models::Run;
 
 use crate::{
     output,
-    api::{
-        handle_api_response,
-        with_spinner,
-    }
+    api,
 };
 
 pub fn apps_cmd() -> Command {
@@ -84,37 +75,19 @@ pub fn apps_cmd() -> Command {
 }
 
 pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let (app_slug, seq) = extract_app_run(cmd);
-    
-    let response = with_spinner(
-        "Fetching logs...",
-        default_api::describe_run_logs(
-            &config.into(),
-            DescribeRunLogsParams {
-                slug: app_slug.clone(),
-                seq,
-            },
-        ),
-    ).await;
+    let (slug, seq) = extract_app_run(cmd);
 
-    for line in response.log_lines {
-        output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
+    if let Ok(resp) = api::describe_run_logs(&config, &slug, seq).await {
+        for line in resp.log_lines {
+            output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
+        }
     }
 }
 
 pub async fn do_show_app(config: Config, args: &ArgMatches) {
     let slug = args.get_one::<String>("slug").unwrap();
 
-    let api_config = &config.into();
-
-    let params = DescribeAppParams {
-        slug: slug.to_string(),
-        runs: Some(5),
-    };
-
-    let resp = handle_api_response(|| default_api::describe_app(&api_config, params)).await;
-
-    match resp {
+    match  api::describe_app(&config, slug).await {
         Ok(app_response) => {
             let app = app_response.app;
             let runs = app_response.runs;
@@ -203,17 +176,7 @@ pub async fn do_show_app(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    let api_config = &config.into();
-    let params = ListAppsParams {
-        query: None,
-        page: None,
-        page_size: None,
-        period: None,
-        num_runs: None,
-        status: None,
-    };
-
-    let resp = handle_api_response(|| default_api::list_apps(&api_config, params)).await;
+    let resp = api::list_apps(&config).await;
 
     match resp {
         Ok(resp) => {
@@ -243,49 +206,31 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
         output::die("App name (--name) is required");
     });
 
-    let slug = if let Some(slug) = args.get_one::<String>("slug") {
-        if slug.is_empty() {
-            None
-        } else {
-            Some(slug.to_string())
-        }
-    } else {
-        None
-    };
+    let slug = args.get_one::<String>("slug").unwrap();
 
     let description = args.get_one::<String>("description").unwrap();
+    let mut spinner = output::spinner("Creating app");
 
-    with_spinner(
-        "Creating app",
-        default_api::create_app(
-            &config.into(),
-            CreateAppParams {
-                create_app_params: CreateAppParamsModel {
-                    slug,
-                    schema: None,
-                    name: name.clone(),
-                    short_description: Some(description.clone()),
-                },
-            },
-        ),
-    )
-    .await;
+    if let Err(err) = api::create_app(&config, name, slug, description).await {
+        spinner.failure();
+        output::tower_error(err);
+    } else {
+        spinner.success();
+        output::success(&format!("App '{}' created", name));
+    }
 
-    output::success(&format!("App '{}' created", name));
 }
 
 pub async fn do_delete_app(config: Config, args: &ArgMatches) {
     let slug = args.get_one::<String>("slug").unwrap();
+    let mut spinner = output::spinner("Deleting app");
 
-    with_spinner(
-        "Deleting app...",
-        default_api::delete_app(
-            &config.into(),
-            DeleteAppParams {
-                slug: slug.to_string(),
-            },
-        ),
-    ).await;
+    if let Err(err) = api::delete_app(&config, slug).await {
+        spinner.failure();
+        output::tower_error(err);
+    } else {
+        spinner.success();
+    }
 }
 
 /// Extract app name and run number from command

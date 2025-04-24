@@ -1,11 +1,10 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
 use config::Config;
-use tower_api::apis::default_api;
 
 use crate::{
     output,
-    api::with_spinner,
+    api,
 };
 
 pub fn teams_cmd() -> Command {
@@ -35,30 +34,30 @@ async fn refresh_session(config: &Config) -> config::Session {
         }
     };
 
-    // Then refresh it with the API
-    let api_config = config.clone().into();
+    let mut spinner = output::spinner("Refreshing session...");
 
-    // Create the required refresh_session_params
-    let refresh_params = default_api::RefreshSessionParams {
-        refresh_session_params: tower_api::models::RefreshSessionParams::new(),
-    };
+    match api::refresh_session(&config).await {
+        Ok(resp) => {
+            spinner.success();
 
-    let response = with_spinner(
-        "Refreshing session...",
-        default_api::refresh_session(&api_config, refresh_params),
-    )
-    .await;
+            // Create a mutable copy of the session to update
+            let mut session = current_session;
 
-    // Create a mutable copy of the session to update
-    let mut session = current_session;
+            // Update it with the API response
+            if let Err(e) = session.update_from_api_response(&resp) {
+                output::config_error(e);
+                std::process::exit(1);
+            }
 
-    // Update it with the API response
-    if let Err(e) = session.update_from_api_response(&response) {
-        output::config_error(e);
-        std::process::exit(1);
+            session
+        },
+        Err(err) => {
+            log::debug!("Failed to refresh session: {}", err);
+
+            spinner.failure();
+            output::die("There was a problem talking to the Tower API. Try again later!");
+        }
     }
-
-    session
 }
 
 pub async fn do_list_teams(config: Config) {
