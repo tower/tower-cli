@@ -192,6 +192,8 @@ where
 {
     match api_call().await {
         Ok(response) => {
+            log::debug!("Response from server: {}", response.content);
+
             if let Some(entity) = response.entity {
                 if let Some(data) = entity.extract_data() {
                     Ok(data)
@@ -199,7 +201,7 @@ where
                     let err = Error::ResponseError(
                         tower_api::apis::ResponseContent {
                             status: StatusCode::NO_CONTENT,
-                            content: "Received an unknown response from the server".to_string(),
+                            content: "Received a response from the server that the CLI wasn't able to understand".to_string(),
                             entity: None,
                         },
                     );
