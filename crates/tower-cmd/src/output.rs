@@ -49,7 +49,7 @@ pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
 
 pub fn package_error(err: tower_package::Error) {
     let msg = match err {
-        tower_package::Error::NoManifest => "No manifeset was found".to_string(),
+        tower_package::Error::NoManifest => "No manifest was found".to_string(),
         tower_package::Error::InvalidManifest => {
             "Invalid manifest was found or created".to_string()
         }

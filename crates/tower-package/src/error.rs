@@ -13,13 +13,15 @@ pub enum Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
+    fn from(err: std::io::Error) -> Self {
+        log::debug!("IO error: {}", err);
         Error::NoManifest
     }
 }
 
 impl From<serde_json::Error> for Error {
-    fn from(_: serde_json::Error) -> Self {
+    fn from(err: serde_json::Error) -> Self {
+        log::debug!("JSON error: {}", err);
         Error::InvalidManifest
     }
 }

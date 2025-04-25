@@ -9,15 +9,14 @@ use tokio_tar::{Archive, Builder};
 use glob::glob;
 use tmpdir::TmpDir;
 
-// TODO: Reintroduce once optional gzip compression is allowed for packaging.
-// use async_compression::tokio::write::GzipEncoder;
+use async_compression::tokio::write::GzipEncoder;
 
 mod error;
 pub use error::Error;
 
 const CURRENT_PACKAGE_VERSION: i32 = 1;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Parameter{
     pub name: String,
     pub description: String,
@@ -49,6 +48,7 @@ impl Manifest {
 }
 
 // PackageSpec describes how to build a package.
+#[derive(Debug)]
 pub struct PackageSpec {
     // towerfile_path is the path to the Towerfile that was used to build this package.
     pub towerfile_path: PathBuf,
@@ -83,6 +83,7 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
 
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
+        log::debug!("creating package spec from towerfile: {:?}", towerfile);
         let towerfile_path = towerfile.file_path.clone();
         let base_dir = towerfile.app.workspace.clone();
 
@@ -151,6 +152,8 @@ impl Package {
    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
    // GZip'd.
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
+       log::debug!("building package from spec: {:?}", spec);
+
        // we canonicalize this because we want to treat all paths in the same keyspace more or
        // less.
        let base_dir = spec.base_dir.canonicalize()?;
@@ -160,13 +163,8 @@ impl Package {
        log::debug!("building package at: {:?}", package_path);
 
        let file = File::create(package_path.clone()).await?;
-       let mut builder = Builder::new(file);
-
-       // TODO: When we want to enable gzip compression, we can uncomment the following lines.
-       // We'll also need to uncommend the stuff below about finishing compression.
-       //let gzip = GzipEncoder::new(file);
-
-       //let mut builder = Builder::new(gzip);
+       let gzip = GzipEncoder::new(file);
+       let mut builder = Builder::new(gzip);
 
        for file_glob in spec.file_globs {
            let path = base_dir.join(file_glob);

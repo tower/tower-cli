@@ -34,6 +34,7 @@ pub async fn upload_file_with_progress(
     let mut req = client
         .request(Method::POST, endpoint_url)
         .header("Content-Type", content_type)
+        .header("Content-Encoding", "gzip")
         .body(Body::wrap_stream(progress_stream));
 
     // Add authorization if available
