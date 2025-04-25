@@ -22,6 +22,11 @@ pub enum Error {
 
     #[snafu(display("Team with slug {} not found!", team_slug))]
     TeamNotFound { team_slug: String },
+
+    #[snafu(display("Unknown describe session value: {}", value))]
+    UnknownDescribeSessionValue { value: serde_json::Value },
+
+    DescribeSessionError { err: tower_api::apis::Error<tower_api::apis::default_api::DescribeSessionError> },
 }
 
 impl From<std::io::Error> for Error {

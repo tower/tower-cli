@@ -89,6 +89,12 @@ pub fn config_error(err: config::Error) {
         config::Error::TeamNotFound { ref team_slug } => {
             format!("Team with slug `{}` not found!", team_slug)
         }
+        config::Error::UnknownDescribeSessionValue { value: _ } => {
+            "An error occured while describing the session associated with the JWT you provided. Maybe your CLI is out of date?".to_string()
+        }
+        config::Error::DescribeSessionError { ref err } => {
+            format!("An error occured while describing the session associated with the JWT you provided: {}", err)
+        }
     };
 
     let line = format!("{} {}\n", "Config error:".red(), msg);

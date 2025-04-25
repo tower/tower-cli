@@ -10,10 +10,12 @@ license = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 dirs = { workspace = true } 
+futures = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 snafu = { workspace = true }
+tokio = { workspace = true }
 toml = { workspace = true }
 testutils = { workspace = true }
 url = { workspace = true }
