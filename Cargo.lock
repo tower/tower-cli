@@ -312,6 +312,7 @@ dependencies = [
 name = "config"
 version = "0.3.8"
 dependencies = [
+ "chrono",
  "clap",
  "dirs",
  "log",
@@ -2727,6 +2728,8 @@ name = "tower-version"
 version = "0.3.8"
 dependencies = [
  "anyhow",
+ "chrono",
+ "config",
  "log",
  "reqwest",
  "serde_json",

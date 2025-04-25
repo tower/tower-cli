@@ -26,8 +26,12 @@ impl App {
     }
 
     async fn check_latest_version() -> Option<String> {
-        let res = tower_version::check_latest_version().await;
-        res.unwrap_or(None)
+        if tower_version::should_check_latest_version().await {
+            let res = tower_version::check_latest_version().await;
+            res.unwrap_or(None)
+        } else {
+            None
+        }
     }
 
     pub async fn run(self) {

@@ -2,9 +2,18 @@ use anyhow::Result;
 use log;
 use reqwest;
 use serde_json::Value;
+use chrono::{Utc, Duration};
 
 pub fn current_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
+}
+
+pub async fn should_check_latest_version() -> bool {
+    let dt = config::get_last_version_check_timestamp();
+    let window = Utc::now() - Duration::minutes(5);
+
+    // If we haven't checked in the last 5 minutes, then we should check.
+    dt < window
 }
 
 pub async fn check_latest_version() -> Result<Option<String>> {
@@ -22,6 +31,9 @@ pub async fn check_latest_version() -> Result<Option<String>> {
     log::debug!("PyPI returned status code: {}", status);
     
     if status.is_success() {
+        // Update the config so we don't check more often.
+        config::set_last_version_check_timestamp(Utc::now());
+
         let json: Value = resp.json().await?;
         if let Some(version) = json.get("info")
             .and_then(|info| info.get("version"))
