@@ -8,6 +8,7 @@ use tokio::{
     io::{BufReader, AsyncReadExt, AsyncWriteExt},
 };
 use tokio_stream::*;
+use async_compression::tokio::bufread::GzipDecoder;
 
 use tokio_tar::Archive;
 use tower_package::{Package, PackageSpec};
@@ -154,9 +155,8 @@ async fn read_package_files(package: Package) -> HashMap<String, String> {
     let buf = BufReader::new(file);
 
     // TODO: Re-enable this when we reintroduce gzip compression
-    //let gzip = GzipDecoder::new(buf);
-    //let mut archive = Archive::new(gzip);
-    let mut archive = Archive::new(buf);
+    let gzip = GzipDecoder::new(buf);
+    let mut archive = Archive::new(gzip);
     let mut entries = archive.entries().expect("Failed to get entries from archive");
 
     let mut files = HashMap::new();
