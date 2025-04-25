@@ -15,6 +15,10 @@ from .tower_api_client.models import (
 )
 from .tower_api_client.models.error_model import ErrorModel
 
+# WAIT_TIMEOUT is the amount of time to wait between requests when polling the
+# Tower API.
+WAIT_TIMEOUT = 2
+
 # DEFAULT_TOWER_URL is the default tower URL to use when connecting back to
 # Tower.
 DEFAULT_TOWER_URL = "https://api.tower.dev"
@@ -68,7 +72,7 @@ def run_app(
     )
 
     output: Optional[Union[ErrorModel, RunAppResponse]] = run_app_api.sync(
-        slug=slug, client=client, json_body=input_body
+        slug=slug, client=client, body=input_body
     )
 
     if output is None:
@@ -92,7 +96,7 @@ def wait_for_run(run: Run) -> None:
 
     while True:
         output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(
-            name=run.app_name,
+            slug=run.app_slug,
             seq=run.number,
             client=client
         )
@@ -114,4 +118,4 @@ def wait_for_run(run: Run) -> None:
                 elif desc.status == "errored":
                     return
                 else:
-                    time.sleep(2)
+                    time.sleep(WAIT_TIMEOUT)
