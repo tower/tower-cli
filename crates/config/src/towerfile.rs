@@ -2,7 +2,7 @@ use crate::Error;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Parameter{
     #[serde(default)]
     pub name: String,
@@ -14,7 +14,7 @@ pub struct Parameter{
     pub default: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct App {
     #[serde(default)]
     pub name: String,
@@ -35,7 +35,7 @@ pub struct App {
     pub workspace: PathBuf,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Towerfile {
     /// file_path is the path to where this file was read on disk. It's always populated by the
     /// parser/application, never by the data.
@@ -67,16 +67,7 @@ impl Towerfile {
     /// from_toml parses a new Towerfile from a TOML string. It's not exposed externally because
     /// the base_dir field always needs to be set after parsing.
     pub fn from_toml(toml: &str) -> Result<Self, Error> {
-        let mut towerfile: Towerfile = toml::from_str(toml)?;
-
-        // We set the workspace to the directory of the Towerfile if it's not set because that's
-        // the implicit behavior overall for legacy Towerfiles.
-        if towerfile.app.workspace.as_os_str().is_empty() {
-            towerfile.app.workspace = towerfile.file_path
-                .parent()
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| PathBuf::new());
-        }
+        let towerfile: Towerfile = toml::from_str(toml)?;
 
         if towerfile.app.name.is_empty() {
             return Err(Error::MissingRequiredAppField{ field: "name".to_string() });
@@ -93,6 +84,16 @@ impl Towerfile {
 
         let mut towerfile = Self::from_toml(&std::fs::read_to_string(path.to_path_buf())?)?;
         towerfile.file_path = path;
+
+        // We set the workspace to the directory of the Towerfile if it's not set because that's
+        // the implicit behavior overall for legacy Towerfiles.
+        if towerfile.app.workspace.as_os_str().is_empty() {
+            log::debug!("Setting workspace to the directory of the Towerfile");
+            towerfile.app.workspace = towerfile.file_path
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap();
+        }
 
         Ok(towerfile)
     }

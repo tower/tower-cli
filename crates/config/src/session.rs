@@ -1,9 +1,12 @@
+use std::future::Future;
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc, TimeZone};
 use std::fs;
 use std::path::PathBuf;
 use url::Url;
 
 use crate::error::Error;
+use tower_api::apis::default_api::describe_session;
 
 const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
 
@@ -65,6 +68,47 @@ fn find_or_create_config_dir() -> Result<PathBuf, Error> {
     }
 
     Ok(config_dir)
+}
+
+pub fn get_last_version_check_timestamp() -> DateTime<Utc> {
+    let default: DateTime<Utc> = Utc.timestamp_opt(0, 0).unwrap();
+
+    // Look up (in the config dir) when the last version check was done. It's stored in a file
+    // called last_version_check.txt and contains a chrono::DateTime timestamp in ISO 8601 format.
+    match find_or_create_config_dir() {
+        Ok(path) => {
+            if let Ok(last_version_check) = fs::read_to_string(path.join("last_version_check.txt")) {
+                if let Ok(dt) = DateTime::parse_from_rfc3339(&last_version_check) {
+                    dt.into()
+                } else {
+                    log::debug!("Error parsing last version check timestamp: {}", last_version_check);
+                    default
+                }
+            } else {
+                log::debug!("Error reading last version check timestamp");
+                default
+            }
+        },
+        Err(err) => {
+            log::debug!("Error finding config dir: {}", err);
+            default
+        }
+    }
+}
+
+pub fn set_last_version_check_timestamp(dt: DateTime<Utc>) {
+    match find_or_create_config_dir() {
+        Ok(path) => {
+            let dt_str = dt.to_rfc3339();
+
+            if let Err(err) = fs::write(path.join("last_version_check.txt"), dt_str) {
+                log::debug!("Error writing last version check timestamp: {}", err);
+            }
+        },
+        Err(err) => {
+            log::debug!("Error finding config dir: {}", err);
+        }
+    }
 }
 
 impl Session {
@@ -215,4 +259,61 @@ impl Session {
 
         return next_session;
     }
+
+    pub fn from_jwt(jwt: &str) -> Result<Self, Error> {
+        // We need to instantiate our own configuration object here, instead of the typical thing
+        // that we do which is turn a Config into a Configuration.
+        let mut config = tower_api::apis::configuration::Configuration::new();
+        config.bearer_access_token = Some(jwt.to_string());
+
+        // We only pull TOWER_URL out of the environment here because we only ever use the JWT and
+        // all that in programmatic contexts (when TOWER_URL is set).
+        let tower_url = if let Ok(val) = std::env::var("TOWER_URL") {
+            val
+        } else {
+            DEFAULT_TOWER_URL.to_string()
+        };
+
+        // Setup the base path to point to the /v1 API endpoint as expected.
+        let mut base_path = Url::parse(&tower_url).unwrap();
+        base_path.set_path("/v1");
+
+        config.base_path = base_path.to_string();
+
+        // This is a bit of a hairy thing: I didn't want to pull in too much from the Tower API
+        // client, so we're using the raw bindings here.
+        match run_future_sync(describe_session(&config)) {
+            Ok(resp) => {
+                // Now we need to extract the session from the response.
+                let entity = resp.entity.unwrap();
+
+                match entity {
+                    tower_api::apis::default_api::DescribeSessionSuccess::Status200(resp) => {
+                        let mut session = Session::from_api_session(&resp.session);
+                        session.tower_url = base_path;
+                        Ok(session)
+                    }
+                    tower_api::apis::default_api::DescribeSessionSuccess::UnknownValue(val) => {
+                        log::error!("Unknown value while describing session: {}", val);
+                        Err(Error::UnknownDescribeSessionValue { value: val })
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("Error describing session: {}", err);
+                Err(Error::DescribeSessionError { err })
+            }
+        }
+    }
+}
+
+// This hairy little function is a workaround for the fact that we can't use async/await in the
+// context of some of the functions in this file.
+fn run_future_sync<F, T>(future: F) -> T 
+where
+    F: Future<Output = T>,
+{
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(future)
+    })
 }

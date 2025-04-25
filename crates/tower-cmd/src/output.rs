@@ -49,7 +49,7 @@ pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
 
 pub fn package_error(err: tower_package::Error) {
     let msg = match err {
-        tower_package::Error::NoManifest => "No manifeset was found".to_string(),
+        tower_package::Error::NoManifest => "No manifest was found".to_string(),
         tower_package::Error::InvalidManifest => {
             "Invalid manifest was found or created".to_string()
         }
@@ -88,6 +88,12 @@ pub fn config_error(err: config::Error) {
         }
         config::Error::TeamNotFound { ref team_slug } => {
             format!("Team with slug `{}` not found!", team_slug)
+        }
+        config::Error::UnknownDescribeSessionValue { value: _ } => {
+            "An error occured while describing the session associated with the JWT you provided. Maybe your CLI is out of date?".to_string()
+        }
+        config::Error::DescribeSessionError { ref err } => {
+            format!("An error occured while describing the session associated with the JWT you provided: {}", err)
         }
     };
 

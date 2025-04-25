@@ -310,15 +310,18 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
+ "chrono",
  "clap",
  "dirs",
+ "futures",
  "log",
  "serde",
  "serde_json",
  "snafu",
  "testutils",
+ "tokio",
  "toml",
  "tower-api",
  "url",
@@ -379,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "crypto"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "base64",
  "pem",
@@ -693,6 +696,7 @@ checksum = "65bc07b1a8bc7c85c5f2e110c476c7389b4554ba72af57d8445ea63a576b0876"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -714,6 +718,17 @@ name = "futures-core"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f29059c0c2090612e8d742178b0580d2dc940c837851ad723096f87af6663e"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e28d1d997f585e54aebc3f97d39e72338912123a67330d723fdbb564d646c9f"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -2410,7 +2425,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "pem",
  "rsa",
@@ -2614,7 +2629,7 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "tokio",
  "tower-api",
@@ -2650,7 +2665,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2689,7 +2704,7 @@ checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
 
 [[package]]
 name = "tower-package"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "async-compression",
  "config",
@@ -2707,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "chrono",
  "log",
@@ -2724,9 +2739,11 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tower-version"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "anyhow",
+ "chrono",
+ "config",
  "log",
  "reqwest",
  "serde_json",

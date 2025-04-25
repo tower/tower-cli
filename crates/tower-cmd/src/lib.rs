@@ -20,14 +20,27 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         let cmd = root_cmd();
-        let session = Session::from_config_dir().ok();
+
+        // In certain scenarios, we want to load a session from a JWT token supplied as an
+        // environment variable. This is for programmatic use cases where we want to test the CLI
+        // in automated environments, for instance.
+        let session = if let Ok(token) = std::env::var("TOWER_JWT") {
+            // let's exchange the token for a session, what we'll load.
+            Session::from_jwt(&token).ok()
+        } else {
+            Session::from_config_dir().ok()
+        }; 
 
         Self { cmd, session }
     }
 
     async fn check_latest_version() -> Option<String> {
-        let res = tower_version::check_latest_version().await;
-        res.unwrap_or(None)
+        if tower_version::should_check_latest_version().await {
+            let res = tower_version::check_latest_version().await;
+            res.unwrap_or(None)
+        } else {
+            None
+        }
     }
 
     pub async fn run(self) {
