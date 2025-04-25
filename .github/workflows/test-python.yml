@@ -1,0 +1,43 @@
+# This workflow will build and test the Rust code in this repository. There are
+# separate workflows for testing the python portion of the code base.
+#
+# This file is *not* generated from automation and is manually maintained.
+#
+name: "[tower] Test python"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        run: actions/setup-python@v5
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        if: github.ref_name != 'main'
+        run: uv sync --all-extras
+
+      - name: Run tests
+        if: github.ref_name != 'main'
+        run: uv run -m pytest --tb=short --disable-warnings
