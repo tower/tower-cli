@@ -1,7 +1,8 @@
 import datetime
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="TeamInvitation")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class TeamInvitation:
     """
     Attributes:
@@ -24,13 +25,14 @@ class TeamInvitation:
     invitation_sent_at: datetime.datetime
     team: "Team"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         email = self.email
+
         invitation_sent_at = self.invitation_sent_at.isoformat()
 
         team = self.team.to_dict()
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "email": email,
@@ -42,10 +44,10 @@ class TeamInvitation:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.team import Team
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         email = d.pop("email")
 
         invitation_sent_at = isoparse(d.pop("invitation_sent_at"))

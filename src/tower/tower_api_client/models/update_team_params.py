@@ -1,34 +1,39 @@
-from typing import Any, Dict, Optional, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import Any, TypeVar, Union, cast
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="UpdateTeamParams")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class UpdateTeamParams:
     """
     Attributes:
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/UpdateTeamParams.json.
-        name (Optional[str]): The name of the team to create. This is optional, if you supply null it will not update
+        name (Union[None, str]): The name of the team to create. This is optional, if you supply null it will not update
             the team name.
-        slug (Optional[str]): The new slug that you want the team to use. This is optional, if you supply null it will
-            not update the slug.
+        slug (Union[None, str]): The new slug that you want the team to use. This is optional, if you supply null it
+            will not update the slug.
+        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateTeamParams.json.
     """
 
-    name: Optional[str]
-    slug: Optional[str]
+    name: Union[None, str]
+    slug: Union[None, str]
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
-        schema = self.schema
+    def to_dict(self) -> dict[str, Any]:
+        name: Union[None, str]
         name = self.name
+
+        slug: Union[None, str]
         slug = self.slug
 
-        field_dict: Dict[str, Any] = {}
+        schema = self.schema
+
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "name": name,
@@ -41,18 +46,29 @@ class UpdateTeamParams:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
+
+        def _parse_name(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
+
+        name = _parse_name(d.pop("name"))
+
+        def _parse_slug(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
+
+        slug = _parse_slug(d.pop("slug"))
+
         schema = d.pop("$schema", UNSET)
 
-        name = d.pop("name")
-
-        slug = d.pop("slug")
-
         update_team_params = cls(
-            schema=schema,
             name=name,
             slug=slug,
+            schema=schema,
         )
 
         return update_team_params

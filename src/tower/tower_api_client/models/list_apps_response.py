@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -12,32 +13,31 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="ListAppsResponse")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class ListAppsResponse:
     """
     Attributes:
-        apps (List['AppSummary']):
+        apps (list['AppSummary']):
         pages (Pagination):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/ListAppsResponse.json.
+            https://api.tower.dev/v1/schemas/ListAppsResponse.json.
     """
 
-    apps: List["AppSummary"]
+    apps: list["AppSummary"]
     pages: "Pagination"
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         apps = []
         for apps_item_data in self.apps:
             apps_item = apps_item_data.to_dict()
-
             apps.append(apps_item)
 
         pages = self.pages.to_dict()
 
         schema = self.schema
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "apps": apps,
@@ -50,11 +50,11 @@ class ListAppsResponse:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.app_summary import AppSummary
         from ..models.pagination import Pagination
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         apps = []
         _apps = d.pop("apps")
         for apps_item_data in _apps:

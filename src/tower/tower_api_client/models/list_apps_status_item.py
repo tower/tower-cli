@@ -3,8 +3,8 @@ from enum import Enum
 
 class ListAppsStatusItem(str, Enum):
     ACTIVE = "active"
-    FAILED = "failed"
     DISABLED = "disabled"
+    FAILED = "failed"
     RUNNING = "running"
 
     def __str__(self) -> str:

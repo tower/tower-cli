@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -11,24 +12,24 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="ResendTeamInvitationResponse")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class ResendTeamInvitationResponse:
     """
     Attributes:
         team_invitation (TeamInvitation):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/ResendTeamInvitationResponse.json.
+            https://api.tower.dev/v1/schemas/ResendTeamInvitationResponse.json.
     """
 
     team_invitation: "TeamInvitation"
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         team_invitation = self.team_invitation.to_dict()
 
         schema = self.schema
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "team_invitation": team_invitation,
@@ -40,10 +41,10 @@ class ResendTeamInvitationResponse:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.team_invitation import TeamInvitation
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         team_invitation = TeamInvitation.from_dict(d.pop("team_invitation"))
 
         schema = d.pop("$schema", UNSET)

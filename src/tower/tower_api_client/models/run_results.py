@@ -1,11 +1,12 @@
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 
 T = TypeVar("T", bound="RunResults")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class RunResults:
     """
     Attributes:
@@ -24,15 +25,20 @@ class RunResults:
     pending: int
     running: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         cancelled = self.cancelled
+
         crashed = self.crashed
+
         errored = self.errored
+
         exited = self.exited
+
         pending = self.pending
+
         running = self.running
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "cancelled": cancelled,
@@ -47,8 +53,8 @@ class RunResults:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         cancelled = d.pop("cancelled")
 
         crashed = d.pop("crashed")

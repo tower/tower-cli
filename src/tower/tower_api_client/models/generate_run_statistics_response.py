@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -13,27 +14,26 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="GenerateRunStatisticsResponse")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class GenerateRunStatisticsResponse:
     """
     Attributes:
-        series (List['SeriesPoint']):
+        series (list['SeriesPoint']):
         settings (StatisticsSettings):
         stats (RunStatistics):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/GenerateRunStatisticsResponse.json.
+            https://api.tower.dev/v1/schemas/GenerateRunStatisticsResponse.json.
     """
 
-    series: List["SeriesPoint"]
+    series: list["SeriesPoint"]
     settings: "StatisticsSettings"
     stats: "RunStatistics"
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         series = []
         for series_item_data in self.series:
             series_item = series_item_data.to_dict()
-
             series.append(series_item)
 
         settings = self.settings.to_dict()
@@ -42,7 +42,7 @@ class GenerateRunStatisticsResponse:
 
         schema = self.schema
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "series": series,
@@ -56,12 +56,12 @@ class GenerateRunStatisticsResponse:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_statistics import RunStatistics
         from ..models.series_point import SeriesPoint
         from ..models.statistics_settings import StatisticsSettings
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         series = []
         _series = d.pop("series")
         for series_item_data in _series:

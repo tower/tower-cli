@@ -1,13 +1,14 @@
 import datetime
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 T = TypeVar("T", bound="User")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class User:
     """
     Attributes:
@@ -16,6 +17,7 @@ class User:
         created_at (datetime.datetime):
         email (str):
         first_name (str):
+        is_alerts_enabled (bool):
         is_invitation_claimed (bool):
         last_name (str):
         profile_photo_url (str):
@@ -26,22 +28,31 @@ class User:
     created_at: datetime.datetime
     email: str
     first_name: str
+    is_alerts_enabled: bool
     is_invitation_claimed: bool
     last_name: str
     profile_photo_url: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         company = self.company
+
         country = self.country
+
         created_at = self.created_at.isoformat()
 
         email = self.email
+
         first_name = self.first_name
+
+        is_alerts_enabled = self.is_alerts_enabled
+
         is_invitation_claimed = self.is_invitation_claimed
+
         last_name = self.last_name
+
         profile_photo_url = self.profile_photo_url
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "company": company,
@@ -49,6 +60,7 @@ class User:
                 "created_at": created_at,
                 "email": email,
                 "first_name": first_name,
+                "is_alerts_enabled": is_alerts_enabled,
                 "is_invitation_claimed": is_invitation_claimed,
                 "last_name": last_name,
                 "profile_photo_url": profile_photo_url,
@@ -58,8 +70,8 @@ class User:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         company = d.pop("company")
 
         country = d.pop("country")
@@ -69,6 +81,8 @@ class User:
         email = d.pop("email")
 
         first_name = d.pop("first_name")
+
+        is_alerts_enabled = d.pop("is_alerts_enabled")
 
         is_invitation_claimed = d.pop("is_invitation_claimed")
 
@@ -82,6 +96,7 @@ class User:
             created_at=created_at,
             email=email,
             first_name=first_name,
+            is_alerts_enabled=is_alerts_enabled,
             is_invitation_claimed=is_invitation_claimed,
             last_name=last_name,
             profile_photo_url=profile_photo_url,

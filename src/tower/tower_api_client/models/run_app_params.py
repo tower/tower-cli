@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -11,31 +12,37 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="RunAppParams")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class RunAppParams:
     """
     Attributes:
         environment (str): The environment to run this app in.
         parameters (RunAppParamsParameters): The parameters to pass into this app.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/RunAppParams.json.
-        parent_run_id (Union[Unset, None, str]): The ID of the run that invoked this run, if relevant. Should be null,
+            https://api.tower.dev/v1/schemas/RunAppParams.json.
+        parent_run_id (Union[None, Unset, str]): The ID of the run that invoked this run, if relevant. Should be null,
             if none.
     """
 
     environment: str
     parameters: "RunAppParamsParameters"
     schema: Union[Unset, str] = UNSET
-    parent_run_id: Union[Unset, None, str] = UNSET
+    parent_run_id: Union[None, Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         environment = self.environment
+
         parameters = self.parameters.to_dict()
 
         schema = self.schema
-        parent_run_id = self.parent_run_id
 
-        field_dict: Dict[str, Any] = {}
+        parent_run_id: Union[None, Unset, str]
+        if isinstance(self.parent_run_id, Unset):
+            parent_run_id = UNSET
+        else:
+            parent_run_id = self.parent_run_id
+
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "environment": environment,
@@ -50,17 +57,24 @@ class RunAppParams:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_app_params_parameters import RunAppParamsParameters
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         environment = d.pop("environment")
 
         parameters = RunAppParamsParameters.from_dict(d.pop("parameters"))
 
         schema = d.pop("$schema", UNSET)
 
-        parent_run_id = d.pop("parent_run_id", UNSET)
+        def _parse_parent_run_id(data: object) -> Union[None, Unset, str]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, str], data)
+
+        parent_run_id = _parse_parent_run_id(d.pop("parent_run_id", UNSET))
 
         run_app_params = cls(
             environment=environment,

@@ -1,13 +1,14 @@
 import datetime
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 T = TypeVar("T", bound="LogLineError")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class LogLineError:
     """
     Attributes:
@@ -18,11 +19,12 @@ class LogLineError:
     content: str
     reported_at: datetime.datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         content = self.content
+
         reported_at = self.reported_at.isoformat()
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "content": content,
@@ -33,8 +35,8 @@ class LogLineError:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         content = d.pop("content")
 
         reported_at = isoparse(d.pop("reported_at"))

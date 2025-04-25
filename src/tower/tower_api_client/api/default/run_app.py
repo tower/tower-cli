@@ -1,9 +1,10 @@
 from http import HTTPStatus
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 import httpx
 
-from ...client import AuthenticatedClient
+from ... import errors
+from ...client import AuthenticatedClient, Client
 from ...models.error_model import ErrorModel
 from ...models.run_app_params import RunAppParams
 from ...models.run_app_response import RunAppResponse
@@ -11,30 +12,30 @@ from ...types import Response
 
 
 def _get_kwargs(
-    name: str,
+    slug: str,
     *,
-    client: AuthenticatedClient,
-    json_body: RunAppParams,
-) -> Dict[str, Any]:
-    url = "{}/apps/{name}/runs".format(client.base_url, name=name)
+    body: RunAppParams,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
-    headers: Dict[str, str] = client.get_headers()
-    cookies: Dict[str, Any] = client.get_cookies()
-
-    json_json_body = json_body.to_dict()
-
-    return {
+    _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": url,
-        "headers": headers,
-        "cookies": cookies,
-        "timeout": client.get_timeout(),
-        "json": json_json_body,
+        "url": "/apps/{slug}/runs".format(
+            slug=slug,
+        ),
     }
+
+    _body = body.to_dict()
+
+    _kwargs["json"] = _body
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
 
 
 def _parse_response(
-    *, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Optional[Union[ErrorModel, RunAppResponse]]:
     if response.status_code == 200:
         response_200 = RunAppResponse.from_dict(response.json())
@@ -48,129 +49,144 @@ def _parse_response(
         response_401 = ErrorModel.from_dict(response.json())
 
         return response_401
-    return None
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
 
 
 def _build_response(
-    *, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[Union[ErrorModel, RunAppResponse]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
         headers=response.headers,
-        parsed=_parse_response(response=response),
+        parsed=_parse_response(client=client, response=response),
     )
 
 
 def sync_detailed(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: RunAppParams,
+    body: RunAppParams,
 ) -> Response[Union[ErrorModel, RunAppResponse]]:
     """Run app
 
      Runs an app with the supplied parameters.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        json_body (RunAppParams):
+        slug (str): The slug of the app to fetch runs for.
+        body (RunAppParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[Union[ErrorModel, RunAppResponse]]
     """
 
     kwargs = _get_kwargs(
-        name=name,
-        client=client,
-        json_body=json_body,
+        slug=slug,
+        body=body,
     )
 
-    response = httpx.request(
-        verify=client.verify_ssl,
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 def sync(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: RunAppParams,
+    body: RunAppParams,
 ) -> Optional[Union[ErrorModel, RunAppResponse]]:
     """Run app
 
      Runs an app with the supplied parameters.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        json_body (RunAppParams):
+        slug (str): The slug of the app to fetch runs for.
+        body (RunAppParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ErrorModel, RunAppResponse]]
+        Union[ErrorModel, RunAppResponse]
     """
 
     return sync_detailed(
-        name=name,
+        slug=slug,
         client=client,
-        json_body=json_body,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: RunAppParams,
+    body: RunAppParams,
 ) -> Response[Union[ErrorModel, RunAppResponse]]:
     """Run app
 
      Runs an app with the supplied parameters.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        json_body (RunAppParams):
+        slug (str): The slug of the app to fetch runs for.
+        body (RunAppParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[Union[ErrorModel, RunAppResponse]]
     """
 
     kwargs = _get_kwargs(
-        name=name,
-        client=client,
-        json_body=json_body,
+        slug=slug,
+        body=body,
     )
 
-    async with httpx.AsyncClient(verify=client.verify_ssl) as _client:
-        response = await _client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 async def asyncio(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: RunAppParams,
+    body: RunAppParams,
 ) -> Optional[Union[ErrorModel, RunAppResponse]]:
     """Run app
 
      Runs an app with the supplied parameters.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        json_body (RunAppParams):
+        slug (str): The slug of the app to fetch runs for.
+        body (RunAppParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ErrorModel, RunAppResponse]]
+        Union[ErrorModel, RunAppResponse]
     """
 
     return (
         await asyncio_detailed(
-            name=name,
+            slug=slug,
             client=client,
-            json_body=json_body,
+            body=body,
         )
     ).parsed

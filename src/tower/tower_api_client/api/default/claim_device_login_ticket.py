@@ -1,9 +1,10 @@
 from http import HTTPStatus
-from typing import Any, Dict, Optional
+from typing import Any, Optional, Union
 
 import httpx
 
-from ...client import AuthenticatedClient
+from ... import errors
+from ...client import AuthenticatedClient, Client
 from ...models.claim_device_login_ticket_params import ClaimDeviceLoginTicketParams
 from ...models.claim_device_login_ticket_response import ClaimDeviceLoginTicketResponse
 from ...types import Response
@@ -11,144 +12,157 @@ from ...types import Response
 
 def _get_kwargs(
     *,
-    client: AuthenticatedClient,
-    json_body: ClaimDeviceLoginTicketParams,
-) -> Dict[str, Any]:
-    url = "{}/login/device/claim".format(client.base_url)
+    body: ClaimDeviceLoginTicketParams,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
-    headers: Dict[str, str] = client.get_headers()
-    cookies: Dict[str, Any] = client.get_cookies()
-
-    json_json_body = json_body.to_dict()
-
-    return {
+    _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": url,
-        "headers": headers,
-        "cookies": cookies,
-        "timeout": client.get_timeout(),
-        "json": json_json_body,
+        "url": "/login/device/claim",
     }
+
+    _body = body.to_dict()
+
+    _kwargs["json"] = _body
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
 
 
 def _parse_response(
-    *, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Optional[ClaimDeviceLoginTicketResponse]:
     if response.status_code == 200:
         response_200 = ClaimDeviceLoginTicketResponse.from_dict(response.json())
 
         return response_200
-    return None
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
 
 
 def _build_response(
-    *, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[ClaimDeviceLoginTicketResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
         headers=response.headers,
-        parsed=_parse_response(response=response),
+        parsed=_parse_response(client=client, response=response),
     )
 
 
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    json_body: ClaimDeviceLoginTicketParams,
+    body: ClaimDeviceLoginTicketParams,
 ) -> Response[ClaimDeviceLoginTicketResponse]:
     """Claim a device login ticket
 
      Claims a device login ticket code for the authenticated user.
 
     Args:
-        json_body (ClaimDeviceLoginTicketParams):
+        body (ClaimDeviceLoginTicketParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[ClaimDeviceLoginTicketResponse]
     """
 
     kwargs = _get_kwargs(
-        client=client,
-        json_body=json_body,
+        body=body,
     )
 
-    response = httpx.request(
-        verify=client.verify_ssl,
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 def sync(
     *,
     client: AuthenticatedClient,
-    json_body: ClaimDeviceLoginTicketParams,
+    body: ClaimDeviceLoginTicketParams,
 ) -> Optional[ClaimDeviceLoginTicketResponse]:
     """Claim a device login ticket
 
      Claims a device login ticket code for the authenticated user.
 
     Args:
-        json_body (ClaimDeviceLoginTicketParams):
+        body (ClaimDeviceLoginTicketParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ClaimDeviceLoginTicketResponse]
+        ClaimDeviceLoginTicketResponse
     """
 
     return sync_detailed(
         client=client,
-        json_body=json_body,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    json_body: ClaimDeviceLoginTicketParams,
+    body: ClaimDeviceLoginTicketParams,
 ) -> Response[ClaimDeviceLoginTicketResponse]:
     """Claim a device login ticket
 
      Claims a device login ticket code for the authenticated user.
 
     Args:
-        json_body (ClaimDeviceLoginTicketParams):
+        body (ClaimDeviceLoginTicketParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[ClaimDeviceLoginTicketResponse]
     """
 
     kwargs = _get_kwargs(
-        client=client,
-        json_body=json_body,
+        body=body,
     )
 
-    async with httpx.AsyncClient(verify=client.verify_ssl) as _client:
-        response = await _client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    json_body: ClaimDeviceLoginTicketParams,
+    body: ClaimDeviceLoginTicketParams,
 ) -> Optional[ClaimDeviceLoginTicketResponse]:
     """Claim a device login ticket
 
      Claims a device login ticket code for the authenticated user.
 
     Args:
-        json_body (ClaimDeviceLoginTicketParams):
+        body (ClaimDeviceLoginTicketParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ClaimDeviceLoginTicketResponse]
+        ClaimDeviceLoginTicketResponse
     """
 
     return (
         await asyncio_detailed(
             client=client,
-            json_body=json_body,
+            body=body,
         )
     ).parsed

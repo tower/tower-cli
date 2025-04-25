@@ -1,11 +1,12 @@
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 
 T = TypeVar("T", bound="CreateAccountParamsFlagsStruct")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class CreateAccountParamsFlagsStruct:
     """
     Attributes:
@@ -14,10 +15,10 @@ class CreateAccountParamsFlagsStruct:
 
     is_test_account: bool
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         is_test_account = self.is_test_account
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "is_test_account": is_test_account,
@@ -27,8 +28,8 @@ class CreateAccountParamsFlagsStruct:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         is_test_account = d.pop("is_test_account")
 
         create_account_params_flags_struct = cls(

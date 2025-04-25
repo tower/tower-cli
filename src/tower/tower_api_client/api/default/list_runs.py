@@ -1,65 +1,96 @@
+import datetime
 from http import HTTPStatus
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 import httpx
 
-from ...client import AuthenticatedClient
+from ... import errors
+from ...client import AuthenticatedClient, Client
 from ...models.list_runs_response import ListRunsResponse
+from ...models.list_runs_status_item import ListRunsStatusItem
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    name: str,
+    slug: str,
     *,
-    client: AuthenticatedClient,
-    page: Union[Unset, None, int] = UNSET,
-    page_size: Union[Unset, None, int] = UNSET,
-) -> Dict[str, Any]:
-    url = "{}/apps/{name}/runs".format(client.base_url, name=name)
+    page: Union[Unset, int] = UNSET,
+    page_size: Union[Unset, int] = UNSET,
+    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {}
 
-    headers: Dict[str, str] = client.get_headers()
-    cookies: Dict[str, Any] = client.get_cookies()
-
-    params: Dict[str, Any] = {}
     params["page"] = page
 
     params["page_size"] = page_size
 
+    json_status: Union[Unset, list[str]] = UNSET
+    if not isinstance(status, Unset):
+        json_status = []
+        for status_item_data in status:
+            status_item = status_item_data.value
+            json_status.append(status_item)
+
+    params["status"] = json_status
+
+    json_start_at: Union[Unset, str] = UNSET
+    if not isinstance(start_at, Unset):
+        json_start_at = start_at.isoformat()
+    params["start_at"] = json_start_at
+
+    json_end_at: Union[Unset, str] = UNSET
+    if not isinstance(end_at, Unset):
+        json_end_at = end_at.isoformat()
+    params["end_at"] = json_end_at
+
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
-    return {
+    _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": url,
-        "headers": headers,
-        "cookies": cookies,
-        "timeout": client.get_timeout(),
+        "url": "/apps/{slug}/runs".format(
+            slug=slug,
+        ),
         "params": params,
     }
 
+    return _kwargs
 
-def _parse_response(*, response: httpx.Response) -> Optional[ListRunsResponse]:
+
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[ListRunsResponse]:
     if response.status_code == 200:
         response_200 = ListRunsResponse.from_dict(response.json())
 
         return response_200
-    return None
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
 
 
-def _build_response(*, response: httpx.Response) -> Response[ListRunsResponse]:
+def _build_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[ListRunsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
         headers=response.headers,
-        parsed=_parse_response(response=response),
+        parsed=_parse_response(client=client, response=response),
     )
 
 
 def sync_detailed(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, None, int] = UNSET,
-    page_size: Union[Unset, None, int] = UNSET,
+    page: Union[Unset, int] = UNSET,
+    page_size: Union[Unset, int] = UNSET,
+    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[ListRunsResponse]:
     """List runs
 
@@ -67,35 +98,49 @@ def sync_detailed(
     parameters passed in.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        page (Union[Unset, None, int]): The page number to fetch.
-        page_size (Union[Unset, None, int]): The number of records to fetch on each page.
+        slug (str): The slug of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch.
+        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
+            separated for multiple).
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
+            datetime (inclusive)
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive)
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[ListRunsResponse]
     """
 
     kwargs = _get_kwargs(
-        name=name,
-        client=client,
+        slug=slug,
         page=page,
         page_size=page_size,
+        status=status,
+        start_at=start_at,
+        end_at=end_at,
     )
 
-    response = httpx.request(
-        verify=client.verify_ssl,
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 def sync(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, None, int] = UNSET,
-    page_size: Union[Unset, None, int] = UNSET,
+    page: Union[Unset, int] = UNSET,
+    page_size: Union[Unset, int] = UNSET,
+    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[ListRunsResponse]:
     """List runs
 
@@ -103,28 +148,44 @@ def sync(
     parameters passed in.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        page (Union[Unset, None, int]): The page number to fetch.
-        page_size (Union[Unset, None, int]): The number of records to fetch on each page.
+        slug (str): The slug of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch.
+        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
+            separated for multiple).
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
+            datetime (inclusive)
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive)
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListRunsResponse]
+        ListRunsResponse
     """
 
     return sync_detailed(
-        name=name,
+        slug=slug,
         client=client,
         page=page,
         page_size=page_size,
+        status=status,
+        start_at=start_at,
+        end_at=end_at,
     ).parsed
 
 
 async def asyncio_detailed(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, None, int] = UNSET,
-    page_size: Union[Unset, None, int] = UNSET,
+    page: Union[Unset, int] = UNSET,
+    page_size: Union[Unset, int] = UNSET,
+    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[ListRunsResponse]:
     """List runs
 
@@ -132,33 +193,47 @@ async def asyncio_detailed(
     parameters passed in.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        page (Union[Unset, None, int]): The page number to fetch.
-        page_size (Union[Unset, None, int]): The number of records to fetch on each page.
+        slug (str): The slug of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch.
+        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
+            separated for multiple).
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
+            datetime (inclusive)
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive)
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[ListRunsResponse]
     """
 
     kwargs = _get_kwargs(
-        name=name,
-        client=client,
+        slug=slug,
         page=page,
         page_size=page_size,
+        status=status,
+        start_at=start_at,
+        end_at=end_at,
     )
 
-    async with httpx.AsyncClient(verify=client.verify_ssl) as _client:
-        response = await _client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 async def asyncio(
-    name: str,
+    slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, None, int] = UNSET,
-    page_size: Union[Unset, None, int] = UNSET,
+    page: Union[Unset, int] = UNSET,
+    page_size: Union[Unset, int] = UNSET,
+    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[ListRunsResponse]:
     """List runs
 
@@ -166,19 +241,32 @@ async def asyncio(
     parameters passed in.
 
     Args:
-        name (str): The name of the app to fetch runs for.
-        page (Union[Unset, None, int]): The page number to fetch.
-        page_size (Union[Unset, None, int]): The number of records to fetch on each page.
+        slug (str): The slug of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch.
+        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
+            separated for multiple).
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
+            datetime (inclusive)
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive)
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListRunsResponse]
+        ListRunsResponse
     """
 
     return (
         await asyncio_detailed(
-            name=name,
+            slug=slug,
             client=client,
             page=page,
             page_size=page_size,
+            status=status,
+            start_at=start_at,
+            end_at=end_at,
         )
     ).parsed

@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 
 if TYPE_CHECKING:
     from ..models.team import Team
@@ -11,31 +12,30 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Session")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class Session:
     """
     Attributes:
-        teams (List['Team']):
+        teams (list['Team']):
         token (Token):
         user (User):
     """
 
-    teams: List["Team"]
+    teams: list["Team"]
     token: "Token"
     user: "User"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         teams = []
         for teams_item_data in self.teams:
             teams_item = teams_item_data.to_dict()
-
             teams.append(teams_item)
 
         token = self.token.to_dict()
 
         user = self.user.to_dict()
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "teams": teams,
@@ -47,12 +47,12 @@ class Session:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.team import Team
         from ..models.token import Token
         from ..models.user import User
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         teams = []
         _teams = d.pop("teams")
         for teams_item_data in _teams:

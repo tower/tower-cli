@@ -1,11 +1,12 @@
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 
 T = TypeVar("T", bound="AppStatistics")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class AppStatistics:
     """
     Attributes:
@@ -22,14 +23,18 @@ class AppStatistics:
     failed_apps: int
     running_apps: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         all_apps = self.all_apps
+
         disabled_apps = self.disabled_apps
+
         exited_apps = self.exited_apps
+
         failed_apps = self.failed_apps
+
         running_apps = self.running_apps
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "all_apps": all_apps,
@@ -43,8 +48,8 @@ class AppStatistics:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         all_apps = d.pop("all_apps")
 
         disabled_apps = d.pop("disabled_apps")

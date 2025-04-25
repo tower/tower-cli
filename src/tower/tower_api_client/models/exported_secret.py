@@ -1,13 +1,14 @@
 import datetime
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 T = TypeVar("T", bound="ExportedSecret")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class ExportedSecret:
     """
     Attributes:
@@ -22,14 +23,16 @@ class ExportedSecret:
     environment: str
     name: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
 
         encrypted_value = self.encrypted_value
+
         environment = self.environment
+
         name = self.name
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "created_at": created_at,
@@ -42,8 +45,8 @@ class ExportedSecret:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         created_at = isoparse(d.pop("created_at"))
 
         encrypted_value = d.pop("encrypted_value")

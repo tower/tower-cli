@@ -1,7 +1,8 @@
 import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
@@ -11,35 +12,39 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="AppVersion")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class AppVersion:
     """
     Attributes:
         created_at (datetime.datetime):
-        parameters (List['Parameter']):
+        parameters (list['Parameter']):
+        towerfile (str): The Towerfile that this version was created from.
         version (str):
     """
 
     created_at: datetime.datetime
-    parameters: List["Parameter"]
+    parameters: list["Parameter"]
+    towerfile: str
     version: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
 
         parameters = []
         for parameters_item_data in self.parameters:
             parameters_item = parameters_item_data.to_dict()
-
             parameters.append(parameters_item)
+
+        towerfile = self.towerfile
 
         version = self.version
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "created_at": created_at,
                 "parameters": parameters,
+                "towerfile": towerfile,
                 "version": version,
             }
         )
@@ -47,10 +52,10 @@ class AppVersion:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.parameter import Parameter
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         created_at = isoparse(d.pop("created_at"))
 
         parameters = []
@@ -60,11 +65,14 @@ class AppVersion:
 
             parameters.append(parameters_item)
 
+        towerfile = d.pop("towerfile")
+
         version = d.pop("version")
 
         app_version = cls(
             created_at=created_at,
             parameters=parameters,
+            towerfile=towerfile,
             version=version,
         )
 

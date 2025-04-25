@@ -1,11 +1,12 @@
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 
 T = TypeVar("T", bound="RunStatistics")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class RunStatistics:
     """
     Attributes:
@@ -18,12 +19,14 @@ class RunStatistics:
     successful_runs: int
     total_runs: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         failed_runs = self.failed_runs
+
         successful_runs = self.successful_runs
+
         total_runs = self.total_runs
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "failed_runs": failed_runs,
@@ -35,8 +38,8 @@ class RunStatistics:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         failed_runs = d.pop("failed_runs")
 
         successful_runs = d.pop("successful_runs")

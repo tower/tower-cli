@@ -1,9 +1,10 @@
 from http import HTTPStatus
-from typing import Any, Dict, Optional
+from typing import Any, Optional, Union
 
 import httpx
 
-from ...client import AuthenticatedClient
+from ... import errors
+from ...client import AuthenticatedClient, Client
 from ...models.update_team_params import UpdateTeamParams
 from ...models.update_team_response import UpdateTeamResponse
 from ...types import Response
@@ -12,40 +13,47 @@ from ...types import Response
 def _get_kwargs(
     slug: str,
     *,
-    client: AuthenticatedClient,
-    json_body: UpdateTeamParams,
-) -> Dict[str, Any]:
-    url = "{}/teams/{slug}".format(client.base_url, slug=slug)
+    body: UpdateTeamParams,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
-    headers: Dict[str, str] = client.get_headers()
-    cookies: Dict[str, Any] = client.get_cookies()
-
-    json_json_body = json_body.to_dict()
-
-    return {
+    _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": url,
-        "headers": headers,
-        "cookies": cookies,
-        "timeout": client.get_timeout(),
-        "json": json_json_body,
+        "url": "/teams/{slug}".format(
+            slug=slug,
+        ),
     }
 
+    _body = body.to_dict()
 
-def _parse_response(*, response: httpx.Response) -> Optional[UpdateTeamResponse]:
+    _kwargs["json"] = _body
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[UpdateTeamResponse]:
     if response.status_code == 200:
         response_200 = UpdateTeamResponse.from_dict(response.json())
 
         return response_200
-    return None
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
 
 
-def _build_response(*, response: httpx.Response) -> Response[UpdateTeamResponse]:
+def _build_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[UpdateTeamResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
         headers=response.headers,
-        parsed=_parse_response(response=response),
+        parsed=_parse_response(client=client, response=response),
     )
 
 
@@ -53,16 +61,20 @@ def sync_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: UpdateTeamParams,
+    body: UpdateTeamParams,
 ) -> Response[UpdateTeamResponse]:
-    """Update Team
+    """Update team
 
      Update a team with a new name or slug. Note that updating the team with a new slug will cause all
     your URLs to change!
 
     Args:
         slug (str): The slug of the team to update
-        json_body (UpdateTeamParams):
+        body (UpdateTeamParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[UpdateTeamResponse]
@@ -70,41 +82,43 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         slug=slug,
-        client=client,
-        json_body=json_body,
+        body=body,
     )
 
-    response = httpx.request(
-        verify=client.verify_ssl,
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 def sync(
     slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: UpdateTeamParams,
+    body: UpdateTeamParams,
 ) -> Optional[UpdateTeamResponse]:
-    """Update Team
+    """Update team
 
      Update a team with a new name or slug. Note that updating the team with a new slug will cause all
     your URLs to change!
 
     Args:
         slug (str): The slug of the team to update
-        json_body (UpdateTeamParams):
+        body (UpdateTeamParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateTeamResponse]
+        UpdateTeamResponse
     """
 
     return sync_detailed(
         slug=slug,
         client=client,
-        json_body=json_body,
+        body=body,
     ).parsed
 
 
@@ -112,16 +126,20 @@ async def asyncio_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: UpdateTeamParams,
+    body: UpdateTeamParams,
 ) -> Response[UpdateTeamResponse]:
-    """Update Team
+    """Update team
 
      Update a team with a new name or slug. Note that updating the team with a new slug will cause all
     your URLs to change!
 
     Args:
         slug (str): The slug of the team to update
-        json_body (UpdateTeamParams):
+        body (UpdateTeamParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[UpdateTeamResponse]
@@ -129,39 +147,41 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         slug=slug,
-        client=client,
-        json_body=json_body,
+        body=body,
     )
 
-    async with httpx.AsyncClient(verify=client.verify_ssl) as _client:
-        response = await _client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 async def asyncio(
     slug: str,
     *,
     client: AuthenticatedClient,
-    json_body: UpdateTeamParams,
+    body: UpdateTeamParams,
 ) -> Optional[UpdateTeamResponse]:
-    """Update Team
+    """Update team
 
      Update a team with a new name or slug. Note that updating the team with a new slug will cause all
     your URLs to change!
 
     Args:
         slug (str): The slug of the team to update
-        json_body (UpdateTeamParams):
+        body (UpdateTeamParams):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateTeamResponse]
+        UpdateTeamResponse
     """
 
     return (
         await asyncio_detailed(
             slug=slug,
             client=client,
-            json_body=json_body,
+            body=body,
         )
     ).parsed

@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -11,49 +12,53 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="ErrorModel")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class ErrorModel:
     """
     Attributes:
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/ErrorModel.json.
+            https://api.tower.dev/v1/schemas/ErrorModel.json.
         detail (Union[Unset, str]): A human-readable explanation specific to this occurrence of the problem. Example:
             Property foo is required but is missing..
-        errors (Union[Unset, List['ErrorDetail']]): Optional list of individual error details
+        errors (Union[Unset, list['ErrorDetail']]): Optional list of individual error details
         instance (Union[Unset, str]): A URI reference that identifies the specific occurrence of the problem. Example:
             https://example.com/error-log/abc123.
         status (Union[Unset, int]): HTTP status code Example: 400.
         title (Union[Unset, str]): A short, human-readable summary of the problem type. This value should not change
             between occurrences of the error. Example: Bad Request.
-        type (Union[Unset, str]): A URI reference to human-readable documentation for the error. Default: 'about:blank'.
-            Example: https://example.com/errors/example.
+        type_ (Union[Unset, str]): A URI reference to human-readable documentation for the error. Default:
+            'about:blank'. Example: https://example.com/errors/example.
     """
 
     schema: Union[Unset, str] = UNSET
     detail: Union[Unset, str] = UNSET
-    errors: Union[Unset, List["ErrorDetail"]] = UNSET
+    errors: Union[Unset, list["ErrorDetail"]] = UNSET
     instance: Union[Unset, str] = UNSET
     status: Union[Unset, int] = UNSET
     title: Union[Unset, str] = UNSET
-    type: Union[Unset, str] = "about:blank"
+    type_: Union[Unset, str] = "about:blank"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         schema = self.schema
+
         detail = self.detail
-        errors: Union[Unset, List[Dict[str, Any]]] = UNSET
+
+        errors: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.errors, Unset):
             errors = []
             for errors_item_data in self.errors:
                 errors_item = errors_item_data.to_dict()
-
                 errors.append(errors_item)
 
         instance = self.instance
-        status = self.status
-        title = self.title
-        type = self.type
 
-        field_dict: Dict[str, Any] = {}
+        status = self.status
+
+        title = self.title
+
+        type_ = self.type_
+
+        field_dict: dict[str, Any] = {}
         field_dict.update({})
         if schema is not UNSET:
             field_dict["$schema"] = schema
@@ -67,16 +72,16 @@ class ErrorModel:
             field_dict["status"] = status
         if title is not UNSET:
             field_dict["title"] = title
-        if type is not UNSET:
-            field_dict["type"] = type
+        if type_ is not UNSET:
+            field_dict["type"] = type_
 
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.error_detail import ErrorDetail
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         schema = d.pop("$schema", UNSET)
 
         detail = d.pop("detail", UNSET)
@@ -94,7 +99,7 @@ class ErrorModel:
 
         title = d.pop("title", UNSET)
 
-        type = d.pop("type", UNSET)
+        type_ = d.pop("type", UNSET)
 
         error_model = cls(
             schema=schema,
@@ -103,7 +108,7 @@ class ErrorModel:
             instance=instance,
             status=status,
             title=title,
-            type=type,
+            type_=type_,
         )
 
         return error_model

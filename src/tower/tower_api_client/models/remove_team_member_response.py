@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -11,24 +12,24 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="RemoveTeamMemberResponse")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class RemoveTeamMemberResponse:
     """
     Attributes:
         team_member (User):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/RemoveTeamMemberResponse.json.
+            https://api.tower.dev/v1/schemas/RemoveTeamMemberResponse.json.
     """
 
     team_member: "User"
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         team_member = self.team_member.to_dict()
 
         schema = self.schema
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "team_member": team_member,
@@ -40,10 +41,10 @@ class RemoveTeamMemberResponse:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.user import User
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         team_member = User.from_dict(d.pop("team_member"))
 
         schema = d.pop("$schema", UNSET)

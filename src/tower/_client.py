@@ -43,7 +43,7 @@ def _env_client(ctx: TowerContext) -> AuthenticatedClient:
 
 
 def run_app(
-    name: str,
+    slug: str,
     environment: Optional[str] = None,
     parameters: Optional[Dict[str, str]] = None,
 ) -> Run:
@@ -68,7 +68,7 @@ def run_app(
     )
 
     output: Optional[Union[ErrorModel, RunAppResponse]] = run_app_api.sync(
-        name=name, client=client, json_body=input_body
+        slug=slug, client=client, json_body=input_body
     )
 
     if output is None:
