@@ -1,30 +1,37 @@
 import datetime
-from typing import Any, Dict, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
-T = TypeVar("T", bound="GetRunLogLine")
+T = TypeVar("T", bound="RunLogLine")
 
 
-@attr.s(auto_attribs=True)
-class GetRunLogLine:
+@_attrs_define
+class RunLogLine:
     """
     Attributes:
+        channel (str):
         message (str):
         timestamp (datetime.datetime):
     """
 
+    channel: str
     message: str
     timestamp: datetime.datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
+        channel = self.channel
+
         message = self.message
+
         timestamp = self.timestamp.isoformat()
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
+                "channel": channel,
                 "message": message,
                 "timestamp": timestamp,
             }
@@ -33,15 +40,18 @@ class GetRunLogLine:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
+        channel = d.pop("channel")
+
         message = d.pop("message")
 
         timestamp = isoparse(d.pop("timestamp"))
 
-        get_run_log_line = cls(
+        run_log_line = cls(
+            channel=channel,
             message=message,
             timestamp=timestamp,
         )
 
-        return get_run_log_line
+        return run_log_line

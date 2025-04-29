@@ -1,13 +1,14 @@
-from typing import Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="ErrorDetail")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class ErrorDetail:
     """
     Attributes:
@@ -20,12 +21,14 @@ class ErrorDetail:
     message: Union[Unset, str] = UNSET
     value: Union[Unset, Any] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         location = self.location
+
         message = self.message
+
         value = self.value
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update({})
         if location is not UNSET:
             field_dict["location"] = location
@@ -37,8 +40,8 @@ class ErrorDetail:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         location = d.pop("location", UNSET)
 
         message = d.pop("message", UNSET)

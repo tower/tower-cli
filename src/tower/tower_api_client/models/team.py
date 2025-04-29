@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
@@ -11,35 +12,38 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Team")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class Team:
     """
     Attributes:
         name (str):
         slug (str):
-        type (str): The type of team, either 'personal' or 'team'.
+        type_ (str): The type of team, either 'personal' or 'team'.
         token (Union[Unset, Token]):
     """
 
     name: str
     slug: str
-    type: str
+    type_: str
     token: Union[Unset, "Token"] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         name = self.name
+
         slug = self.slug
-        type = self.type
-        token: Union[Unset, Dict[str, Any]] = UNSET
+
+        type_ = self.type_
+
+        token: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.token, Unset):
             token = self.token.to_dict()
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "name": name,
                 "slug": slug,
-                "type": type,
+                "type": type_,
             }
         )
         if token is not UNSET:
@@ -48,15 +52,15 @@ class Team:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.token import Token
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         name = d.pop("name")
 
         slug = d.pop("slug")
 
-        type = d.pop("type")
+        type_ = d.pop("type")
 
         _token = d.pop("token", UNSET)
         token: Union[Unset, Token]
@@ -68,7 +72,7 @@ class Team:
         team = cls(
             name=name,
             slug=slug,
-            type=type,
+            type_=type_,
             token=token,
         )
 

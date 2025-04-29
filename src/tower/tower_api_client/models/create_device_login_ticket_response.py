@@ -1,7 +1,8 @@
 import datetime
-from typing import Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
@@ -9,7 +10,7 @@ from ..types import UNSET, Unset
 T = TypeVar("T", bound="CreateDeviceLoginTicketResponse")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class CreateDeviceLoginTicketResponse:
     """
     Attributes:
@@ -21,7 +22,7 @@ class CreateDeviceLoginTicketResponse:
         user_code (str): The code that the user needs to enter to authenticate.
         verification_url (str): The URL that the device should poll to check authentication status.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/CreateDeviceLoginTicketResponse.json.
+            https://api.tower.dev/v1/schemas/CreateDeviceLoginTicketResponse.json.
     """
 
     device_code: str
@@ -33,18 +34,24 @@ class CreateDeviceLoginTicketResponse:
     verification_url: str
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         device_code = self.device_code
+
         expires_in = self.expires_in
+
         generated_at = self.generated_at.isoformat()
 
         interval = self.interval
+
         login_url = self.login_url
+
         user_code = self.user_code
+
         verification_url = self.verification_url
+
         schema = self.schema
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "device_code": device_code,
@@ -62,8 +69,8 @@ class CreateDeviceLoginTicketResponse:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
-        d = src_dict.copy()
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
         device_code = d.pop("device_code")
 
         expires_in = d.pop("expires_in")

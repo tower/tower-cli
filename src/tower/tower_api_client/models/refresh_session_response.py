@@ -1,7 +1,8 @@
 import datetime
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import attr
+from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
@@ -13,28 +14,28 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="RefreshSessionResponse")
 
 
-@attr.s(auto_attribs=True)
+@_attrs_define
 class RefreshSessionResponse:
     """
     Attributes:
         refreshed_at (datetime.datetime): A timestamp that indicates the last time the session data was refreshed.
         session (Session):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            http://localhost:8081/v1/schemas/RefreshSessionResponse.json.
+            https://api.tower.dev/v1/schemas/RefreshSessionResponse.json.
     """
 
     refreshed_at: datetime.datetime
     session: "Session"
     schema: Union[Unset, str] = UNSET
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         refreshed_at = self.refreshed_at.isoformat()
 
         session = self.session.to_dict()
 
         schema = self.schema
 
-        field_dict: Dict[str, Any] = {}
+        field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "refreshed_at": refreshed_at,
@@ -47,10 +48,10 @@ class RefreshSessionResponse:
         return field_dict
 
     @classmethod
-    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.session import Session
 
-        d = src_dict.copy()
+        d = dict(src_dict)
         refreshed_at = isoparse(d.pop("refreshed_at"))
 
         session = Session.from_dict(d.pop("session"))

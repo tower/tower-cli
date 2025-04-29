@@ -1,52 +1,55 @@
 from http import HTTPStatus
-from typing import Any, Dict, Optional
+from typing import Any, Optional, Union
 
 import httpx
 
-from ...client import AuthenticatedClient
+from ... import errors
+from ...client import AuthenticatedClient, Client
 from ...models.cancel_run_response import CancelRunResponse
 from ...types import Response
 
 
 def _get_kwargs(
-    name: str,
+    slug: str,
     seq: int,
-    *,
-    client: AuthenticatedClient,
-) -> Dict[str, Any]:
-    url = "{}/apps/{name}/runs/{seq}".format(client.base_url, name=name, seq=seq)
-
-    headers: Dict[str, str] = client.get_headers()
-    cookies: Dict[str, Any] = client.get_cookies()
-
-    return {
+) -> dict[str, Any]:
+    _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": url,
-        "headers": headers,
-        "cookies": cookies,
-        "timeout": client.get_timeout(),
+        "url": "/apps/{slug}/runs/{seq}".format(
+            slug=slug,
+            seq=seq,
+        ),
     }
 
+    return _kwargs
 
-def _parse_response(*, response: httpx.Response) -> Optional[CancelRunResponse]:
+
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[CancelRunResponse]:
     if response.status_code == 200:
         response_200 = CancelRunResponse.from_dict(response.json())
 
         return response_200
-    return None
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
 
 
-def _build_response(*, response: httpx.Response) -> Response[CancelRunResponse]:
+def _build_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[CancelRunResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
         headers=response.headers,
-        parsed=_parse_response(response=response),
+        parsed=_parse_response(client=client, response=response),
     )
 
 
 def sync_detailed(
-    name: str,
+    slug: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -56,29 +59,31 @@ def sync_detailed(
      Cancel a run
 
     Args:
-        name (str): The name of the app to fetch runs for.
+        slug (str): The slug of the app to fetch runs for.
         seq (int): The number of the run to fetch.
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[CancelRunResponse]
     """
 
     kwargs = _get_kwargs(
-        name=name,
+        slug=slug,
         seq=seq,
-        client=client,
     )
 
-    response = httpx.request(
-        verify=client.verify_ssl,
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 def sync(
-    name: str,
+    slug: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -88,22 +93,26 @@ def sync(
      Cancel a run
 
     Args:
-        name (str): The name of the app to fetch runs for.
+        slug (str): The slug of the app to fetch runs for.
         seq (int): The number of the run to fetch.
 
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
     Returns:
-        Response[CancelRunResponse]
+        CancelRunResponse
     """
 
     return sync_detailed(
-        name=name,
+        slug=slug,
         seq=seq,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    name: str,
+    slug: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -113,27 +122,29 @@ async def asyncio_detailed(
      Cancel a run
 
     Args:
-        name (str): The name of the app to fetch runs for.
+        slug (str): The slug of the app to fetch runs for.
         seq (int): The number of the run to fetch.
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
         Response[CancelRunResponse]
     """
 
     kwargs = _get_kwargs(
-        name=name,
+        slug=slug,
         seq=seq,
-        client=client,
     )
 
-    async with httpx.AsyncClient(verify=client.verify_ssl) as _client:
-        response = await _client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
-    return _build_response(response=response)
+    return _build_response(client=client, response=response)
 
 
 async def asyncio(
-    name: str,
+    slug: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -143,16 +154,20 @@ async def asyncio(
      Cancel a run
 
     Args:
-        name (str): The name of the app to fetch runs for.
+        slug (str): The slug of the app to fetch runs for.
         seq (int): The number of the run to fetch.
 
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
     Returns:
-        Response[CancelRunResponse]
+        CancelRunResponse
     """
 
     return (
         await asyncio_detailed(
-            name=name,
+            slug=slug,
             seq=seq,
             client=client,
         )
