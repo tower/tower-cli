@@ -11,20 +11,12 @@ use crate::{
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
-        .about("Interact with the apps that you own")
+        .about("Manage the apps in your current Tower account")
         .arg_required_else_help(true)
         .subcommand(Command::new("list").about("List all of your apps`"))
         .subcommand(
             Command::new("show")
                 .allow_external_subcommands(true)
-                .arg(
-                    Arg::new("name")
-                        .short('n')
-                        .long("name")
-                        .value_parser(value_parser!(String))
-                        .required(true)
-                        .action(clap::ArgAction::Set),
-                )
                 .about("Show the details about an app in Tower"),
         )
         .subcommand(
@@ -62,20 +54,12 @@ pub fn apps_cmd() -> Command {
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
-                .arg(
-                    Arg::new("slug")
-                        .short('n')
-                        .long("slug")
-                        .value_parser(value_parser!(String))
-                        .required(true)
-                        .action(clap::ArgAction::Set),
-                )
                 .about("Delete an app in Tower"),
         )
 }
 
-pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
-    let (slug, seq) = extract_app_run(cmd);
+pub async fn do_logs(config: Config, cmd: &ArgMatches) {
+    let (slug, seq) = extract_app_slug_and_run("logs", cmd.subcommand());
 
     if let Ok(resp) = api::describe_run_logs(&config, &slug, seq).await {
         for line in resp.log_lines {
@@ -84,10 +68,10 @@ pub async fn do_logs_app(config: Config, cmd: Option<(&str, &ArgMatches)>) {
     }
 }
 
-pub async fn do_show_app(config: Config, args: &ArgMatches) {
-    let slug = args.get_one::<String>("slug").unwrap();
+pub async fn do_show(config: Config, cmd: &ArgMatches) {
+    let slug = extract_app_slug("show", cmd.subcommand());
 
-    match  api::describe_app(&config, slug).await {
+    match  api::describe_app(&config, &slug).await {
         Ok(app_response) => {
             let app = app_response.app;
             let runs = app_response.runs;
@@ -201,7 +185,7 @@ pub async fn do_list_apps(config: Config) {
     }
 }
 
-pub async fn do_create_app(config: Config, args: &ArgMatches) {
+pub async fn do_create(config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap_or_else(|| {
         output::die("App name (--name) is required");
     });
@@ -221,11 +205,11 @@ pub async fn do_create_app(config: Config, args: &ArgMatches) {
 
 }
 
-pub async fn do_delete_app(config: Config, args: &ArgMatches) {
-    let slug = args.get_one::<String>("slug").unwrap();
+pub async fn do_delete(config: Config, cmd: &ArgMatches) {
+    let slug = extract_app_slug("delete", cmd.subcommand());
     let mut spinner = output::spinner("Deleting app");
 
-    if let Err(err) = api::delete_app(&config, slug).await {
+    if let Err(err) = api::delete_app(&config, &slug).await {
         spinner.failure();
         output::tower_error(err);
     } else {
@@ -234,17 +218,29 @@ pub async fn do_delete_app(config: Config, args: &ArgMatches) {
 }
 
 /// Extract app name and run number from command
-fn extract_app_run(cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
+fn extract_app_slug_and_run(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
     if let Some((slug, _)) = cmd {
         if let Some((slug, num)) = slug.split_once('#') {
             return (
                 slug.to_string(),
                 num.parse::<i64>().unwrap_or_else(|_| {
-                    output::die("Run number must be a valid number");
+                    output::die("Run number must be an actual number");
                 }),
             );
         }
-        output::die("Run number is required (e.g. tower apps logs <app name>#<run number>)");
+
+        let line = format!("Run number is required. Example: tower apps {} <app name>#<run number>", subcmd);
+        output::die(&line);
     }
-    output::die("App name (e.g. tower apps logs <app name>#<run number>) is required");
+    let line = format!("App slug is required. Example: tower apps {} <app name>#<run number>", subcmd);
+    output::die(&line)
+}
+
+fn extract_app_slug(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
+    if let Some((slug, _)) = cmd {
+        return slug.to_string();
+    }
+
+    let line = format!("App slug is required. Example: tower apps {} <app name>", subcmd);
+    output::die(&line);
 }
