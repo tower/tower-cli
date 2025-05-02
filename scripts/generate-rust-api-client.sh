@@ -14,6 +14,7 @@
 #
 ###
 
+# TOWER_URL is the URL of the API that we want to generate the client from.
 TOWER_URL="https://api.tower.dev"
 
 # BASEDIR is the directory to change into before running the generator.
@@ -24,6 +25,9 @@ CONFIG_FILE="rust-api-client-generator-config.yaml"
 
 # ARGS are the args sent to the generator.
 ARGS="generate --config ${CONFIG_FILE}"
+
+# OPENAPI_GENERATOR_VERSION is the version of the openapi-generator-cli to use.
+OPENAPI_GENERATOR_VERSION="7.13.0"
 
 # We need to get the OpenAPI spec file into scope in the first place.
 curl -sL ${TOWER_URL}/v1/openapi.json -o ${BASEDIR}/openapi.json
