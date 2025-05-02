@@ -53,10 +53,18 @@ pub async fn upload_file_with_progress(
         // NOTE: I just kind of lifted this out of the generated client to figure out how to
         // deserialize this type into something that is useful and resembles the original/generated
         // stuff.
+        let tower_trace_id = response
+            .headers()
+            .get("x-tower-trace-id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
         let status = response.status();
         let content = response.text().await?;
         let entity: Option<DeployAppError> = serde_json::from_str(&content).ok();
-        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+
+        Err(Error::ResponseError(ResponseContent { tower_trace_id, status, content, entity }))
     }
 }
 

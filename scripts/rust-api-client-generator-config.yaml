@@ -3,6 +3,7 @@ generatorName: rust
 inputSpec: openapi.json
 outputDir: ../crates/tower-api
 httpUserAgent: "Tower CLI"
+templateDir: rust-client-templates
 nameMappings:
   $schema: schema
 

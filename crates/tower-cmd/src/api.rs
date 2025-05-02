@@ -199,6 +199,7 @@ where
                 } else {
                     let err = Error::ResponseError(
                         tower_api::apis::ResponseContent {
+                            tower_trace_id: "".to_string(),
                             status: StatusCode::NO_CONTENT,
                             content: "Received a response from the server that the CLI wasn't able to understand".to_string(),
                             entity: None,
@@ -209,6 +210,7 @@ where
             } else {
                 let err = Error::ResponseError(
                     tower_api::apis::ResponseContent {
+                        tower_trace_id: "".to_string(),
                         status: StatusCode::NO_CONTENT,
                         content: "Empty response from server".to_string(),
                         entity: None,

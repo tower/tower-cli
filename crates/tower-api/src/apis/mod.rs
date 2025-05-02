@@ -3,6 +3,7 @@ use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct ResponseContent<T> {
+    pub tower_trace_id: String,
     pub status: reqwest::StatusCode,
     pub content: String,
     pub entity: Option<T>,
