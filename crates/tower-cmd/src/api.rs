@@ -191,6 +191,7 @@ where
 {
     match api_call.await {
         Ok(response) => {
+            log::debug!("tower trace ID: {}", response.tower_trace_id);
             log::debug!("Response from server: {}", response.content);
 
             if let Some(entity) = response.entity {
