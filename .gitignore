@@ -2,3 +2,14 @@
 /.venv
 *.pyc
 __pycache__
+
+# 
+# Artifacts from the Rust client generation process
+#
+/crates/tower-api/.openapi-generator-ignore
+/crates/tower-api/.openapi-generator/
+/crates/tower-api/.travis.yml
+/crates/tower-api/git_push.sh
+/crates/tower-api/.gitignore
+/scripts/openapi.json
+/scripts/openapi-generator-cli-*.jar

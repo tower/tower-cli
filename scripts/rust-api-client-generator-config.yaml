@@ -1,8 +1,8 @@
 # Generator Configuration
 generatorName: rust
-inputSpec: /local/openapi.json
-outputDir: /local/tower-api
-httpUserAgent: "tower_cli_client"
+inputSpec: openapi.json
+outputDir: ../crates/tower-api
+httpUserAgent: "Tower CLI"
 nameMappings:
   $schema: schema
 
