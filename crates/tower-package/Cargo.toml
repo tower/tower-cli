@@ -16,8 +16,9 @@ serde_json = { workspace = true }
 snafu = { workspace = true } 
 tmpdir = { workspace = true }
 tokio = { workspace = true } 
-tokio-tar = { workspace = true }
 tokio-stream = { workspace = true }
+tokio-tar = { workspace = true }
+tokio-util = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

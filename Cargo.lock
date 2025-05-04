@@ -2719,6 +2719,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tar",
+ "tokio-util",
 ]
 
 [[package]]
