@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize, de::Error as _};
 use crate::{apis::ResponseContent, models};
 use super::{Error, configuration, ContentType};
 
+const DEFAULT_TOWER_TRACE_ID: &str = "(none)";
+
 {{#operations}}
 {{#operation}}
 {{#vendorExtensions.x-group-parameters}}
@@ -422,8 +424,7 @@ pub {{#supportAsync}}async {{/supportAsync}}fn {{{operationId}}}(configuration: 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         {{^supportMultipleResponses}}

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize, de::Error as _};
 use crate::{apis::ResponseContent, models};
 use super::{Error, configuration, ContentType};
 
+const DEFAULT_TOWER_TRACE_ID: &str = "(none)";
+
 /// struct for passing parameters to the method [`accept_invitation`]
 #[derive(Clone, Debug)]
 pub struct AcceptInvitationParams {
@@ -1365,8 +1367,7 @@ pub async fn accept_invitation(configuration: &configuration::Configuration, par
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1401,8 +1402,7 @@ pub async fn acknowledge_alert(configuration: &configuration::Configuration, par
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1437,8 +1437,7 @@ pub async fn cancel_run(configuration: &configuration::Configuration, params: Ca
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1474,8 +1473,7 @@ pub async fn claim_device_login_ticket(configuration: &configuration::Configurat
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1508,8 +1506,7 @@ pub async fn create_account(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1544,8 +1541,7 @@ pub async fn create_api_key(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1581,8 +1577,7 @@ pub async fn create_app(configuration: &configuration::Configuration, params: Cr
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1618,8 +1613,7 @@ pub async fn create_catalog(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1651,8 +1645,7 @@ pub async fn create_device_login_ticket(configuration: &configuration::Configura
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1688,8 +1681,7 @@ pub async fn create_secret(configuration: &configuration::Configuration, params:
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1722,8 +1714,7 @@ pub async fn create_session(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1759,8 +1750,7 @@ pub async fn create_team(configuration: &configuration::Configuration, params: C
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1795,8 +1785,7 @@ pub async fn delete_alert(configuration: &configuration::Configuration, params: 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1831,8 +1820,7 @@ pub async fn delete_api_key(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1867,8 +1855,7 @@ pub async fn delete_app(configuration: &configuration::Configuration, params: De
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1903,8 +1890,7 @@ pub async fn delete_catalog(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1942,8 +1928,7 @@ pub async fn delete_secret(configuration: &configuration::Configuration, params:
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -1979,8 +1964,7 @@ pub async fn delete_team(configuration: &configuration::Configuration, params: D
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2016,8 +2000,7 @@ pub async fn delete_team_invitation(configuration: &configuration::Configuration
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2055,8 +2038,7 @@ pub async fn deploy_app(configuration: &configuration::Configuration, params: De
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2094,8 +2076,7 @@ pub async fn describe_app(configuration: &configuration::Configuration, params: 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2130,8 +2111,7 @@ pub async fn describe_app_version(configuration: &configuration::Configuration, 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2163,8 +2143,7 @@ pub async fn describe_device_login_session(configuration: &configuration::Config
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2207,8 +2186,7 @@ pub async fn describe_run(configuration: &configuration::Configuration, params: 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2243,8 +2221,7 @@ pub async fn describe_run_logs(configuration: &configuration::Configuration, par
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2282,8 +2259,7 @@ pub async fn describe_secrets_key(configuration: &configuration::Configuration, 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2318,8 +2294,7 @@ pub async fn describe_session(configuration: &configuration::Configuration) -> R
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2367,8 +2342,7 @@ pub async fn export_secrets(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2403,8 +2377,7 @@ pub async fn generate_app_statistics(configuration: &configuration::Configuratio
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2442,8 +2415,7 @@ pub async fn generate_run_statistics(configuration: &configuration::Configuratio
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2479,8 +2451,7 @@ pub async fn invite_team_member(configuration: &configuration::Configuration, pa
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2515,8 +2486,7 @@ pub async fn leave_team(configuration: &configuration::Configuration, params: Le
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2569,8 +2539,7 @@ pub async fn list_alerts(configuration: &configuration::Configuration, params: L
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2605,8 +2574,7 @@ pub async fn list_api_keys(configuration: &configuration::Configuration) -> Resu
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2641,8 +2609,7 @@ pub async fn list_app_environments(configuration: &configuration::Configuration,
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2677,8 +2644,7 @@ pub async fn list_app_versions(configuration: &configuration::Configuration, par
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2742,8 +2708,7 @@ pub async fn list_apps(configuration: &configuration::Configuration, params: Lis
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2790,8 +2755,7 @@ pub async fn list_catalogs(configuration: &configuration::Configuration, params:
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2826,8 +2790,7 @@ pub async fn list_my_team_invitations(configuration: &configuration::Configurati
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2880,8 +2843,7 @@ pub async fn list_runs(configuration: &configuration::Configuration, params: Lis
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2916,8 +2878,7 @@ pub async fn list_secret_environments(configuration: &configuration::Configurati
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -2964,8 +2925,7 @@ pub async fn list_secrets(configuration: &configuration::Configuration, params: 
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3000,8 +2960,7 @@ pub async fn list_team_invitations(configuration: &configuration::Configuration,
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3036,8 +2995,7 @@ pub async fn list_team_members(configuration: &configuration::Configuration, par
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3072,8 +3030,7 @@ pub async fn list_teams(configuration: &configuration::Configuration) -> Result<
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3109,8 +3066,7 @@ pub async fn refresh_session(configuration: &configuration::Configuration, param
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3146,8 +3102,7 @@ pub async fn remove_team_member(configuration: &configuration::Configuration, pa
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3183,8 +3138,7 @@ pub async fn resend_team_invitation(configuration: &configuration::Configuration
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3228,8 +3182,7 @@ pub async fn run_app(configuration: &configuration::Configuration, params: RunAp
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3264,8 +3217,7 @@ pub async fn stream_run_logs(configuration: &configuration::Configuration, param
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3301,8 +3253,7 @@ pub async fn update_account_slug(configuration: &configuration::Configuration, p
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3338,8 +3289,7 @@ pub async fn update_app(configuration: &configuration::Configuration, params: Up
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3375,8 +3325,7 @@ pub async fn update_catalog(configuration: &configuration::Configuration, params
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3412,8 +3361,7 @@ pub async fn update_my_team_invitation(configuration: &configuration::Configurat
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3449,8 +3397,7 @@ pub async fn update_secret(configuration: &configuration::Configuration, params:
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3486,8 +3433,7 @@ pub async fn update_team(configuration: &configuration::Configuration, params: U
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
@@ -3523,8 +3469,7 @@ pub async fn update_user(configuration: &configuration::Configuration, params: U
         .headers()
         .get("x-tower-trace-id")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-				.to_string();
+        .map_or(String::from(DEFAULT_TOWER_TRACE_ID), String::from);
 
     if !status.is_client_error() && !status.is_server_error() {
         let content = resp.text().await?;
