@@ -32,7 +32,7 @@ pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsRes
         page: None,
         page_size: None,
         period: None,
-        num_runs: None,
+        num_runs: Some(0),
         status: None,
     };
 
