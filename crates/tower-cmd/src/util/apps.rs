@@ -83,6 +83,7 @@ pub async fn ensure_app_exists(
             // Convert any creation error to a response error
             Err(tower_api::apis::Error::ResponseError(
                 tower_api::apis::ResponseContent {
+                    tower_trace_id: "".to_string(),
                     status: match &create_err {
                         tower_api::apis::Error::ResponseError(resp) => resp.status,
                         _ => StatusCode::INTERNAL_SERVER_ERROR,

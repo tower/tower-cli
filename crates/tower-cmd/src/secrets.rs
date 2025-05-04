@@ -15,6 +15,7 @@ use tower_api::{
 use crate::{
     output,
     api,
+    util::cmd,
 };
 
 pub fn secrets_cmd() -> Command {
@@ -76,37 +77,21 @@ pub fn secrets_cmd() -> Command {
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
-                .arg(
-                    Arg::new("name")
-                        .short('n')
-                        .long("name")
-                        .value_parser(value_parser!(String))
-                        .required(true)
-                        .help("Name of the secret to delete")
-                        .action(clap::ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("environment")
-                        .short('e')
-                        .long("environment")
-                        .default_value("default")
-                        .value_parser(value_parser!(String))
-                        .action(clap::ArgAction::Set)
-                        .help("Environment the secret belongs to"),
-                )
                 .about("Delete a secret in Tower"),
         )
 }
 
-pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
-    let show = args.get_one::<bool>("show").unwrap_or(&false);
-    let env = args.get_one::<String>("environment").unwrap();
-    let all = args.get_one::<bool>("all").unwrap_or(&false);
+pub async fn do_list(config: Config, args: &ArgMatches) {
+    let all = cmd::get_bool_flag(args, "all");
+    let show = cmd::get_bool_flag(args, "show"); 
+    let env = cmd::get_string_flag(args, "environment");
 
-    if *show {
+    log::debug!("listing secrets, environment={} all={} show={}", env, all, show);
+
+    if show {
         let (private_key, public_key) = crypto::generate_key_pair();
 
-        match api::export_secrets(&config, env, *all, public_key).await {
+        match api::export_secrets(&config, &env, all, public_key).await {
             Ok(list_response) => {
                 let headers = vec![
                     "Secret".bold().yellow().to_string(),
@@ -131,7 +116,7 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
             Err(err) => output::tower_error(err),
         }
     } else {
-        match api::list_secrets(&config, env, *all).await {
+        match api::list_secrets(&config, &env, all).await {
             Ok(list_response) => {
                 let headers = vec![
                     "Secret".bold().yellow().to_string(),
@@ -152,14 +137,14 @@ pub async fn do_list_secrets(config: Config, args: &ArgMatches) {
     }
 }
 
-pub async fn do_create_secret(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("name").unwrap();
-    let environment = args.get_one::<String>("environment").unwrap();
-    let value = args.get_one::<String>("value").unwrap();
+pub async fn do_create(config: Config, args: &ArgMatches) {
+    let name = cmd::get_string_flag(args, "name");
+    let environment = cmd::get_string_flag(args, "environment");
+    let value = cmd::get_string_flag(args, "value");
 
     let mut spinner = output::spinner("Creating secret...");
 
-    match encrypt_and_create_secret(&config, name, value, environment).await { 
+    match encrypt_and_create_secret(&config, &name, &value, &environment).await { 
         Ok(_) => {
             spinner.success();
 
@@ -178,16 +163,13 @@ pub async fn do_create_secret(config: Config, args: &ArgMatches) {
     }
 }
 
-pub async fn do_delete_secret(config: Config, args: &ArgMatches) {
-    let env_default = "default".to_string();
-    let name = args.get_one::<String>("name").unwrap();
-    let environment = args
-        .get_one::<String>("environment")
-        .unwrap_or(&env_default);
+pub async fn do_delete(config: Config, args: &ArgMatches) {
+    let (environment, name) = extract_secret_environment_and_name("delete", args.subcommand());
+    log::debug!("deleting secret, environment={} name={}", environment, name);
 
     let mut spinner = output::spinner("Deleting secret...");
 
-    if let Ok(_) = api::delete_secret(&config, name, environment).await {
+    if let Ok(_) = api::delete_secret(&config, &name, &environment).await {
         spinner.success();
     } else {
         spinner.failure();
@@ -231,4 +213,18 @@ async fn encrypt_and_create_secret(
             output::die("There was a problem with the Tower API! Please try again later.");
         }
     }
+}
+
+fn extract_secret_environment_and_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> (String, String) {
+    if let Some((slug, _)) = cmd {
+        if let Some((env, name)) = slug.split_once('/') {
+            return (env.to_string(), name.to_string());
+        }
+
+        let line = format!("Secret name is required. Example: tower secrets {} <environment>/<secret name>", subcmd);
+        output::die(&line);
+    }
+
+    let line = format!("Secret name and environment is required. Example: tower secrets {} <environment>/<secret name>", subcmd);
+    output::die(&line);
 }

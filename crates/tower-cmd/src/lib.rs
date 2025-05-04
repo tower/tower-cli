@@ -25,7 +25,6 @@ impl App {
         // environment variable. This is for programmatic use cases where we want to test the CLI
         // in automated environments, for instance.
         let session = if let Ok(token) = std::env::var("TOWER_JWT") {
-            // let's exchange the token for a session, what we'll load.
             Session::from_jwt(&token).ok()
         } else {
             Session::from_config_dir().ok()
@@ -91,12 +90,10 @@ impl App {
 
                 match apps_command {
                     Some(("list", _)) => apps::do_list_apps(sessionized_config).await,
-                    Some(("show", args)) => apps::do_show_app(sessionized_config, args).await,
-                    Some(("logs", args)) => {
-                        apps::do_logs_app(sessionized_config, args.subcommand()).await
-                    }
-                    Some(("create", args)) => apps::do_create_app(sessionized_config, args).await,
-                    Some(("delete", args)) => apps::do_delete_app(sessionized_config, args).await,
+                    Some(("create", args)) => apps::do_create(sessionized_config, args).await,
+                    Some(("show", args)) => apps::do_show(sessionized_config, args).await,
+                    Some(("logs", args)) => apps::do_logs(sessionized_config, args).await,
+                    Some(("delete", args)) => apps::do_delete(sessionized_config, args).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -107,15 +104,9 @@ impl App {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => {
-                        secrets::do_list_secrets(sessionized_config, args).await
-                    }
-                    Some(("create", args)) => {
-                        secrets::do_create_secret(sessionized_config, args).await
-                    }
-                    Some(("delete", args)) => {
-                        secrets::do_delete_secret(sessionized_config, args).await
-                    }
+                    Some(("list", args)) => secrets::do_list(sessionized_config, args).await,
+                    Some(("create", args)) => secrets::do_create(sessionized_config, args).await,
+                    Some(("delete", args)) => secrets::do_delete(sessionized_config, args).await,
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -128,8 +119,8 @@ impl App {
                 let teams_command = sub_matches.subcommand();
 
                 match teams_command {
-                    Some(("list", _)) => teams::do_list_teams(sessionized_config).await,
-                    Some(("switch", args)) => teams::do_switch_team(sessionized_config, args).await,
+                    Some(("list", _)) => teams::do_list(sessionized_config).await,
+                    Some(("switch", args)) => teams::do_switch(sessionized_config, args).await,
                     _ => {
                         teams::teams_cmd().print_help().unwrap();
                         std::process::exit(2);

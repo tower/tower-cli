@@ -1,12 +1,16 @@
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
 from ..models.run_status import RunStatus
 from ..models.run_status_group import RunStatusGroup
+
+if TYPE_CHECKING:
+    from ..models.run_parameter import RunParameter
+
 
 T = TypeVar("T", bound="Run")
 
@@ -22,6 +26,7 @@ class Run:
         ended_at (Union[None, datetime.datetime]):
         environment (str):
         number (int):
+        parameters (list['RunParameter']): Parameters used to invoke this run.
         run_id (str):
         scheduled_at (datetime.datetime):
         started_at (Union[None, datetime.datetime]):
@@ -36,6 +41,7 @@ class Run:
     ended_at: Union[None, datetime.datetime]
     environment: str
     number: int
+    parameters: list["RunParameter"]
     run_id: str
     scheduled_at: datetime.datetime
     started_at: Union[None, datetime.datetime]
@@ -65,6 +71,11 @@ class Run:
 
         number = self.number
 
+        parameters = []
+        for parameters_item_data in self.parameters:
+            parameters_item = parameters_item_data.to_dict()
+            parameters.append(parameters_item)
+
         run_id = self.run_id
 
         scheduled_at = self.scheduled_at.isoformat()
@@ -89,6 +100,7 @@ class Run:
                 "ended_at": ended_at,
                 "environment": environment,
                 "number": number,
+                "parameters": parameters,
                 "run_id": run_id,
                 "scheduled_at": scheduled_at,
                 "started_at": started_at,
@@ -101,6 +113,8 @@ class Run:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.run_parameter import RunParameter
+
         d = dict(src_dict)
         app_slug = d.pop("app_slug")
 
@@ -142,6 +156,13 @@ class Run:
 
         number = d.pop("number")
 
+        parameters = []
+        _parameters = d.pop("parameters")
+        for parameters_item_data in _parameters:
+            parameters_item = RunParameter.from_dict(parameters_item_data)
+
+            parameters.append(parameters_item)
+
         run_id = d.pop("run_id")
 
         scheduled_at = isoparse(d.pop("scheduled_at"))
@@ -173,6 +194,7 @@ class Run:
             ended_at=ended_at,
             environment=environment,
             number=number,
+            parameters=parameters,
             run_id=run_id,
             scheduled_at=scheduled_at,
             started_at=started_at,

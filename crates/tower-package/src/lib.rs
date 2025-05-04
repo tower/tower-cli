@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use tokio::{
     fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, BufReader, AsyncReadExt, AsyncWriteExt},
 };
 use config::Towerfile;
 use tokio_tar::{Archive, Builder};
@@ -10,6 +11,7 @@ use glob::glob;
 use tmpdir::TmpDir;
 
 use async_compression::tokio::write::GzipEncoder;
+use async_compression::tokio::bufread::GzipDecoder;
 
 mod error;
 pub use error::Error;
@@ -242,10 +244,9 @@ impl Package {
            path
        };
 
-       let file = File::open(self.package_file_path.clone().unwrap()).await?;
-       let mut archive = Archive::new(file);
-
-       archive.unpack(path.clone()).await?;
+       // self.package_file_path should be set otherwise this is a bug.
+       let package_path = self.package_file_path.clone().unwrap();
+       unpack_archive(&package_path, &path).await?;
        self.unpacked_path = Some(path);
        Ok(())
    }
@@ -279,4 +280,43 @@ fn extract_glob_path(path: PathBuf) -> String {
     {
         str.to_string()
     }
+}
+
+/// Check if a file is a valid gzip file by attempting to decompress it
+async fn is_valid_gzip<P: AsRef<Path>>(path: P) -> bool {
+    let file = match File::open(&path).await {
+        Ok(file) => file,
+        Err(_) => return false,
+    };
+    
+    let reader = BufReader::new(file);
+    let mut decoder = GzipDecoder::new(reader);
+    
+    // Try to read a small amount of data. If we can, then we assume that it's a valid gzip file.
+    // Othwewise, it's not gzipped I suppose?
+    let mut buffer = [0u8; 1024];
+    match decoder.read(&mut buffer).await {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+async fn unpack_archive<P: AsRef<Path>>(package_path: P, output_path: P) -> Result<(), std::io::Error> {
+    let reader: Pin<Box<dyn AsyncRead + Send + Unpin>> = if is_valid_gzip(&package_path).await {
+        // gor gzipped files
+        let file = File::open(&package_path).await?;
+        let buf_reader = BufReader::new(file);
+        let decoder = GzipDecoder::new(buf_reader);
+        Box::pin(decoder)
+    } else {
+        // For regular files
+        let file = File::open(&package_path).await?;
+        Box::pin(file)
+    };
+    
+    // Create and unpack the archive
+    let mut archive = Archive::new(reader);
+    archive.unpack(output_path).await?;
+    
+    Ok(())
 }

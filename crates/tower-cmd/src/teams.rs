@@ -1,4 +1,4 @@
-use clap::{value_parser, Arg, ArgMatches, Command};
+use clap::{ArgMatches, Command};
 use colored::*;
 use config::Config;
 
@@ -14,12 +14,8 @@ pub fn teams_cmd() -> Command {
         .subcommand(Command::new("list").about("List teams you belong to"))
         .subcommand(
             Command::new("switch")
+                .allow_external_subcommands(true)
                 .about("Switch context to a different team")
-                .arg(
-                    Arg::new("team_slug")
-                        .value_parser(value_parser!(String))
-                        .action(clap::ArgAction::Set),
-                ),
         )
 }
 
@@ -60,7 +56,7 @@ async fn refresh_session(config: &Config) -> config::Session {
     }
 }
 
-pub async fn do_list_teams(config: Config) {
+pub async fn do_list(config: Config) {
     // Refresh the session and get the updated data
     let session = refresh_session(&config).await;
 
@@ -121,24 +117,19 @@ pub async fn do_list_teams(config: Config) {
     output::newline();
 }
 
-pub async fn do_switch_team(config: Config, args: &ArgMatches) {
-    let team_slug = args
-        .get_one::<String>("team_slug")
-        .map(|s| s.as_str())
-        .unwrap_or_else(|| {
-            output::die("Team Slug (e.g. tower teams switch <team_slug>) is required");
-        });
+pub async fn do_switch(config: Config, args: &ArgMatches) {
+    let slug = extract_team_slug("switch", args.subcommand());
 
     // Refresh the session first to ensure we have the latest teams data
     let session = refresh_session(&config).await;
 
     // Check if the provided team slug exists in the refreshed session
-    let team = session.teams.iter().find(|team| team.slug == team_slug);
+    let team = session.teams.iter().find(|team| team.slug == slug);
 
     match team {
         Some(team) => {
             // Team found, set it as active
-            match config.set_active_team_by_slug(team_slug) {
+            match config.set_active_team_by_slug(&slug) {
                 Ok(_) => {
                     output::success(&format!("Switched to team: {}", team.name));
                 }
@@ -152,9 +143,18 @@ pub async fn do_switch_team(config: Config, args: &ArgMatches) {
             // Team not found
             output::failure(&format!(
                 "Team '{}' not found. Use 'tower teams list' to see all your teams.",
-                team_slug
+                slug
             ));
             std::process::exit(1);
         }
     }
+}
+
+fn extract_team_slug(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
+    if let Some((slug, _)) = cmd {
+        return slug.to_string();
+    }
+
+    let line = format!("Team slug is required. Example: tower teams {} <team name>", subcmd);
+    output::die(&line);
 }
