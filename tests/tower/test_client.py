@@ -25,7 +25,8 @@ def test_running_apps(httpx_mock):
                 "scheduled_at": "2025-04-25T20:54:58.761867Z",
                 "started_at":   "2025-04-25T20:54:59.366937Z",
                 "status":       "pending",
-                "status_group": ""
+                "status_group": "",
+                "parameters":   []
             }
         },
         status_code=200,
@@ -60,7 +61,8 @@ def test_waiting_for_runs(httpx_mock):
                 "scheduled_at": "2025-04-25T20:54:58.761867Z",
                 "started_at":   "2025-04-25T20:54:59.366937Z",
                 "status":       "pending",
-                "status_group": ""
+                "status_group": "",
+                "parameters":   []
             }
         },
         status_code=200,
@@ -83,7 +85,8 @@ def test_waiting_for_runs(httpx_mock):
                 "scheduled_at": "2025-04-25T20:54:58.761867Z",
                 "started_at":   "2025-04-25T20:54:59.366937Z",
                 "status":       "exited",
-                "status_group": "successful"
+                "status_group": "successful",
+                "parameters":   []
             }
         },
         status_code=200,
@@ -107,7 +110,8 @@ def test_waiting_for_runs(httpx_mock):
         scheduled_at="2025-04-25T20:54:58.761867Z",
         started_at="2025-04-25T20:54:59.366937Z",
         status="crashed",
-        status_group="failed"
+        status_group="failed",
+        parameters=[]
     )
 
     # Set WAIT_TIMEOUT to 0 so we don't have to...wait.
