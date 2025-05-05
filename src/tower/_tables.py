@@ -52,7 +52,7 @@ class Table:
         Converts the table to a Polars LazyFrame. This is useful when you
         understand Polars and you want to do something more complicated.
         """
-        return pl.scan_iceberg(self._table).collect()
+        return pl.scan_iceberg(self._table)
 
 
     def rows_affected(self) -> RowsAffectedInformation:
@@ -142,7 +142,7 @@ class Table:
     def schema(self) -> pa.Schema:
         # We take an Iceberg Schema and we need to convert it into a PyArrow Schema
         iceberg_schema = self._table.schema()
-        return convert_iceberg_schema(iceberg_schema)
+        return iceberg_schema.as_arrow()
 
 
 class TableReference:
@@ -196,7 +196,6 @@ class TableReference:
         )
 
         return Table(self._context, table)
-
 
 
 def tables(
