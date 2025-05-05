@@ -51,7 +51,7 @@ Tower supports several optional features that can be installed as needed:
 #### AI/LLM Support
 
 ```bash
-pip install tower[ai]
+pip install "tower[ai]"
 ```
 
 Provides integration with language models through:
@@ -61,7 +61,7 @@ Provides integration with language models through:
 #### Apache Iceberg Support
 
 ```bash
-pip install tower[iceberg]
+pip install "tower[iceberg]"
 ```
 
 Provides Apache Iceberg table support:
@@ -72,7 +72,7 @@ Provides Apache Iceberg table support:
 #### Install All Optional Features
 
 ```bash
-pip install tower[all]
+pip install "tower[all]"
 ```
 
 #### Check Available Features
