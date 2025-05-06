@@ -28,16 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Install dependencies
-        if: github.ref_name != 'main'
-        run: uv sync --all-extras
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
 
       - name: Run tests
-        if: github.ref_name != 'main'
-        run: uv run -m pytest --tb=short --disable-warnings
+        run: uv run pytest tests
