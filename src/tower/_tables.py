@@ -127,11 +127,11 @@ class Table:
         """
         if isinstance(filters, list):
             # We need to covnert the pc.Expression into PyIceberg
-            next_filters = convert_pyarrow_expression(filters)
+            next_filters = convert_pyarrow_expressions(filters)
             filters = next_filters
 
         self._table.delete(
-            delete_filters=filters,
+            delete_filter=filters,
 
             # We want this to always be the case. Not sure why you wouldn't?
             case_sensitive=True,
@@ -142,10 +142,25 @@ class Table:
 
         return self
 
+
     def schema(self) -> pa.Schema:
         # We take an Iceberg Schema and we need to convert it into a PyArrow Schema
         iceberg_schema = self._table.schema()
         return iceberg_schema.as_arrow()
+
+
+    def column(self, name: str) -> pa.compute.Expression:
+        """
+        Returns a column from the table. This is useful when you want to
+        perform some operations on the column.
+        """
+        field = self.schema().field(name)
+        
+        if field is None:
+            raise ValueError(f"Column {name} not found in table schema")
+
+        # We need to convert the PyArrow field into pa.compute.Expression
+        return pa.compute.field(name)
 
 
 class TableReference:

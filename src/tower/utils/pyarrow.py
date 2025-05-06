@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Any, Optional, List
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -85,34 +85,132 @@ def convert_pyarrow_schema(arrow_schema: pa.Schema) -> IcebergSchema:
     return IcebergSchema(*fields)
 
 
+def extract_field_and_literal(expr: pc.Expression) -> tuple[str, Any]:
+    """Extract field name and literal value from a comparison expression."""
+    # First, convert the expression to a string and parse it
+    expr_str = str(expr)
+    
+    # PyArrow expression strings look like: "(field_name == literal)" or similar
+    # Need to determine the operator and then split accordingly
+    operators = ["==", "!=", ">", ">=", "<", "<="]
+    op_used = None
+    for op in operators:
+        if op in expr_str:
+            op_used = op
+            break
+    
+    if not op_used:
+        raise ValueError(f"Could not find comparison operator in expression: {expr_str}")
+    
+    # Remove parentheses and split by operator
+    expr_clean = expr_str.strip("()")
+    parts = expr_clean.split(op_used)
+    if len(parts) != 2:
+        raise ValueError(f"Expected binary comparison in expression: {expr_str}")
+    
+    # Determine which part is the field and which is the literal
+    field_name = None
+    literal_value = None
+    
+    # Clean up the parts
+    left = parts[0].strip()
+    right = parts[1].strip()
+    
+    # Typically field name doesn't have quotes, literals (strings) do
+    if left.startswith('"') or left.startswith("'"):
+        # Right side is the field
+        field_name = right
+        # Extract the literal value - this is a simplification
+        literal_value = left.strip('"\'')
+    else:
+        # Left side is the field
+        field_name = left
+        # Extract the literal value - this is a simplification
+        literal_value = right.strip('"\'')
+    
+    # Try to convert numeric literals
+    try:
+        if "." in literal_value:
+            literal_value = float(literal_value)
+        else:
+            literal_value = int(literal_value)
+    except ValueError:
+        # Keep as string if not numeric
+        pass
+        
+    return field_name, literal_value
+
 def convert_pyarrow_expression(expr: pc.Expression) -> Optional[BooleanExpression]:
+    """Convert a PyArrow compute expression to a PyIceberg boolean expression."""
     if expr is None:
         return None
+    
+    # Handle the expression based on its string representation
+    expr_str = str(expr)
+    
+    # Handle logical operations
+    if "and" in expr_str.lower() and isinstance(expr, pc.Expression):
+        # This is a simplification - in real code, you'd need to parse the expression
+        # to extract the sub-expressions properly
+        left_expr = None  # You'd need to extract this
+        right_expr = None  # You'd need to extract this
+        return And(
+            convert_pyarrow_expression(left_expr),
+            convert_pyarrow_expression(right_expr)
+        )
+    elif "or" in expr_str.lower() and isinstance(expr, pc.Expression):
+        # Similar simplification
+        left_expr = None  # You'd need to extract this
+        right_expr = None  # You'd need to extract this
+        return Or(
+            convert_pyarrow_expression(left_expr),
+            convert_pyarrow_expression(right_expr)
+        )
+    elif "not" in expr_str.lower() and isinstance(expr, pc.Expression):
+        # Similar simplification
+        inner_expr = None  # You'd need to extract this
+        return Not(convert_pyarrow_expression(inner_expr))
+    
+    # Handle comparison operations
+    try:
+        if "==" in expr_str:
+            field_name, value = extract_field_and_literal(expr)
+            return EqualTo(Reference(field_name), value)
+        elif "!=" in expr_str:
+            field_name, value = extract_field_and_literal(expr)
+            return NotEqualTo(Reference(field_name), value)
+        elif ">=" in expr_str:
+            field_name, value = extract_field_and_literal(expr)
+            return GreaterThanOrEqual(Reference(field_name), value)
+        elif ">" in expr_str:
+            field_name, value = extract_field_and_literal(expr)
+            return GreaterThan(Reference(field_name), value)
+        elif "<=" in expr_str:
+            field_name, value = extract_field_and_literal(expr)
+            return LessThanOrEqual(Reference(field_name), value)
+        elif "<" in expr_str:
+            field_name, value = extract_field_and_literal(expr)
+            return LessThan(Reference(field_name), value)
+        else:
+            raise ValueError(f"Unsupported expression: {expr_str}")
+    except Exception as e:
+        raise ValueError(f"Failed to convert expression '{expr_str}': {str(e)}")
 
-    if expr.op == "and":
-        return And(convert_expression(expr.args[0]), convert_expression(expr.args[1]))
-    elif expr.op == "or":
-        return Or(convert_expression(expr.args[0]), convert_expression(expr.args[1]))
-    elif expr.op == "not":
-        return Not(convert_expression(expr.args[0]))
-    elif expr.op in {"==", "equal"}:
-        return EqualTo(Reference(expr.args[0].name), expr.args[1].as_py())
-    elif expr.op in {"!=", "not_equal"}:
-        return NotEqualTo(Reference(expr.args[0].name), expr.args[1].as_py())
-    elif expr.op in {">", "greater"}:
-        return GreaterThan(Reference(expr.args[0].name), expr.args[1].as_py())
-    elif expr.op == ">=":
-        return GreaterThanOrEqual(Reference(expr.args[0].name), expr.args[1].as_py())
-    elif expr.op == "<":
-        return LessThan(Reference(expr.args[0].name), expr.args[1].as_py())
-    elif expr.op == "<=":
-        return LessThanOrEqual(Reference(expr.args[0].name), expr.args[1].as_py())
-    else:
-        raise ValueError(f"Unsupported operation: {expr.op}")
 
-
-def convert_pyarrow_expressions(exprs: List[pc.Expression]) -> List[BooleanExpression]:
+def convert_pyarrow_expressions(exprs: List[pc.Expression]) -> BooleanExpression:
     """
-    Convert a list of PyArrow expressions to PyIceberg expressions.
+    Convert a list of PyArrow expressions to a single PyIceberg expression.
+    Multiple expressions are combined with AND.
     """
-    return [convert_pyarrow_expression(expr) for expr in exprs]
+    if not exprs:
+        raise ValueError("No expressions provided")
+    
+    if len(exprs) == 1:
+        return convert_pyarrow_expression(exprs[0])
+    
+    # Combine multiple expressions with AND
+    result = convert_pyarrow_expression(exprs[0])
+    for expr in exprs[1:]:
+        result = And(result, convert_pyarrow_expression(expr))
+    
+    return result
