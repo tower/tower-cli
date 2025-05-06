@@ -66,6 +66,19 @@ def arrow_to_iceberg_type(arrow_type):
         raise ValueError(f"Unsupported Arrow type: {arrow_type}")
 
 
+def convert_pyarrow_field(num, field) -> types.NestedField:
+    name = field.name
+    field_type = arrow_to_iceberg_type(field.type)
+    field_id = num + 1  # Iceberg requires field IDs
+
+    return types.NestedField(
+        field_id,
+        name,
+        field_type,
+        required=not field.nullable
+    )
+
+
 def convert_pyarrow_schema(arrow_schema: pa.Schema) -> IcebergSchema:
     """Convert a PyArrow schema to a PyIceberg schema."""
     fields = [convert_pyarrow_field(i, field) for i, field in enumerate(arrow_schema)]

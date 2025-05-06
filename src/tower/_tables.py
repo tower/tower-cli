@@ -7,8 +7,11 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from pyiceberg.catalog import load_catalog
 from pyiceberg.table import Table as IcebergTable
+from pyiceberg.catalog import (
+    Catalog,
+    load_catalog,
+)
 
 from ._context import TowerContext
 from .utils.pyarrow import (
@@ -74,7 +77,7 @@ class Table:
             TTable: The table with the inserted rows.
         """
         self._table.append(data)
-        self._stats.inserts += data.num_rows()
+        self._stats.inserts += data.num_rows
         return self
 
 
@@ -146,9 +149,9 @@ class Table:
 
 
 class TableReference:
-    def __init__(self, ctx: TowerContext, catalog_name: str, name: str, namespace: Optional[str] = None):
+    def __init__(self, ctx: TowerContext, catalog: Catalog, name: str, namespace: Optional[str] = None):
         self._context = ctx
-        self._catalog = load_catalog(catalog_name)
+        self._catalog = catalog
         self._name = name
         self._namespace = namespace
 
@@ -200,7 +203,7 @@ class TableReference:
 
 def tables(
     name: str,
-    catalog: str = "default",
+    catalog: Union[str, Catalog] = "default",
     namespace: Optional[str] = None
 ) -> TableReference:
     """
@@ -209,11 +212,16 @@ def tables(
 
     Args:
         `name` (str): The name of the table to load.
-        `catalog` (str): The name of the catalog to use. "default" by default.
+        `catalog` (Union[str, Catalog]): The name of the catalog or the actual
+            catalog to use. "default" is the default value. You can pass in an
+            actual catalog object for testing purposes.
         `namespace` (Optional[str]): The namespace in which to load the table.
 
     Returns:
         TableReference: A reference to a table to be resolved with `create` or `load`
     """
+    if isinstance(catalog, str):
+        catalog = load_catalog(catalog)
+
     ctx = TowerContext.build()
     return TableReference(ctx, catalog, name, namespace)
