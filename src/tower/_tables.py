@@ -126,7 +126,7 @@ class Table:
             TTable: The table with the deleted rows.
         """
         if isinstance(filters, list):
-            # We need to covnert the pc.Expression into PyIceberg
+            # We need to convert the pc.Expression into PyIceberg
             next_filters = convert_pyarrow_expressions(filters)
             filters = next_filters
 
