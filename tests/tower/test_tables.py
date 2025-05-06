@@ -6,9 +6,10 @@ import pathlib
 from urllib.parse import urljoin
 from urllib.request import pathname2url
 
-import polars as pl
-import pyarrow as pa
-from pyiceberg.catalog.memory import InMemoryCatalog
+# We import all the things we need from Tower.
+import tower.polars as pl
+import tower.pyarrow as pa
+from tower.pyiceberg.catalog.memory import InMemoryCatalog
 
 # Imports the library under test
 import tower
