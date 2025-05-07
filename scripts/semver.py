@@ -6,7 +6,7 @@ import argparse
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SEMVER_EXP = re.compile("\d+\.\d+(\.\d+)?(-prerelease\.(\d+))?")
+SEMVER_EXP = re.compile("\d+\.\d+(\.\d+)?(-rc\.(\d+))?")
 
 class Version:
     def __init__(self, version_str):
@@ -19,8 +19,8 @@ class Version:
             self.minor = int(parts[1])
 
             if len(parts) > 2:
-                if "-prerelease" in parts[2]:
-                    prerelease_parts = parts[2].split("-prerelease")
+                if "-rc" in parts[2]:
+                    prerelease_parts = parts[2].split("-rc")
                     self.patch = int(prerelease_parts[0])
                 else:
                     self.patch = int(parts[2])
@@ -49,7 +49,7 @@ class Version:
 
     def to_tag_string(self):
         if self.prerelease > 0:
-            return "{major}.{minor}.{patch}-prerelease.{prerelease}".format(major=self.major, minor=self.minor, patch=self.patch, prerelease=self.prerelease)
+            return "{major}.{minor}.{patch}-rc.{prerelease}".format(major=self.major, minor=self.minor, patch=self.patch, prerelease=self.prerelease)
         else:
             return "{major}.{minor}.{patch}".format(major=self.major, minor=self.minor, patch=self.patch)
 
