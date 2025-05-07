@@ -128,6 +128,7 @@ def replace_line_with_regex(file_path, pattern, replace_text):
     
     # Use regex to replace lines matching the pattern
     new_content = pattern.sub(replace_text + '\n', content)
+    print(new_content)
     
     with open(file_path, 'w') as file:
         file.write(new_content)
@@ -135,10 +136,12 @@ def replace_line_with_regex(file_path, pattern, replace_text):
     print(f"Regex replacement complete in {file_path}")
 
 def update_cargo_file(version):
-    replace_line_with_regex("Cargo.toml", re.compile(r'^\s*version\s*=\s*".*"$'), f'version = "{version.to_tag_string()}"')
+    pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
+    replace_line_with_regex("Cargo.toml", pattern, f'version = "{version.to_tag_string()}"')
 
 def update_pyproject_file(version):
-    replace_line_with_regex("pyproject.toml", re.compile(r'^\s*version\s*=\s*".*"$'), f'version = "{version.to_python_string()}"')
+    pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
+    replace_line_with_regex("pyproject.toml", pattern, f'version = "{version.to_python_string()}"')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
