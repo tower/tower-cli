@@ -156,6 +156,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-i", "--patch", type=str2bool, required=False, default=False, help="Increment the patch version")
     parser.add_argument("-p", "--prerelease", type=str2bool, required=False, default=False, help="Include the fact that this is a prerelease version")
+    parser.add_argument("-p", "--release", type=str2bool, required=False, default=False, help="Remove the perelease designation")
     parser.add_argument("-w", "--write", type=str2bool, required=False, default=False, help="Update the various tools in this repository")
     args = parser.parse_args()
 
@@ -172,7 +173,9 @@ if __name__ == "__main__":
     else:
         version = get_current_version(version_base)
 
-    if args.prerelease:
+    if args.release:
+        version.prerelease = 0
+    elif args.prerelease:
         version.prerelease += 1
 
     if args.write:
