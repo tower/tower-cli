@@ -132,12 +132,9 @@ def replace_line_with_regex(file_path, pattern, replace_text):
     
     # Use regex to replace lines matching the pattern
     new_content = pattern.sub(replace_text + '\n', content)
-    print(new_content)
     
     with open(file_path, 'w') as file:
         file.write(new_content)
-    
-    print(f"Regex replacement complete in {file_path}")
 
 def update_cargo_file(version):
     pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
@@ -156,7 +153,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-i", "--patch", type=str2bool, required=False, default=False, help="Increment the patch version")
     parser.add_argument("-p", "--prerelease", type=str2bool, required=False, default=False, help="Include the fact that this is a prerelease version")
-    parser.add_argument("-p", "--release", type=str2bool, required=False, default=False, help="Remove the perelease designation")
+    parser.add_argument("-r", "--release", type=str2bool, required=False, default=False, help="Remove the perelease designation")
     parser.add_argument("-w", "--write", type=str2bool, required=False, default=False, help="Update the various tools in this repository")
     args = parser.parse_args()
 
