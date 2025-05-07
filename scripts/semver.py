@@ -6,7 +6,7 @@ import argparse
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SEMVER_EXP = re.compile("\d+\.\d+(\.\d+(-prerelease\.(\d+))?)?")
+SEMVER_EXP = re.compile("\d+\.\d+(\.\d+)?(-prerelease\.(\d+))?")
 
 class Version:
     def __init__(self, version_str):
@@ -19,10 +19,14 @@ class Version:
             self.minor = int(parts[1])
 
             if len(parts) > 2:
-                self.patch = int(parts[2])
+                if "-prerelease" in parts[2]:
+                    prerelease_parts = parts[2].split("-prerelease")
+                    self.patch = int(prerelease_parts[0])
+                else:
+                    self.patch = int(parts[2])
 
                 if len(parts) > 3:
-                    self.prerelease = int(parts[3].split(".")[1])
+                    self.prerelease = int(parts[3])
                 else:
                     self.prerelease = 0
             else:
@@ -177,5 +181,6 @@ if __name__ == "__main__":
 
         # Do a cargo build to update the lock file
         os.system("cargo build")
+        os.system("uv lock")
     else:
         print(version.to_tag_string(), end='', flush=True)
