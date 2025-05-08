@@ -4,7 +4,9 @@ build-backend = "maturin"
 
 [project]
 name = "tower"
-version = "0.3.12"
+version = "0.3.13"
+
+
 
 
 

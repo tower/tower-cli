@@ -5,6 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.delete_secret_response import DeleteSecretResponse
 from ...types import UNSET, Response, Unset
 
 
@@ -32,9 +33,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Any]:
-    if response.status_code == 204:
-        return None
+) -> Optional[DeleteSecretResponse]:
+    if response.status_code == 200:
+        response_200 = DeleteSecretResponse.from_dict(response.json())
+
+        return response_200
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -43,7 +46,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Any]:
+) -> Response[DeleteSecretResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -57,7 +60,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     environment: Union[Unset, str] = UNSET,
-) -> Response[Any]:
+) -> Response[DeleteSecretResponse]:
     """Delete secret
 
      Delete a secret by name.
@@ -71,7 +74,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[DeleteSecretResponse]
     """
 
     kwargs = _get_kwargs(
@@ -86,12 +89,12 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     name: str,
     *,
     client: AuthenticatedClient,
     environment: Union[Unset, str] = UNSET,
-) -> Response[Any]:
+) -> Optional[DeleteSecretResponse]:
     """Delete secret
 
      Delete a secret by name.
@@ -105,7 +108,36 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        DeleteSecretResponse
+    """
+
+    return sync_detailed(
+        name=name,
+        client=client,
+        environment=environment,
+    ).parsed
+
+
+async def asyncio_detailed(
+    name: str,
+    *,
+    client: AuthenticatedClient,
+    environment: Union[Unset, str] = UNSET,
+) -> Response[DeleteSecretResponse]:
+    """Delete secret
+
+     Delete a secret by name.
+
+    Args:
+        name (str): The name of the secret to delete.
+        environment (Union[Unset, str]): The environment of the secret to delete.
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[DeleteSecretResponse]
     """
 
     kwargs = _get_kwargs(
@@ -116,3 +148,34 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    name: str,
+    *,
+    client: AuthenticatedClient,
+    environment: Union[Unset, str] = UNSET,
+) -> Optional[DeleteSecretResponse]:
+    """Delete secret
+
+     Delete a secret by name.
+
+    Args:
+        name (str): The name of the secret to delete.
+        environment (Union[Unset, str]): The environment of the secret to delete.
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        DeleteSecretResponse
+    """
+
+    return (
+        await asyncio_detailed(
+            name=name,
+            client=client,
+            environment=environment,
+        )
+    ).parsed

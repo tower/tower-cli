@@ -1,34 +1,38 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="ExportUserSecretsParams")
+if TYPE_CHECKING:
+    from ..models.secret import Secret
+
+
+T = TypeVar("T", bound="DeleteSecretResponse")
 
 
 @_attrs_define
-class ExportUserSecretsParams:
+class DeleteSecretResponse:
     """
     Attributes:
-        public_key (str):
+        secret (Secret):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/ExportUserSecretsParams.json.
+            https://api.tower.dev/v1/schemas/DeleteSecretResponse.json.
     """
 
-    public_key: str
+    secret: "Secret"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        public_key = self.public_key
+        secret = self.secret.to_dict()
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "public_key": public_key,
+                "secret": secret,
             }
         )
         if schema is not UNSET:
@@ -38,14 +42,16 @@ class ExportUserSecretsParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.secret import Secret
+
         d = dict(src_dict)
-        public_key = d.pop("public_key")
+        secret = Secret.from_dict(d.pop("secret"))
 
         schema = d.pop("$schema", UNSET)
 
-        export_user_secrets_params = cls(
-            public_key=public_key,
+        delete_secret_response = cls(
+            secret=secret,
             schema=schema,
         )
 
-        return export_user_secrets_params
+        return delete_secret_response

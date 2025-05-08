@@ -19,6 +19,7 @@ class UpdateUserParams:
         first_name (Union[None, Unset, str]):
         is_alerts_enabled (Union[None, Unset, bool]):
         last_name (Union[None, Unset, str]):
+        password (Union[None, Unset, str]):
     """
 
     schema: Union[Unset, str] = UNSET
@@ -27,6 +28,7 @@ class UpdateUserParams:
     first_name: Union[None, Unset, str] = UNSET
     is_alerts_enabled: Union[None, Unset, bool] = UNSET
     last_name: Union[None, Unset, str] = UNSET
+    password: Union[None, Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         schema = self.schema
@@ -61,6 +63,12 @@ class UpdateUserParams:
         else:
             last_name = self.last_name
 
+        password: Union[None, Unset, str]
+        if isinstance(self.password, Unset):
+            password = UNSET
+        else:
+            password = self.password
+
         field_dict: dict[str, Any] = {}
         field_dict.update({})
         if schema is not UNSET:
@@ -75,6 +83,8 @@ class UpdateUserParams:
             field_dict["is_alerts_enabled"] = is_alerts_enabled
         if last_name is not UNSET:
             field_dict["last_name"] = last_name
+        if password is not UNSET:
+            field_dict["password"] = password
 
         return field_dict
 
@@ -128,6 +138,15 @@ class UpdateUserParams:
 
         last_name = _parse_last_name(d.pop("last_name", UNSET))
 
+        def _parse_password(data: object) -> Union[None, Unset, str]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, str], data)
+
+        password = _parse_password(d.pop("password", UNSET))
+
         update_user_params = cls(
             schema=schema,
             company=company,
@@ -135,6 +154,7 @@ class UpdateUserParams:
             first_name=first_name,
             is_alerts_enabled=is_alerts_enabled,
             last_name=last_name,
+            password=password,
         )
 
         return update_user_params

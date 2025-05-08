@@ -5,37 +5,20 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.export_secrets_params import ExportSecretsParams
 from ...models.export_secrets_response import ExportSecretsResponse
-from ...models.export_user_secrets_params import ExportUserSecretsParams
-from ...types import UNSET, Response, Unset
+from ...types import Response
 
 
 def _get_kwargs(
     *,
-    body: ExportUserSecretsParams,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    body: ExportSecretsParams,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
-    params: dict[str, Any] = {}
-
-    params["environment"] = environment
-
-    params["all"] = all_
-
-    params["page"] = page
-
-    params["page_size"] = page_size
-
-    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
-
     _kwargs: dict[str, Any] = {
-        "method": "get",
+        "method": "post",
         "url": "/secrets/export",
-        "params": params,
     }
 
     _body = body.to_dict()
@@ -74,23 +57,14 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: ExportUserSecretsParams,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    body: ExportSecretsParams,
 ) -> Response[ExportSecretsResponse]:
     """Export secrets
 
      Lists all the secrets in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
-        body (ExportUserSecretsParams):
+        body (ExportSecretsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -102,10 +76,6 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
-        environment=environment,
-        all_=all_,
-        page=page,
-        page_size=page_size,
     )
 
     response = client.get_httpx_client().request(
@@ -118,23 +88,14 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: ExportUserSecretsParams,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    body: ExportSecretsParams,
 ) -> Optional[ExportSecretsResponse]:
     """Export secrets
 
      Lists all the secrets in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
-        body (ExportUserSecretsParams):
+        body (ExportSecretsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -147,33 +108,20 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
-        environment=environment,
-        all_=all_,
-        page=page,
-        page_size=page_size,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: ExportUserSecretsParams,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    body: ExportSecretsParams,
 ) -> Response[ExportSecretsResponse]:
     """Export secrets
 
      Lists all the secrets in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
-        body (ExportUserSecretsParams):
+        body (ExportSecretsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -185,10 +133,6 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
-        environment=environment,
-        all_=all_,
-        page=page,
-        page_size=page_size,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -199,23 +143,14 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: ExportUserSecretsParams,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    body: ExportSecretsParams,
 ) -> Optional[ExportSecretsResponse]:
     """Export secrets
 
      Lists all the secrets in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
-        body (ExportUserSecretsParams):
+        body (ExportSecretsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -229,9 +164,5 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
-            environment=environment,
-            all_=all_,
-            page=page,
-            page_size=page_size,
         )
     ).parsed

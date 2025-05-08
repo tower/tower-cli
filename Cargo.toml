@@ -4,7 +4,9 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.12"
+version = "0.3.13"
+
+
 
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.77"
@@ -31,7 +33,6 @@ glob = "0.3"
 http = "1.1"
 indicatif = "0.17"
 log = "0.4"
-open = "5"
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
@@ -61,6 +62,7 @@ tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 url = { version = "2", features = ["serde"] }
+webbrowser = "1"
 
 # The profile that 'dist' will build with
 [profile.dist]
