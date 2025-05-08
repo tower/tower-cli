@@ -4,9 +4,9 @@ Helpers to ensure users have the correct dependencies installed.
 Tower supports optional features that require additional dependencies.
 These can be installed using pip:
 
-    pip install tower[ai]      # For AI/LLM features
-    pip install tower[iceberg] # For Apache Iceberg table support
-    pip install tower[all]     # For all optional features
+    pip install "tower[ai]"      # For AI/LLM features
+    pip install "tower[iceberg]" # For Apache Iceberg table support
+    pip install "tower[all]"     # For all optional features
 """
 
 import importlib.util
@@ -121,7 +121,7 @@ def override_get_attr(name: str) -> Any:
                 raise ImportError(
                     f"This requires the '{feature}' feature and the following dependencies: {deps}.\n"
                     f"You are missing these packages: {missing}\n"
-                    f"Install with: pip install tower[{feature}]"
+                    f'Install with: pip install "tower[{feature}]"'
                 )
 
             # Check if module is already cached

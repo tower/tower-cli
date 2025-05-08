@@ -5,9 +5,9 @@ This package provides tools for interacting with the Tower platform,
 including running apps locally or in the Tower cloud.
 
 Optional features:
-- AI/LLM support: Install with `pip install tower[ai]`
-- Apache Iceberg support: Install with `pip install tower[iceberg]`
-- All features: Install with `pip install tower[all]`
+- AI/LLM support: Install with `pip install "tower[ai]"`
+- Apache Iceberg support: Install with `pip install "tower[iceberg]"`
+- All features: Install with `pip install "tower[all]"`
 """
 
 from ._client import (
