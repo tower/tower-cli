@@ -36,10 +36,12 @@ async fn handle_device_login(
         log::debug!("failed to open web browser: {}", err);
 
         let line = format!(
-            "Please open the following URL in your browser: {}",
+            "Please open the following URL in your browser: {}\n",
             claim.login_url
         );
         output::write(&line);
+    } else {
+        log::debug!("opened browser to {}", claim.login_url);
     }
 
     let mut spinner = output::spinner("Waiting for login...");
