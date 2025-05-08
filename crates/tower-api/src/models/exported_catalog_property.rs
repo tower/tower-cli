@@ -12,18 +12,21 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Account {
+pub struct ExportedCatalogProperty {
+    #[serde(rename = "encrypted_value")]
+    pub encrypted_value: String,
     #[serde(rename = "name")]
     pub name: String,
-    #[serde(rename = "slug")]
-    pub slug: String,
+    #[serde(rename = "preview")]
+    pub preview: String,
 }
 
-impl Account {
-    pub fn new(name: String, slug: String) -> Account {
-        Account {
+impl ExportedCatalogProperty {
+    pub fn new(encrypted_value: String, name: String, preview: String) -> ExportedCatalogProperty {
+        ExportedCatalogProperty {
+            encrypted_value,
             name,
-            slug,
+            preview,
         }
     }
 }

@@ -1,11 +1,10 @@
 [package]
 name = "tower-api"
-version = "1.0.0"
-authors = ["hello@tower.dev"]
-description = "REST API to interact with Tower Services."
-# Override this license by providing a License Object in the OpenAPI.
-license = "Unlicense"
-edition = "2021"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 log = { workspace = true }

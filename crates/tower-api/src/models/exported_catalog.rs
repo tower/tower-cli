@@ -12,7 +12,7 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Catalog {
+pub struct ExportedCatalog {
     #[serde(rename = "CreatedAt")]
     pub created_at: String,
     #[serde(rename = "environment")]
@@ -20,16 +20,16 @@ pub struct Catalog {
     #[serde(rename = "name")]
     pub name: String,
     #[serde(rename = "properties")]
-    pub properties: Vec<models::CatalogProperty>,
+    pub properties: Vec<models::ExportedCatalogProperty>,
     #[serde(rename = "slug")]
     pub slug: String,
     #[serde(rename = "type")]
     pub r#type: String,
 }
 
-impl Catalog {
-    pub fn new(created_at: String, environment: String, name: String, properties: Vec<models::CatalogProperty>, slug: String, r#type: String) -> Catalog {
-        Catalog {
+impl ExportedCatalog {
+    pub fn new(created_at: String, environment: String, name: String, properties: Vec<models::ExportedCatalogProperty>, slug: String, r#type: String) -> ExportedCatalog {
+        ExportedCatalog {
             created_at,
             environment,
             name,

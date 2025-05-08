@@ -95,14 +95,14 @@ pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: r
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ExportSecretsParams {
-        export_user_secrets_params: tower_api::models::ExportUserSecretsParams {
+        export_secrets_params: tower_api::models::ExportSecretsParams {
             schema: None,
+            all,
             public_key: crypto::serialize_public_key(public_key),
+            environment: env.to_string(),
+            page: 1,
+            page_size: 100,
         },
-        environment: Some(env.to_string()),
-        all: Some(all),
-        page: None,
-        page_size: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::export_secrets(api_config, params)).await
@@ -147,7 +147,7 @@ pub async fn describe_secrets_key(config: &Config) -> Result<tower_api::models::
     unwrap_api_response(tower_api::apis::default_api::describe_secrets_key(api_config, params)).await
 }
 
-pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<(), Error<tower_api::apis::default_api::DeleteSecretError>> {
+pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<tower_api::models::DeleteSecretResponse, Error<tower_api::apis::default_api::DeleteSecretError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DeleteSecretParams {
@@ -315,11 +315,11 @@ impl ResponseEntity for tower_api::apis::default_api::DeleteAppSuccess {
 }
 
 impl ResponseEntity for tower_api::apis::default_api::DeleteSecretSuccess {
-    type Data = ();
+    type Data = tower_api::models::DeleteSecretResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status204() => Some(()),
+            Self::Status200(res) => Some(res),
             Self::UnknownValue(_) => None,
         }
     }

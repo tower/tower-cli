@@ -12,19 +12,19 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CreateCatalogResponse {
+pub struct DeleteSecretResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    #[serde(rename = "catalog")]
-    pub catalog: Box<models::Catalog>,
+    #[serde(rename = "secret")]
+    pub secret: Box<models::Secret>,
 }
 
-impl CreateCatalogResponse {
-    pub fn new(catalog: models::Catalog) -> CreateCatalogResponse {
-        CreateCatalogResponse {
+impl DeleteSecretResponse {
+    pub fn new(secret: models::Secret) -> DeleteSecretResponse {
+        DeleteSecretResponse {
             schema: None,
-            catalog: Box::new(catalog),
+            secret: Box::new(secret),
         }
     }
 }
