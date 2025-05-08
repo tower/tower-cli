@@ -94,8 +94,8 @@ def get_current_version(base):
             released_versions = [ver for ver in same_versions if ver.prerelease == 0]
 
             # If there is a released version, then let's go with this.
-            if len(release_versions) > 1:
-                return release_versions[0]
+            if len(released_versions) > 1:
+                return released_versions[0]
             else:
                 return max(same_versions, key=lambda x: x.prerelease)
         else:
