@@ -32,7 +32,9 @@ async fn handle_device_login(
     claim: CreateDeviceLoginTicketResponse,
 ) {
     // Try to open the login URL in browser
-    if let Err(_) = open::that(&claim.login_url) {
+    if let Err(err) = webbrowser::open(&claim.login_url) {
+        log::debug!("failed to open web browser: {}", err);
+
         let line = format!(
             "Please open the following URL in your browser: {}",
             claim.login_url
