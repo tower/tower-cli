@@ -4,7 +4,7 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.0"
+cargo-dist-version = "0.28.5"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -25,7 +25,7 @@ create-release = true
 pr-run-mode = "skip"
 # Local artifacts jobs to run in CI
 local-artifacts-jobs = ["./build-binaries"]
-# Make sure to publish prerelease versions
+# Whether to publish prereleases to package managers
 publish-prereleases = true
 
 [dist.github-custom-runners]
