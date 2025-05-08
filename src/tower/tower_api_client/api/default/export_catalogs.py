@@ -5,37 +5,36 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.delete_secret_response import DeleteSecretResponse
-from ...types import UNSET, Response, Unset
+from ...models.export_catalogs_params import ExportCatalogsParams
+from ...models.export_catalogs_response import ExportCatalogsResponse
+from ...types import Response
 
 
 def _get_kwargs(
-    name: str,
     *,
-    environment: Union[Unset, str] = UNSET,
+    body: ExportCatalogsParams,
 ) -> dict[str, Any]:
-    params: dict[str, Any] = {}
-
-    params["environment"] = environment
-
-    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
-        "method": "delete",
-        "url": "/secrets/{name}".format(
-            name=name,
-        ),
-        "params": params,
+        "method": "post",
+        "url": "/catalogs/export",
     }
 
+    _body = body.to_dict()
+
+    _kwargs["json"] = _body
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DeleteSecretResponse]:
+) -> Optional[ExportCatalogsResponse]:
     if response.status_code == 200:
-        response_200 = DeleteSecretResponse.from_dict(response.json())
+        response_200 = ExportCatalogsResponse.from_dict(response.json())
 
         return response_200
     if client.raise_on_unexpected_status:
@@ -46,7 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DeleteSecretResponse]:
+) -> Response[ExportCatalogsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,30 +55,27 @@ def _build_response(
 
 
 def sync_detailed(
-    name: str,
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[DeleteSecretResponse]:
-    """Delete secret
+    body: ExportCatalogsParams,
+) -> Response[ExportCatalogsResponse]:
+    """Export catalogs
 
-     Delete a secret by name.
+     Lists all the catalogs in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        name (str): The name of the secret to delete.
-        environment (Union[Unset, str]): The environment of the secret to delete.
+        body (ExportCatalogsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteSecretResponse]
+        Response[ExportCatalogsResponse]
     """
 
     kwargs = _get_kwargs(
-        name=name,
-        environment=environment,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -90,59 +86,53 @@ def sync_detailed(
 
 
 def sync(
-    name: str,
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[DeleteSecretResponse]:
-    """Delete secret
+    body: ExportCatalogsParams,
+) -> Optional[ExportCatalogsResponse]:
+    """Export catalogs
 
-     Delete a secret by name.
+     Lists all the catalogs in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        name (str): The name of the secret to delete.
-        environment (Union[Unset, str]): The environment of the secret to delete.
+        body (ExportCatalogsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteSecretResponse
+        ExportCatalogsResponse
     """
 
     return sync_detailed(
-        name=name,
         client=client,
-        environment=environment,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    name: str,
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[DeleteSecretResponse]:
-    """Delete secret
+    body: ExportCatalogsParams,
+) -> Response[ExportCatalogsResponse]:
+    """Export catalogs
 
-     Delete a secret by name.
+     Lists all the catalogs in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        name (str): The name of the secret to delete.
-        environment (Union[Unset, str]): The environment of the secret to delete.
+        body (ExportCatalogsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteSecretResponse]
+        Response[ExportCatalogsResponse]
     """
 
     kwargs = _get_kwargs(
-        name=name,
-        environment=environment,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -151,31 +141,28 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    name: str,
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[DeleteSecretResponse]:
-    """Delete secret
+    body: ExportCatalogsParams,
+) -> Optional[ExportCatalogsResponse]:
+    """Export catalogs
 
-     Delete a secret by name.
+     Lists all the catalogs in your current account and re-encrypt them with the public key you supplied.
 
     Args:
-        name (str): The name of the secret to delete.
-        environment (Union[Unset, str]): The environment of the secret to delete.
+        body (ExportCatalogsParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteSecretResponse
+        ExportCatalogsResponse
     """
 
     return (
         await asyncio_detailed(
-            name=name,
             client=client,
-            environment=environment,
+            body=body,
         )
     ).parsed
