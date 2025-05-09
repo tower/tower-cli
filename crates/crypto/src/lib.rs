@@ -96,7 +96,7 @@ pub fn serialize_public_key(key: RsaPublicKey) -> String {
 mod test {
     use super::*;
     use rand::{distributions::Alphanumeric, Rng};
-    use rsa::pkcs1::DecodeRsaPublicKey;
+    use rsa::pkcs8::DecodePublicKey;
 
     #[test]
     fn test_encrypt_decrypt() {
@@ -129,7 +129,7 @@ mod test {
     fn test_serialize_public_key() {
         let  (_private_key, public_key) = testutils::crypto::get_test_keys();
         let serialized = serialize_public_key(public_key.clone());
-        let deserialized = RsaPublicKey::from_pkcs1_pem(&serialized).unwrap();
+        let deserialized = RsaPublicKey::from_public_key_pem(&serialized).unwrap();
 
         assert_eq!(public_key, deserialized);
     }
