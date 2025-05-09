@@ -108,6 +108,24 @@ pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: r
     unwrap_api_response(tower_api::apis::default_api::export_secrets(api_config, params)).await
 } 
 
+pub async fn export_catalogs(config: &Config, env: &str, all: bool, public_key: rsa::RsaPublicKey) -> Result<tower_api::models::ExportCatalogsResponse, Error<tower_api::apis::default_api::ExportCatalogsError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ExportCatalogsParams {
+        export_catalogs_params: tower_api::models::ExportCatalogsParams {
+            schema: None,
+            all,
+            public_key: crypto::serialize_public_key(public_key),
+            environment: env.to_string(),
+            page: 1,
+            page_size: 100,
+        },
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::export_catalogs(api_config, params)).await
+} 
+
+
 pub async fn list_secrets(config: &Config, env: &str, all: bool) -> Result<tower_api::models::ListSecretsResponse, Error<tower_api::apis::default_api::ListSecretsError>> {
     let api_config = &config.into();
 
@@ -238,6 +256,17 @@ impl ResponseEntity for tower_api::apis::default_api::ListSecretsSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::ExportSecretsSuccess {
     type Data = tower_api::models::ExportSecretsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::ExportCatalogsSuccess {
+    type Data = tower_api::models::ExportCatalogsResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
