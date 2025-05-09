@@ -8,6 +8,7 @@ use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use crate::{
     output,
     api,
+    Error,
 };
 
 pub fn run_cmd() -> Command {
@@ -85,8 +86,22 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
     // There is always an implicit `local` environment when running in a local context.
     let env = "local".to_string();
 
-    // Load all the secrets from the server
-    let secrets = get_secrets(&config, &env).await;
+    let mut spinner = output::spinner("Setting up runtime environment...");
+
+    // Load all the secrets and catalogs from the server
+    let secrets = if let Ok(secs) = get_secrets(&config, &env).await {
+        secs
+    } else {
+        output::die("Something went wrong loading secrets into your environment");
+    };
+
+    let catalogs = if let Ok(cats) = get_catalogs(&config, &env).await {
+        cats
+    } else {
+        output::die("Something went wrong loading catalogs into your environment");
+    };
+
+    spinner.success();
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -110,7 +125,7 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher
-        .launch(package, env, secrets, params, HashMap::new())
+        .launch(package, env, secrets, params, catalogs)
         .await
     {
         output::runtime_error(err);
@@ -236,26 +251,51 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 
 /// get_secrets manages the process of getting secrets from the Tower server in a way that can be
 /// used by the local runtime during local app execution.
-async fn get_secrets(config: &Config, env: &str) -> HashMap<String, String> {
+async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
     let (private_key, public_key) = crypto::generate_key_pair();
-
-    let mut spinner = output::spinner("Getting secrets...");
 
     match api::export_secrets(&config, env, false, public_key).await {
         Ok(res) => {
-            spinner.success();
-            res.secrets
-                .into_iter()
-                .map(|secret| {
-                    let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string());
-                    (secret.name, decrypted_value)
-                })
-                .collect()
+            let mut secrets = HashMap::new();
+
+            for secret in res.secrets {
+                // we will decrypt each property and inject it into the vals map.
+                let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
+                secrets.insert(secret.name, decrypted_value);
+            }
+
+            Ok(secrets)
         },
         Err(err) => {
-            spinner.failure();
             output::tower_error(err);
-            HashMap::new()
+            Err(Error::FetchingSecretsFailed)
+        }
+    }
+}
+
+/// get_catalogs manages the process of exporting catalogs, decrypting their properties, and
+/// preparting them for injection into the environment during app execution
+async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
+    let (private_key, public_key) = crypto::generate_key_pair();
+
+    match api::export_catalogs(&config, env, false, public_key).await {
+        Ok(res) => {
+            let mut vals = HashMap::new();
+
+            for catalog in res.catalogs {
+                // we will decrypt each property and inject it into the vals map.
+                for property in catalog.properties {
+                    let decrypted_value = crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
+                    let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
+                    vals.insert(name, decrypted_value);
+                }
+            }
+
+            Ok(vals)
+        },
+        Err(err) => {
+            output::tower_error(err);
+            Err(Error::FetchingCatalogsFailed)
         }
     }
 }
@@ -323,3 +363,11 @@ async fn monitor_status(mut app: LocalApp) {
         }
     }
 }
+
+fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &str) -> String {
+    let catalog_name = catalog_name.replace('.', "_").replace(':', "_").to_uppercase();
+    let property_name = property_name.replace('.', "_").replace(':', "_").to_uppercase();
+
+    format!("PYICEBERG_CATALOG__{}__{}", catalog_name, property_name)
+}
+

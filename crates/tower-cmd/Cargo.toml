@@ -23,6 +23,7 @@ rsa = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 simple_logger = { workspace = true }
+snafu = { workspace = true }
 spinners = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

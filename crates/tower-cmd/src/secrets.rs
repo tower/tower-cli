@@ -103,7 +103,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                     let decrypted_value = crypto::decrypt(
                         private_key.clone(),
                         secret.encrypted_value.clone(),
-                    );
+                    ).unwrap();
 
                     vec![
                         secret.name.clone(),
@@ -203,7 +203,7 @@ async fn encrypt_and_create_secret(
                     output::die("Failed to parse public key");
                 });
 
-            let encrypted_value = encrypt(public_key, value.to_string());
+            let encrypted_value = encrypt(public_key, value.to_string()).unwrap();
             let preview = create_preview(value);
 
             api::create_secret(&config, name, environment, &encrypted_value, &preview).await

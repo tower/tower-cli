@@ -5,12 +5,15 @@ mod apps;
 mod deploy;
 pub mod output;
 pub mod api;
+pub mod error;
 mod run;
 mod secrets;
 mod session;
 mod teams;
 mod util;
 mod version;
+
+pub use error::Error;
 
 pub struct App {
     session: Option<Session>,
