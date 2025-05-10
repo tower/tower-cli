@@ -52,9 +52,26 @@ def run_app(
     parameters: Optional[Dict[str, str]] = None,
 ) -> Run:
     """
-    `run_app` invokes an app based on the configured environment. You can
-    supply an optional `environment` override, and an optional dict
-    `parameters` to pass into the app.
+    Run a Tower application with specified parameters and environment.
+
+    This function initiates a new run of a Tower application identified by its slug.
+    The run can be configured with an optional environment override and runtime parameters.
+    If no environment is specified, the default environment from the Tower context is used.
+
+    Args:
+        slug (str): The unique identifier of the application to run.
+        environment (Optional[str]): The environment to run the application in.
+            If not provided, uses the default environment from the Tower context.
+        parameters (Optional[Dict[str, str]]): A dictionary of key-value pairs
+            to pass as parameters to the application run.
+
+    Returns:
+        Run: A Run object containing information about the initiated application run,
+            including the app_slug and run number.
+
+    Raises:
+        RuntimeError: If there is an error initiating the run or if the Tower API
+            returns an error response.
     """
     ctx = TowerContext.build()
     client = _env_client(ctx)
@@ -86,10 +103,25 @@ def run_app(
 
 def wait_for_run(run: Run) -> None:
     """
-    `wait_for_run` waits for a run to reach a terminal state by polling the
-    Tower API every 2 seconds for the latest status. If the app returns a
-    terminal status (`exited`, `errored`, `cancelled`, or `crashed`) then this
-    function returns.
+    Wait for a Tower app run to reach a terminal state by polling the Tower API.
+
+    This function continuously polls the Tower API every 2 seconds (defined by WAIT_TIMEOUT)
+    to check the status of the specified run. The function returns when the run reaches
+    any of the following terminal states:
+    - exited: The run completed successfully
+    - failed: The run failed during execution
+    - canceled: The run was manually canceled
+    - errored: The run encountered an error
+
+    Args:
+        run (Run): The Run object containing the app_slug and number of the run to monitor.
+
+    Returns:
+        None: This function does not return any value.
+
+    Raises:
+        RuntimeError: If there is an error fetching the run status from the Tower API
+            or if the API returns an error response.
     """
     ctx = TowerContext.build()
     client = _env_client(ctx)
@@ -129,7 +161,10 @@ def wait_for_runs(runs: List[Run]) -> None:
     `crashed`) then this function returns.
 
     Args:
-        runs (List[Run]): A list of runs to wait for.
+        runs (List[Run]): A list of Run objects to monitor.
+
+    Returns:
+        None: This function does not return any value.
 
     Raises:
         RuntimeError: If there is an error fetching the run status or if any
