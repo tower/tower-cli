@@ -13,6 +13,7 @@ Optional features:
 from ._client import (
     run_app,
     wait_for_run,
+    wait_for_runs,
 )
 
 from ._features import override_get_attr, get_available_features, is_feature_enabled

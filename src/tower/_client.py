@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Dict, Optional
+from typing import List, Dict, Optional
 
 from ._context import TowerContext
 from .tower_api_client import AuthenticatedClient
@@ -119,3 +119,21 @@ def wait_for_run(run: Run) -> None:
                     return
                 else:
                     time.sleep(WAIT_TIMEOUT)
+
+
+def wait_for_runs(runs: List[Run]) -> None:
+    """
+    `wait_for_runs` waits for a list of runs to reach a terminal state by
+    polling the Tower API every 2 seconds for the latest status. If any of the
+    runs return a terminal status (`exited`, `errored`, `cancelled`, or
+    `crashed`) then this function returns.
+
+    Args:
+        runs (List[Run]): A list of runs to wait for.
+
+    Raises:
+        RuntimeError: If there is an error fetching the run status or if any
+            of the runs fail.
+    """
+    for run in runs:
+        wait_for_run(run)
