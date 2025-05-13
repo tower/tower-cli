@@ -4,9 +4,11 @@ version = { workspace = true }
 edition = "2021"
 
 [dependencies]
+aes-gcm = { workspace = true } 
 base64 = { workspace = true }
 pem = { workspace = true }
 rand = { workspace = true }
 rsa = { workspace = true }
 sha2 = { workspace = true }
+snafu = { workspace = true }
 testutils = { workspace = true }
