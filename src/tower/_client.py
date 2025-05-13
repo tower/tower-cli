@@ -1,5 +1,6 @@
 import os
 import time
+import httpx
 from typing import List, Dict, Optional
 
 from ._context import TowerContext
