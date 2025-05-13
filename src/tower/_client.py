@@ -36,9 +36,9 @@ DEFAULT_TOWER_URL = "https://api.tower.dev"
 # app somewhere.
 DEFAULT_TOWER_ENVIRONMENT = "default"
 
-# DEFAULT_RETIRES_ON_FAILURE is the number of times to retry querying the Tower
+# DEFAULT_NUM_TIMEOUT_RETRIES is the number of times to retry querying the Tower
 # API before we just give up entirely.
-DEFAULT_RETIRES_ON_FAILURE = 5
+DEFAULT_NUM_TIMEOUT_RETRIES = 5
 
 
 def run_app(
@@ -138,7 +138,7 @@ def wait_for_run(
         # we've enounctered some sort of operational problem there.
         if timeout is not None:
             if _time_since(start_time) > timeout:
-                raise TimeoutException(t)
+                raise TimeoutException(_time_since(start_time))
 
         # We time this out to avoid waiting forever on the API.
         try:
@@ -163,7 +163,7 @@ def wait_for_run(
             # up entirely.
             retries += 1
 
-            if retries >= DEFAULT_RETRIES_ON_FAILURE:
+            if retries >= DEFAULT_NUM_TIMEOUT_RETRIES:
                raise UnknownException("There was a problem with the Tower API.")
 
 
@@ -215,7 +215,7 @@ def wait_for_runs(
             # spent a load of time deeper inside the loop on reties, etc.
             if timeout is not None:
                 if _time_since(start_time) > timeout:
-                    raise TimeoutException(t)
+                    raise TimeoutException(_time_since(start_time))
 
             try:
                 desc = _check_run_status(ctx, run, timeout=2.0)
@@ -241,7 +241,7 @@ def wait_for_runs(
                 # up entirely.
                 retries += 1
 
-                if retries >= DEFAULT_RETRIES_ON_FAILURE:
+                if retries >= DEFAULT_NUM_TIMEOUT_RETRIES:
                    raise UnknownException("There was a problem with the Tower API.")
 
     return (successful_runs, failed_runs)
@@ -343,4 +343,4 @@ def _check_run_status(
     except httpx.TimeoutException:
         # If we received a timeout from the API then we should raise our own
         # timeout type.
-        raise TimeoutException("Timeout while waiting for run status")
+        raise TimeoutException(timeout)
