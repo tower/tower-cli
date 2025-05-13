@@ -123,5 +123,12 @@ easily. Then you can `import tower` and you're off to the races!
 uv run python
 ```
 
+To run tests:
+
+```bash
+uv sync --locked --all-extras --dev
+uv run pytest tests
+```
+
 If you need to get the latest OpenAPI SDK, you can run
 `./scripts/generate-python-api-client.sh`.
