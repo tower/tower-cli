@@ -132,7 +132,7 @@ def test_waiting_for_a_run(httpx_mock, mock_api_config, mock_run_response_factor
     )
 
     tower = mock_api_config
-    run = create_run_object(number=run_number, status="crashed")
+    run = create_run_object(number=run_number, status="pending")
 
     # Now actually wait for the run
     final_run = tower.wait_for_run(run)

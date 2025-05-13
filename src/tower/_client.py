@@ -237,7 +237,7 @@ def wait_for_runs(
                 # We need to re-add this run to the list so we check it again
                 # in the future. We add it to the back since we took it off the
                 # front, effectively moving to the next run.
-                awaiting_runs.append(run)
+                awaiting_runs.append(desc)
             else:
                 raise UnhandledRunStateException(desc.status)
         except TimeoutException:
