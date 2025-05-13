@@ -210,40 +210,47 @@ def wait_for_runs(
     successful_runs = []
     failed_runs = []
 
-    while awaiting_runs:
-        for run in awaiting_runs:
-            # Check the overall timeout at the top of the loop in case we've
-            # spent a load of time deeper inside the loop on reties, etc.
-            if timeout is not None:
-                if _time_since(start_time) > timeout:
-                    raise TimeoutException(_time_since(start_time))
+    while len(awaiting_runs) > 0:
+        run = awaiting_runs.pop(0)
 
-            try:
-                desc = _check_run_status(ctx, run, timeout=2.0)
-                retries = 0
+        # Check the overall timeout at the top of the loop in case we've
+        # spent a load of time deeper inside the loop on reties, etc.
+        if timeout is not None:
+            if _time_since(start_time) > timeout:
+                raise TimeoutException(_time_since(start_time))
 
-                if _is_successful_run(desc):
-                    successful_runs.append(desc)
-                    awaiting_runs.remove(run)
-                elif _is_failed_run(desc):
-                    if raise_on_failure:
-                        raise RunFailedError(desc.app_slug, desc.number, desc.status)
-                    else:
-                        failed_runs.append(desc)
-                        awaiting_runs.remove(run)
+        try:
+            desc = _check_run_status(ctx, run, timeout=2.0)
+            retries = 0
 
-                elif _is_run_awaiting_completion(desc):
-                    time.sleep(WAIT_TIMEOUT)
+            if _is_successful_run(desc):
+                successful_runs.append(desc)
+            elif _is_failed_run(desc):
+                if raise_on_failure:
+                    raise RunFailedError(desc.app_slug, desc.number, desc.status)
                 else:
-                    raise UnhandledRunStateException(desc.status)
-            except TimeoutException:
-                # timed out in the API, we want to keep trying this for a while
-                # (assuming we didn't hit the global timeout limit) until we give
-                # up entirely.
-                retries += 1
+                    failed_runs.append(desc)
 
-                if retries >= DEFAULT_NUM_TIMEOUT_RETRIES:
-                   raise UnknownException("There was a problem with the Tower API.")
+            elif _is_run_awaiting_completion(desc):
+                time.sleep(WAIT_TIMEOUT)
+
+                # We need to re-add this run to the list so we check it again
+                # in the future. We add it to the back since we took it off the
+                # front, effectively moving to the next run.
+                awaiting_runs.append(run)
+            else:
+                raise UnhandledRunStateException(desc.status)
+        except TimeoutException:
+            # timed out in the API, we want to keep trying this for a while
+            # (assuming we didn't hit the global timeout limit) until we give
+            # up entirely.
+            retries += 1
+
+            if retries >= DEFAULT_NUM_TIMEOUT_RETRIES:
+               raise UnknownException("There was a problem with the Tower API.")
+            else:
+                # Add the item back on the list for retry later on.
+                awaiting_runs.append(run)
 
     return (successful_runs, failed_runs)
 

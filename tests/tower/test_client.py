@@ -312,14 +312,10 @@ def test_raising_an_error_during_partial_failure(
         json=mock_run_response_factory(number=3, status="pending"),
         status_code=200,
     )
-
-    httpx_mock.add_response(
-        method="GET",
-        url=f"https://api.example.com/v1/apps/my-app/runs/3",
-        json=mock_run_response_factory(number=3, status="exited", status_group="successful"),
-        status_code=200,
-    )
     
+    # NOTE: We don't have a second response for this run because we'll never
+    # get to it.
+
     runs.append(create_run_object(number=3))
     
 
