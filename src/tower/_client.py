@@ -3,7 +3,7 @@ import time
 from typing import List, Dict, Optional
 
 from ._context import TowerContext
-from ._errors import (
+from .exceptions import (
     NotFoundException,
     UnauthorizedException,
     UnknownException,
@@ -36,23 +36,9 @@ DEFAULT_TOWER_URL = "https://api.tower.dev"
 # app somewhere.
 DEFAULT_TOWER_ENVIRONMENT = "default"
 
-
-def _env_client(ctx: TowerContext) -> AuthenticatedClient:
-    tower_url = ctx.tower_url
-
-    if not tower_url.endswith("/v1"):
-        if tower_url.endswith("/"):
-            tower_url += "v1"
-        else:
-            tower_url += "/v1"
-
-    return AuthenticatedClient(
-        verify_ssl=False,
-        base_url=tower_url,
-        token=ctx.api_key,
-        auth_header_name="X-API-Key",
-        prefix="",
-    )
+# DEFAULT_RETIRES_ON_FAILURE is the number of times to retry querying the Tower
+# API before we just give up entirely.
+DEFAULT_RETIRES_ON_FAILURE = 5
 
 
 def run_app(
@@ -110,6 +96,157 @@ def run_app(
             return output.run
 
 
+def wait_for_run(
+    run: Run,
+    timeout: Optional[float] = 86_400.0, # one day
+    raise_on_failure: bool = False,
+) -> Run:
+    """
+    Wait for a Tower app run to reach a terminal state by polling the Tower API.
+
+    This function continuously polls the Tower API every 2 seconds (defined by WAIT_TIMEOUT)
+    to check the status of the specified run. The function returns when the run reaches
+    a terminal state (exited, errored, cancelled, or crashed).
+
+    Args:
+        run (Run): The Run object containing the app_slug and number of the run to monitor.
+        timeout (Optional[float]): Maximum time to wait in seconds before raising a
+            TimeoutException. Defaults to one day (86,400 seconds).
+        raise_on_failure (bool): If True, raises a RunFailedError when the run fails.
+            If False, returns the failed run object. Defaults to False.
+
+    Returns:
+        Run: The final state of the run after completion or failure.
+
+    Raises:
+        TimeoutException: If the specified timeout is reached before the run completes.
+        RunFailedError: If raise_on_failure is True and the run fails.
+        UnhandledRunStateException: If the run enters an unexpected state.
+        UnknownException: If there are persistent problems communicating with the Tower API.
+        NotFoundException: If the run cannot be found.
+        UnauthorizedException: If the API key is invalid or unauthorized.
+    """
+    ctx = TowerContext.build()
+    retries = 0
+
+    # We use this to track the timeout, if one is defined.
+    start_time = time.time()
+
+    while True:
+        # We check for a timeout at the top of the loop because we want to
+        # avoid waiting unnecessarily for the timeout hitting the Tower API if
+        # we've enounctered some sort of operational problem there.
+        if timeout is not None:
+            if _time_since(start_time) > timeout:
+                raise TimeoutException(t)
+
+        # We time this out to avoid waiting forever on the API.
+        try:
+            desc = _check_run_status(ctx, run, timeout=2.0)
+            retries = 0
+
+            if _is_successful_run(desc):
+                return desc
+            elif _is_failed_run(desc):
+                if raise_on_failure:
+                    raise RunFailedError(desc.app_slug, desc.number, desc.status)
+                else:
+                    return desc
+
+            elif _is_run_awaiting_completion(desc):
+                time.sleep(WAIT_TIMEOUT)
+            else:
+                raise UnhandledRunStateException(desc.status)
+        except TimeoutException:
+            # timed out in the API, we want to keep trying this for a while
+            # (assuming we didn't hit the global timeout limit) until we give
+            # up entirely.
+            retries += 1
+
+            if retries >= DEFAULT_RETRIES_ON_FAILURE:
+               raise UnknownException("There was a problem with the Tower API.")
+
+
+def wait_for_runs(
+    runs: List[Run],
+    timeout: Optional[float] = 86_400.0, # one day
+    raise_on_failure: bool = False,
+) -> tuple[List[Run], List[Run]]:
+    """
+    Wait for multiple Tower app runs to reach terminal states by polling the Tower API.
+
+    This function continuously polls the Tower API every 2 seconds (defined by WAIT_TIMEOUT)
+    to check the status of all specified runs. The function returns when all runs reach
+    terminal states (`exited`, `errored`, `cancelled`, or `crashed`).
+
+    Args:
+        runs (List[Run]): A list of Run objects to monitor.
+        timeout (Optional[float]): Maximum time to wait in seconds before raising a
+            TimeoutException. Defaults to one day (86,400 seconds).
+        raise_on_failure (bool): If True, raises a RunFailedError when any run fails.
+            If False, failed runs are returned in the failed_runs list. Defaults to False.
+
+    Returns:
+        tuple[List[Run], List[Run]]: A tuple containing two lists:
+            - successful_runs: List of runs that completed successfully (status: 'exited')
+            - failed_runs: List of runs that failed (status: 'crashed', 'cancelled', or 'errored')
+
+    Raises:
+        TimeoutException: If the specified timeout is reached before all runs complete.
+        RunFailedError: If raise_on_failure is True and any run fails.
+        UnhandledRunStateException: If a run enters an unexpected state.
+        UnknownException: If there are persistent problems communicating with the Tower API.
+        NotFoundException: If any run cannot be found.
+        UnauthorizedException: If the API key is invalid or unauthorized.
+    """
+    ctx = TowerContext.build()
+    retries = 0
+
+    # We use this to track the timeout, if one is defined.
+    start_time = time.time()
+
+    awaiting_runs = runs
+    successful_runs = []
+    failed_runs = []
+
+    while awaiting_runs:
+        for run in awaiting_runs:
+            # Check the overall timeout at the top of the loop in case we've
+            # spent a load of time deeper inside the loop on reties, etc.
+            if timeout is not None:
+                if _time_since(start_time) > timeout:
+                    raise TimeoutException(t)
+
+            try:
+                desc = _check_run_status(ctx, run, timeout=2.0)
+                retries = 0
+
+                if _is_successful_run(desc):
+                    successful_runs.append(desc)
+                    awaiting_runs.remove(run)
+                elif _is_failed_run(desc):
+                    if raise_on_failure:
+                        raise RunFailedError(desc.app_slug, desc.number, desc.status)
+                    else:
+                        failed_runs.append(desc)
+                        awaiting_runs.remove(run)
+
+                elif _is_run_awaiting_completion(desc):
+                    time.sleep(WAIT_TIMEOUT)
+                else:
+                    raise UnhandledRunStateException(desc.status)
+            except TimeoutException:
+                # timed out in the API, we want to keep trying this for a while
+                # (assuming we didn't hit the global timeout limit) until we give
+                # up entirely.
+                retries += 1
+
+                if retries >= DEFAULT_RETRIES_ON_FAILURE:
+                   raise UnknownException("There was a problem with the Tower API.")
+
+    return (successful_runs, failed_runs)
+
+
 def _is_failed_run(run: Run) -> bool:
     """
     Check if the given run has failed.
@@ -149,39 +286,37 @@ def _is_run_awaiting_completion(run: Run) -> bool:
     return run.status in ["pending", "scheduled", "running"]
 
 
-def wait_for_run(
+def _env_client(ctx: TowerContext, timeout: Optional[float] = None) -> AuthenticatedClient:
+    tower_url = ctx.tower_url
+
+    if not tower_url.endswith("/v1"):
+        if tower_url.endswith("/"):
+            tower_url += "v1"
+        else:
+            tower_url += "/v1"
+
+    return AuthenticatedClient(
+        verify_ssl=False,
+        base_url=tower_url,
+        token=ctx.api_key,
+        auth_header_name="X-API-Key",
+        prefix="",
+        timeout=timeout,
+    )
+
+
+def _time_since(start_time: float) -> float:
+    return time.time() - start_time
+
+
+def _check_run_status(
+    ctx: TowerContext,
     run: Run,
-    timeout: Optional[float] = 86_400.0, # one day
-    raise_on_failure: bool = False,
+    timeout: Optional[float] = 2.0, # one day
 ) -> Run:
-    """
-    Wait for a Tower app run to reach a terminal state by polling the Tower API.
+    client = _env_client(ctx, timeout=timeout)
 
-    This function continuously polls the Tower API every 2 seconds (defined by WAIT_TIMEOUT)
-    to check the status of the specified run. The function returns when the run reaches
-    any of the defined terminal states.
-
-    Args:
-        run (Run): The Run object containing the app_slug and number of the run to monitor.
-        timeout (Optional[float]): An optional timeout for this wait. Defaults
-            to one day (86,000 seconds).
-        raise_on_failure (bool): Whether to raise an exception when a failure
-            occurs. Defaults to False.
-
-    Returns:
-        None: This function does not return any value.
-
-    Raises:
-        RuntimeError: If there is an error fetching the run status from the Tower API
-            or if the API returns an error response.
-    """
-    ctx = TowerContext.build()
-    client = _env_client(ctx)
-
-    # We use this to track the timeout, if one is defined.
-    start_time = time.time()
-
-    while True:
+    try:
         output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(
             slug=run.app_slug,
             seq=run.number,
@@ -189,73 +324,23 @@ def wait_for_run(
         )
 
         if output is None:
-            raise UnknownException("Error fetching run")
-        else:
-            if isinstance(output, ErrorModel):
-                # If it was a 404 error, that means that we couldn't find this
-                # app for some reason. This is really only relevant on the
-                # first time that we check--if we could find the run, but then
-                # suddenly couldn't that's a really big problem I'd say.
-                if output.status == 404:
-                    raise NotFoundException(output.detail)
-                elif output.status == 401:
-                    # NOTE: Most of the time, this shouldn't happen?
-                    raise UnauthorizedException(output.detail)
-                else:
-                    raise UnknownException(output.detail)
+            raise UnknownException("Failed to fetch run")
+        elif isinstance(output, ErrorModel):
+            # If it was a 404 error, that means that we couldn't find this
+            # app for some reason. This is really only relevant on the
+            # first time that we check--if we could find the run, but then
+            # suddenly couldn't that's a really big problem I'd say.
+            if output.status == 404:
+                raise NotFoundException(output.detail)
+            elif output.status == 401:
+                # NOTE: Most of the time, this shouldn't happen?
+                raise UnauthorizedException(output.detail)
             else:
-                desc = output.run
-
-                if _is_successful_run(desc):
-                    return True
-                elif _is_failed_run(desc):
-                    if raise_on_failure:
-                        raise RunFailedError(desc.app_slug, desc.number)
-                    else:
-                        return False
-
-                elif _is_run_awaiting_completion(desc):
-                    time.sleep(WAIT_TIMEOUT)
-                else:
-                    raise UnhandledRunStateException(desc.status)
-
-                # Before we head back to the top of the loop, let's see if we
-                # should timeout
-                if timeout is not None:
-                    # The user defined a timeout, so let's actually see if we
-                    # reached it.
-                    t = time.time() - start_time
-                    if t > timeout:
-                        raise TimeoutException(t)
-
-
-def wait_for_runs(
-    runs: List[Run],
-    timeout: Optional[float] = 86_400.0, # one day
-    raise_on_failure: bool = False,
-) -> tuple[List[Run], List[Run]]:
-    """
-    `wait_for_runs` waits for a list of runs to reach a terminal state by
-    polling the Tower API every 2 seconds for the latest status. If any of the
-    runs return a terminal status (`exited`, `errored`, `cancelled`, or
-    `crashed`) then this function returns.
-
-    Args:
-        runs (List[Run]): A list of Run objects to monitor.
-        timeout (Optional[float]): Timeout to wait.
-        raise_on_failure (bool): If true, raises an exception when
-            any one of the awaited runs fails. Defaults to False.
-
-    Returns:
-        None: This function does not return any value.
-
-    Raises:
-        RuntimeError: If there is an error fetching the run status or if any
-            of the runs fail.
-    """
-    for run in runs:
-        wait_for_run(
-            run,
-            timeout=timeout,
-            raise_on_failure=raise_on_failure,
-        )
+                raise UnknownException(output.detail)
+        else:
+            # There was a run object, so let's return that.
+            return output.run
+    except httpx.TimeoutException:
+        # If we received a timeout from the API then we should raise our own
+        # timeout type.
+        raise TimeoutException("Timeout while waiting for run status")
