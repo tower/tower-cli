@@ -21,7 +21,7 @@ class UnhandledRunStateException(Exception):
 
 class TimeoutException(Exception):
     def __init__(self, time: float):
-        super().__init__("A timeout occured after {time} seconds.")
+        super().__init__(f"A timeout occurred after {time} seconds.")
 
 
 class RunFailedError(RuntimeError):
