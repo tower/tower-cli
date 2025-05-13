@@ -5,14 +5,6 @@ build-backend = "maturin"
 [project]
 name = "tower"
 version = "0.3.13"
-
-
-
-
-
-
-
-
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
 readme = "README.md"
@@ -68,8 +60,8 @@ tower = { workspace = true }
 
 [dependency-groups]
 dev = [
-	"openapi-python-client>=0.12.1",
+  "openapi-python-client>=0.12.1",
   "pytest>=8.3.5",
   "pytest-httpx>=0.35.0",
-	"pyiceberg[sql-sqlite]>=0.9.0",
+  "pyiceberg[sql-sqlite]>=0.9.0",
 ]
