@@ -13,6 +13,8 @@ use tower_package::Package;
 
 pub mod local;
 pub mod errors;
+pub mod app;
+pub mod launcher;
 
 use errors::Error;
 
