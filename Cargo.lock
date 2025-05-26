@@ -2896,6 +2896,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
+name = "tower-telemetry"
+version = "0.3.14"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "tower-version"
 version = "0.3.14"
 dependencies = [
