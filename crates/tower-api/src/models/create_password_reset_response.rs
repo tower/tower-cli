@@ -12,24 +12,20 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ListAlertsResponse {
+pub struct CreatePasswordResetResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    /// List of alerts
-    #[serde(rename = "alerts")]
-    pub alerts: Vec<models::Alert>,
-    /// Pagination information
-    #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    /// A boolean indicating the request was successfully processed.
+    #[serde(rename = "ok")]
+    pub ok: bool,
 }
 
-impl ListAlertsResponse {
-    pub fn new(alerts: Vec<models::Alert>, pages: models::Pagination) -> ListAlertsResponse {
-        ListAlertsResponse {
+impl CreatePasswordResetResponse {
+    pub fn new(ok: bool) -> CreatePasswordResetResponse {
+        CreatePasswordResetResponse {
             schema: None,
-            alerts,
-            pages: Box::new(pages),
+            ok,
         }
     }
 }

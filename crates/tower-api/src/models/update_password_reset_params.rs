@@ -12,24 +12,20 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ListAlertsResponse {
+pub struct UpdatePasswordResetParams {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
-    /// List of alerts
-    #[serde(rename = "alerts")]
-    pub alerts: Vec<models::Alert>,
-    /// Pagination information
-    #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    /// The new password that you want to set for your account
+    #[serde(rename = "password")]
+    pub password: String,
 }
 
-impl ListAlertsResponse {
-    pub fn new(alerts: Vec<models::Alert>, pages: models::Pagination) -> ListAlertsResponse {
-        ListAlertsResponse {
+impl UpdatePasswordResetParams {
+    pub fn new(password: String) -> UpdatePasswordResetParams {
+        UpdatePasswordResetParams {
             schema: None,
-            alerts,
-            pages: Box::new(pages),
+            password,
         }
     }
 }

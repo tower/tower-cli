@@ -12,18 +12,19 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CancelRunResponse {
-    /// A URL to the JSON Schema for this object.
-    #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
+pub struct RunFailureAlert {
+    /// App that the failed Run belongs to
+    #[serde(rename = "app")]
+    pub app: Box<models::App>,
+    /// Run that failed
     #[serde(rename = "run")]
     pub run: Box<models::Run>,
 }
 
-impl CancelRunResponse {
-    pub fn new(run: models::Run) -> CancelRunResponse {
-        CancelRunResponse {
-            schema: None,
+impl RunFailureAlert {
+    pub fn new(app: models::App, run: models::Run) -> RunFailureAlert {
+        RunFailureAlert {
+            app: Box::new(app),
             run: Box::new(run),
         }
     }

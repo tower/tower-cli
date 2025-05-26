@@ -12,15 +12,12 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StatisticsSettings {
-    #[serde(rename = "period")]
-    pub period: String,
+pub struct ListAlerts200Response {
 }
 
-impl StatisticsSettings {
-    pub fn new(period: String) -> StatisticsSettings {
-        StatisticsSettings {
-            period,
+impl ListAlerts200Response {
+    pub fn new() -> ListAlerts200Response {
+        ListAlerts200Response {
         }
     }
 }
