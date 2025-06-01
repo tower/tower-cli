@@ -64,7 +64,7 @@ pub trait App {
     fn terminate(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 
     // status checks the status of an app 
-    fn status(&mut self) -> impl Future<Output = Result<Status, Error>> + Send;
+    fn status(&self) -> impl Future<Output = Result<Status, Error>> + Send;
 
     // output returns a reader that contains a combination of the stdout and stderr messages from
     // the child process

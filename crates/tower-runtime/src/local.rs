@@ -14,21 +14,17 @@ use crate::{
 };
 
 use tokio::{
+    fs,
+    io::{AsyncRead, BufReader, AsyncBufReadExt},
+    time::{timeout, Duration},
+    sync::Mutex,
+    process::{Child, Command}, 
     sync::oneshot,
     sync::oneshot::error::TryRecvError,
     sync::mpsc::{
         UnboundedSender,
         unbounded_channel,
     },
-    process::Command,
-};
-
-use tokio::{
-    fs,
-    io::{AsyncRead, BufReader, AsyncBufReadExt},
-    time::{timeout, Duration},
-    sync::Mutex,
-    process::Child, 
 };
 
 use tower_package::{Manifest, Package};
@@ -50,26 +46,11 @@ pub struct LocalApp {
     package: Option<Package>,
 
     child: Option<Arc<Mutex<Child>>>,
-    status: Option<Status>,
-    waiter: Option<oneshot::Receiver<i32>>,
+    status: Mutex<Option<Status>>,
+    waiter: Mutex<oneshot::Receiver<i32>>,
 
     output_sender: OutputSender,
     output_receiver: OutputReceiver,
-}
-
-impl Default for LocalApp {
-    fn default() -> Self {
-        let (sender, receiver) = unbounded_channel::<Output>();
-
-        Self {
-            package: None,
-            child: None,
-            status: None,
-            waiter: None,
-            output_sender: Arc::new(Mutex::new(sender)),
-            output_receiver: Arc::new(Mutex::new(receiver)),
-        }
-    }
 }
 
 // Helper function to check if a file is executable
@@ -262,7 +243,7 @@ impl App for LocalApp {
                 output_receiver,
                 package: Some(package),
                 child: Some(child),
-                waiter: Some(rx),
+                waiter: Mutex::new(rx),
                 status: None,
             })
         } else {
@@ -271,29 +252,29 @@ impl App for LocalApp {
         }
     }
 
-    async fn status(&mut self) -> Result<Status, Error> {
-        if let Some(status) = self.status {
+    async fn status(&self) -> Result<Status, Error> {
+        let mut status = self.status.lock().await;
+
+        if let Some(status) = *status {
             Ok(status)
         } else {
-            if let Some(waiter) = &mut self.waiter {
-                let res = waiter.try_recv();
-                match res {
-                    Err(TryRecvError::Empty) => Ok(Status::Running),
-                    Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
-                    Ok(t) => {
-                        // We save this for the next time this gets called.
-                        if t == 0 {
-                            self.status = Some(Status::Exited);
-                            Ok(Status::Exited)
-                        } else {
-                            let status = Status::Crashed { code: t };
-                            self.status = Some(status);
-                            Ok(status)
-                        }
+            let mut waiter = self.waiter.lock().await;
+            let res = waiter.try_recv();
+
+            match res {
+                Err(TryRecvError::Empty) => Ok(Status::Running),
+                Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
+                Ok(t) => {
+                    // We save this for the next time this gets called.
+                    if t == 0 {
+                        *status = Some(Status::Exited);
+                        Ok(Status::Exited)
+                    } else {
+                        let next_status = Status::Crashed { code: t };
+                        *status = Some(next_status);
+                        Ok(next_status)
                     }
                 }
-            } else {
-                Ok(Status::None)
             }
         }
     }
