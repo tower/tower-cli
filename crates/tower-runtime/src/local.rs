@@ -244,7 +244,7 @@ impl App for LocalApp {
                 package: Some(package),
                 child: Some(child),
                 waiter: Mutex::new(rx),
-                status: None,
+                status: Mutex::new(None),
             })
         } else {
             log::error!("failed to spawn process: {}", res.err().unwrap());

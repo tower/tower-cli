@@ -71,9 +71,16 @@ pub trait App {
     fn output(&self) -> impl Future<Output = Result<OutputReceiver, Error>> + Send;
 }
 
-#[derive(Default)]
 pub struct AppLauncher<A: App> {
     pub app: Option<A>,
+}
+
+impl<A: App> std::default::Default for AppLauncher<A> {
+    fn default() -> Self {
+        Self {
+            app: None,
+        }
+    }
 }
 
 impl<A: App> AppLauncher<A> {

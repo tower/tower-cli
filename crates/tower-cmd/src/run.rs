@@ -346,7 +346,7 @@ async fn monitor_output(output: OutputReceiver) {
 
 /// monitor_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_status(mut app: LocalApp) {
+async fn monitor_status(app: LocalApp) {
     loop {
         if let Ok(status) = app.status().await {
             match status {
