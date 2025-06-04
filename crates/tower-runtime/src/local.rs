@@ -188,12 +188,12 @@ impl App for LocalApp {
 
             let res = Command::new(pip_path)
                 .current_dir(&working_dir)
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
                 .arg("install")
                 .arg("-r")
                 .arg(package_path.join("requirements.txt"))
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .kill_on_drop(true)
                 .spawn();
 
