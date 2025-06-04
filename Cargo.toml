@@ -4,7 +4,8 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.14"
+version = "0.3.15"
+
 
 
 description = "Tower is the best way to host Python data apps in production"
