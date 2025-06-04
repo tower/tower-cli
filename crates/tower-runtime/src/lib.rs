@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::{
     UnboundedReceiver,
     UnboundedSender,
+    unbounded_channel,
 };
 use chrono::{DateTime, Utc};
 
@@ -65,10 +66,6 @@ pub trait App {
 
     // status checks the status of an app 
     fn status(&self) -> impl Future<Output = Result<Status, Error>> + Send;
-
-    // output returns a reader that contains a combination of the stdout and stderr messages from
-    // the child process
-    fn output(&self) -> impl Future<Output = Result<OutputReceiver, Error>> + Send;
 }
 
 pub struct AppLauncher<A: App> {
@@ -83,9 +80,18 @@ impl<A: App> std::default::Default for AppLauncher<A> {
     }
 }
 
+pub fn create_output_stream() -> (OutputSender, OutputReceiver) {
+    let (sender, receiver) = unbounded_channel::<Output>();
+
+    let output_sender = Arc::new(Mutex::new(sender));
+    let output_receiver = Arc::new(Mutex::new(receiver));
+    (output_sender, output_receiver)
+}
+
 impl<A: App> AppLauncher<A> {
     pub async fn launch(
         &mut self,
+        output_sender: OutputSender,
         package: Package,
         environment: String,
         secrets: HashMap<String, String>,
@@ -95,6 +101,7 @@ impl<A: App> AppLauncher<A> {
         let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
 
         let opts = StartOptions {
+            output_sender: Some(output_sender),
             cwd: Some(cwd),
             environment,
             secrets,
@@ -141,6 +148,7 @@ pub struct StartOptions {
     pub secrets: HashMap<String, String>,
     pub parameters: HashMap<String, String>,
     pub env_vars: HashMap<String, String>,
+    pub output_sender: Option<OutputSender>,
 }
 
 pub struct ExecuteOptions {

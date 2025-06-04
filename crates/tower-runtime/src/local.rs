@@ -10,6 +10,7 @@ use std::os::unix::fs::PermissionsExt;
 use crate::{
     Status,
     StartOptions,
+    OutputSender,
     errors::Error,
 };
 
@@ -21,10 +22,6 @@ use tokio::{
     process::{Child, Command}, 
     sync::oneshot,
     sync::oneshot::error::TryRecvError,
-    sync::mpsc::{
-        UnboundedSender,
-        unbounded_channel,
-    },
 };
 
 use tower_package::{Manifest, Package};
@@ -34,8 +31,6 @@ use crate::{
     Channel,
     App,
     Output,
-    OutputSender,
-    OutputReceiver,
 };
 
 pub struct LocalApp {
@@ -48,9 +43,6 @@ pub struct LocalApp {
     child: Option<Arc<Mutex<Child>>>,
     status: Mutex<Option<Status>>,
     waiter: Mutex<oneshot::Receiver<i32>>,
-
-    output_sender: OutputSender,
-    output_receiver: OutputReceiver,
 }
 
 // Helper function to check if a file is executable
@@ -132,11 +124,6 @@ async fn find_bash() -> Result<PathBuf, Error> {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        let (sender, receiver) = unbounded_channel::<Output>();
-
-        let output_sender = Arc::new(Mutex::new(sender));
-        let output_receiver = Arc::new(Mutex::new(receiver));
-
         let package = opts.package;
         let environment = opts.environment;
         let package_path = package.unpacked_path
@@ -198,12 +185,15 @@ impl App for LocalApp {
                 .spawn();
 
             if let Ok(mut child) = res {
-                // Let's also send our logs to this output channel.
-                let stdout = child.stdout.take().expect("no stdout");
-                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, output_sender.clone(), BufReader::new(stdout)));
+                if let Some(ref sender) = opts.output_sender {
+                    // Let's also send our logs to this output channel.
+                    let stdout = child.stdout.take().expect("no stdout");
+                    tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
 
-                let stderr = child.stderr.take().expect("no stderr");
-                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, output_sender.clone(), BufReader::new(stderr)));
+                    let stderr = child.stderr.take().expect("no stderr");
+                    tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+
+                }
 
                 log::debug!("waiting for dependency installation to complete");
 
@@ -232,15 +222,23 @@ impl App for LocalApp {
             Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
         };
 
-        if let Ok(child) = res {
+        if let Ok(mut child) = res {
+            if let Some(ref sender) = opts.output_sender {
+                // Let's also send our logs to this output channel.
+                let stdout = child.stdout.take().expect("no stdout");
+                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
+
+                let stderr = child.stderr.take().expect("no stderr");
+                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+
+            }
+
             let child = Arc::new(Mutex::new(child));
             let (sx, rx) = oneshot::channel::<i32>();
 
             tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
 
             Ok(Self {
-                output_sender,
-                output_receiver,
                 package: Some(package),
                 child: Some(child),
                 waiter: Mutex::new(rx),
@@ -292,22 +290,6 @@ impl App for LocalApp {
         } else {
             // Nothing to terminate. Should this be an error?
             Ok(())
-        }
-    }
-
-    async fn output(&self) -> Result<OutputReceiver, Error> {
-        if let Some(proc) = &self.child {
-            let mut child = proc.lock().await;
-
-            let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, Channel::Program, self.output_sender.clone(), BufReader::new(stdout)));
-
-            let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, Channel::Program, self.output_sender.clone(), BufReader::new(stderr)));
-
-            Ok(self.output_receiver.clone())
-        } else {
-            Err(Error::NoRunningApp)
         }
     }
 }
@@ -459,7 +441,7 @@ async fn wait_for_process(sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
     let _ = sx.send(code);
 }
 
-async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Arc<Mutex<UnboundedSender<Output>>>, input: BufReader<R>) {
+async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: OutputSender, input: BufReader<R>) {
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
