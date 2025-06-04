@@ -10,17 +10,8 @@ use std::os::unix::fs::PermissionsExt;
 use crate::{
     Status,
     StartOptions,
+    OutputSender,
     errors::Error,
-};
-
-use tokio::{
-    sync::oneshot,
-    sync::oneshot::error::TryRecvError,
-    sync::mpsc::{
-        UnboundedSender,
-        unbounded_channel,
-    },
-    process::Command,
 };
 
 use tokio::{
@@ -28,7 +19,9 @@ use tokio::{
     io::{AsyncRead, BufReader, AsyncBufReadExt},
     time::{timeout, Duration},
     sync::Mutex,
-    process::Child, 
+    process::{Child, Command}, 
+    sync::oneshot,
+    sync::oneshot::error::TryRecvError,
 };
 
 use tower_package::{Manifest, Package};
@@ -38,8 +31,6 @@ use crate::{
     Channel,
     App,
     Output,
-    OutputSender,
-    OutputReceiver,
 };
 
 pub struct LocalApp {
@@ -50,26 +41,8 @@ pub struct LocalApp {
     package: Option<Package>,
 
     child: Option<Arc<Mutex<Child>>>,
-    status: Option<Status>,
-    waiter: Option<oneshot::Receiver<i32>>,
-
-    output_sender: OutputSender,
-    output_receiver: OutputReceiver,
-}
-
-impl Default for LocalApp {
-    fn default() -> Self {
-        let (sender, receiver) = unbounded_channel::<Output>();
-
-        Self {
-            package: None,
-            child: None,
-            status: None,
-            waiter: None,
-            output_sender: Arc::new(Mutex::new(sender)),
-            output_receiver: Arc::new(Mutex::new(receiver)),
-        }
-    }
+    status: Mutex<Option<Status>>,
+    waiter: Mutex<oneshot::Receiver<i32>>,
 }
 
 // Helper function to check if a file is executable
@@ -151,11 +124,6 @@ async fn find_bash() -> Result<PathBuf, Error> {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        let (sender, receiver) = unbounded_channel::<Output>();
-
-        let output_sender = Arc::new(Mutex::new(sender));
-        let output_receiver = Arc::new(Mutex::new(receiver));
-
         let package = opts.package;
         let environment = opts.environment;
         let package_path = package.unpacked_path
@@ -207,22 +175,25 @@ impl App for LocalApp {
 
             let res = Command::new(pip_path)
                 .current_dir(&working_dir)
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
                 .arg("install")
                 .arg("-r")
                 .arg(package_path.join("requirements.txt"))
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .kill_on_drop(true)
                 .spawn();
 
             if let Ok(mut child) = res {
-                // Let's also send our logs to this output channel.
-                let stdout = child.stdout.take().expect("no stdout");
-                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, output_sender.clone(), BufReader::new(stdout)));
+                if let Some(ref sender) = opts.output_sender {
+                    // Let's also send our logs to this output channel.
+                    let stdout = child.stdout.take().expect("no stdout");
+                    tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
 
-                let stderr = child.stderr.take().expect("no stderr");
-                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, output_sender.clone(), BufReader::new(stderr)));
+                    let stderr = child.stderr.take().expect("no stderr");
+                    tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+
+                }
 
                 log::debug!("waiting for dependency installation to complete");
 
@@ -251,19 +222,27 @@ impl App for LocalApp {
             Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
         };
 
-        if let Ok(child) = res {
+        if let Ok(mut child) = res {
+            if let Some(ref sender) = opts.output_sender {
+                // Let's also send our logs to this output channel.
+                let stdout = child.stdout.take().expect("no stdout");
+                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
+
+                let stderr = child.stderr.take().expect("no stderr");
+                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+
+            }
+
             let child = Arc::new(Mutex::new(child));
             let (sx, rx) = oneshot::channel::<i32>();
 
             tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
 
             Ok(Self {
-                output_sender,
-                output_receiver,
                 package: Some(package),
                 child: Some(child),
-                waiter: Some(rx),
-                status: None,
+                waiter: Mutex::new(rx),
+                status: Mutex::new(None),
             })
         } else {
             log::error!("failed to spawn process: {}", res.err().unwrap());
@@ -271,29 +250,29 @@ impl App for LocalApp {
         }
     }
 
-    async fn status(&mut self) -> Result<Status, Error> {
-        if let Some(status) = self.status {
+    async fn status(&self) -> Result<Status, Error> {
+        let mut status = self.status.lock().await;
+
+        if let Some(status) = *status {
             Ok(status)
         } else {
-            if let Some(waiter) = &mut self.waiter {
-                let res = waiter.try_recv();
-                match res {
-                    Err(TryRecvError::Empty) => Ok(Status::Running),
-                    Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
-                    Ok(t) => {
-                        // We save this for the next time this gets called.
-                        if t == 0 {
-                            self.status = Some(Status::Exited);
-                            Ok(Status::Exited)
-                        } else {
-                            let status = Status::Crashed { code: t };
-                            self.status = Some(status);
-                            Ok(status)
-                        }
+            let mut waiter = self.waiter.lock().await;
+            let res = waiter.try_recv();
+
+            match res {
+                Err(TryRecvError::Empty) => Ok(Status::Running),
+                Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
+                Ok(t) => {
+                    // We save this for the next time this gets called.
+                    if t == 0 {
+                        *status = Some(Status::Exited);
+                        Ok(Status::Exited)
+                    } else {
+                        let next_status = Status::Crashed { code: t };
+                        *status = Some(next_status);
+                        Ok(next_status)
                     }
                 }
-            } else {
-                Ok(Status::None)
             }
         }
     }
@@ -311,22 +290,6 @@ impl App for LocalApp {
         } else {
             // Nothing to terminate. Should this be an error?
             Ok(())
-        }
-    }
-
-    async fn output(&self) -> Result<OutputReceiver, Error> {
-        if let Some(proc) = &self.child {
-            let mut child = proc.lock().await;
-
-            let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, Channel::Program, self.output_sender.clone(), BufReader::new(stdout)));
-
-            let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, Channel::Program, self.output_sender.clone(), BufReader::new(stderr)));
-
-            Ok(self.output_receiver.clone())
-        } else {
-            Err(Error::NoRunningApp)
         }
     }
 }
@@ -478,7 +441,7 @@ async fn wait_for_process(sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
     let _ = sx.send(code);
 }
 
-async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Arc<Mutex<UnboundedSender<Output>>>, input: BufReader<R>) {
+async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: OutputSender, input: BufReader<R>) {
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {

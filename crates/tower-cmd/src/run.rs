@@ -123,22 +123,22 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
         std::process::exit(1);
     }
 
+    let (sender, receiver) = tower_runtime::create_output_stream();
+
+    output::success(&format!("Launching app `{}`", towerfile.app.name));
+    let output_task = tokio::spawn(monitor_output(receiver));
+
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher
-        .launch(package, env, secrets, params, catalogs)
+        .launch(sender, package, env, secrets, params, catalogs)
         .await
     {
         output::runtime_error(err);
         return;
     }
 
-    output::success(&format!("App `{}` has been launched", towerfile.app.name));
-
     // Monitor app output and status concurrently
     let app = launcher.app.unwrap();
-    let output = app.output().await.unwrap();
-
-    let output_task = tokio::spawn(monitor_output(output));
     let status_task = tokio::spawn(monitor_status(app));
 
     let (res1, res2) = tokio::join!(output_task, status_task);
@@ -346,7 +346,7 @@ async fn monitor_output(output: OutputReceiver) {
 
 /// monitor_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_status(mut app: LocalApp) {
+async fn monitor_status(app: LocalApp) {
     loop {
         if let Ok(status) = app.status().await {
             match status {
