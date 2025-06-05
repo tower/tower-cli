@@ -60,7 +60,8 @@ tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 tower-telemetry = { path = "crates/tower-telemetry" }
 tracing = { version = "0.1" }
-tracing-subscriber = { version = "0.3" }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
 

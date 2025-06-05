@@ -59,9 +59,17 @@ impl App {
 
         if config.debug {
             // Set log level to "DEBUG"
-            tower_telemetry::enable_logging(tower_telemetry::LogLevel::Debug);
+            tower_telemetry::enable_logging(
+                tower_telemetry::LogLevel::Debug,
+                tower_telemetry::LogFormat::Plain,
+                tower_telemetry::LogDestination::Stdout,
+            );
         } else {
-            tower_telemetry::enable_logging(tower_telemetry::LogLevel::Warn);
+            tower_telemetry::enable_logging(
+                tower_telemetry::LogLevel::Warn,
+                tower_telemetry::LogFormat::Plain,
+                tower_telemetry::LogDestination::Stdout,
+            );
         }
 
         // Check for newer version only if we successfully get a latest version
