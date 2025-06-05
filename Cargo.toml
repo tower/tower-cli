@@ -62,6 +62,7 @@ tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 tower-telemetry = { path = "crates/tower-telemetry" }
+tracing = { version = "0.1" }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
 

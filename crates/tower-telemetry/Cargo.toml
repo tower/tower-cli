@@ -7,4 +7,4 @@ rust-version = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-log = { workspace = true }
+tracing = { workspace = true }
