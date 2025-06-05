@@ -6,7 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.log_line import LogLine
-from ...models.log_line_error import LogLineError
+from ...models.sse_warning import SSEWarning
 from ...types import Response
 
 
@@ -27,7 +27,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[list[Union["LogLine", "LogLineError"]]]:
+) -> Optional[list[Union["LogLine", "SSEWarning"]]]:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.text
@@ -35,7 +35,7 @@ def _parse_response(
 
             def _parse_response_200_item(
                 data: object,
-            ) -> Union["LogLine", "LogLineError"]:
+            ) -> Union["LogLine", "SSEWarning"]:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
@@ -46,7 +46,7 @@ def _parse_response(
                     pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                response_200_item_type_1 = LogLineError.from_dict(data)
+                response_200_item_type_1 = SSEWarning.from_dict(data)
 
                 return response_200_item_type_1
 
@@ -63,7 +63,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[list[Union["LogLine", "LogLineError"]]]:
+) -> Response[list[Union["LogLine", "SSEWarning"]]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -77,7 +77,7 @@ def sync_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[list[Union["LogLine", "LogLineError"]]]:
+) -> Response[list[Union["LogLine", "SSEWarning"]]]:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -91,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['LogLine', 'LogLineError']]]
+        Response[list[Union['LogLine', 'SSEWarning']]]
     """
 
     kwargs = _get_kwargs(
@@ -111,7 +111,7 @@ def sync(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[list[Union["LogLine", "LogLineError"]]]:
+) -> Optional[list[Union["LogLine", "SSEWarning"]]]:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -125,7 +125,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['LogLine', 'LogLineError']]
+        list[Union['LogLine', 'SSEWarning']]
     """
 
     return sync_detailed(
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[list[Union["LogLine", "LogLineError"]]]:
+) -> Response[list[Union["LogLine", "SSEWarning"]]]:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -154,7 +154,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['LogLine', 'LogLineError']]]
+        Response[list[Union['LogLine', 'SSEWarning']]]
     """
 
     kwargs = _get_kwargs(
@@ -172,7 +172,7 @@ async def asyncio(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[list[Union["LogLine", "LogLineError"]]]:
+) -> Optional[list[Union["LogLine", "SSEWarning"]]]:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -186,7 +186,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['LogLine', 'LogLineError']]
+        list[Union['LogLine', 'SSEWarning']]
     """
 
     return (

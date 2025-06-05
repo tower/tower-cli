@@ -190,6 +190,8 @@ pub mod run_results;
 pub use self::run_results::RunResults;
 pub mod run_statistics;
 pub use self::run_statistics::RunStatistics;
+pub mod search_runs_response;
+pub use self::search_runs_response::SearchRunsResponse;
 pub mod secret;
 pub use self::secret::Secret;
 pub mod series_point;

@@ -25,6 +25,7 @@ class Run:
         created_at (datetime.datetime):
         ended_at (Union[None, datetime.datetime]):
         environment (str):
+        exit_code (Union[None, int]): Exit code of the run, if the run is completed. Null if there is no exit code
         number (int):
         parameters (list['RunParameter']): Parameters used to invoke this run.
         run_id (str):
@@ -40,6 +41,7 @@ class Run:
     created_at: datetime.datetime
     ended_at: Union[None, datetime.datetime]
     environment: str
+    exit_code: Union[None, int]
     number: int
     parameters: list["RunParameter"]
     run_id: str
@@ -68,6 +70,9 @@ class Run:
             ended_at = self.ended_at
 
         environment = self.environment
+
+        exit_code: Union[None, int]
+        exit_code = self.exit_code
 
         number = self.number
 
@@ -99,6 +104,7 @@ class Run:
                 "created_at": created_at,
                 "ended_at": ended_at,
                 "environment": environment,
+                "exit_code": exit_code,
                 "number": number,
                 "parameters": parameters,
                 "run_id": run_id,
@@ -154,6 +160,13 @@ class Run:
 
         environment = d.pop("environment")
 
+        def _parse_exit_code(data: object) -> Union[None, int]:
+            if data is None:
+                return data
+            return cast(Union[None, int], data)
+
+        exit_code = _parse_exit_code(d.pop("exit_code"))
+
         number = d.pop("number")
 
         parameters = []
@@ -193,6 +206,7 @@ class Run:
             created_at=created_at,
             ended_at=ended_at,
             environment=environment,
+            exit_code=exit_code,
             number=number,
             parameters=parameters,
             run_id=run_id,
