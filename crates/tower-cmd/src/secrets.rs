@@ -11,6 +11,7 @@ use tower_api::{
     },
     models::CreateSecretResponse,
 };
+use tower_telemetry::debug;
 
 use crate::{
     output,
@@ -86,7 +87,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let show = cmd::get_bool_flag(args, "show"); 
     let env = cmd::get_string_flag(args, "environment");
 
-    log::debug!("listing secrets, environment={} all={} show={}", env, all, show);
+    debug!("listing secrets, environment={} all={} show={}", env, all, show);
 
     if show {
         let (private_key, public_key) = crypto::generate_key_pair();
@@ -157,7 +158,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
             output::success(&line);
         },
         Err(err) => {
-            log::debug!("Failed to create secrets: {}", err);
+            debug!("Failed to create secrets: {}", err);
             spinner.failure();
         }
     }
@@ -165,7 +166,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
     let (environment, name) = extract_secret_environment_and_name("delete", args.subcommand());
-    log::debug!("deleting secret, environment={} name={}", environment, name);
+    debug!("deleting secret, environment={} name={}", environment, name);
 
     let mut spinner = output::spinner("Deleting secret...");
 
@@ -209,7 +210,7 @@ async fn encrypt_and_create_secret(
             api::create_secret(&config, name, environment, &encrypted_value, &preview).await
         },
         Err(err) => {
-            log::debug!("failed to talk to tower api: {}", err);
+            debug!("failed to talk to tower api: {}", err);
             output::die("There was a problem with the Tower API! Please try again later.");
         }
     }

@@ -11,6 +11,7 @@ use tokio::sync::mpsc::{
 use chrono::{DateTime, Utc};
 
 use tower_package::Package;
+use tower_telemetry::debug;
 
 pub mod local;
 pub mod errors;
@@ -128,7 +129,7 @@ impl<A: App> AppLauncher<A> {
     pub async fn terminate(&mut self) -> Result<(), Error> {
         if let Some(app) = &mut self.app {
             if let Err(err) = app.terminate().await {
-                log::debug!("failed to terminate app: {}", err);
+                debug!("failed to terminate app: {}", err);
                 Err(err)
             } else {
                 self.app = None;

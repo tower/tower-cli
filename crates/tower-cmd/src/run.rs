@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
+use tower_telemetry::debug;
 
 use crate::{
     output,
@@ -52,7 +53,7 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 
     match res {
         Ok((local, path, params, app_name)) => {
-            log::debug!(
+            debug!(
                 "Running app at {}, local: {}",
                 path.to_str().unwrap(),
                 local
@@ -118,7 +119,7 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
 
     // Unpack the package
     if let Err(err) = package.unpack().await {
-        log::debug!("Failed to unpack package: {}", err);
+        debug!("Failed to unpack package: {}", err);
         output::package_error(err);
         std::process::exit(1);
     }
@@ -170,7 +171,7 @@ async fn do_run_remote(
     match api::run_app(&config, &app_slug, env, params).await {
         Err(err) => {
             spinner.failure();
-            log::debug!("Failed to schedule run: {}", err);
+            debug!("Failed to schedule run: {}", err);
             output::tower_error(err);
         }, 
         Ok(res) => {
@@ -305,7 +306,7 @@ async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, Stri
 /// error.
 fn load_towerfile(path: &PathBuf) -> Towerfile {
     Towerfile::from_path(path.clone()).unwrap_or_else(|err| {
-        log::debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
+        debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
         output::config_error(err);
         std::process::exit(1);
     })
@@ -323,7 +324,7 @@ async fn build_package(towerfile: &Towerfile) -> Package {
         }
         Err(err) => {
             spinner.failure();
-            log::debug!("Failed to build package: {}", err);
+            debug!("Failed to build package: {}", err);
             output::package_error(err);
             std::process::exit(1);
         }

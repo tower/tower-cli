@@ -1,77 +1,110 @@
-use tracing::event;
+#[macro_export]
+macro_rules! event_with_level {
+    // With context
+    ($level:expr, ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
+        if let Some(runid) = $ctx.runid {
+            $crate::tracing::event!($level, runid = %runid, "{}", format!($fmt, $($arg)*))
+        } else {
+            $crate::tracing::event!($level, "{}", format!($fmt, $($arg)*))
+        }
+    };
 
+    // Without context
+    ($level:expr, $fmt:expr, $($arg:tt)*) => {
+        $crate::tracing::event!($level, "{}", format!($fmt, $($arg)*))
+    };
+}
+
+#[macro_export]
 macro_rules! debug {
-    // Handle case with context, format string and arguments
-    ($ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::DEBUG, runid = %run_id, "{}", format!($fmt, $($arg)*));
-        } else {
-            event!(tracing::Level::DEBUG, "{}", format!($fmt, $($arg)*));
-        }
+    // With context, format string and arguments
+    (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::DEBUG, $ctx, $fmt, $($arg)*)
     };
-    // Handle case with context and just a message (no formatting)
-    ($ctx:expr, $msg:expr) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::DEBUG, runid = %run_id, $msg);
-        } else {
-            event!(tracing::Level::DEBUG, "{}", $msg);
-        }
+
+    // With context, just message
+    (ctx: $ctx:expr, $msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::DEBUG, $ctx, "{}", $msg)
+    };
+
+    // Without context, format string and arguments
+    ($fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::DEBUG, $fmt, $($arg)*)
+    };
+
+    // Without context, just message
+    ($msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::DEBUG, "{}", $msg)
     };
 }
 
+#[macro_export]
 macro_rules! info {
-    // Handle case with context, format string and arguments
-    ($ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::INFO, runid = %run_id, "{}", format!($fmt, $($arg)*));
-        } else {
-            event!(tracing::Level::INFO, "{}", format!($fmt, $($arg)*));
-        }
+    // With context, format string and arguments
+    (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::INFO, $ctx, $fmt, $($arg)*)
     };
-    // Handle case with context and just a message (no formatting)
-    ($ctx:expr, $msg:expr) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::INFO, runid = %run_id, $msg);
-        } else {
-            event!(tracing::Level::INFO, "{}", $msg);
-        }
+
+    // With context, just message
+    (ctx: $ctx:expr, $msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::INFO, $ctx, "{}", $msg)
+    };
+
+    // Without context, format string and arguments
+    ($fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::INFO, $fmt, $($arg)*)
+    };
+
+    // Without context, just message
+    ($msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::INFO, "{}", $msg)
     };
 }
 
+#[macro_export]
 macro_rules! warn {
-    // Handle case with context, format string and arguments
-    ($ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::WARN, runid = %run_id, "{}", format!($fmt, $($arg)*));
-        } else {
-            event!(tracing::Level::WARN, "{}", format!($fmt, $($arg)*));
-        }
+    // With context, format string and arguments
+    (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::WARN, $ctx, $fmt, $($arg)*)
     };
-    // Handle case with context and just a message (no formatting)
-    ($ctx:expr, $msg:expr) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::WARN, runid = %run_id, $msg);
-        } else {
-            event!(tracing::Level::WARN, "{}", $msg);
-        }
+
+    // With context, just message
+    (ctx: $ctx:expr, $msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::WARN, $ctx, "{}", $msg)
+    };
+
+    // Without context, format string and arguments
+    ($fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::WARN, $fmt, $($arg)*)
+    };
+
+    // Without context, just message
+    ($msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::WARN, "{}", $msg)
     };
 }
 
+#[macro_export]
 macro_rules! error {
-    // Handle case with context, format string and arguments
-    ($ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::ERROR, runid = %run_id, "{}", format!($fmt, $($arg)*));
-        } else {
-            event!(tracing::Level::ERROR, "{}", format!($fmt, $($arg)*));
-        }
+    // With context, format string and arguments
+    (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::ERROR, $ctx, $fmt, $($arg)*)
     };
-    // Handle case with context and just a message (no formatting)
-    ($ctx:expr, $msg:expr) => {
-        if let Some(run_id) = $ctx.run_id {
-            event!(tracing::Level::ERROR, runid = %run_id, $msg);
-        } else {
-            event!(tracing::Level::ERROR, "{}", $msg);
-        }
+
+    // With context, just message
+    (ctx: $ctx:expr, $msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::ERROR, $ctx, "{}", $msg)
+    };
+
+    // Without context, format string and arguments
+    ($fmt:expr, $($arg:tt)*) => {
+        $crate::event_with_level!($crate::tracing::Level::ERROR, $fmt, $($arg)*)
+    };
+
+    // Without context, just message
+    ($msg:expr) => {
+        $crate::event_with_level!($crate::tracing::Level::ERROR, "{}", $msg)
     };
 }
+
+

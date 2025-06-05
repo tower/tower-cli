@@ -57,17 +57,11 @@ impl App {
             config.clone()
         };
 
-        // Setup logging
-        simple_logger::SimpleLogger::new()
-            .with_module_level("rustyline", log::LevelFilter::Warn)
-            .env()
-            .init()
-            .unwrap();
-
         if config.debug {
-            log::set_max_level(log::LevelFilter::Debug);
+            // Set log level to "DEBUG"
+            tower_telemetry::enable_logging(tower_telemetry::LogLevel::Debug);
         } else {
-            log::set_max_level(log::LevelFilter::Info);
+            tower_telemetry::enable_logging(tower_telemetry::LogLevel::Warn);
         }
 
         // Check for newer version only if we successfully get a latest version

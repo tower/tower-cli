@@ -3,6 +3,7 @@ use config::Config;
 use http::StatusCode;
 use std::collections::HashMap;
 use tower_api::apis::ResponseContent;
+use tower_telemetry::debug;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -209,8 +210,8 @@ where
 {
     match api_call.await {
         Ok(response) => {
-            log::debug!("tower trace ID: {}", response.tower_trace_id);
-            log::debug!("Response from server: {}", response.content);
+            debug!("tower trace ID: {}", response.tower_trace_id);
+            debug!("Response from server: {}", response.content);
 
             if let Some(entity) = response.entity {
                 if let Some(data) = entity.extract_data() {

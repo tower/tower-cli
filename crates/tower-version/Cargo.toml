@@ -12,6 +12,6 @@ repository.workspace = true
 anyhow = { workspace = true }
 chrono = { workspace = true }
 config = { workspace = true }
-log = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
+tower-telemetry = { workspace = true }

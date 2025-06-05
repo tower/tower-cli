@@ -12,14 +12,11 @@ use async_compression::tokio::bufread::GzipDecoder;
 
 use tokio_tar::Archive;
 use tower_package::{Package, PackageSpec};
+use tower_telemetry::debug;
 use config::Towerfile;
 
 #[tokio::test]
 async fn it_creates_package() {
-    // We enable env_logger here as a way of debugging this test. There might be a way of doing
-    // this globally...but I don't know what it is.
-    let _ = env_logger::try_init();
-
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
@@ -50,10 +47,6 @@ async fn it_creates_package() {
 
 #[tokio::test]
 async fn it_respects_complex_file_globs() {
-    // We enable env_logger here as a way of debugging this test. There might be a way of doing
-    // this globally...but I don't know what it is.
-    let _ = env_logger::try_init();
-
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
@@ -90,8 +83,6 @@ async fn it_respects_complex_file_globs() {
 
 #[tokio::test]
 async fn it_respects_workspace_settings() {
-    let _ = env_logger::try_init();
-
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "app/Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "app/main.py", "print('Hello, world!')").await;
@@ -182,7 +173,7 @@ async fn create_test_file(tempdir: PathBuf, path: &str, contents: &str) {
         }
     }
 
-    log::debug!("creating test file at: {:?} with content {:?}", path, contents);
+    debug!("creating test file at: {:?} with content {:?}", path, contents);
     let mut file = File::create(&path).await.expect("Failed to create file");
     file.write_all(contents.as_bytes()).await.expect("Failed to write content to file")
 }

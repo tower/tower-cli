@@ -26,13 +26,11 @@ colored = "2"
 config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
 dirs = "5"
-env_logger = "*"
 futures = "0.3"
 futures-util = "0.3"
 glob = "0.3"
 http = "1.1"
 indicatif = "0.17"
-log = { version = "0.4", features = ["kv"] }
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
@@ -46,7 +44,6 @@ rsa = "0.9"
 serde = "1"
 serde_json = "1.0"
 sha2 = "0.10"
-simple_logger = "5"
 snafu = "0.7"
 spinners = "4"
 testutils = { path = "crates/testutils" }
@@ -63,6 +60,7 @@ tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 tower-telemetry = { path = "crates/tower-telemetry" }
 tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
 

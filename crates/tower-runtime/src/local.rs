@@ -25,6 +25,7 @@ use tokio::{
 };
 
 use tower_package::{Manifest, Package};
+use tower_telemetry::debug;
 
 use crate::{
     FD,
@@ -132,7 +133,7 @@ impl App for LocalApp {
             .to_path_buf();
 
         let mut python_path = find_python(None).await?;
-        log::debug!("using system python at {:?}", python_path);
+        debug!("using system python at {:?}", python_path);
 
         // set for later on.
         let working_dir = if let Some(dir) = opts.cwd {
@@ -144,7 +145,7 @@ impl App for LocalApp {
         let mut is_virtualenv = false;
 
         if Path::new(&package_path.join("requirements.txt")).exists() {
-            log::debug!("requirements.txt file found. installing dependencies");
+            debug!("requirements.txt file found. installing dependencies");
 
             // There's a requirements.txt, so we'll create a new virtualenv and install the files
             // taht we want in there.
@@ -169,7 +170,7 @@ impl App for LocalApp {
             //
             // TODO: Find a better way to operate in the context of a virtual env here.
             python_path = find_python(Some(working_dir.join(".venv").join("bin"))).await?;
-            log::debug!("using virtualenv python at {:?}", python_path);
+            debug!("using virtualenv python at {:?}", python_path);
 
             is_virtualenv = true;
 
@@ -195,16 +196,16 @@ impl App for LocalApp {
 
                 }
 
-                log::debug!("waiting for dependency installation to complete");
+                debug!("waiting for dependency installation to complete");
 
                 // Wait for the child to complete entirely.
                 child.wait().await.expect("child failed to exit");
             }
         } else {
-            log::debug!("missing requirements.txt file found. no dependencies to install");
+            debug!("missing requirements.txt file found. no dependencies to install");
         }
 
-        log::debug!(" - working directory: {:?}", &working_dir);
+        debug!(" - working directory: {:?}", &working_dir);
 
         let res = if package.manifest.invoke.ends_with(".sh") {
             let manifest = &package.manifest;
@@ -245,7 +246,7 @@ impl App for LocalApp {
                 status: Mutex::new(None),
             })
         } else {
-            log::error!("failed to spawn process: {}", res.err().unwrap());
+            debug!("failed to spawn process: {}", res.err().unwrap());
             Err(Error::SpawnFailed)
         }
     }
@@ -282,7 +283,7 @@ impl App for LocalApp {
             let mut child = proc.lock().await;
 
             if let Err(err) = child.kill().await {
-                log::warn!("failed to terminate app: {}", err);
+                debug!("failed to terminate app: {}", err);
                 Err(Error::TerminateFailed)
             } else {
                 Ok(())
@@ -306,7 +307,7 @@ impl LocalApp {
         params: HashMap<String, String>,
         other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
-        log::debug!(" - python script {}", manifest.invoke);
+        debug!(" - python script {}", manifest.invoke);
 
         let child = Command::new(python_path)
             .current_dir(&cwd)
@@ -333,9 +334,9 @@ impl LocalApp {
         other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
         let bash_path = find_bash().await?;
-        log::debug!("using bash at {:?}", bash_path);
+        debug!("using bash at {:?}", bash_path);
 
-        log::debug!(" - bash script {}", manifest.invoke);
+        debug!(" - bash script {}", manifest.invoke);
 
         let child = Command::new(bash_path)
             .current_dir(&cwd)
@@ -363,20 +364,20 @@ fn make_env_var_key(src: &str) -> String {
 fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
-    log::debug!("converting {} env variables", (params.len() + secs.len()));
+    debug!("converting {} env variables", (params.len() + secs.len()));
 
     for (key, value) in secs.into_iter() {
-        log::debug!("adding key {}", make_env_var_key(&key));
+        debug!("adding key {}", make_env_var_key(&key));
         res.insert(make_env_var_key(&key), value.to_string());
     }
 
     for (key, value) in params.into_iter() {
-        log::debug!("adding key {}", make_env_var_key(&key));
+        debug!("adding key {}", make_env_var_key(&key));
         res.insert(key.to_string(), value.to_string());
     }
 
     for (key, value) in other_env_vars.into_iter() {
-        log::debug!("adding key {}", &key);
+        debug!("adding key {}", &key);
         res.insert(key.to_string(), value.to_string());
     }
 
@@ -429,13 +430,13 @@ async fn wait_for_process(sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
                 break status.code().expect("no status code");
             } else {
                 // something went wrong.
-                log::error!("failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
+                debug!("failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
                 break -1;
             }
         }
     };
 
-    log::debug!("process exited with code {}", code);
+    debug!("process exited with code {}", code);
 
     // this just shuts up the compiler about ignoring the results.
     let _ = sx.send(code);
