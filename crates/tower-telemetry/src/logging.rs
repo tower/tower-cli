@@ -1,11 +1,11 @@
 #[macro_export]
 macro_rules! event_with_level {
     // With context
-    ($level:expr, ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        if let Some(runid) = $ctx.runid {
-            $crate::tracing::event!($level, runid = %runid, "{}", format!($fmt, $($arg)*))
+    ($level:expr, ctx: $ctx:expr, $fmt:expr, $($arg:tt)+) => {
+        if let Some(runid) = &$ctx.runid {
+            $crate::tracing::event!($level, runid = %runid, "{}", format!($fmt, $($arg)+))
         } else {
-            $crate::tracing::event!($level, "{}", format!($fmt, $($arg)*))
+            $crate::tracing::event!($level, "{}", format!($fmt, $($arg)+))
         }
     };
 
@@ -18,13 +18,13 @@ macro_rules! event_with_level {
 #[macro_export]
 macro_rules! debug {
     // With context, format string and arguments
-    (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        $crate::event_with_level!($crate::tracing::Level::DEBUG, $ctx, $fmt, $($arg)*)
+    (ctx: $ctx:expr, $fmt:expr, $($arg:tt)+) => {
+        $crate::event_with_level!($crate::tracing::Level::DEBUG, ctx: $ctx, $fmt, $($arg)+)
     };
 
     // With context, just message
     (ctx: $ctx:expr, $msg:expr) => {
-        $crate::event_with_level!($crate::tracing::Level::DEBUG, $ctx, "{}", $msg)
+        $crate::event_with_level!($crate::tracing::Level::DEBUG, ctx: $ctx, "{}", $msg)
     };
 
     // Without context, format string and arguments

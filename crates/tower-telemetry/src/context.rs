@@ -1,11 +1,11 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     /// runid is the ID of the run in the current context.
-    pub(crate) runid: Option<String>,
+    pub runid: Option<String>,
 }
 
 impl Context {
-    pub fn with_runid(runid: String) -> Self {
+    pub fn from_runid(runid: String) -> Self {
         Self {
             runid: Some(runid),
         }

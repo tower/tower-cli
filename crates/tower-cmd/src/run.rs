@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
-use tower_telemetry::debug;
+use tower_telemetry::{Context, debug};
 
 use crate::{
     output,
@@ -131,7 +131,7 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher
-        .launch(sender, package, env, secrets, params, catalogs)
+        .launch(Context::new(), sender, package, env, secrets, params, catalogs)
         .await
     {
         output::runtime_error(err);
