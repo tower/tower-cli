@@ -5,9 +5,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn from_runid(runid: String) -> Self {
+    pub fn from_runid(runid: &str) -> Self {
         Self {
-            runid: Some(runid),
+            runid: Some(runid.to_string()),
         }
     }
 
