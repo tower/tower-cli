@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use tower_package::Package;
+use tower_telemetry::debug;
 
 use tower_api::apis::configuration::Configuration;
 use tower_api::apis::ResponseContent;
@@ -86,7 +87,7 @@ pub async fn deploy_app_package(
 
     // Get the package file path
     let package_path = package.package_file_path.unwrap_or_else(|| {
-        log::debug!("No package file path found");
+        debug!("No package file path found");
         output::die("An error happened in Tower CLI that it couldn't recover from.");
     });
 

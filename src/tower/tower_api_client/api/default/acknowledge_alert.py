@@ -10,12 +10,12 @@ from ...types import Response
 
 
 def _get_kwargs(
-    alert_id: str,
+    alert_seq: int,
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/alerts/{alert_id}/acknowledge".format(
-            alert_id=alert_id,
+        "url": "/alerts/{alert_seq}/acknowledge".format(
+            alert_seq=alert_seq,
         ),
     }
 
@@ -47,7 +47,7 @@ def _build_response(
 
 
 def sync_detailed(
-    alert_id: str,
+    alert_seq: int,
     *,
     client: AuthenticatedClient,
 ) -> Response[AcknowledgeAlertResponse]:
@@ -56,7 +56,7 @@ def sync_detailed(
      Mark an alert as acknowledged
 
     Args:
-        alert_id (str): ID of the alert to acknowledge
+        alert_seq (int): Seq of the alert to acknowledge
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -67,7 +67,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        alert_id=alert_id,
+        alert_seq=alert_seq,
     )
 
     response = client.get_httpx_client().request(
@@ -78,7 +78,7 @@ def sync_detailed(
 
 
 def sync(
-    alert_id: str,
+    alert_seq: int,
     *,
     client: AuthenticatedClient,
 ) -> Optional[AcknowledgeAlertResponse]:
@@ -87,7 +87,7 @@ def sync(
      Mark an alert as acknowledged
 
     Args:
-        alert_id (str): ID of the alert to acknowledge
+        alert_seq (int): Seq of the alert to acknowledge
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,13 +98,13 @@ def sync(
     """
 
     return sync_detailed(
-        alert_id=alert_id,
+        alert_seq=alert_seq,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    alert_id: str,
+    alert_seq: int,
     *,
     client: AuthenticatedClient,
 ) -> Response[AcknowledgeAlertResponse]:
@@ -113,7 +113,7 @@ async def asyncio_detailed(
      Mark an alert as acknowledged
 
     Args:
-        alert_id (str): ID of the alert to acknowledge
+        alert_seq (int): Seq of the alert to acknowledge
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,7 +124,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        alert_id=alert_id,
+        alert_seq=alert_seq,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -133,7 +133,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    alert_id: str,
+    alert_seq: int,
     *,
     client: AuthenticatedClient,
 ) -> Optional[AcknowledgeAlertResponse]:
@@ -142,7 +142,7 @@ async def asyncio(
      Mark an alert as acknowledged
 
     Args:
-        alert_id (str): ID of the alert to acknowledge
+        alert_seq (int): Seq of the alert to acknowledge
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,7 +154,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            alert_id=alert_id,
+            alert_seq=alert_seq,
             client=client,
         )
     ).parsed

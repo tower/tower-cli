@@ -11,6 +11,7 @@ use tokio::sync::mpsc::{
 use chrono::{DateTime, Utc};
 
 use tower_package::Package;
+use tower_telemetry::debug;
 
 pub mod local;
 pub mod errors;
@@ -91,6 +92,7 @@ pub fn create_output_stream() -> (OutputSender, OutputReceiver) {
 impl<A: App> AppLauncher<A> {
     pub async fn launch(
         &mut self,
+        ctx: tower_telemetry::Context,
         output_sender: OutputSender,
         package: Package,
         environment: String,
@@ -101,6 +103,7 @@ impl<A: App> AppLauncher<A> {
         let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
 
         let opts = StartOptions {
+            ctx,
             output_sender: Some(output_sender),
             cwd: Some(cwd),
             environment,
@@ -128,7 +131,7 @@ impl<A: App> AppLauncher<A> {
     pub async fn terminate(&mut self) -> Result<(), Error> {
         if let Some(app) = &mut self.app {
             if let Err(err) = app.terminate().await {
-                log::debug!("failed to terminate app: {}", err);
+                debug!("failed to terminate app: {}", err);
                 Err(err)
             } else {
                 self.app = None;
@@ -142,6 +145,7 @@ impl<A: App> AppLauncher<A> {
 }
 
 pub struct StartOptions {
+    pub ctx: tower_telemetry::Context,
     pub package: Package,
     pub cwd: Option<PathBuf>,
     pub environment: String,

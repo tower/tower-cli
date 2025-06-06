@@ -14,8 +14,8 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     slug: str,
     *,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -86,8 +86,8 @@ def sync_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -99,8 +99,8 @@ def sync_detailed(
 
     Args:
         slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -136,8 +136,8 @@ def sync(
     slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -149,8 +149,8 @@ def sync(
 
     Args:
         slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -181,8 +181,8 @@ async def asyncio_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -194,8 +194,8 @@ async def asyncio_detailed(
 
     Args:
         slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -229,8 +229,8 @@ async def asyncio(
     slug: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -242,8 +242,8 @@ async def asyncio(
 
     Args:
         slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this

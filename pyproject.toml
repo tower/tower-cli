@@ -4,10 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "tower"
-version = "0.3.15"
-
-
-
+version = "0.3.16"
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
 readme = "README.md"
@@ -39,14 +36,14 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
-  "attrs>=24.2.0",
-  "httpx>=0.23.3",
-  "python-dateutil>=2.9.0.post0",
+  "attrs==24.2.0",
+  "httpx==0.28.1",
+  "python-dateutil==2.9.0.post0",
 ]
 
 [project.optional-dependencies]
-ai = ["huggingface-hub>=0.30.2", "ollama>=0.4.7"]
-iceberg = ["polars>=1.27.1", "pyarrow>=19.0.1", "pyiceberg>=0.9.0"]
+ai = ["huggingface-hub==0.30.2", "ollama==0.4.7"]
+iceberg = ["polars==1.27.1", "pyarrow==19.0.1", "pyiceberg==0.9.0"]
 all = ["tower[ai,iceberg]"]
 
 [tool.maturin]
@@ -63,8 +60,8 @@ tower = { workspace = true }
 
 [dependency-groups]
 dev = [
-  "openapi-python-client>=0.12.1",
-  "pytest>=8.3.5",
-  "pytest-httpx>=0.35.0",
-  "pyiceberg[sql-sqlite]>=0.9.0",
+  "openapi-python-client==0.24.3",
+  "pytest==8.3.5",
+  "pytest-httpx==0.35.0",
+  "pyiceberg[sql-sqlite]==0.9.0",
 ]

@@ -4,10 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.15"
-
-
-
+version = "0.3.16"
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.77"
 authors = ["Brad Heller <brad@tower.dev>"]
@@ -27,13 +24,11 @@ colored = "2"
 config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
 dirs = "5"
-env_logger = "*"
 futures = "0.3"
 futures-util = "0.3"
 glob = "0.3"
 http = "1.1"
 indicatif = "0.17"
-log = { version = "0.4", features = ["kv"] }
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
@@ -47,7 +42,6 @@ rsa = "0.9"
 serde = "1"
 serde_json = "1.0"
 sha2 = "0.10"
-simple_logger = "5"
 snafu = "0.7"
 spinners = "4"
 testutils = { path = "crates/testutils" }
@@ -63,6 +57,9 @@ tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 tower-telemetry = { path = "crates/tower-telemetry" }
+tracing = { version = "0.1" }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
 

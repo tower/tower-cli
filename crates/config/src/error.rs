@@ -1,4 +1,5 @@
 use snafu::prelude::*;
+use tower_telemetry::debug;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -43,8 +44,7 @@ impl From<serde_json::Error> for Error {
 
 impl From<toml::de::Error> for Error {
     fn from(err: toml::de::Error) -> Self {
-        log::debug!("error parsing Towerfile TOMl: {}", err);
-        println!("error parsing Towerfile TOML: {}", err);
+        debug!("error parsing Towerfile TOMl: {}", err);
         Error::InvalidTowerfile
     }
 }

@@ -1,6 +1,7 @@
 use crate::Error;
 use serde::Deserialize;
 use std::path::PathBuf;
+use tower_telemetry::debug;
 
 #[derive(Deserialize, Debug)]
 pub struct Parameter{
@@ -88,7 +89,7 @@ impl Towerfile {
         // We set the workspace to the directory of the Towerfile if it's not set because that's
         // the implicit behavior overall for legacy Towerfiles.
         if towerfile.app.workspace.as_os_str().is_empty() {
-            log::debug!("Setting workspace to the directory of the Towerfile");
+            debug!("Setting workspace to the directory of the Towerfile");
             towerfile.app.workspace = towerfile.file_path
                 .parent()
                 .map(|p| p.to_path_buf())

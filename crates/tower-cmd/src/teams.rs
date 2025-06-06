@@ -1,6 +1,7 @@
 use clap::{ArgMatches, Command};
 use colored::*;
 use config::Config;
+use tower_telemetry::debug;
 
 use crate::{
     output,
@@ -48,7 +49,7 @@ async fn refresh_session(config: &Config) -> config::Session {
             session
         },
         Err(err) => {
-            log::debug!("Failed to refresh session: {}", err);
+            debug!("Failed to refresh session: {}", err);
 
             spinner.failure();
             output::die("There was a problem talking to the Tower API. Try again later!");

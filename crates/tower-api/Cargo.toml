@@ -7,7 +7,6 @@ rust-version = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-log = { workspace = true }
 serde = { version = "^1.0", features = ["derive"] }
 serde_with = { version = "^3.8", default-features = false, features = ["base64", "std", "macros"] }
 serde_json = "^1.0"

@@ -10,7 +10,6 @@ license = { workspace = true }
 async-compression = { workspace = true }
 config = { workspace = true }
 glob = { workspace = true }
-log = { workspace = true }
 serde = { workspace = true } 
 serde_json = { workspace = true } 
 snafu = { workspace = true } 
@@ -19,6 +18,4 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-tar = { workspace = true }
 tokio-util = { workspace = true }
-
-[dev-dependencies]
-env_logger = { workspace = true }
+tower-telemetry = { workspace = true }

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use crate::{output, util};
 use tower_package::{Package, PackageSpec};
+use tower_telemetry::debug;
 use tower_api::apis::configuration::Configuration;
 
 pub fn deploy_cmd() -> Command {
@@ -30,7 +31,7 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
     // Determine the directory to build the package from
     let dir = resolve_path(args);
-    log::debug!("Building package from directory: {:?}", dir);
+    debug!("Building package from directory: {:?}", dir);
 
     let path = dir.join("Towerfile");
 

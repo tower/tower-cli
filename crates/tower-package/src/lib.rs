@@ -13,6 +13,8 @@ use tmpdir::TmpDir;
 use async_compression::tokio::write::GzipEncoder;
 use async_compression::tokio::bufread::GzipDecoder;
 
+use tower_telemetry::debug;
+
 mod error;
 pub use error::Error;
 
@@ -85,7 +87,7 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
 
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
-        log::debug!("creating package spec from towerfile: {:?}", towerfile);
+        debug!("creating package spec from towerfile: {:?}", towerfile);
         let towerfile_path = towerfile.file_path.clone();
         let base_dir = towerfile.app.workspace.clone();
 
@@ -154,7 +156,7 @@ impl Package {
    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
    // GZip'd.
    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
-       log::debug!("building package from spec: {:?}", spec);
+       debug!("building package from spec: {:?}", spec);
 
        // we canonicalize this because we want to treat all paths in the same keyspace more or
        // less.
@@ -162,7 +164,7 @@ impl Package {
 
        let tmp_dir = TmpDir::new("tower-package").await?;
        let package_path = tmp_dir.to_path_buf().join("package.tar");
-       log::debug!("building package at: {:?}", package_path);
+       debug!("building package at: {:?}", package_path);
 
        let file = File::create(package_path.clone()).await?;
        let gzip = GzipEncoder::new(file);
@@ -171,14 +173,14 @@ impl Package {
        for file_glob in spec.file_globs {
            let path = base_dir.join(file_glob);
            let path_str = extract_glob_path(path);
-           log::debug!("resolving glob pattern: {}", path_str);
+           debug!("resolving glob pattern: {}", path_str);
 
            for entry in glob(&path_str).unwrap() {
                let physical_path = entry.unwrap()
                    .canonicalize()
                    .unwrap();
 
-               log::debug!(" - adding file: {:?}", physical_path);
+               debug!(" - adding file: {:?}", physical_path);
 
                // turn this back in to a path that is relative to the TAR file root
                let cp = physical_path.clone();

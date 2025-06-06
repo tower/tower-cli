@@ -13,6 +13,7 @@ use tower_api::{
     },
     models::ErrorModel,
 };
+use tower_telemetry::debug;
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
@@ -120,13 +121,13 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
     let error_model: ErrorModel = match serde_json::from_str(&err.content) {
         Ok(model) => model,
         Err(e) => {
-            log::debug!("Failed to parse error content as JSON: {}", e);
-            log::debug!("Raw error content: {}", err.content);
+            debug!("Failed to parse error content as JSON: {}", e);
+            debug!("Raw error content: {}", err.content);
             error("An unexpected error occurred while processing the response.");
             return;
         }
     };
-    log::debug!("Error model (status: {}): {:?}", err.status, error_model);
+    debug!("Error model (status: {}): {:?}", err.status, error_model);
 
     match err.status {
         StatusCode::CONFLICT => {
@@ -186,15 +187,15 @@ pub fn tower_error<T>(err: ApiError<T>) {
             output_response_content_error(resp);
         }
         ApiError::Reqwest(e) => {
-            log::debug!("Reqwest error: {:?}", e);
+            debug!("Reqwest error: {:?}", e);
             error("The Tower CLI wasn't able to talk to the Tower API! Are you offline? Try again later.");
         }
         ApiError::Serde(e) => {
-            log::debug!("Serde error: {:?}", e);
+            debug!("Serde error: {:?}", e);
             error("The Tower API returned something that the Tower CLI didn't understand. Maybe you need to upgrade Tower CLI?");
         }
         ApiError::Io(e) => {
-            log::debug!("Io error: {:?}", e);
+            debug!("Io error: {:?}", e);
             error("An error happened while talking to the Tower API. You can try that again in a bit.");
         }
     }

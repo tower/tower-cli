@@ -25,6 +25,7 @@ use tokio::{
 };
 
 use tower_package::{Manifest, Package};
+use tower_telemetry::debug;
 
 use crate::{
     FD,
@@ -34,6 +35,8 @@ use crate::{
 };
 
 pub struct LocalApp {
+    ctx: tower_telemetry::Context,
+
     // LocalApp needs to take ownership of the package as a way of taking responsibility for it's
     // lifetime and, most importantly, it's contents. The compiler complains that we never actually
     // use this struct member, so we allow the dead_code attribute to silence the warning.
@@ -124,6 +127,7 @@ async fn find_bash() -> Result<PathBuf, Error> {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
+        let ctx = opts.ctx.clone();
         let package = opts.package;
         let environment = opts.environment;
         let package_path = package.unpacked_path
@@ -132,7 +136,7 @@ impl App for LocalApp {
             .to_path_buf();
 
         let mut python_path = find_python(None).await?;
-        log::debug!("using system python at {:?}", python_path);
+        debug!(ctx: &ctx, "using system python at {:?}", python_path);
 
         // set for later on.
         let working_dir = if let Some(dir) = opts.cwd {
@@ -144,7 +148,7 @@ impl App for LocalApp {
         let mut is_virtualenv = false;
 
         if Path::new(&package_path.join("requirements.txt")).exists() {
-            log::debug!("requirements.txt file found. installing dependencies");
+            debug!(ctx: &ctx, "requirements.txt file found. installing dependencies");
 
             // There's a requirements.txt, so we'll create a new virtualenv and install the files
             // taht we want in there.
@@ -169,7 +173,7 @@ impl App for LocalApp {
             //
             // TODO: Find a better way to operate in the context of a virtual env here.
             python_path = find_python(Some(working_dir.join(".venv").join("bin"))).await?;
-            log::debug!("using virtualenv python at {:?}", python_path);
+            debug!(ctx: &ctx, "using virtualenv python at {:?}", python_path);
 
             is_virtualenv = true;
 
@@ -195,16 +199,16 @@ impl App for LocalApp {
 
                 }
 
-                log::debug!("waiting for dependency installation to complete");
+                debug!(ctx: &ctx, "waiting for dependency installation to complete");
 
                 // Wait for the child to complete entirely.
                 child.wait().await.expect("child failed to exit");
             }
         } else {
-            log::debug!("missing requirements.txt file found. no dependencies to install");
+            debug!(ctx: &ctx, "missing requirements.txt file found. no dependencies to install");
         }
 
-        log::debug!(" - working directory: {:?}", &working_dir);
+        debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
 
         let res = if package.manifest.invoke.ends_with(".sh") {
             let manifest = &package.manifest;
@@ -212,14 +216,14 @@ impl App for LocalApp {
             let params= opts.parameters;
             let other_env_vars = opts.env_vars;
 
-            Self::execute_bash_program(&environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params, other_env_vars).await
+            Self::execute_bash_program(&ctx, &environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params, other_env_vars).await
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
             let other_env_vars = opts.env_vars;
 
-            Self::execute_python_program(&environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
+            Self::execute_python_program(&ctx, &environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
         };
 
         if let Ok(mut child) = res {
@@ -236,16 +240,17 @@ impl App for LocalApp {
             let child = Arc::new(Mutex::new(child));
             let (sx, rx) = oneshot::channel::<i32>();
 
-            tokio::spawn(wait_for_process(sx, Arc::clone(&child)));
+            tokio::spawn(wait_for_process(ctx.clone(), sx, Arc::clone(&child)));
 
             Ok(Self {
+                ctx,
                 package: Some(package),
                 child: Some(child),
                 waiter: Mutex::new(rx),
                 status: Mutex::new(None),
             })
         } else {
-            log::error!("failed to spawn process: {}", res.err().unwrap());
+            debug!(ctx: &ctx, "failed to spawn process: {}", res.err().unwrap());
             Err(Error::SpawnFailed)
         }
     }
@@ -282,7 +287,7 @@ impl App for LocalApp {
             let mut child = proc.lock().await;
 
             if let Err(err) = child.kill().await {
-                log::warn!("failed to terminate app: {}", err);
+                debug!(ctx: &self.ctx, "failed to terminate app: {}", err);
                 Err(Error::TerminateFailed)
             } else {
                 Ok(())
@@ -296,6 +301,7 @@ impl App for LocalApp {
 
 impl LocalApp {
     async fn execute_python_program(
+        ctx: &tower_telemetry::Context,
         env: &str,
         cwd: PathBuf,
         is_virtualenv: bool,
@@ -306,7 +312,7 @@ impl LocalApp {
         params: HashMap<String, String>,
         other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
-        log::debug!(" - python script {}", manifest.invoke);
+        debug!(ctx: &ctx, " - python script {}", manifest.invoke);
 
         let child = Command::new(python_path)
             .current_dir(&cwd)
@@ -315,7 +321,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
+            .envs(make_env_vars(&ctx, env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -323,6 +329,7 @@ impl LocalApp {
     }
 
     async fn execute_bash_program(
+        ctx: &tower_telemetry::Context,
         env: &str,
         cwd: PathBuf,
         is_virtualenv: bool,
@@ -333,9 +340,9 @@ impl LocalApp {
         other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
         let bash_path = find_bash().await?;
-        log::debug!("using bash at {:?}", bash_path);
+        debug!(ctx: &ctx, "using bash at {:?}", bash_path);
 
-        log::debug!(" - bash script {}", manifest.invoke);
+        debug!(ctx: &ctx, " - bash script {}", manifest.invoke);
 
         let child = Command::new(bash_path)
             .current_dir(&cwd)
@@ -343,7 +350,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
+            .envs(make_env_vars(&ctx, env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -360,23 +367,23 @@ fn make_env_var_key(src: &str) -> String {
     }
 }
 
-fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
-    log::debug!("converting {} env variables", (params.len() + secs.len()));
+    debug!(ctx: &ctx, "converting {} env variables", (params.len() + secs.len()));
 
     for (key, value) in secs.into_iter() {
-        log::debug!("adding key {}", make_env_var_key(&key));
+        debug!(ctx: &ctx, "adding key {}", make_env_var_key(&key));
         res.insert(make_env_var_key(&key), value.to_string());
     }
 
     for (key, value) in params.into_iter() {
-        log::debug!("adding key {}", make_env_var_key(&key));
+        debug!(ctx: &ctx, "adding key {}", make_env_var_key(&key));
         res.insert(key.to_string(), value.to_string());
     }
 
     for (key, value) in other_env_vars.into_iter() {
-        log::debug!("adding key {}", &key);
+        debug!(ctx: &ctx, "adding key {}", &key);
         res.insert(key.to_string(), value.to_string());
     }
 
@@ -418,7 +425,7 @@ fn make_env_vars(env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<S
     res
 }
 
-async fn wait_for_process(sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
+async fn wait_for_process(ctx: tower_telemetry::Context, sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
     let code = loop {
         let mut child = proc.lock().await;
         let timeout = timeout(Duration::from_millis(250), child.wait()).await;
@@ -429,13 +436,13 @@ async fn wait_for_process(sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
                 break status.code().expect("no status code");
             } else {
                 // something went wrong.
-                log::error!("failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
+                debug!(ctx: &ctx, "failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
                 break -1;
             }
         }
     };
 
-    log::debug!("process exited with code {}", code);
+    debug!(ctx: &ctx, "process exited with code {}", code);
 
     // this just shuts up the compiler about ignoring the results.
     let _ = sx.send(code);

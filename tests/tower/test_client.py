@@ -50,6 +50,7 @@ def mock_run_response_factory():
                 "scheduled_at": "2025-04-25T20:54:58.761867Z",
                 "started_at": "2025-04-25T20:54:59.366937Z",
                 "status": status,
+                "exit_code": None,
                 "status_group": status_group,
                 "parameters": parameters
             }
@@ -75,6 +76,7 @@ def create_run_object():
             parameters = []
             
         return Run(
+            exit_code=None,
             app_slug=app_slug,
             app_version=app_version,
             cancelled_at=None,
