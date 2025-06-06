@@ -42,12 +42,12 @@ macro_rules! debug {
 macro_rules! info {
     // With context, format string and arguments
     (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        $crate::event_with_level!($crate::tracing::Level::INFO, $ctx, $fmt, $($arg)*)
+        $crate::event_with_level!($crate::tracing::Level::INFO, ctx: $ctx, $fmt, $($arg)*)
     };
 
     // With context, just message
     (ctx: $ctx:expr, $msg:expr) => {
-        $crate::event_with_level!($crate::tracing::Level::INFO, $ctx, "{}", $msg)
+        $crate::event_with_level!($crate::tracing::Level::INFO, ctx: $ctx, "{}", $msg)
     };
 
     // Without context, format string and arguments
@@ -65,12 +65,12 @@ macro_rules! info {
 macro_rules! warn {
     // With context, format string and arguments
     (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        $crate::event_with_level!($crate::tracing::Level::WARN, $ctx, $fmt, $($arg)*)
+        $crate::event_with_level!($crate::tracing::Level::WARN, ctx: $ctx, $fmt, $($arg)*)
     };
 
     // With context, just message
     (ctx: $ctx:expr, $msg:expr) => {
-        $crate::event_with_level!($crate::tracing::Level::WARN, $ctx, "{}", $msg)
+        $crate::event_with_level!($crate::tracing::Level::WARN, ctx: $ctx, "{}", $msg)
     };
 
     // Without context, format string and arguments
@@ -88,12 +88,12 @@ macro_rules! warn {
 macro_rules! error {
     // With context, format string and arguments
     (ctx: $ctx:expr, $fmt:expr, $($arg:tt)*) => {
-        $crate::event_with_level!($crate::tracing::Level::ERROR, $ctx, $fmt, $($arg)*)
+        $crate::event_with_level!($crate::tracing::Level::ERROR, ctx: $ctx, $fmt, $($arg)*)
     };
 
     // With context, just message
     (ctx: $ctx:expr, $msg:expr) => {
-        $crate::event_with_level!($crate::tracing::Level::ERROR, $ctx, "{}", $msg)
+        $crate::event_with_level!($crate::tracing::Level::ERROR, ctx: $ctx, "{}", $msg)
     };
 
     // Without context, format string and arguments
