@@ -4,7 +4,8 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.17"
+version = "0.3.18"
+
 
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.77"
