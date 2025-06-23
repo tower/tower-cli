@@ -106,7 +106,7 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
     env_vars.extend(catalogs);
     env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
 
-    // There should always be a session, if htere isn't one then I'm not sure how we got here?
+    // There should always be a session, if there isn't one then I'm not sure how we got here?
     let session = config.session.unwrap_or_else(|| {
         output::die("No session found. Please log in to Tower first.");
     });
