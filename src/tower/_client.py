@@ -102,6 +102,8 @@ def run_app(
         # Raise an AppNotFoundError here if the app was, indeed, not found.
         if e.status_code == 404:
             raise AppNotFoundError(slug)
+        else:
+            raise UnknownException(f"Unexpected status code {e.status_code} when running app {slug}")
 
 def wait_for_run(
     run: Run,
