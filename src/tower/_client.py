@@ -303,12 +303,21 @@ def _env_client(ctx: TowerContext, timeout: Optional[float] = None) -> Authentic
         else:
             tower_url += "/v1"
 
+    if ctx.jwt is not None:
+        token = ctx.jwt
+        auth_header_name = "Authorization"
+        prefix = "Bearer"
+    else:
+        token = ctx.api_key
+        auth_header_name = "X-API-Key"
+        prefix = ""
+
     return AuthenticatedClient(
         verify_ssl=False,
         base_url=tower_url,
-        token=ctx.api_key,
-        auth_header_name="X-API-Key",
-        prefix="",
+        token=token,
+        auth_header_name=auth_header_name,
+        prefix=prefix,
         timeout=timeout,
     )
 
