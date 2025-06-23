@@ -51,7 +51,7 @@ pub fn run_cmd() -> Command {
 pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     let res = get_run_parameters(args, cmd);
 
-    // We always expect there to be an environmnt due to the fact that there is a
+    // We always expect there to be an environment due to the fact that there is a
     // default value.
     let env = args.get_one::<String>("environment").unwrap();
 
