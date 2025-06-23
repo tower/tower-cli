@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 
 from ._context import TowerContext
 from .exceptions import (
+    AppNotFoundError,
     NotFoundException,
     UnauthorizedException,
     UnknownException,
@@ -24,6 +25,7 @@ from .tower_api_client.models import (
     RunAppResponse,
 )
 from .tower_api_client.models.error_model import ErrorModel
+from .tower_api_client.errors import UnexpectedStatus
 
 # WAIT_TIMEOUT is the amount of time to wait between requests when polling the
 # Tower API.
@@ -84,18 +86,22 @@ def run_app(
         parameters=run_params,
     )
 
-    output: Optional[Union[ErrorModel, RunAppResponse]] = run_app_api.sync(
-        slug=slug, client=client, body=input_body
-    )
+    try:
+        output: Optional[Union[ErrorModel, RunAppResponse]] = run_app_api.sync(
+            slug=slug, client=client, body=input_body
+        )
 
-    if output is None:
-        raise RuntimeError("Error running app")
-    else:
-        if isinstance(output, ErrorModel):
-            raise RuntimeError(f"Error running app: {output.title}")
+        if output is None:
+            raise RuntimeError("Error running app")
         else:
-            return output.run
-
+            if isinstance(output, ErrorModel):
+                raise RuntimeError(f"Error running app: {output.title}")
+            else:
+                return output.run
+    except UnexpectedStatus as e:
+        # Raise an AppNotFoundError here if the app was, indeed, not found.
+        if e.status_code == 404:
+            raise AppNotFoundError(slug)
 
 def wait_for_run(
     run: Run,
@@ -319,6 +325,7 @@ def _env_client(ctx: TowerContext, timeout: Optional[float] = None) -> Authentic
         auth_header_name=auth_header_name,
         prefix=prefix,
         timeout=timeout,
+        raise_on_unexpected_status=True,
     )
 
 
