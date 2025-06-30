@@ -324,3 +324,67 @@ def test_raising_an_error_during_partial_failure(
     # Now actually wait for the runs
     with pytest.raises(RunFailedError) as excinfo:
         tower.wait_for_runs(runs, raise_on_failure=True)
+
+
+def test_raising_an_error_for_a_not_found_app(
+    httpx_mock, 
+    mock_api_config, 
+    mock_run_response_factory, 
+    create_run_object
+):
+    tower = mock_api_config
+    
+    # Mock a 404 response with error model
+    error_response = {
+        "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
+        "status": 404,
+        "title": "Not Found",
+        "detail": "The requested app 'non-existent-app' was not found",
+        "instance": "https://api.example.com/v1/apps/non-existent-app",
+        "type": "about:blank"
+    }
+    
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api.example.com/v1/apps/non-existent-app/runs",
+        json=error_response,
+        status_code=404,
+    )
+
+    # Attempt to run a non-existent app and verify it raises the correct error
+    with pytest.raises(tower.exceptions.AppNotFoundError) as excinfo:
+        tower.run_app("non-existent-app")
+    
+    assert "not found" in str(excinfo.value).lower()
+
+
+def test_raising_an_unexpected_error_based_on_status_code(
+    httpx_mock, 
+    mock_api_config, 
+    mock_run_response_factory, 
+    create_run_object
+):
+    tower = mock_api_config
+    
+    # Mock a 404 response with error model
+    error_response = {
+        "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
+        "status": 404,
+        "title": "Not Found",
+        "detail": "The requested app 'non-existent-app' was not found",
+        "instance": "https://api.example.com/v1/apps/non-existent-app",
+        "type": "about:blank"
+    }
+    
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api.example.com/v1/apps/non-existent-app/runs",
+        json=error_response,
+        status_code=400,
+    )
+
+    # Attempt to run a non-existent app and verify it raises the correct error
+    with pytest.raises(tower.exceptions.UnknownException) as excinfo:
+        tower.run_app("non-existent-app")
+    
+    assert "unexpected status code" in str(excinfo.value).lower()
