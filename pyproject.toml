@@ -4,7 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "tower"
-version = "0.3.18"
+version = "0.3.19"
+
 
 
 description = "Tower CLI and runtime environment for Tower."
