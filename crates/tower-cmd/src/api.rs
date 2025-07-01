@@ -32,9 +32,9 @@ pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsRes
         query: None,
         page: None,
         page_size: None,
-        period: None,
         num_runs: Some(0),
-        status: None,
+        sort: None,
+        filter: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
@@ -305,7 +305,15 @@ impl ResponseEntity for tower_api::apis::default_api::ListAppsSuccess {
     fn extract_data(self) -> Option<Self::Data> {
         match self {
             Self::Status200(data) => Some(data),
-            Self::UnknownValue(_) => None,
+            Self::UnknownValue(data) => {
+                match serde_json::from_value(data) {
+                    Ok(obj) => Some(obj),
+                    Err(err) => {
+                        debug!("Failed to deserialize ListAppsResponse from value: {}", err);
+                        None
+                    },
+                }
+            }
         }
     }
 }

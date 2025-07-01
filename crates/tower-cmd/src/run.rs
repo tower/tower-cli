@@ -51,6 +51,10 @@ pub fn run_cmd() -> Command {
 pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     let res = get_run_parameters(args, cmd);
 
+    // We always expect there to be an environment due to the fact that there is a
+    // default value.
+    let env = args.get_one::<String>("environment").unwrap();
+
     match res {
         Ok((local, path, params, app_name)) => {
             debug!(
@@ -64,13 +68,9 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
                 if app_name.is_some() {
                     output::die("Running apps by name locally is not supported yet.");
                 } else {
-                    do_run_local(config, path, params).await;
+                    do_run_local(config, path, env, params).await;
                 }
             } else {
-                // We always expect there to be an environmnt due to the fact that there is a
-                // default value.
-                let env = args.get_one::<String>("environment").unwrap();
-
                 do_run_remote(config, path, env, params, app_name).await;
             }
         }
@@ -83,10 +83,7 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String, String>) {
-    // There is always an implicit `local` environment when running in a local context.
-    let env = "local".to_string();
-
+async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) {
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     // Load all the secrets and catalogs from the server
@@ -103,6 +100,18 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
     };
 
     spinner.success();
+
+    // We prepare all the other misc environment variables that we need to inject
+    let mut env_vars = HashMap::new();
+    env_vars.extend(catalogs);
+    env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
+
+    // There should always be a session, if there isn't one then I'm not sure how we got here?
+    let session = config.session.unwrap_or_else(|| {
+        output::die("No session found. Please log in to Tower first.");
+    });
+
+    env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
@@ -131,7 +140,7 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher
-        .launch(Context::new(), sender, package, env, secrets, params, catalogs)
+        .launch(Context::new(), sender, package, env.to_string(), secrets, params, env_vars)
         .await
     {
         output::runtime_error(err);
