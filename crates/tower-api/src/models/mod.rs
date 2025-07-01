@@ -202,8 +202,6 @@ pub mod run_log_line;
 pub use self::run_log_line::RunLogLine;
 pub mod run_parameter;
 pub use self::run_parameter::RunParameter;
-pub mod run_results;
-pub use self::run_results::RunResults;
 pub mod run_statistics;
 pub use self::run_statistics::RunStatistics;
 pub mod run_timeseries_point;
