@@ -39,6 +39,7 @@ def mock_run_response_factory():
             
         return {
             "run": {
+                "app_name": "my-app",
                 "app_slug": app_slug,
                 "app_version": app_version,
                 "cancelled_at": None,
@@ -76,6 +77,7 @@ def create_run_object():
             parameters = []
             
         return Run(
+            app_name="my-app",
             exit_code=None,
             app_slug=app_slug,
             app_version=app_version,
