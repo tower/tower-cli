@@ -21,6 +21,22 @@
           inherit system;
         };
 
+        version = "0.3.18";
+        maintainer = "Tower Computing Inc. <support@tower.dev>";
+        homepage = "https://github.com/tower/tower-cli";
+        description = "Tower CLI and runtime environment";
+        longDescription = ''
+          Tower CLI and runtime environment
+          Tower is the best way to host Python data apps in production.
+          This package provides the Tower CLI tool for managing and deploying
+          applications to the Tower platform.
+        '';
+
+        commonNativeBuildInputs = with pkgs; [ pkg-config ];
+        commonBuildInputs = with pkgs; [ openssl zlib ];
+
+        isMuslTarget = target: target == "x86_64-unknown-linux-musl" || target == "aarch64-unknown-linux-musl";
+
         rustToolchain = fenix.packages.${system}.stable.toolchain;
         rustToolchainWithMusl = fenix.packages.${system}.stable.withComponents [
           "cargo"
@@ -41,17 +57,11 @@
           
           cargoBuildOptions = x: x;
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-
-          buildInputs = with pkgs; [
-            openssl
-            zlib
-          ];
+          nativeBuildInputs = commonNativeBuildInputs;
+          buildInputs = commonBuildInputs;
 
           meta = with pkgs.lib; {
-            description = "Tower CLI and runtime environment";
+            inherit description;
             license = licenses.mit;
             platforms = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
             mainProgram = "tower";
@@ -87,20 +97,15 @@
           cargoBuildOptions = x: x;
 
           CARGO_BUILD_TARGET = target;
-          CARGO_BUILD_RUSTFLAGS = if (target == "x86_64-unknown-linux-musl" || target == "aarch64-unknown-linux-musl")
+          CARGO_BUILD_RUSTFLAGS = if (isMuslTarget target)
             then "-C target-feature=+crt-static" 
             else "";
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ] ++ pkgs.lib.optionals (target == "x86_64-unknown-linux-musl" || target == "aarch64-unknown-linux-musl") [
+          nativeBuildInputs = commonNativeBuildInputs ++ pkgs.lib.optionals (isMuslTarget target) [
             crossPkgs.stdenv.cc
           ];
 
-          buildInputs = with crossPkgs; [
-            openssl
-            zlib
-          ];
+          buildInputs = with crossPkgs; commonBuildInputs;
 
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = 
             if target == "x86_64-unknown-linux-musl" 
@@ -132,7 +137,7 @@
           tower-cli-macos-arm = tower-cli-macos-arm;
           
           tower-cli-deb-x86 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-0.3.18-amd64.deb";
+            name = "tower-cli-${version}-amd64.deb";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
@@ -146,17 +151,14 @@
               name: tower-cli
               arch: amd64
               platform: linux
-              version: 0.3.18
+              version: ${version}
               section: utils
               priority: optional
-              maintainer: Tower Computing Inc. <brad@tower.dev>
+              maintainer: ${maintainer}
               description: |
-                Tower CLI and runtime environment
-                Tower is the best way to host Python data apps in production.
-                This package provides the Tower CLI tool for managing and deploying
-                applications to the Tower platform.
+                ${longDescription}
               vendor: Tower Computing Inc.
-              homepage: https://github.com/tower/tower-cli
+              homepage: ${homepage}
               license: MIT
               
               contents:
@@ -169,12 +171,12 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager deb --target $out/tower-cli_0.3.18_amd64.deb
+              nfpm package --config nfpm.yaml --packager deb --target $out/tower-cli_${version}_amd64.deb
             '';
           };
 
           tower-cli-deb-arm64 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-0.3.18-arm64.deb";
+            name = "tower-cli-${version}-arm64.deb";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
@@ -188,17 +190,14 @@
               name: tower-cli
               arch: arm64
               platform: linux
-              version: 0.3.18
+              version: ${version}
               section: utils
               priority: optional
-              maintainer: Tower Computing Inc. <brad@tower.dev>
+              maintainer: ${maintainer}
               description: |
-                Tower CLI and runtime environment
-                Tower is the best way to host Python data apps in production.
-                This package provides the Tower CLI tool for managing and deploying
-                applications to the Tower platform.
+                ${longDescription}
               vendor: Tower Computing Inc.
-              homepage: https://github.com/tower/tower-cli
+              homepage: ${homepage}
               license: MIT
               
               contents:
@@ -211,12 +210,12 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager deb --target $out/tower-cli_0.3.18_arm64.deb
+              nfpm package --config nfpm.yaml --packager deb --target $out/tower-cli_${version}_arm64.deb
             '';
           };
           
           tower-cli-rpm-x86 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-0.3.18-x86_64.rpm";
+            name = "tower-cli-${version}-x86_64.rpm";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
@@ -230,16 +229,13 @@
               name: tower-cli
               arch: x86_64
               platform: linux
-              version: 0.3.18
+              version: ${version}
               release: 1
-              maintainer: Tower Computing Inc. <brad@tower.dev>
+              maintainer: ${maintainer}
               description: |
-                Tower CLI and runtime environment
-                Tower is the best way to host Python data apps in production.
-                This package provides the Tower CLI tool for managing and deploying
-                applications to the Tower platform.
+                ${longDescription}
               vendor: Tower Computing Inc.
-              homepage: https://github.com/tower/tower-cli
+              homepage: ${homepage}
               license: MIT
               
               contents:
@@ -252,12 +248,12 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-cli-0.3.18-1.x86_64.rpm
+              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-cli-${version}-1.x86_64.rpm
             '';
           };
 
           tower-cli-rpm-arm64 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-0.3.18-aarch64.rpm";
+            name = "tower-cli-${version}-aarch64.rpm";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
@@ -271,16 +267,13 @@
               name: tower-cli
               arch: aarch64
               platform: linux
-              version: 0.3.18
+              version: ${version}
               release: 1
-              maintainer: Tower Computing Inc. <brad@tower.dev>
+              maintainer: ${maintainer}
               description: |
-                Tower CLI and runtime environment
-                Tower is the best way to host Python data apps in production.
-                This package provides the Tower CLI tool for managing and deploying
-                applications to the Tower platform.
+                ${longDescription}
               vendor: Tower Computing Inc.
-              homepage: https://github.com/tower/tower-cli
+              homepage: ${homepage}
               license: MIT
               
               contents:
@@ -293,7 +286,7 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-cli-0.3.18-1.aarch64.rpm
+              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-cli-${version}-1.aarch64.rpm
             '';
           };
         };
@@ -308,10 +301,7 @@
             openssl
           ];
           
-          buildInputs = with pkgs; [
-            openssl
-            zlib
-          ];
+          buildInputs = commonBuildInputs;
 
           shellHook = ''
             export RUST_LOG=debug
