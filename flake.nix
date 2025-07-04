@@ -52,7 +52,7 @@
           rustc = rustToolchain;
         };
 
-        tower-cli = naersk-native.buildPackage {
+        tower = naersk-native.buildPackage {
           src = ./.;
           
           cargoBuildOptions = x: x;
@@ -124,31 +124,31 @@
           OPENSSL_INCLUDE_DIR = "${crossPkgs.openssl.dev}/include";
         };
 
-        tower-cli-linux-x86 = mkCrossTarget "x86_64-unknown-linux-musl";
-        tower-cli-linux-arm64 = mkCrossTarget "aarch64-unknown-linux-musl";
-        tower-cli-macos-arm = if system == "aarch64-darwin" then tower-cli else mkCrossTarget "aarch64-apple-darwin";
+        tower-linux-x86 = mkCrossTarget "x86_64-unknown-linux-musl";
+        tower-linux-arm64 = mkCrossTarget "aarch64-unknown-linux-musl";
+        tower-macos-arm = if system == "aarch64-darwin" then tower else mkCrossTarget "aarch64-apple-darwin";
 
       in {
         packages = {
-          default = tower-cli;
-          tower-cli = tower-cli;
-          tower-cli-linux-x86 = tower-cli-linux-x86;
-          tower-cli-linux-arm64 = tower-cli-linux-arm64;
-          tower-cli-macos-arm = tower-cli-macos-arm;
+          default = tower;
+          tower = tower;
+          tower-linux-x86 = tower-linux-x86;
+          tower-linux-arm64 = tower-linux-arm64;
+          tower-macos-arm = tower-macos-arm;
           
-          tower-cli-deb-x86 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-${version}-amd64.deb";
+          tower-deb-x86 = pkgs.stdenv.mkDerivation {
+            name = "tower-${version}-amd64.deb";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
             
             buildPhase = ''
               mkdir -p package/usr/bin
-              cp ${tower-cli-linux-x86}/bin/tower package/usr/bin/
+              cp ${tower-linux-x86}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
               cat > nfpm.yaml << 'EOF'
-              name: tower-cli
+              name: tower
               arch: amd64
               platform: linux
               version: ${version}
@@ -171,23 +171,23 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager deb --target $out/tower-cli_${version}_amd64.deb
+              nfpm package --config nfpm.yaml --packager deb --target $out/tower_${version}_amd64.deb
             '';
           };
 
           tower-cli-deb-arm64 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-${version}-arm64.deb";
+            name = "tower-${version}-arm64.deb";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
             
             buildPhase = ''
               mkdir -p package/usr/bin
-              cp ${tower-cli-linux-arm64}/bin/tower package/usr/bin/
+              cp ${tower-linux-arm64}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
               cat > nfpm.yaml << 'EOF'
-              name: tower-cli
+              name: tower
               arch: arm64
               platform: linux
               version: ${version}
@@ -210,23 +210,23 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager deb --target $out/tower-cli_${version}_arm64.deb
+              nfpm package --config nfpm.yaml --packager deb --target $out/tower_${version}_arm64.deb
             '';
           };
           
-          tower-cli-rpm-x86 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-${version}-x86_64.rpm";
+          tower-rpm-x86 = pkgs.stdenv.mkDerivation {
+            name = "tower-${version}-x86_64.rpm";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
             
             buildPhase = ''
               mkdir -p package/usr/bin
-              cp ${tower-cli-linux-x86}/bin/tower package/usr/bin/
+              cp ${tower-linux-x86}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
               cat > nfpm.yaml << 'EOF'
-              name: tower-cli
+              name: tower
               arch: x86_64
               platform: linux
               version: ${version}
@@ -248,23 +248,23 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-cli-${version}-1.x86_64.rpm
+              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-${version}-1.x86_64.rpm
             '';
           };
 
-          tower-cli-rpm-arm64 = pkgs.stdenv.mkDerivation {
-            name = "tower-cli-${version}-aarch64.rpm";
+          tower-rpm-arm64 = pkgs.stdenv.mkDerivation {
+            name = "tower-${version}-aarch64.rpm";
             nativeBuildInputs = with pkgs; [ nfpm ];
             
             unpackPhase = "true";
             
             buildPhase = ''
               mkdir -p package/usr/bin
-              cp ${tower-cli-linux-arm64}/bin/tower package/usr/bin/
+              cp ${tower-linux-arm64}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
               cat > nfpm.yaml << 'EOF'
-              name: tower-cli
+              name: tower
               arch: aarch64
               platform: linux
               version: ${version}
@@ -286,7 +286,7 @@
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-cli-${version}-1.aarch64.rpm
+              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-${version}-1.aarch64.rpm
             '';
           };
         };
@@ -315,7 +315,7 @@
         apps = {
           default = {
             type = "app";
-            program = "${tower-cli}/bin/tower";
+            program = "${tower}/bin/tower";
           };
         };
       }

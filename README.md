@@ -14,6 +14,63 @@ $ pip install -U tower
 
 You can also download the CLI directly from one of our [releases](https://github.com/tower/tower-cli/releases/latest).
 
+### Nix Flake
+
+If you have Nix installed with flakes enabled, you can install the latest version
+of tower CLI with the following:
+
+#### Profile
+
+```bash
+$ nix profile install github:tower/tower-cli#tower
+```
+
+#### NixOS/nix-darwin
+
+If you are using [NixOS]()/[nix-darwin](https://github.com/nix-darwin/nix-darwin)
+with flakes then you can add the following:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    tower-cli.url = "github:tower/tower-cli";
+  };
+
+  outputs = { self, nixpkgs, tower-cli, ... }@inputs: {
+    # with nix-darwin:
+    # darwinConfigurations.your-hostname = darwin.lib.darwinSystem {
+    nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [{
+        environment.systemPackages = [ tower-cli.packages.${system}.tower ];
+      }];
+    };
+  };
+}
+```
+
+#### Devenv
+
+If you're using [devenv](https://devenv.sh), you can add tower-cli to your project:
+
+```yaml
+# devenv.yaml
+inputs:
+  tower-cli:
+    url: github:tower/tower-cli
+```
+
+```nix
+# devenv.nix
+{ inputs, pkgs, ... }:
+{
+  packages = [
+    inputs.tower-cli.packages.${pkgs.stdenv.system}.tower
+  ];
+}
+```
+
 ## Using the Tower CLI
 
 There are two big components in the Tower CLI reposiory: The CLI itself and the
