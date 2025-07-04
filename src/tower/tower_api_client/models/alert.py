@@ -3,26 +3,25 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
     from ..models.run_failure_alert import RunFailureAlert
 
 
-T = TypeVar("T", bound="ListAlertsResponseAlert")
+T = TypeVar("T", bound="Alert")
 
 
 @_attrs_define
-class ListAlertsResponseAlert:
+class Alert:
     """
     Attributes:
-        acked (bool): Whether the alert has been acknowledged
-        alert_type (str): Type of the alert
-        created_at (datetime.datetime): When the alert was created
+        acked (bool):
+        alert_type (str):
+        created_at (datetime.datetime):
         detail (RunFailureAlert):
-        seq (int): Sequence number of the alert
-        status (str): Current status of the alert
+        seq (int):
+        status (str):
     """
 
     acked: bool
@@ -31,7 +30,6 @@ class ListAlertsResponseAlert:
     detail: "RunFailureAlert"
     seq: int
     status: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         acked = self.acked
@@ -47,7 +45,6 @@ class ListAlertsResponseAlert:
         status = self.status
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "acked": acked,
@@ -78,7 +75,7 @@ class ListAlertsResponseAlert:
 
         status = d.pop("status")
 
-        list_alerts_response_alert = cls(
+        alert = cls(
             acked=acked,
             alert_type=alert_type,
             created_at=created_at,
@@ -87,21 +84,4 @@ class ListAlertsResponseAlert:
             status=status,
         )
 
-        list_alerts_response_alert.additional_properties = d
-        return list_alerts_response_alert
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties
+        return alert

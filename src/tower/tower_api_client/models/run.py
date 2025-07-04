@@ -19,6 +19,7 @@ T = TypeVar("T", bound="Run")
 class Run:
     """
     Attributes:
+        app_name (str):
         app_slug (str):
         app_version (str):
         cancelled_at (Union[None, datetime.datetime]):
@@ -35,6 +36,7 @@ class Run:
         status_group (RunStatusGroup):
     """
 
+    app_name: str
     app_slug: str
     app_version: str
     cancelled_at: Union[None, datetime.datetime]
@@ -51,6 +53,8 @@ class Run:
     status_group: RunStatusGroup
 
     def to_dict(self) -> dict[str, Any]:
+        app_name = self.app_name
+
         app_slug = self.app_slug
 
         app_version = self.app_version
@@ -98,6 +102,7 @@ class Run:
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
+                "app_name": app_name,
                 "app_slug": app_slug,
                 "app_version": app_version,
                 "cancelled_at": cancelled_at,
@@ -122,6 +127,8 @@ class Run:
         from ..models.run_parameter import RunParameter
 
         d = dict(src_dict)
+        app_name = d.pop("app_name")
+
         app_slug = d.pop("app_slug")
 
         app_version = d.pop("app_version")
@@ -200,6 +207,7 @@ class Run:
         status_group = RunStatusGroup(d.pop("status_group"))
 
         run = cls(
+            app_name=app_name,
             app_slug=app_slug,
             app_version=app_version,
             cancelled_at=cancelled_at,

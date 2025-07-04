@@ -1,3 +1,4 @@
+import datetime
 from http import HTTPStatus
 from typing import Any, Optional, Union
 
@@ -13,10 +14,25 @@ def _get_kwargs(
     slug: str,
     *,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
     params["runs"] = runs
+
+    json_start_at: Union[Unset, str] = UNSET
+    if not isinstance(start_at, Unset):
+        json_start_at = start_at.isoformat()
+    params["start_at"] = json_start_at
+
+    json_end_at: Union[Unset, str] = UNSET
+    if not isinstance(end_at, Unset):
+        json_end_at = end_at.isoformat()
+    params["end_at"] = json_end_at
+
+    params["timezone"] = timezone
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -60,6 +76,9 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Response[DescribeAppResponse]:
     """Describe app
 
@@ -68,6 +87,12 @@ def sync_detailed(
     Args:
         slug (str): The slug of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -80,6 +105,9 @@ def sync_detailed(
     kwargs = _get_kwargs(
         slug=slug,
         runs=runs,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     )
 
     response = client.get_httpx_client().request(
@@ -94,6 +122,9 @@ def sync(
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Optional[DescribeAppResponse]:
     """Describe app
 
@@ -102,6 +133,12 @@ def sync(
     Args:
         slug (str): The slug of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -115,6 +152,9 @@ def sync(
         slug=slug,
         client=client,
         runs=runs,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     ).parsed
 
 
@@ -123,6 +163,9 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Response[DescribeAppResponse]:
     """Describe app
 
@@ -131,6 +174,12 @@ async def asyncio_detailed(
     Args:
         slug (str): The slug of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,6 +192,9 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         slug=slug,
         runs=runs,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -155,6 +207,9 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Optional[DescribeAppResponse]:
     """Describe app
 
@@ -163,6 +218,12 @@ async def asyncio(
     Args:
         slug (str): The slug of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -177,5 +238,8 @@ async def asyncio(
             slug=slug,
             client=client,
             runs=runs,
+            start_at=start_at,
+            end_at=end_at,
+            timezone=timezone,
         )
     ).parsed
