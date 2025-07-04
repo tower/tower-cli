@@ -1,0 +1,34 @@
+name: PR Base Branch Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-base-branch:
+    name: Check PR Base Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR targets main instead of develop
+        if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'develop'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const message = `⚠️ **WARNING: This PR targets \`main\` instead of \`develop\`**
+            
+            This PR is targeting \`main\` which will trigger a production deployment when merged.
+            
+            If this is a regular feature/fix PR, please change the base branch to \`develop\`.
+            If this is intentional (e.g., hotfix), you can ignore this warning.
+            
+            Current base: \`${context.payload.pull_request.base.ref}\`
+            Recommended base: \`develop\``;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: message
+            });
+            
+            core.warning('PR targets main branch - please verify this is intentional');
