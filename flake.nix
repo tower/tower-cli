@@ -21,7 +21,7 @@
           inherit system;
         };
 
-        version = "0.3.18";
+        version = builtins.readFile "${./.}/version.txt";
         maintainer = "Tower Computing Inc. <support@tower.dev>";
         homepage = "https://github.com/tower/tower-cli";
         description = "Tower CLI and runtime environment";
