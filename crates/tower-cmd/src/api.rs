@@ -20,6 +20,9 @@ pub async fn describe_app(config: &Config, slug: &str) -> Result<tower_api::mode
     let params = tower_api::apis::default_api::DescribeAppParams {
         slug: slug.to_string(),
         runs: None,
+        start_at: None,
+        end_at: None,
+        timezone: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_app(api_config, params)).await

@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
+from ..models.app_health_status import AppHealthStatus
 from ..models.app_status import AppStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run import Run
+    from ..models.run_results import RunResults
 
 
 T = TypeVar("T", bound="App")
@@ -20,6 +22,7 @@ class App:
     """
     Attributes:
         created_at (datetime.datetime): The date and time this app was created.
+        health_status (AppHealthStatus): The health status of this app
         name (str): The name of the app.
         next_run_at (Union[None, datetime.datetime]): The next time this app will run as part of it's schedule, null if
             none.
@@ -29,10 +32,12 @@ class App:
         slug (str): The unique slug of the app.
         version (Union[None, str]): The current version of this app, null if none.
         last_run (Union[Unset, Run]):
+        run_results (Union[Unset, RunResults]):
         status (Union[Unset, AppStatus]): The status of the app
     """
 
     created_at: datetime.datetime
+    health_status: AppHealthStatus
     name: str
     next_run_at: Union[None, datetime.datetime]
     owner: str
@@ -41,10 +46,13 @@ class App:
     slug: str
     version: Union[None, str]
     last_run: Union[Unset, "Run"] = UNSET
+    run_results: Union[Unset, "RunResults"] = UNSET
     status: Union[Unset, AppStatus] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
+
+        health_status = self.health_status.value
 
         name = self.name
 
@@ -70,6 +78,10 @@ class App:
         if not isinstance(self.last_run, Unset):
             last_run = self.last_run.to_dict()
 
+        run_results: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.run_results, Unset):
+            run_results = self.run_results.to_dict()
+
         status: Union[Unset, str] = UNSET
         if not isinstance(self.status, Unset):
             status = self.status.value
@@ -78,6 +90,7 @@ class App:
         field_dict.update(
             {
                 "created_at": created_at,
+                "health_status": health_status,
                 "name": name,
                 "next_run_at": next_run_at,
                 "owner": owner,
@@ -89,6 +102,8 @@ class App:
         )
         if last_run is not UNSET:
             field_dict["last_run"] = last_run
+        if run_results is not UNSET:
+            field_dict["run_results"] = run_results
         if status is not UNSET:
             field_dict["status"] = status
 
@@ -97,9 +112,12 @@ class App:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run import Run
+        from ..models.run_results import RunResults
 
         d = dict(src_dict)
         created_at = isoparse(d.pop("created_at"))
+
+        health_status = AppHealthStatus(d.pop("health_status"))
 
         name = d.pop("name")
 
@@ -145,6 +163,13 @@ class App:
         else:
             last_run = Run.from_dict(_last_run)
 
+        _run_results = d.pop("run_results", UNSET)
+        run_results: Union[Unset, RunResults]
+        if isinstance(_run_results, Unset):
+            run_results = UNSET
+        else:
+            run_results = RunResults.from_dict(_run_results)
+
         _status = d.pop("status", UNSET)
         status: Union[Unset, AppStatus]
         if isinstance(_status, Unset):
@@ -154,6 +179,7 @@ class App:
 
         app = cls(
             created_at=created_at,
+            health_status=health_status,
             name=name,
             next_run_at=next_run_at,
             owner=owner,
@@ -162,6 +188,7 @@ class App:
             slug=slug,
             version=version,
             last_run=last_run,
+            run_results=run_results,
             status=status,
         )
 

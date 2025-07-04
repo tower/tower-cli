@@ -35,11 +35,7 @@ indicatif = "0.17"
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
-reqwest = { version = "0.12", features = [
-    "json",
-    "native-tls-vendored",
-    "stream",
-] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 rpassword = "7"
 rsa = "0.9"
 serde = "1"

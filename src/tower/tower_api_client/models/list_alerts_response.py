@@ -6,7 +6,7 @@ from attrs import define as _attrs_define
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.list_alerts_response_alert import ListAlertsResponseAlert
+    from ..models.alert import Alert
     from ..models.pagination import Pagination
 
 
@@ -17,13 +17,13 @@ T = TypeVar("T", bound="ListAlertsResponse")
 class ListAlertsResponse:
     """
     Attributes:
-        alerts (list['ListAlertsResponseAlert']): List of alerts
+        alerts (list['Alert']): List of alerts
         pages (Pagination):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListAlertsResponse.json.
     """
 
-    alerts: list["ListAlertsResponseAlert"]
+    alerts: list["Alert"]
     pages: "Pagination"
     schema: Union[Unset, str] = UNSET
 
@@ -51,14 +51,14 @@ class ListAlertsResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.list_alerts_response_alert import ListAlertsResponseAlert
+        from ..models.alert import Alert
         from ..models.pagination import Pagination
 
         d = dict(src_dict)
         alerts = []
         _alerts = d.pop("alerts")
         for alerts_item_data in _alerts:
-            alerts_item = ListAlertsResponseAlert.from_dict(alerts_item_data)
+            alerts_item = Alert.from_dict(alerts_item_data)
 
             alerts.append(alerts_item)
 

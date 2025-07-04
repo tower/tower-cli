@@ -7,7 +7,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_statistics import RunStatistics
-    from ..models.series_point import SeriesPoint
+    from ..models.run_timeseries_point import RunTimeseriesPoint
     from ..models.statistics_settings import StatisticsSettings
 
 
@@ -18,14 +18,14 @@ T = TypeVar("T", bound="GenerateRunStatisticsResponse")
 class GenerateRunStatisticsResponse:
     """
     Attributes:
-        series (list['SeriesPoint']):
+        series (list['RunTimeseriesPoint']):
         settings (StatisticsSettings):
         stats (RunStatistics):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/GenerateRunStatisticsResponse.json.
     """
 
-    series: list["SeriesPoint"]
+    series: list["RunTimeseriesPoint"]
     settings: "StatisticsSettings"
     stats: "RunStatistics"
     schema: Union[Unset, str] = UNSET
@@ -58,14 +58,14 @@ class GenerateRunStatisticsResponse:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_statistics import RunStatistics
-        from ..models.series_point import SeriesPoint
+        from ..models.run_timeseries_point import RunTimeseriesPoint
         from ..models.statistics_settings import StatisticsSettings
 
         d = dict(src_dict)
         series = []
         _series = d.pop("series")
         for series_item_data in _series:
-            series_item = SeriesPoint.from_dict(series_item_data)
+            series_item = RunTimeseriesPoint.from_dict(series_item_data)
 
             series.append(series_item)
 

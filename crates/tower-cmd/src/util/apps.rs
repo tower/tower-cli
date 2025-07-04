@@ -18,6 +18,9 @@ pub async fn ensure_app_exists(
         DescribeAppParams {
             slug: app_slug.to_string(),
             runs: None,
+            start_at: None,
+            end_at: None,
+            timezone: None,
         },
     )
     .await;
