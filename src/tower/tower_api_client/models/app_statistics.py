@@ -12,15 +12,13 @@ class AppStatistics:
     Attributes:
         all_apps (int):
         disabled_apps (int):
-        exited_apps (int):
-        failed_apps (int):
+        healthy_apps (int):
         running_apps (int):
     """
 
     all_apps: int
     disabled_apps: int
-    exited_apps: int
-    failed_apps: int
+    healthy_apps: int
     running_apps: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -28,9 +26,7 @@ class AppStatistics:
 
         disabled_apps = self.disabled_apps
 
-        exited_apps = self.exited_apps
-
-        failed_apps = self.failed_apps
+        healthy_apps = self.healthy_apps
 
         running_apps = self.running_apps
 
@@ -39,8 +35,7 @@ class AppStatistics:
             {
                 "all_apps": all_apps,
                 "disabled_apps": disabled_apps,
-                "exited_apps": exited_apps,
-                "failed_apps": failed_apps,
+                "healthy_apps": healthy_apps,
                 "running_apps": running_apps,
             }
         )
@@ -54,17 +49,14 @@ class AppStatistics:
 
         disabled_apps = d.pop("disabled_apps")
 
-        exited_apps = d.pop("exited_apps")
-
-        failed_apps = d.pop("failed_apps")
+        healthy_apps = d.pop("healthy_apps")
 
         running_apps = d.pop("running_apps")
 
         app_statistics = cls(
             all_apps=all_apps,
             disabled_apps=disabled_apps,
-            exited_apps=exited_apps,
-            failed_apps=failed_apps,
+            healthy_apps=healthy_apps,
             running_apps=running_apps,
         )
 

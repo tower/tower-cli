@@ -5,8 +5,9 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.list_apps_filter import ListAppsFilter
 from ...models.list_apps_response import ListAppsResponse
-from ...models.list_apps_status_item import ListAppsStatusItem
+from ...models.list_apps_sort import ListAppsSort
 from ...types import UNSET, Response, Unset
 
 
@@ -15,9 +16,9 @@ def _get_kwargs(
     query: Union[Unset, str] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
-    period: Union[Unset, str] = UNSET,
     num_runs: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListAppsStatusItem]] = UNSET,
+    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
+    filter_: Union[Unset, ListAppsFilter] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -27,18 +28,19 @@ def _get_kwargs(
 
     params["page_size"] = page_size
 
-    params["period"] = period
-
     params["num_runs"] = num_runs
 
-    json_status: Union[Unset, list[str]] = UNSET
-    if not isinstance(status, Unset):
-        json_status = []
-        for status_item_data in status:
-            status_item = status_item_data.value
-            json_status.append(status_item)
+    json_sort: Union[Unset, str] = UNSET
+    if not isinstance(sort, Unset):
+        json_sort = sort.value
 
-    params["status"] = json_status
+    params["sort"] = json_sort
+
+    json_filter_: Union[Unset, str] = UNSET
+    if not isinstance(filter_, Unset):
+        json_filter_ = filter_.value
+
+    params["filter"] = json_filter_
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -81,9 +83,9 @@ def sync_detailed(
     query: Union[Unset, str] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
-    period: Union[Unset, str] = UNSET,
     num_runs: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListAppsStatusItem]] = UNSET,
+    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
+    filter_: Union[Unset, ListAppsFilter] = UNSET,
 ) -> Response[ListAppsResponse]:
     """List apps
 
@@ -93,11 +95,11 @@ def sync_detailed(
         query (Union[Unset, str]): The search query to filter apps by.
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
-        status (Union[Unset, list[ListAppsStatusItem]]): Filter apps by status(es) (comma
-            separated for multiple). Valid values: active, failed, disabled etc.
+        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
+            ListAppsSort.CREATED_AT.
+        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -111,9 +113,9 @@ def sync_detailed(
         query=query,
         page=page,
         page_size=page_size,
-        period=period,
         num_runs=num_runs,
-        status=status,
+        sort=sort,
+        filter_=filter_,
     )
 
     response = client.get_httpx_client().request(
@@ -129,9 +131,9 @@ def sync(
     query: Union[Unset, str] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
-    period: Union[Unset, str] = UNSET,
     num_runs: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListAppsStatusItem]] = UNSET,
+    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
+    filter_: Union[Unset, ListAppsFilter] = UNSET,
 ) -> Optional[ListAppsResponse]:
     """List apps
 
@@ -141,11 +143,11 @@ def sync(
         query (Union[Unset, str]): The search query to filter apps by.
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
-        status (Union[Unset, list[ListAppsStatusItem]]): Filter apps by status(es) (comma
-            separated for multiple). Valid values: active, failed, disabled etc.
+        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
+            ListAppsSort.CREATED_AT.
+        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -160,9 +162,9 @@ def sync(
         query=query,
         page=page,
         page_size=page_size,
-        period=period,
         num_runs=num_runs,
-        status=status,
+        sort=sort,
+        filter_=filter_,
     ).parsed
 
 
@@ -172,9 +174,9 @@ async def asyncio_detailed(
     query: Union[Unset, str] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
-    period: Union[Unset, str] = UNSET,
     num_runs: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListAppsStatusItem]] = UNSET,
+    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
+    filter_: Union[Unset, ListAppsFilter] = UNSET,
 ) -> Response[ListAppsResponse]:
     """List apps
 
@@ -184,11 +186,11 @@ async def asyncio_detailed(
         query (Union[Unset, str]): The search query to filter apps by.
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
-        status (Union[Unset, list[ListAppsStatusItem]]): Filter apps by status(es) (comma
-            separated for multiple). Valid values: active, failed, disabled etc.
+        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
+            ListAppsSort.CREATED_AT.
+        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -202,9 +204,9 @@ async def asyncio_detailed(
         query=query,
         page=page,
         page_size=page_size,
-        period=period,
         num_runs=num_runs,
-        status=status,
+        sort=sort,
+        filter_=filter_,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -218,9 +220,9 @@ async def asyncio(
     query: Union[Unset, str] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
-    period: Union[Unset, str] = UNSET,
     num_runs: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListAppsStatusItem]] = UNSET,
+    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
+    filter_: Union[Unset, ListAppsFilter] = UNSET,
 ) -> Optional[ListAppsResponse]:
     """List apps
 
@@ -230,11 +232,11 @@ async def asyncio(
         query (Union[Unset, str]): The search query to filter apps by.
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d, or none)
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
-        status (Union[Unset, list[ListAppsStatusItem]]): Filter apps by status(es) (comma
-            separated for multiple). Valid values: active, failed, disabled etc.
+        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
+            ListAppsSort.CREATED_AT.
+        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -250,8 +252,8 @@ async def asyncio(
             query=query,
             page=page,
             page_size=page_size,
-            period=period,
             num_runs=num_runs,
-            status=status,
+            sort=sort,
+            filter_=filter_,
         )
     ).parsed

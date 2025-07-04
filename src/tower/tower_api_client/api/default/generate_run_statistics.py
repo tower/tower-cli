@@ -1,3 +1,4 @@
+import datetime
 from http import HTTPStatus
 from typing import Any, Optional, Union
 
@@ -6,16 +7,37 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.generate_run_statistics_response import GenerateRunStatisticsResponse
+from ...models.generate_run_statistics_status_item import (
+    GenerateRunStatisticsStatusItem,
+)
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    period: Union[Unset, str] = "24h",
+    status: Union[Unset, list[GenerateRunStatisticsStatusItem]] = UNSET,
+    start_at: datetime.datetime,
+    end_at: datetime.datetime,
+    timezone: Union[Unset, str] = "UTC",
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
-    params["period"] = period
+    json_status: Union[Unset, list[str]] = UNSET
+    if not isinstance(status, Unset):
+        json_status = []
+        for status_item_data in status:
+            status_item = status_item_data.value
+            json_status.append(status_item)
+
+    params["status"] = json_status
+
+    json_start_at = start_at.isoformat()
+    params["start_at"] = json_start_at
+
+    json_end_at = end_at.isoformat()
+    params["end_at"] = json_end_at
+
+    params["timezone"] = timezone
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -55,14 +77,22 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    period: Union[Unset, str] = "24h",
+    status: Union[Unset, list[GenerateRunStatisticsStatusItem]] = UNSET,
+    start_at: datetime.datetime,
+    end_at: datetime.datetime,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Response[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
      Generates statistics about runs over a specified time period.
 
     Args:
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d) Default: '24h'.
+        status (Union[Unset, list[GenerateRunStatisticsStatusItem]]): Filter runs by status(es).
+            Define multiple with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime): Start date and time for statistics (inclusive)
+        end_at (datetime.datetime): End date and time for statistics (inclusive)
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -73,7 +103,10 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        period=period,
+        status=status,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     )
 
     response = client.get_httpx_client().request(
@@ -86,14 +119,22 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    period: Union[Unset, str] = "24h",
+    status: Union[Unset, list[GenerateRunStatisticsStatusItem]] = UNSET,
+    start_at: datetime.datetime,
+    end_at: datetime.datetime,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Optional[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
      Generates statistics about runs over a specified time period.
 
     Args:
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d) Default: '24h'.
+        status (Union[Unset, list[GenerateRunStatisticsStatusItem]]): Filter runs by status(es).
+            Define multiple with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime): Start date and time for statistics (inclusive)
+        end_at (datetime.datetime): End date and time for statistics (inclusive)
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -105,21 +146,32 @@ def sync(
 
     return sync_detailed(
         client=client,
-        period=period,
+        status=status,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    period: Union[Unset, str] = "24h",
+    status: Union[Unset, list[GenerateRunStatisticsStatusItem]] = UNSET,
+    start_at: datetime.datetime,
+    end_at: datetime.datetime,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Response[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
      Generates statistics about runs over a specified time period.
 
     Args:
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d) Default: '24h'.
+        status (Union[Unset, list[GenerateRunStatisticsStatusItem]]): Filter runs by status(es).
+            Define multiple with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime): Start date and time for statistics (inclusive)
+        end_at (datetime.datetime): End date and time for statistics (inclusive)
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -130,7 +182,10 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        period=period,
+        status=status,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -141,14 +196,22 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    period: Union[Unset, str] = "24h",
+    status: Union[Unset, list[GenerateRunStatisticsStatusItem]] = UNSET,
+    start_at: datetime.datetime,
+    end_at: datetime.datetime,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Optional[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
      Generates statistics about runs over a specified time period.
 
     Args:
-        period (Union[Unset, str]): Time period for statistics (24h, 7d, 30d) Default: '24h'.
+        status (Union[Unset, list[GenerateRunStatisticsStatusItem]]): Filter runs by status(es).
+            Define multiple with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime): Start date and time for statistics (inclusive)
+        end_at (datetime.datetime): End date and time for statistics (inclusive)
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,6 +224,9 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
-            period=period,
+            status=status,
+            start_at=start_at,
+            end_at=end_at,
+            timezone=timezone,
         )
     ).parsed

@@ -9,7 +9,6 @@ class SearchRunsStatusItem(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
     SCHEDULED = "scheduled"
-    VALUE_7 = ""
 
     def __str__(self) -> str:
         return str(self.value)
