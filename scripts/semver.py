@@ -6,7 +6,7 @@ import argparse
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SEMVER_EXP = re.compile("\d+\.\d+(\.\d+)?(-rc\.(\d+))?")
+SEMVER_EXP = re.compile(r"\d+\.\d+(\.\d+)?(-rc\.(\d+))?")
 
 class Version:
     def __init__(self, version_str):

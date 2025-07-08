@@ -21,15 +21,40 @@
           inherit system;
         };
 
-        version = builtins.readFile "${./.}/version.txt";
         maintainer = "Tower Computing Inc. <support@tower.dev>";
         homepage = "https://github.com/tower/tower-cli";
         description = "Tower CLI and runtime environment";
-        longDescription = ''
+        longDescription = " |
           Tower CLI and runtime environment
           Tower is the best way to host Python data apps in production.
           This package provides the Tower CLI tool for managing and deploying
           applications to the Tower platform.
+        ";
+
+        getVersionScript = ''
+          VERSION=${builtins.getEnv "VERSION"}
+          if [ -z "$VERSION" ]; then
+            VERSION="SNAPSHOT"
+          fi
+        '';
+
+        mkNfpmConfig = { arch, packager }: ''
+          name: tower
+          arch: ${arch}
+          platform: linux
+          version: $VERSION
+          ${if packager == "rpm" then "release: 1" else "section: utils\npriority: optional"}
+          maintainer: ${maintainer}
+          description: ${longDescription}
+          vendor: Tower Computing Inc.
+          homepage: "${homepage}"
+          license: MIT
+          
+          contents:
+            - src: package/usr/bin/tower
+              dst: /usr/bin/tower
+              file_info:
+                mode: 0755
         '';
 
         commonNativeBuildInputs = with pkgs; [ pkg-config ];
@@ -137,156 +162,99 @@
           tower-macos-arm = tower-macos-arm;
           
           tower-deb-x86 = pkgs.stdenv.mkDerivation {
-            name = "tower-${version}-amd64.deb";
-            nativeBuildInputs = with pkgs; [ nfpm ];
+            name = "tower-deb-amd64";
+            nativeBuildInputs = with pkgs; [ nfpm python git ];
             
             unpackPhase = "true";
             
             buildPhase = ''
+              ${getVersionScript}
+              
               mkdir -p package/usr/bin
               cp ${tower-linux-x86}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
-              cat > nfpm.yaml << 'EOF'
-              name: tower
-              arch: amd64
-              platform: linux
-              version: ${version}
-              section: utils
-              priority: optional
-              maintainer: ${maintainer}
-              description: |
-                ${longDescription}
-              vendor: Tower Computing Inc.
-              homepage: ${homepage}
-              license: MIT
-              
-              contents:
-                - src: package/usr/bin/tower
-                  dst: /usr/bin/tower
-                  file_info:
-                    mode: 0755
+              cat > nfpm.yaml << EOF
+              ${mkNfpmConfig { arch = "amd64"; packager = "deb"; }}
               EOF
             '';
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager deb --target $out/tower_${version}_amd64.deb
+              nfpm package --config nfpm.yaml --packager deb --target $out/tower_''${VERSION}_amd64.deb
             '';
           };
 
-          tower-cli-deb-arm64 = pkgs.stdenv.mkDerivation {
-            name = "tower-${version}-arm64.deb";
-            nativeBuildInputs = with pkgs; [ nfpm ];
+          tower-deb-arm64 = pkgs.stdenv.mkDerivation {
+            name = "tower-deb-arm64";
+            nativeBuildInputs = with pkgs; [ nfpm python git ];
             
             unpackPhase = "true";
             
             buildPhase = ''
+              ${getVersionScript}
+              
               mkdir -p package/usr/bin
               cp ${tower-linux-arm64}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
-              cat > nfpm.yaml << 'EOF'
-              name: tower
-              arch: arm64
-              platform: linux
-              version: ${version}
-              section: utils
-              priority: optional
-              maintainer: ${maintainer}
-              description: |
-                ${longDescription}
-              vendor: Tower Computing Inc.
-              homepage: ${homepage}
-              license: MIT
-              
-              contents:
-                - src: package/usr/bin/tower
-                  dst: /usr/bin/tower
-                  file_info:
-                    mode: 0755
+              cat > nfpm.yaml << EOF
+              ${mkNfpmConfig { arch = "arm64"; packager = "deb"; }}
               EOF
             '';
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager deb --target $out/tower_${version}_arm64.deb
+              cat nfpm.yaml
+              nfpm package --config nfpm.yaml --packager deb --target $out/tower_''${VERSION}_arm64.deb
             '';
           };
           
           tower-rpm-x86 = pkgs.stdenv.mkDerivation {
-            name = "tower-${version}-x86_64.rpm";
-            nativeBuildInputs = with pkgs; [ nfpm ];
+            name = "tower-rpm-x86_64";
+            nativeBuildInputs = with pkgs; [ nfpm python git ];
             
             unpackPhase = "true";
             
             buildPhase = ''
+              ${getVersionScript}
+              
               mkdir -p package/usr/bin
               cp ${tower-linux-x86}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
-              cat > nfpm.yaml << 'EOF'
-              name: tower
-              arch: x86_64
-              platform: linux
-              version: ${version}
-              release: 1
-              maintainer: ${maintainer}
-              description: |
-                ${longDescription}
-              vendor: Tower Computing Inc.
-              homepage: ${homepage}
-              license: MIT
-              
-              contents:
-                - src: package/usr/bin/tower
-                  dst: /usr/bin/tower
-                  file_info:
-                    mode: 0755
+              cat > nfpm.yaml << EOF
+              ${mkNfpmConfig { arch = "x86_64"; packager = "rpm"; }}
               EOF
             '';
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-${version}-1.x86_64.rpm
+              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-''${VERSION}-1.x86_64.rpm
             '';
           };
 
           tower-rpm-arm64 = pkgs.stdenv.mkDerivation {
-            name = "tower-${version}-aarch64.rpm";
-            nativeBuildInputs = with pkgs; [ nfpm ];
+            name = "tower-rpm-aarch64";
+            nativeBuildInputs = with pkgs; [ nfpm python git ];
             
             unpackPhase = "true";
             
             buildPhase = ''
+              ${getVersionScript}
+              
               mkdir -p package/usr/bin
               cp ${tower-linux-arm64}/bin/tower package/usr/bin/
               chmod 755 package/usr/bin/tower
               
-              cat > nfpm.yaml << 'EOF'
-              name: tower
-              arch: aarch64
-              platform: linux
-              version: ${version}
-              release: 1
-              maintainer: ${maintainer}
-              description: |
-                ${longDescription}
-              vendor: Tower Computing Inc.
-              homepage: ${homepage}
-              license: MIT
-              
-              contents:
-                - src: package/usr/bin/tower
-                  dst: /usr/bin/tower
-                  file_info:
-                    mode: 0755
+              cat > nfpm.yaml << EOF
+              ${mkNfpmConfig { arch = "aarch64"; packager = "rpm"; }}
               EOF
             '';
             
             installPhase = ''
               mkdir -p $out
-              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-${version}-1.aarch64.rpm
+              nfpm package --config nfpm.yaml --packager rpm --target $out/tower-''${VERSION}-1.aarch64.rpm
             '';
           };
         };
