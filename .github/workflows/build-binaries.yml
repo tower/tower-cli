@@ -15,12 +15,12 @@ on:
       plan:
         required: true
         type: string
-  pull_request:
-    paths:
-      # When we change pyproject.toml, we want to ensure that the maturin builds still work.
-      - pyproject.toml
-      # And when we change this workflow itself...
-      - .github/workflows/build-binaries.yml
+  push:
+    # paths:
+    #   # When we change pyproject.toml, we want to ensure that the maturin builds still work.
+    #   - pyproject.toml
+    #   # And when we change this workflow itself...
+    #   - .github/workflows/build-binaries.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -248,6 +248,10 @@ jobs:
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
+        env:
+          # ⚙️ This is the fix. It sets the CFLAGS for the aarch64 target,
+          # defining the ARM architecture for the ring crate's build script.
+          CFLAGS_aarch64_unknown_linux_gnu: "-march=armv8-a -D__ARM_ARCH=8"
       - uses: uraimo/run-on-arch-action@v2
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
