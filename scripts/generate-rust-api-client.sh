@@ -16,6 +16,7 @@
 
 # TOWER_URL is the URL of the API that we want to generate the client from.
 TOWER_URL="https://api.tower.dev"
+SPEC_FILE="specs/openapi.json"
 
 # BASEDIR is the directory to change into before running the generator.
 BASEDIR=$(dirname "$0")
@@ -31,6 +32,10 @@ OPENAPI_GENERATOR_VERSION="7.13.0"
 
 # We need to get the OpenAPI spec file into scope in the first place.
 curl -sL ${TOWER_URL}/v1/openapi.json -o ${BASEDIR}/openapi.json
+
+# Save a copy of the spec for contract testing
+mkdir -p ${BASEDIR}/../specs
+cp ${BASEDIR}/openapi.json ${BASEDIR}/../${SPEC_FILE}
 
 ###
 #

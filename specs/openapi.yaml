@@ -1,0 +1,4691 @@
+components:
+  schemas:
+    APIKey:
+      additionalProperties: false
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        identifier:
+          type: string
+        last_used_at:
+          format: date-time
+          nullable: true
+          type: string
+        name:
+          type: string
+      required:
+        - name
+        - identifier
+        - last_used_at
+        - created_at
+      type: object
+    AcceptInvitationParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/AcceptInvitationParams.json
+          format: uri
+          readOnly: true
+          type: string
+        code:
+          description: The invitation code to accept
+          type: string
+      required:
+        - code
+      type: object
+    AcceptInvitationResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/AcceptInvitationResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+      type: object
+    Account:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+        - name
+        - slug
+      type: object
+    AcknowledgeAlertResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/AcknowledgeAlertResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        status:
+          type: string
+      required:
+        - status
+      type: object
+    AcknowledgeAllAlertsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/AcknowledgeAllAlertsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        count:
+          description: Number of alerts that were acknowledged
+          format: int64
+          type: integer
+        status:
+          type: string
+      required:
+        - status
+        - count
+      type: object
+    Alert:
+      additionalProperties: false
+      properties:
+        acked:
+          type: boolean
+        alert_type:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        detail:
+          oneOf:
+            - $ref: "#/components/schemas/RunFailureAlert"
+          type: object
+        seq:
+          format: int64
+          type: integer
+        status:
+          type: string
+      required:
+        - alert_type
+        - seq
+        - detail
+        - created_at
+        - status
+        - acked
+      type: object
+    App:
+      additionalProperties: false
+      properties:
+        created_at:
+          description: The date and time this app was created.
+          format: date-time
+          type: string
+        health_status:
+          description: The health status of this app
+          enum:
+            - healthy
+            - warning
+          type: string
+        last_run:
+          $ref: "#/components/schemas/Run"
+          description: The last run of this app, null if none.
+        name:
+          description: The name of the app.
+          type: string
+        next_run_at:
+          description: The next time this app will run as part of it's schedule, null if none.
+          format: date-time
+          nullable: true
+          type: string
+        owner:
+          description: The account slug that owns this app
+          type: string
+        run_results:
+          $ref: "#/components/schemas/RunResults"
+          description: The stats of all the runs of this app
+        schedule:
+          description: The schedule associated with this app, null if none.
+          nullable: true
+          type: string
+        short_description:
+          description: A short description of the app. Can be empty.
+          type: string
+        slug:
+          description: The unique slug of the app.
+          type: string
+        status:
+          description: The status of the app
+          enum:
+            - active
+            - disabled
+          type: string
+        version:
+          description: The current version of this app, null if none.
+          nullable: true
+          type: string
+      required:
+        - name
+        - slug
+        - owner
+        - short_description
+        - version
+        - schedule
+        - created_at
+        - next_run_at
+        - health_status
+      type: object
+    AppStatistics:
+      additionalProperties: false
+      properties:
+        all_apps:
+          format: int64
+          type: integer
+        disabled_apps:
+          format: int64
+          type: integer
+        healthy_apps:
+          format: int64
+          type: integer
+        running_apps:
+          format: int64
+          type: integer
+      required:
+        - all_apps
+        - healthy_apps
+        - running_apps
+        - disabled_apps
+      type: object
+    AppSummary:
+      additionalProperties: false
+      properties:
+        app:
+          $ref: "#/components/schemas/App"
+        runs:
+          items:
+            $ref: "#/components/schemas/Run"
+          type: array
+      required:
+        - app
+        - runs
+      type: object
+    AppVersion:
+      additionalProperties: false
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        parameters:
+          items:
+            $ref: "#/components/schemas/Parameter"
+          type: array
+        towerfile:
+          description: The Towerfile that this version was created from.
+          type: string
+        version:
+          type: string
+      required:
+        - version
+        - parameters
+        - created_at
+        - towerfile
+      type: object
+    CancelRunResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CancelRunResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        run:
+          $ref: "#/components/schemas/Run"
+      required:
+        - run
+      type: object
+    Catalog:
+      additionalProperties: false
+      properties:
+        CreatedAt:
+          format: date-time
+          type: string
+        environment:
+          type: string
+        name:
+          type: string
+        properties:
+          items:
+            $ref: "#/components/schemas/CatalogProperty"
+          type: array
+        slug:
+          type: string
+        type:
+          type: string
+      required:
+        - type
+        - name
+        - slug
+        - environment
+        - properties
+        - CreatedAt
+      type: object
+    CatalogProperty:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        preview:
+          type: string
+      required:
+        - name
+        - preview
+      type: object
+    ClaimDeviceLoginTicketParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ClaimDeviceLoginTicketParams.json
+          format: uri
+          readOnly: true
+          type: string
+        user_code:
+          description: The user code to claim.
+          type: string
+      required:
+        - user_code
+      type: object
+    ClaimDeviceLoginTicketResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ClaimDeviceLoginTicketResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        claimed:
+          description: Whether the code was successfully claimed.
+          type: boolean
+      required:
+        - claimed
+      type: object
+    CreateAPIKeyParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAPIKeyParams.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          type: string
+      required:
+        - name
+      type: object
+    CreateAPIKeyResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAPIKeyResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        api_key:
+          $ref: "#/components/schemas/APIKey"
+          description: Created API key
+      required:
+        - api_key
+      type: object
+    CreateAccountParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAccountParams.json
+          format: uri
+          readOnly: true
+          type: string
+        company:
+          type: string
+        country:
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+        invite:
+          type: string
+        last_name:
+          type: string
+        password:
+          type: string
+      required:
+        - first_name
+        - last_name
+        - company
+        - country
+        - email
+        - password
+        - invite
+      type: object
+    CreateAccountParamsFlagsStruct:
+      additionalProperties: false
+      properties:
+        is_test_account:
+          type: boolean
+      required:
+        - is_test_account
+      type: object
+    CreateAccountResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAccountResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
+      required:
+        - session
+      type: object
+    CreateAppParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAppParams.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: The name of the app.
+          maxLength: 64
+          minLength: 3
+          type: string
+        short_description:
+          description: A description of the app.
+          type: string
+        slug:
+          description: A slug for the app.
+          maxLength: 64
+          type: string
+      required:
+        - name
+      type: object
+    CreateAppResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAppResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        app:
+          $ref: "#/components/schemas/App"
+      required:
+        - app
+      type: object
+    CreateAuthenticatorParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAuthenticatorParams.json
+          format: uri
+          readOnly: true
+          type: string
+        authenticator_url:
+          description: The authenticator URL with an otpauth scheme that identifies this authenticator
+          type: string
+        verification_code:
+          description: A code taken from the authenticator as verification that it's correctly configured.
+          type: string
+      required:
+        - authenticator_url
+        - verification_code
+      type: object
+    CreateAuthenticatorResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateAuthenticatorResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        authenticator:
+          $ref: "#/components/schemas/VerifiedAuthenticator"
+      required:
+        - authenticator
+      type: object
+    CreateCatalogParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateCatalogParams.json
+          format: uri
+          readOnly: true
+          type: string
+        environment:
+          type: string
+        name:
+          type: string
+        properties:
+          items:
+            $ref: "#/components/schemas/EncryptedCatalogProperty"
+          type: array
+        slug:
+          type: string
+        type:
+          enum:
+            - snowflake-open-catalog
+            - apache-polaris
+            - cloudflare-r2-catalog
+            - lakekeeper
+          type: string
+      required:
+        - name
+        - type
+        - slug
+        - environment
+        - properties
+      type: object
+    CreateCatalogResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateCatalogResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        catalog:
+          $ref: "#/components/schemas/Catalog"
+      required:
+        - catalog
+      type: object
+    CreateDeviceLoginTicketResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateDeviceLoginTicketResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        device_code:
+          description: The unique code identifying this device login request.
+          type: string
+        expires_in:
+          description: Number of seconds until this request expires.
+          format: int64
+          type: integer
+        generated_at:
+          description: When this device login request was created.
+          format: date-time
+          type: string
+        interval:
+          description: Number of seconds to wait between polling attempts.
+          format: int64
+          type: integer
+        login_url:
+          description: The URL where the user should go to enter the user code.
+          type: string
+        user_code:
+          description: The code that the user needs to enter to authenticate.
+          type: string
+        verification_url:
+          description: The URL that the device should poll to check authentication status.
+          type: string
+      required:
+        - device_code
+        - user_code
+        - login_url
+        - verification_url
+        - generated_at
+        - expires_in
+        - interval
+      type: object
+    CreatePasswordResetParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreatePasswordResetParams.json
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          description: The email address to send the password reset email to
+          type: string
+      required:
+        - email
+      type: object
+    CreatePasswordResetResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreatePasswordResetResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        ok:
+          description: A boolean indicating the request was successfully processed.
+          type: boolean
+      required:
+        - ok
+      type: object
+    CreateSecretParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateSecretParams.json
+          format: uri
+          readOnly: true
+          type: string
+        encrypted_value:
+          type: string
+        environment:
+          type: string
+        name:
+          type: string
+        preview:
+          type: string
+      required:
+        - name
+        - environment
+        - encrypted_value
+        - preview
+      type: object
+    CreateSecretResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateSecretResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        secret:
+          $ref: "#/components/schemas/Secret"
+      required:
+        - secret
+      type: object
+    CreateSessionParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateSessionParams.json
+          format: uri
+          readOnly: true
+          type: string
+        code:
+          description: One-time password verification code for two-factor authentication. If the user has two-factor authentication enabled, this code is required to log in.
+          type: string
+        password:
+          type: string
+        username:
+          type: string
+      required:
+        - username
+        - password
+      type: object
+    CreateSessionResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateSessionResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
+          description: The new session information.
+      required:
+        - session
+      type: object
+    CreateTeamParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateTeamParams.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: The name of the team to create
+          type: string
+        slug:
+          description: The slug of the team to create
+          type: string
+      required:
+        - name
+        - slug
+      type: object
+    CreateTeamResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/CreateTeamResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team:
+          $ref: "#/components/schemas/Team"
+          description: The team that was just created
+      required:
+        - team
+      type: object
+    DeleteAPIKeyParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteAPIKeyParams.json
+          format: uri
+          readOnly: true
+          type: string
+        identifier:
+          type: string
+      required:
+        - identifier
+      type: object
+    DeleteAPIKeyResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteAPIKeyResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        api_key:
+          $ref: "#/components/schemas/APIKey"
+          description: Created API key
+      required:
+        - api_key
+      type: object
+    DeleteAppResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteAppResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        app:
+          $ref: "#/components/schemas/App"
+      required:
+        - app
+      type: object
+    DeleteAuthenticatorParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteAuthenticatorParams.json
+          format: uri
+          readOnly: true
+          type: string
+        authenticator_id:
+          description: The ID of the authenticator to delete
+          type: string
+      required:
+        - authenticator_id
+      type: object
+    DeleteAuthenticatorResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteAuthenticatorResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        authenticator:
+          $ref: "#/components/schemas/VerifiedAuthenticator"
+      required:
+        - authenticator
+      type: object
+    DeleteCatalogResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteCatalogResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        catalog:
+          $ref: "#/components/schemas/Catalog"
+      required:
+        - catalog
+      type: object
+    DeleteSecretResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteSecretResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        secret:
+          $ref: "#/components/schemas/Secret"
+      required:
+        - secret
+      type: object
+    DeleteTeamInvitationParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteTeamInvitationParams.json
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          description: The email address of the team member to remove
+          type: string
+      required:
+        - email
+      type: object
+    DeleteTeamInvitationResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteTeamInvitationResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        invitation:
+          $ref: "#/components/schemas/TeamInvitation"
+          description: The team invitation that was just removed
+      required:
+        - invitation
+      type: object
+    DeleteTeamParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteTeamParams.json
+          format: uri
+          readOnly: true
+          type: string
+        slug:
+          description: The slug of the team to delete
+          type: string
+      required:
+        - slug
+      type: object
+    DeleteTeamResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeleteTeamResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team:
+          $ref: "#/components/schemas/Team"
+          description: The team that was just created
+      required:
+        - team
+      type: object
+    DeployAppResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DeployAppResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        version:
+          $ref: "#/components/schemas/AppVersion"
+      required:
+        - version
+      type: object
+    DescribeAppResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeAppResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        app:
+          $ref: "#/components/schemas/App"
+        runs:
+          items:
+            $ref: "#/components/schemas/Run"
+          type: array
+      required:
+        - app
+        - runs
+      type: object
+    DescribeAppVersionResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeAppVersionResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        version:
+          $ref: "#/components/schemas/AppVersion"
+      required:
+        - version
+      type: object
+    DescribeDeviceLoginSessionResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeDeviceLoginSessionResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
+          description: The current session associated with your authentication method.
+      required:
+        - session
+      type: object
+    DescribeRunLogsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeRunLogsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        log_lines:
+          items:
+            $ref: "#/components/schemas/RunLogLine"
+          type: array
+      required:
+        - log_lines
+      type: object
+    DescribeRunResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeRunResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        run:
+          $ref: "#/components/schemas/Run"
+      required:
+        - run
+      type: object
+    DescribeSecretsKeyResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeSecretsKeyResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        public_key:
+          type: string
+      required:
+        - public_key
+      type: object
+    DescribeSessionResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/DescribeSessionResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
+          description: The current session associated with your authentication method.
+      required:
+        - session
+      type: object
+    EncryptedCatalogProperty:
+      additionalProperties: false
+      properties:
+        encrypted_value:
+          type: string
+        name:
+          type: string
+        preview:
+          type: string
+      required:
+        - name
+        - encrypted_value
+        - preview
+      type: object
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value:
+          description: The value at the given location
+      type: object
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ErrorModel.json
+          format: uri
+          readOnly: true
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of the problem.
+          example: Property foo is required but is missing.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+          type: array
+        instance:
+          description: A URI reference that identifies the specific occurrence of the problem.
+          example: https://example.com/error-log/abc123
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          example: 400
+          format: int64
+          type: integer
+        title:
+          description: A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+          example: Bad Request
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          example: https://example.com/errors/example
+          format: uri
+          type: string
+      type: object
+    ExportCatalogsParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ExportCatalogsParams.json
+          format: uri
+          readOnly: true
+          type: string
+        all:
+          default: false
+          description: Whether to fetch all catalogs or only the ones in the supplied environment.
+          type: boolean
+        environment:
+          default: default
+          description: The environment to filter by.
+          type: string
+        page:
+          default: 1
+          description: The page number to fetch.
+          format: int64
+          type: integer
+        page_size:
+          default: 20
+          description: The number of records to fetch on each page.
+          format: int64
+          type: integer
+        public_key:
+          description: The PEM-encoded public key you want to use to encrypt sensitive catalog properties.
+          type: string
+      required:
+        - public_key
+        - environment
+        - all
+        - page
+        - page_size
+      type: object
+    ExportCatalogsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ExportCatalogsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        catalogs:
+          items:
+            $ref: "#/components/schemas/ExportedCatalog"
+          type: array
+        pages:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - pages
+        - catalogs
+      type: object
+    ExportSecretsParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ExportSecretsParams.json
+          format: uri
+          readOnly: true
+          type: string
+        all:
+          default: false
+          description: Whether to fetch all secrets or only the ones that are not marked as deleted.
+          type: boolean
+        environment:
+          default: default
+          description: The environment to filter by.
+          type: string
+        page:
+          default: 1
+          description: The page number to fetch.
+          format: int64
+          type: integer
+        page_size:
+          default: 20
+          description: The number of records to fetch on each page.
+          format: int64
+          type: integer
+        public_key:
+          description: The PEM-encoded public key you want to use to encrypt sensitive secret values.
+          type: string
+      required:
+        - public_key
+        - environment
+        - all
+        - page
+        - page_size
+      type: object
+    ExportSecretsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ExportSecretsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        pages:
+          $ref: "#/components/schemas/Pagination"
+        secrets:
+          items:
+            $ref: "#/components/schemas/ExportedSecret"
+          type: array
+      required:
+        - pages
+        - secrets
+      type: object
+    ExportedCatalog:
+      additionalProperties: false
+      properties:
+        CreatedAt:
+          format: date-time
+          type: string
+        environment:
+          type: string
+        name:
+          type: string
+        properties:
+          items:
+            $ref: "#/components/schemas/ExportedCatalogProperty"
+          type: array
+        slug:
+          type: string
+        type:
+          type: string
+      required:
+        - type
+        - name
+        - slug
+        - environment
+        - properties
+        - CreatedAt
+      type: object
+    ExportedCatalogProperty:
+      additionalProperties: false
+      properties:
+        encrypted_value:
+          type: string
+        name:
+          type: string
+        preview:
+          type: string
+      required:
+        - name
+        - encrypted_value
+        - preview
+      type: object
+    ExportedSecret:
+      additionalProperties: false
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        encrypted_value:
+          type: string
+        environment:
+          type: string
+        name:
+          type: string
+      required:
+        - name
+        - environment
+        - encrypted_value
+        - created_at
+      type: object
+    FeaturebaseIdentity:
+      additionalProperties: false
+      properties:
+        company_hash:
+          type: string
+        user_hash:
+          type: string
+      required:
+        - user_hash
+        - company_hash
+      type: object
+    GenerateAppStatisticsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/GenerateAppStatisticsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        statistics:
+          $ref: "#/components/schemas/AppStatistics"
+      required:
+        - statistics
+      type: object
+    GenerateAuthenticatorResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/GenerateAuthenticatorResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        authenticator:
+          $ref: "#/components/schemas/UnverifiedAuthenticator"
+      required:
+        - authenticator
+      type: object
+    GenerateRunStatisticsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/GenerateRunStatisticsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        series:
+          items:
+            $ref: "#/components/schemas/RunTimeseriesPoint"
+          type: array
+        settings:
+          $ref: "#/components/schemas/StatisticsSettings"
+        stats:
+          $ref: "#/components/schemas/RunStatistics"
+      required:
+        - settings
+        - stats
+        - series
+      type: object
+    InviteTeamMemberParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/InviteTeamMemberParams.json
+          format: uri
+          readOnly: true
+          type: string
+        emails:
+          description: The email addresses of the people to invite. It can be a list in any format (comma separated, newline separated, etc.) and it will be parsed into individual addresses
+          type: string
+        message:
+          description: Optional message to include in the invite email
+          type: string
+      required:
+        - emails
+      type: object
+    InviteTeamMemberResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/InviteTeamMemberResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team_invitations:
+          description: The team invitation that you created
+          items:
+            $ref: "#/components/schemas/TeamInvitation"
+          type: array
+      required:
+        - team_invitations
+      type: object
+    LeaveTeamResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/LeaveTeamResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team:
+          $ref: "#/components/schemas/Team"
+          description: The team that you just left
+      required:
+        - team
+      type: object
+    ListAPIKeysResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListAPIKeysResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        api_keys:
+          description: List of API keys
+          items:
+            $ref: "#/components/schemas/APIKey"
+          type: array
+      required:
+        - api_keys
+      type: object
+    ListAlertsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListAlertsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        alerts:
+          description: List of alerts
+          items:
+            $ref: "#/components/schemas/Alert"
+          type: array
+        pages:
+          $ref: "#/components/schemas/Pagination"
+          description: Pagination information
+      required:
+        - alerts
+        - pages
+      type: object
+    ListAppEnvironmentsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListAppEnvironmentsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        environments:
+          items:
+            type: string
+          type: array
+      required:
+        - environments
+      type: object
+    ListAppVersionsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListAppVersionsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        versions:
+          items:
+            $ref: "#/components/schemas/AppVersion"
+          type: array
+      required:
+        - versions
+      type: object
+    ListAppsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListAppsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        apps:
+          items:
+            $ref: "#/components/schemas/AppSummary"
+          type: array
+        pages:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - apps
+        - pages
+      type: object
+    ListAuthenticatorsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListAuthenticatorsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        authenticators:
+          items:
+            $ref: "#/components/schemas/VerifiedAuthenticator"
+          type: array
+      required:
+        - authenticators
+      type: object
+    ListCatalogsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListCatalogsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        catalogs:
+          items:
+            $ref: "#/components/schemas/Catalog"
+          type: array
+        pages:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - pages
+        - catalogs
+      type: object
+    ListMyTeamInvitationsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListMyTeamInvitationsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team_invitations:
+          description: All of team invitations
+          items:
+            $ref: "#/components/schemas/TeamInvitation"
+          type: array
+      required:
+        - team_invitations
+      type: object
+    ListRunsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListRunsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        pages:
+          $ref: "#/components/schemas/Pagination"
+        runs:
+          items:
+            $ref: "#/components/schemas/Run"
+          type: array
+      required:
+        - pages
+        - runs
+      type: object
+    ListSecretEnvironmentsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListSecretEnvironmentsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        environments:
+          items:
+            type: string
+          type: array
+      required:
+        - environments
+      type: object
+    ListSecretsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListSecretsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        pages:
+          $ref: "#/components/schemas/Pagination"
+        secrets:
+          items:
+            $ref: "#/components/schemas/Secret"
+          type: array
+      required:
+        - pages
+        - secrets
+      type: object
+    ListTeamInvitationsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListTeamInvitationsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team_invitations:
+          description: All of team invitations
+          items:
+            $ref: "#/components/schemas/TeamInvitation"
+          type: array
+      required:
+        - team_invitations
+      type: object
+    ListTeamMembersResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListTeamMembersResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team_members:
+          description: All of the members of a team
+          items:
+            $ref: "#/components/schemas/User"
+          type: array
+      required:
+        - team_members
+      type: object
+    ListTeamsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ListTeamsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        teams:
+          description: List of teams
+          items:
+            $ref: "#/components/schemas/Team"
+          type: array
+      required:
+        - teams
+      type: object
+    LogLine:
+      additionalProperties: false
+      properties:
+        channel:
+          description: The channel (either Program or Setup) this log line belongs to.
+          enum:
+            - program
+            - setup
+          type: string
+        content:
+          description: Contents of the log message.
+          type: string
+        line_num:
+          description: Line number.
+          format: int64
+          type: integer
+        reported_at:
+          description: Timestamp of the log line.
+          format: date-time
+          type: string
+        run_id:
+          description: The uuid of the Run.
+          type: string
+      required:
+        - run_id
+        - channel
+        - reported_at
+        - line_num
+        - content
+      type: object
+    Pagination:
+      additionalProperties: false
+      properties:
+        num_pages:
+          format: int64
+          type: integer
+        page:
+          format: int64
+          type: integer
+        page_size:
+          format: int64
+          type: integer
+        total:
+          format: int64
+          type: integer
+      required:
+        - page
+        - total
+        - num_pages
+        - page_size
+      type: object
+    Parameter:
+      additionalProperties: false
+      properties:
+        default:
+          type: string
+        description:
+          type: string
+        name:
+          type: string
+      required:
+        - name
+        - default
+        - description
+      type: object
+    RefreshSessionParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/RefreshSessionParams.json
+          format: uri
+          readOnly: true
+          type: string
+      type: object
+    RefreshSessionResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/RefreshSessionResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        refreshed_at:
+          description: A timestamp that indicates the last time the session data was refreshed.
+          format: date-time
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
+          description: Refresh the current session and return the updated session information.
+      required:
+        - refreshed_at
+        - session
+      type: object
+    RemoveTeamMemberParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/RemoveTeamMemberParams.json
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          description: The email address of the team member to remove
+          type: string
+      required:
+        - email
+      type: object
+    RemoveTeamMemberResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/RemoveTeamMemberResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team_member:
+          $ref: "#/components/schemas/User"
+          description: The team member that was just removed
+      required:
+        - team_member
+      type: object
+    ResendTeamInvitationParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ResendTeamInvitationParams.json
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          description: The email address of team invitation to resend
+          type: string
+        message:
+          description: Optional message to include in the invite email
+          type: string
+      required:
+        - email
+      type: object
+    ResendTeamInvitationResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/ResendTeamInvitationResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team_invitation:
+          $ref: "#/components/schemas/TeamInvitation"
+          description: The team invitations that were resent
+      required:
+        - team_invitation
+      type: object
+    Run:
+      additionalProperties: false
+      properties:
+        app_name:
+          type: string
+        app_slug:
+          type: string
+        app_version:
+          type: string
+        cancelled_at:
+          format: date-time
+          nullable: true
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        ended_at:
+          format: date-time
+          nullable: true
+          type: string
+        environment:
+          type: string
+        exit_code:
+          description: Exit code of the run, if the run is completed. Null if there is no exit code
+          format: int64
+          nullable: true
+          type: integer
+        number:
+          format: int64
+          type: integer
+        parameters:
+          description: Parameters used to invoke this run.
+          items:
+            $ref: "#/components/schemas/RunParameter"
+          type: array
+        run_id:
+          type: string
+        scheduled_at:
+          format: date-time
+          type: string
+        started_at:
+          format: date-time
+          nullable: true
+          type: string
+        status:
+          enum:
+            - scheduled
+            - pending
+            - running
+            - crashed
+            - errored
+            - exited
+            - cancelled
+          type: string
+        status_group:
+          enum:
+            - successful
+            - failed
+            - ""
+          type: string
+      required:
+        - run_id
+        - number
+        - app_slug
+        - app_name
+        - status
+        - status_group
+        - parameters
+        - environment
+        - exit_code
+        - created_at
+        - scheduled_at
+        - cancelled_at
+        - started_at
+        - ended_at
+        - app_version
+      type: object
+    RunAppParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/RunAppParams.json
+          format: uri
+          readOnly: true
+          type: string
+        environment:
+          description: The environment to run this app in.
+          type: string
+        parameters:
+          additionalProperties:
+            type: string
+          description: The parameters to pass into this app.
+          type: object
+        parent_run_id:
+          description: The ID of the run that invoked this run, if relevant. Should be null, if none.
+          nullable: true
+          type: string
+      required:
+        - environment
+        - parameters
+      type: object
+    RunAppResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/RunAppResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        run:
+          $ref: "#/components/schemas/Run"
+      required:
+        - run
+      type: object
+    RunFailureAlert:
+      additionalProperties: false
+      properties:
+        app:
+          $ref: "#/components/schemas/App"
+          description: App that the failed Run belongs to
+        run:
+          $ref: "#/components/schemas/Run"
+          description: Run that failed
+      required:
+        - run
+        - app
+      type: object
+    RunLogLine:
+      additionalProperties: false
+      properties:
+        channel:
+          type: string
+        message:
+          type: string
+        timestamp:
+          format: date-time
+          type: string
+      required:
+        - channel
+        - timestamp
+        - message
+      type: object
+    RunParameter:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+      required:
+        - name
+        - value
+      type: object
+    RunResults:
+      additionalProperties: false
+      properties:
+        cancelled:
+          format: int64
+          type: integer
+        crashed:
+          format: int64
+          type: integer
+        errored:
+          format: int64
+          type: integer
+        exited:
+          format: int64
+          type: integer
+        pending:
+          format: int64
+          type: integer
+        running:
+          format: int64
+          type: integer
+      required:
+        - pending
+        - running
+        - exited
+        - errored
+        - crashed
+        - cancelled
+      type: object
+    RunStatistics:
+      additionalProperties: false
+      properties:
+        cancelled_runs:
+          format: int64
+          type: integer
+        crashed_runs:
+          format: int64
+          type: integer
+        errored_runs:
+          format: int64
+          type: integer
+        exited_runs:
+          format: int64
+          type: integer
+        running_runs:
+          format: int64
+          type: integer
+        total_runs:
+          format: int64
+          type: integer
+      required:
+        - running_runs
+        - exited_runs
+        - errored_runs
+        - crashed_runs
+        - cancelled_runs
+        - total_runs
+      type: object
+    RunTimeseriesPoint:
+      additionalProperties: false
+      properties:
+        cancelled:
+          format: int64
+          type: integer
+        crashed:
+          format: int64
+          type: integer
+        errored:
+          format: int64
+          type: integer
+        exited:
+          format: int64
+          type: integer
+        pending:
+          format: int64
+          type: integer
+        period:
+          description: The period of the timeseries point, typically the start of the period.
+          format: date-time
+          type: string
+        running:
+          format: int64
+          type: integer
+        scheduled:
+          format: int64
+          type: integer
+      required:
+        - period
+        - scheduled
+        - pending
+        - running
+        - exited
+        - errored
+        - crashed
+        - cancelled
+      type: object
+    SSEWarning:
+      additionalProperties: false
+      properties:
+        content:
+          description: Contents of the warning.
+          type: string
+        reported_at:
+          description: Timestamp of the event.
+          format: date-time
+          type: string
+      required:
+        - reported_at
+        - content
+      type: object
+    SearchRunsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/SearchRunsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        pages:
+          $ref: "#/components/schemas/Pagination"
+        runs:
+          items:
+            $ref: "#/components/schemas/Run"
+          type: array
+      required:
+        - pages
+        - runs
+      type: object
+    Secret:
+      additionalProperties: false
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        environment:
+          type: string
+        name:
+          type: string
+        preview:
+          type: string
+      required:
+        - name
+        - environment
+        - preview
+        - created_at
+      type: object
+    Session:
+      additionalProperties: false
+      properties:
+        featurebase_identity:
+          $ref: "#/components/schemas/FeaturebaseIdentity"
+        teams:
+          items:
+            $ref: "#/components/schemas/Team"
+          type: array
+        token:
+          $ref: "#/components/schemas/Token"
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+        - token
+        - teams
+        - featurebase_identity
+      type: object
+    StatisticsSettings:
+      additionalProperties: false
+      properties:
+        end_at:
+          description: The end time for the statistics period.
+          format: date-time
+          type: string
+        interval:
+          description: The interval for the statistics period.
+          enum:
+            - daily
+            - hourly
+          type: string
+        start_at:
+          description: The start time for the statistics period.
+          format: date-time
+          type: string
+        timezone:
+          description: The time zone for the statistics period.
+          type: string
+      required:
+        - interval
+        - timezone
+        - start_at
+        - end_at
+      type: object
+    Team:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        token:
+          $ref: "#/components/schemas/Token"
+        type:
+          description: The type of team, either 'personal' or 'team'.
+          type: string
+      required:
+        - name
+        - slug
+        - type
+      type: object
+    TeamInvitation:
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+        invitation_sent_at:
+          format: date-time
+          type: string
+        team:
+          $ref: "#/components/schemas/Team"
+      required:
+        - team
+        - email
+        - invitation_sent_at
+      type: object
+    Token:
+      additionalProperties: false
+      properties:
+        jwt:
+          type: string
+      required:
+        - jwt
+      type: object
+    UnverifiedAuthenticator:
+      additionalProperties: false
+      properties:
+        issuer:
+          description: The issuer of the unverified authenticator.
+          type: string
+        key:
+          description: The key of the unverified authenticator.
+          type: string
+        label:
+          description: The label that is used for this unverified authenticator.
+          type: string
+        url:
+          description: The full URL of the authenticator.
+          type: string
+      required:
+        - label
+        - issuer
+        - key
+        - url
+      type: object
+    UpdateAccountSlugParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateAccountSlugParams.json
+          format: uri
+          readOnly: true
+          type: string
+        new_slug:
+          description: The new slug for the account
+          type: string
+      required:
+        - new_slug
+      type: object
+    UpdateAccountSlugResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateAccountSlugResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        account:
+          $ref: "#/components/schemas/Account"
+      required:
+        - account
+      type: object
+    UpdateAppParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateAppParams.json
+          format: uri
+          readOnly: true
+          type: string
+        description:
+          description: New description for the App
+          type: string
+        status:
+          description: New status for the App
+          type: string
+      required:
+        - status
+        - description
+      type: object
+    UpdateAppResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateAppResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        App:
+          $ref: "#/components/schemas/App"
+      required:
+        - App
+      type: object
+    UpdateCatalogParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateCatalogParams.json
+          format: uri
+          readOnly: true
+          type: string
+        environment:
+          description: New environment for the catalog
+          type: string
+        name:
+          description: New name for the catalog
+          type: string
+        properties:
+          items:
+            $ref: "#/components/schemas/EncryptedCatalogProperty"
+          type: array
+      required:
+        - name
+        - environment
+        - properties
+      type: object
+    UpdateCatalogResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateCatalogResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        catalog:
+          $ref: "#/components/schemas/Catalog"
+      required:
+        - catalog
+      type: object
+    UpdateMyTeamInvitationParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateMyTeamInvitationParams.json
+          format: uri
+          readOnly: true
+          type: string
+        accepted:
+          description: Whether or not the invitation was accepted. If false, it's considered rejected.
+          type: boolean
+        slug:
+          description: The slug of the team invitation to update
+          type: string
+      required:
+        - slug
+        - accepted
+      type: object
+    UpdateMyTeamInvitationResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateMyTeamInvitationResponse.json
+          format: uri
+          readOnly: true
+          type: string
+      type: object
+    UpdatePasswordResetParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdatePasswordResetParams.json
+          format: uri
+          readOnly: true
+          type: string
+        password:
+          description: The new password that you want to set for your account
+          type: string
+      required:
+        - password
+      type: object
+    UpdatePasswordResetResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdatePasswordResetResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        ok:
+          description: A boolean indicating the request was successfully processed.
+          type: boolean
+      required:
+        - ok
+      type: object
+    UpdateSecretParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateSecretParams.json
+          format: uri
+          readOnly: true
+          type: string
+        encrypted_value:
+          type: string
+        environment:
+          type: string
+        preview:
+          type: string
+      required:
+        - environment
+        - encrypted_value
+        - preview
+      type: object
+    UpdateSecretResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateSecretResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        secret:
+          $ref: "#/components/schemas/Secret"
+      required:
+        - secret
+      type: object
+    UpdateTeamParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateTeamParams.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: The name of the team to create. This is optional, if you supply null it will not update the team name.
+          nullable: true
+          type: string
+        slug:
+          description: The new slug that you want the team to use. This is optional, if you supply null it will not update the slug.
+          nullable: true
+          type: string
+      required:
+        - name
+        - slug
+      type: object
+    UpdateTeamResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateTeamResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        team:
+          $ref: "#/components/schemas/Team"
+          description: The team that was just created
+      required:
+        - team
+      type: object
+    UpdateUserParams:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateUserParams.json
+          format: uri
+          readOnly: true
+          type: string
+        company:
+          nullable: true
+          type: string
+        country:
+          nullable: true
+          type: string
+        first_name:
+          nullable: true
+          type: string
+        is_alerts_enabled:
+          nullable: true
+          type: boolean
+        last_name:
+          nullable: true
+          type: string
+        password:
+          nullable: true
+          type: string
+      type: object
+    UpdateUserResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          example: https://api.tower.dev/v1/schemas/UpdateUserResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+      type: object
+    User:
+      additionalProperties: false
+      properties:
+        company:
+          type: string
+        country:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+        is_alerts_enabled:
+          type: boolean
+        is_invitation_claimed:
+          type: boolean
+        last_name:
+          type: string
+        profile_photo_url:
+          type: string
+      required:
+        - first_name
+        - last_name
+        - company
+        - country
+        - email
+        - profile_photo_url
+        - is_invitation_claimed
+        - created_at
+        - is_alerts_enabled
+      type: object
+    VerifiedAuthenticator:
+      additionalProperties: false
+      properties:
+        created_at:
+          description: The ISO8601 timestamp indicating when this authenticator was created
+          format: date-time
+          type: string
+        id:
+          description: The ID of this authenticator
+          type: string
+        issuer:
+          description: The issuer of the unverified authenticator.
+          type: string
+        label:
+          description: The label that is used for this unverified authenticator.
+          type: string
+      required:
+        - id
+        - label
+        - issuer
+        - created_at
+      type: object
+  securitySchemes:
+    APIKeyAuth:
+      description: API key created by a Tower user or Tower service account to authenticate an API request.
+      in: header
+      name: X-API-Key
+      type: apiKey
+    BearerAuth:
+      description: Bearer token authentication scheme which uses a JWT provided by the Tower API as part of a Tower session (see documentation about creating sessions).
+      scheme: bearer
+      type: http
+info:
+  contact:
+    email: hello@tower.dev
+    name: Tower Computing GmbH
+    url: https://tower.dev
+  description: REST API to interact with Tower Services.
+  termsOfService: https://tower.dev/terms
+  title: Tower API
+  version: v0.6.14
+openapi: 3.0.3
+paths:
+  /accounts:
+    post:
+      description: This is the primary way that users register new accounts with Tower.
+      operationId: create-account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAccountResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Create account
+  /accounts/authenticator:
+    delete:
+      description: Removes an authenticator from your account so you're no longer required to provide it at login.
+      operationId: delete-authenticator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteAuthenticatorParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteAuthenticatorResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete authenticator
+    get:
+      description: Enumerates the authenticators associated with the current users' account
+      operationId: list-authenticators
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAuthenticatorsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List authenticators
+    post:
+      description: Associates an authenticator with your account, where the authenticator is identified by the URL with an otpauth URI scheme.
+      operationId: create-authenticator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuthenticatorParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAuthenticatorResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Create authenticator
+  /accounts/authenticator/generate:
+    post:
+      description: Generates a new authenticator for the user. This is used to set up two-factor authentication.
+      operationId: generate-authenticator
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateAuthenticatorResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Generate authenticator
+  /accounts/invite:
+    post:
+      description: Accept an invitation code to join an account
+      operationId: accept-invitation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInvitationParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptInvitationResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Accept an invitation code
+  /accounts/password-reset:
+    post:
+      description: Starts the password reset process for an account. If an email address exists for the account supplied, you will get a reset password email.
+      operationId: create-password-reset
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePasswordResetParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePasswordResetResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Create password reset
+  /accounts/password-reset/{code}:
+    post:
+      description: Updates the password reset code with the new password
+      operationId: update-password-reset
+      parameters:
+        - description: The password reset code that was sent to you
+          in: path
+          name: code
+          required: true
+          schema:
+            description: The password reset code that was sent to you
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePasswordResetParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatePasswordResetResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update password reset
+  /accounts/{slug}:
+    put:
+      description: Update the slug for an account
+      operationId: update-account-slug
+      parameters:
+        - description: The slug of the account to update
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the account to update
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountSlugParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateAccountSlugResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update account slug
+  /alerts:
+    get:
+      description: List alerts for the current account with optional filtering
+      operationId: list-alerts
+      parameters:
+        - description: Filter alerts by alert type
+          explode: false
+          in: query
+          name: alert_type
+          schema:
+            description: Filter alerts by alert type
+            type: string
+        - description: Filter alerts created after or at this datetime (inclusive)
+          explode: false
+          in: query
+          name: start_at
+          schema:
+            description: Filter alerts created after or at this datetime (inclusive)
+            format: date-time
+            type: string
+        - description: Filter alerts created before or at this datetime (inclusive)
+          explode: false
+          in: query
+          name: end_at
+          schema:
+            description: Filter alerts created before or at this datetime (inclusive)
+            format: date-time
+            type: string
+        - description: The page number to fetch.
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: The page number to fetch.
+            format: int64
+            type: integer
+        - description: The number of records to fetch on each page.
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: The number of records to fetch on each page.
+            format: int64
+            type: integer
+        - description: Filter alerts by acknowledged status.
+          explode: false
+          in: query
+          name: acked
+          schema:
+            description: Filter alerts by acknowledged status.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAlertsResponse"
+                properties:
+                  alerts:
+                    description: List of alerts of different types
+                    items:
+                      $ref: "#/components/schemas/Alert"
+                    title: alerts
+                    type: array
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List alerts
+  /alerts/acknowledge-all:
+    post:
+      description: Mark all unacknowledged alerts as acknowledged for the current user in the current account
+      operationId: acknowledge-all-alerts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcknowledgeAllAlertsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Acknowledge all alerts
+  /alerts/stream:
+    get:
+      description: Streams alert notifications in real-time
+      operationId: stream-alerts
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                description: Each oneOf object in the array represents one possible Server Sent Events (SSE) message, serialized as UTF-8 text according to the SSE specification.
+                items:
+                  oneOf:
+                    - $ref: "#/components/schemas/SSEWarning"
+                      title: Event error
+                      type: object
+                    - $ref: "#/components/schemas/RunFailureAlert"
+                      title: Event run_failure_alert
+                      type: object
+                title: Server Sent Events
+                type: array
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Stream alert notifications
+  /alerts/{alert_id}:
+    delete:
+      description: Permanently delete an alert
+      operationId: delete-alert
+      parameters:
+        - description: ID of the alert to delete
+          in: path
+          name: alert_id
+          required: true
+          schema:
+            description: ID of the alert to delete
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete alert
+  /alerts/{alert_seq}/acknowledge:
+    post:
+      description: Mark an alert as acknowledged
+      operationId: acknowledge-alert
+      parameters:
+        - description: Seq of the alert to acknowledge
+          in: path
+          name: alert_seq
+          required: true
+          schema:
+            description: Seq of the alert to acknowledge
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcknowledgeAlertResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Acknowledge alert
+  /api-keys:
+    delete:
+      operationId: delete-api-key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteAPIKeyParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteAPIKeyResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete API key
+    get:
+      description: List all the API keys associated with your current account.
+      operationId: list-api-keys
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAPIKeysResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List API keys
+    post:
+      operationId: create-api-key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAPIKeyResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Create API Key
+  /apps:
+    get:
+      description: Get all the apps for the current account.
+      operationId: list-apps
+      parameters:
+        - description: The search query to filter apps by.
+          explode: false
+          in: query
+          name: query
+          schema:
+            description: The search query to filter apps by.
+            type: string
+        - description: The page number to fetch.
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: The page number to fetch.
+            format: int64
+            type: integer
+        - description: The number of records to fetch on each page.
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: The number of records to fetch on each page.
+            format: int64
+            type: integer
+        - description: Number of recent runs to fetch (-1 for all runs, defaults to 20)
+          explode: false
+          in: query
+          name: num_runs
+          schema:
+            default: 20
+            description: Number of recent runs to fetch (-1 for all runs, defaults to 20)
+            format: int64
+            type: integer
+        - description: Sort order for the results.
+          explode: false
+          in: query
+          name: sort
+          schema:
+            default: created_at
+            description: Sort order for the results.
+            enum:
+              - most_recent_run
+              - a_to_z
+              - created_at
+              - updated_at
+            type: string
+        - description: Filter to see apps with certain statuses.
+          explode: false
+          in: query
+          name: filter
+          schema:
+            description: Filter to see apps with certain statuses.
+            enum:
+              - disabled
+              - running
+              - withWarning
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+        - APIKeyAuth: []
+      summary: List apps
+    post:
+      description: Create a new app in the current account.
+      operationId: create-app
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAppResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Create app
+  /apps/{name}:
+    put:
+      description: Update an app in the currently authenticated account.
+      operationId: update-app
+      parameters:
+        - description: The name of the App to update.
+          in: path
+          name: name
+          required: true
+          schema:
+            description: The name of the App to update.
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateAppResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update app
+  /apps/{name}/versions:
+    get:
+      description: List all versions of an app in the current account, sorted with the most recent first.
+      operationId: list-app-versions
+      parameters:
+        - description: The name of the app to list versions for.
+          in: path
+          name: name
+          required: true
+          schema:
+            description: The name of the app to list versions for.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppVersionsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List app versions
+  /apps/{name}/versions/{num}:
+    get:
+      description: Describe an app version for an app in the current account.
+      operationId: describe-app-version
+      parameters:
+        - description: The name of the app to get the version for.
+          in: path
+          name: name
+          required: true
+          schema:
+            description: The name of the app to get the version for.
+            type: string
+        - description: The version string to get the version for.
+          in: path
+          name: num
+          required: true
+          schema:
+            description: The version string to get the version for.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeAppVersionResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Describe app version
+  /apps/{slug}:
+    delete:
+      description: Delete one of your apps, the associated code, and all the runs as well.
+      operationId: delete-app
+      parameters:
+        - description: The slug of the app to delete.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to delete.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteAppResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete app
+    get:
+      description: Get all the runs for the current account.
+      operationId: describe-app
+      parameters:
+        - description: The slug of the app to fetch.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to fetch.
+            type: string
+        - description: The number of recent runs to fetch for the app.
+          explode: false
+          in: query
+          name: runs
+          schema:
+            description: The number of recent runs to fetch for the app.
+            format: int64
+            type: integer
+        - description: Filter runs scheduled after this datetime (inclusive). Provide timestamps in ISO-8601 format.
+          explode: false
+          in: query
+          name: start_at
+          schema:
+            description: Filter runs scheduled after this datetime (inclusive). Provide timestamps in ISO-8601 format.
+            format: date-time
+            type: string
+        - description: Filter runs scheduled before or at this datetime (inclusive). Provide timestamps in ISO-8601 format.
+          explode: false
+          in: query
+          name: end_at
+          schema:
+            description: Filter runs scheduled before or at this datetime (inclusive). Provide timestamps in ISO-8601 format.
+            format: date-time
+            type: string
+        - description: Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to UTC.
+          explode: false
+          in: query
+          name: timezone
+          schema:
+            default: UTC
+            description: Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to UTC.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeAppResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Describe app
+  /apps/{slug}/deploy:
+    post:
+      description: Deploy a new version of an app. Reads the request body, which is a TAR file (or a GZipped TAR file) and creates a new deployment for an app based on that file.
+      operationId: deploy-app
+      parameters:
+        - description: The slug of the app to deploy.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to deploy.
+            type: string
+        - description: The encoding of the content.
+          in: header
+          name: Content-Encoding
+          schema:
+            description: The encoding of the content.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployAppResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Bad Request
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Internal Server Error
+      security:
+        - BearerAuth: []
+      summary: Deploy app
+  /apps/{slug}/environments:
+    get:
+      description: Generates a list of all the known environments for a given app in the current account.
+      operationId: list-app-environments
+      parameters:
+        - description: The name of the app to get the version for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The name of the app to get the version for.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppEnvironmentsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List app environments
+  /apps/{slug}/runs:
+    get:
+      description: Generates a list of all the runs for a given app. The list is paginated based on the query string parameters passed in.
+      operationId: list-runs
+      parameters:
+        - description: The page number to fetch.
+          explode: false
+          in: query
+          name: page
+          schema:
+            default: 1
+            description: The page number to fetch.
+            format: int64
+            type: integer
+        - description: The number of records to fetch on each page.
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            default: 20
+            description: The number of records to fetch on each page.
+            format: int64
+            type: integer
+        - description: The slug of the app to fetch runs for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to fetch runs for.
+            type: string
+        - description: Filter runs by status(es) (comma separated for multiple).
+          explode: false
+          in: query
+          name: status
+          schema:
+            description: Filter runs by status(es) (comma separated for multiple).
+            items:
+              enum:
+                - scheduled
+                - pending
+                - running
+                - crashed
+                - errored
+                - exited
+                - cancelled
+              type: string
+            type: array
+        - description: Filter runs scheduled after or at this datetime (inclusive)
+          explode: false
+          in: query
+          name: start_at
+          schema:
+            description: Filter runs scheduled after or at this datetime (inclusive)
+            format: date-time
+            type: string
+        - description: Filter runs scheduled before or at this datetime (inclusive)
+          explode: false
+          in: query
+          name: end_at
+          schema:
+            description: Filter runs scheduled before or at this datetime (inclusive)
+            format: date-time
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRunsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List runs
+    post:
+      description: Runs an app with the supplied parameters.
+      operationId: run-app
+      parameters:
+        - description: The slug of the app to fetch runs for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to fetch runs for.
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunAppParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunAppResponse"
+          description: OK
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunAppResponse"
+                type: object
+          description: Created
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+                type: object
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+        - APIKeyAuth: []
+      summary: Run app
+  /apps/{slug}/runs/{seq}:
+    get:
+      description: Describe a run of an app.
+      operationId: describe-run
+      parameters:
+        - description: The slug of the app to fetch runs for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to fetch runs for.
+            type: string
+        - description: The number of the run to fetch.
+          in: path
+          name: seq
+          required: true
+          schema:
+            description: The number of the run to fetch.
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeRunResponse"
+          description: OK
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+                type: object
+          description: Unauthorized
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+                type: object
+          description: Not found
+      security:
+        - BearerAuth: []
+        - APIKeyAuth: []
+      summary: Describe run
+    post:
+      description: Cancel a run
+      operationId: cancel-run
+      parameters:
+        - description: The slug of the app to fetch runs for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to fetch runs for.
+            type: string
+        - description: The number of the run to fetch.
+          in: path
+          name: seq
+          required: true
+          schema:
+            description: The number of the run to fetch.
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelRunResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Cancel run
+  /apps/{slug}/runs/{seq}/logs:
+    get:
+      description: Retrieves the logs associated with a particular run of an app.
+      operationId: describe-run-logs
+      parameters:
+        - description: The slug of the app to get logs for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to get logs for.
+            type: string
+        - description: The sequence number of the run to get logs for.
+          in: path
+          name: seq
+          required: true
+          schema:
+            description: The sequence number of the run to get logs for.
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeRunLogsResponse"
+          description: OK
+          headers:
+            ContentType:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Describe run logs
+  /apps/{slug}/runs/{seq}/logs/stream:
+    get:
+      description: Streams the logs associated with a particular run of an app in real-time.
+      operationId: stream-run-logs
+      parameters:
+        - description: The slug of the app to get logs for.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the app to get logs for.
+            type: string
+        - description: The sequence number of the run to get logs for.
+          in: path
+          name: seq
+          required: true
+          schema:
+            description: The sequence number of the run to get logs for.
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                description: Each oneOf object in the array represents one possible Server Sent Events (SSE) message, serialized as UTF-8 text according to the SSE specification.
+                items:
+                  oneOf:
+                    - $ref: "#/components/schemas/LogLine"
+                      title: Event log
+                      type: object
+                    - $ref: "#/components/schemas/SSEWarning"
+                      title: Event warning
+                      type: object
+                title: Server Sent Events
+                type: array
+          description: SSE log stream
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Stream run logs
+  /catalogs:
+    get:
+      description: Lists all the catalogs associated with your current account.
+      operationId: list-catalogs
+      parameters:
+        - description: The environment to filter by.
+          explode: false
+          in: query
+          name: environment
+          schema:
+            description: The environment to filter by.
+            type: string
+        - description: Whether to fetch all catalogs across all environments or only for the current environment.
+          explode: false
+          in: query
+          name: all
+          schema:
+            description: Whether to fetch all catalogs across all environments or only for the current environment.
+            type: boolean
+        - description: The page number to fetch.
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: The page number to fetch.
+            format: int64
+            type: integer
+        - description: The number of records to fetch on each page.
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: The number of records to fetch on each page.
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCatalogsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List catalogs
+    post:
+      description: Create a new catalog object in the currently authenticated account.
+      operationId: create-catalog
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCatalogParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCatalogResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Create catalog
+  /catalogs/export:
+    post:
+      description: Lists all the catalogs in your current account and re-encrypt them with the public key you supplied.
+      operationId: export-catalogs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportCatalogsParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportCatalogsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Export catalogs
+  /catalogs/{slug}:
+    delete:
+      description: Delete a new catalog object in the currently authenticated account.
+      operationId: delete-catalog
+      parameters:
+        - description: The slug of the catalog to update.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the catalog to update.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteCatalogResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete catalog
+    put:
+      description: Update a new catalog object in the currently authenticated account.
+      operationId: update-catalog
+      parameters:
+        - description: The slug of the catalog to update.
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the catalog to update.
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCatalogParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateCatalogResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update catalog
+  /login/device:
+    get:
+      description: Creates a new device login ticket and returns the codes and urls needed for authentication.
+      operationId: create-device-login-ticket
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDeviceLoginTicketResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Create device login ticket
+  /login/device/claim:
+    post:
+      description: Claims a device login ticket code for the authenticated user.
+      operationId: claim-device-login-ticket
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimDeviceLoginTicketParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimDeviceLoginTicketResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Claim a device login ticket
+  /login/device/{device_code}:
+    get:
+      description: Checks if a device login code has been claimed and returns the user session if so.
+      operationId: describe-device-login-session
+      parameters:
+        - description: The device code to check.
+          in: path
+          name: device_code
+          required: true
+          schema:
+            description: The device code to check.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeDeviceLoginSessionResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Describe device login session
+  /runs:
+    get:
+      description: Search, filter, and list runs across all of the apps in your account.
+      operationId: search-runs
+      parameters:
+        - description: The page number to fetch.
+          explode: false
+          in: query
+          name: page
+          schema:
+            default: 1
+            description: The page number to fetch.
+            format: int64
+            type: integer
+        - description: The number of records to fetch on each page.
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            default: 20
+            description: The number of records to fetch on each page.
+            format: int64
+            type: integer
+        - description: Filter runs by status(es). Define multiple with a comma-separated list. Supplying none will return all statuses.
+          explode: false
+          in: query
+          name: status
+          schema:
+            default:
+              - scheduled
+              - pending
+              - running
+              - crashed
+              - errored
+              - exited
+              - cancelled
+            description: Filter runs by status(es). Define multiple with a comma-separated list. Supplying none will return all statuses.
+            items:
+              enum:
+                - scheduled
+                - pending
+                - running
+                - crashed
+                - errored
+                - exited
+                - cancelled
+              type: string
+            type: array
+        - description: Filter runs scheduled after this datetime (inclusive). Provide timestamps in ISO-8601 format.
+          explode: false
+          in: query
+          name: start_at
+          schema:
+            description: Filter runs scheduled after this datetime (inclusive). Provide timestamps in ISO-8601 format.
+            format: date-time
+            type: string
+        - description: Filter runs scheduled before or at this datetime (inclusive). Provide timestamps in ISO-8601 format.
+          explode: false
+          in: query
+          name: end_at
+          schema:
+            description: Filter runs scheduled before or at this datetime (inclusive). Provide timestamps in ISO-8601 format.
+            format: date-time
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchRunsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Search runs
+  /secrets:
+    get:
+      description: Lists all the secrets associated with your current account.
+      operationId: list-secrets
+      parameters:
+        - description: The environment to filter by.
+          explode: false
+          in: query
+          name: environment
+          schema:
+            description: The environment to filter by.
+            type: string
+        - description: Whether to fetch all secrets or only the ones that are not marked as deleted.
+          explode: false
+          in: query
+          name: all
+          schema:
+            description: Whether to fetch all secrets or only the ones that are not marked as deleted.
+            type: boolean
+        - description: The page number to fetch.
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: The page number to fetch.
+            format: int64
+            type: integer
+        - description: The number of records to fetch on each page.
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: The number of records to fetch on each page.
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSecretsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List secrets
+    post:
+      description: Creates a new secret and associates it with the current account.
+      operationId: create-secret
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSecretParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSecretResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Create secret
+  /secrets/environments:
+    get:
+      description: Lists all the environments associated with secrets.
+      operationId: list-secret-environments
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSecretEnvironmentsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List secret environments
+  /secrets/export:
+    post:
+      description: Lists all the secrets in your current account and re-encrypt them with the public key you supplied.
+      operationId: export-secrets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportSecretsParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportSecretsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Export secrets
+  /secrets/key:
+    get:
+      description: Gets the encryption key used for encrypting secrets that you want to create in Tower.
+      operationId: describe-secrets-key
+      parameters:
+        - description: The format to return the key in. Options are 'pkcs1' and 'spki'.
+          explode: false
+          in: query
+          name: format
+          schema:
+            description: The format to return the key in. Options are 'pkcs1' and 'spki'.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeSecretsKeyResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Describe encryption key
+  /secrets/{name}:
+    delete:
+      description: Delete a secret by name.
+      operationId: delete-secret
+      parameters:
+        - description: The name of the secret to delete.
+          in: path
+          name: name
+          required: true
+          schema:
+            description: The name of the secret to delete.
+            type: string
+        - description: The environment of the secret to delete.
+          explode: false
+          in: query
+          name: environment
+          schema:
+            description: The environment of the secret to delete.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteSecretResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete secret
+    put:
+      description: Updates a secret that has previously been created in your account
+      operationId: update-secret
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSecretParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateSecretResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update secret
+  /session:
+    get:
+      description: Validate your current session and return the user information associated with the session.
+      operationId: describe-session
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescribeSessionResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Describe session
+    post:
+      description: Create a new session and return it.
+      operationId: create-session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Create session
+  /session/refresh:
+    post:
+      description: Returns a new session based on the supplied authentication context. This is helpful when clients want to use POST instead of GET to check session information.
+      operationId: refresh-session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshSessionParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshSessionResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Refresh session
+  /stats/apps:
+    get:
+      description: Generates current statistics about apps
+      operationId: generate-app-statistics
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateAppStatisticsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Generate app statistics
+  /stats/runs:
+    get:
+      description: Generates statistics about runs over a specified time period.
+      operationId: generate-run-statistics
+      parameters:
+        - description: Filter runs by status(es). Define multiple with a comma-separated list. Supplying none will return all statuses.
+          explode: false
+          in: query
+          name: status
+          schema:
+            default:
+              - scheduled
+              - pending
+              - running
+              - crashed
+              - errored
+              - exited
+              - cancelled
+            description: Filter runs by status(es). Define multiple with a comma-separated list. Supplying none will return all statuses.
+            items:
+              enum:
+                - scheduled
+                - pending
+                - running
+                - crashed
+                - errored
+                - exited
+                - cancelled
+              type: string
+            type: array
+        - description: Start date and time for statistics (inclusive)
+          explode: false
+          in: query
+          name: start_at
+          required: true
+          schema:
+            description: Start date and time for statistics (inclusive)
+            format: date-time
+            type: string
+        - description: End date and time for statistics (inclusive)
+          explode: false
+          in: query
+          name: end_at
+          required: true
+          schema:
+            description: End date and time for statistics (inclusive)
+            format: date-time
+            type: string
+        - description: Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to UTC.
+          explode: false
+          in: query
+          name: timezone
+          schema:
+            default: UTC
+            description: Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to UTC.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateRunStatisticsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Generate run statistics
+  /team-invites:
+    get:
+      description: List your pending invitations for teams
+      operationId: list-my-team-invitations
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMyTeamInvitationsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List my team invitations
+    put:
+      description: Update a team invitation that you have pending
+      operationId: update-my-team-invitation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyTeamInvitationParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateMyTeamInvitationResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update my team invitation
+  /teams:
+    delete:
+      description: Delete a new team
+      operationId: delete-team
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteTeamParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteTeamResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete team
+    get:
+      description: List all the teams that the user is a member of.
+      operationId: list-teams
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTeamsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List teams
+    post:
+      description: Create a new team
+      operationId: create-team
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTeamResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Create team
+  /teams/{slug}:
+    put:
+      description: Update a team with a new name or slug. Note that updating the team with a new slug will cause all your URLs to change!
+      operationId: update-team
+      parameters:
+        - description: The slug of the team to update
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to update
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateTeamResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update team
+  /teams/{slug}/invites:
+    delete:
+      description: Delete a pending team invitation that you have previously sent
+      operationId: delete-team-invitation
+      parameters:
+        - description: The slug of the team to remove someone from
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to remove someone from
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteTeamInvitationParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteTeamInvitationResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Delete team invitation
+    get:
+      description: List the pending invitations for a team
+      operationId: list-team-invitations
+      parameters:
+        - description: The slug of the team to list members for
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to list members for
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTeamInvitationsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List team invitations
+    post:
+      description: Invite a new team
+      operationId: invite-team-member
+      parameters:
+        - description: The slug of the team to invite someone to
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to invite someone to
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteTeamMemberParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteTeamMemberResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Invite team member
+  /teams/{slug}/invites/resend:
+    post:
+      description: Resend a team invitation to a user if they need a reminder or if they lost it
+      operationId: resend-team-invitation
+      parameters:
+        - description: The slug of the team to invite someone to
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to invite someone to
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendTeamInvitationParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResendTeamInvitationResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Resend team invitation
+  /teams/{slug}/leave:
+    post:
+      description: Remove yourself from a team, if that's something you'd like to do for whatever reason. If you're the last member of a team, you cannot remove yourself. You should delete the team instead.
+      operationId: leave-team
+      parameters:
+        - description: The slug of the team to leave
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to leave
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveTeamResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Leave team
+  /teams/{slug}/members:
+    delete:
+      description: Remove a new team
+      operationId: remove-team-member
+      parameters:
+        - description: The slug of the team to remove someone from
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to remove someone from
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveTeamMemberParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoveTeamMemberResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Remove team member
+    get:
+      description: List the members of a team
+      operationId: list-team-members
+      parameters:
+        - description: The slug of the team to list members for
+          in: path
+          name: slug
+          required: true
+          schema:
+            description: The slug of the team to list members for
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTeamMembersResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: List team members
+  /user:
+    put:
+      description: Updates your current user profile.
+      operationId: update-user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserParams"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateUserResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - BearerAuth: []
+      summary: Update user profile
+servers:
+  - url: https://api.tower.dev/v1
