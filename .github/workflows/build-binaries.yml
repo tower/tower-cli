@@ -248,6 +248,12 @@ jobs:
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
+        env:
+          # Set the CFLAGS for the aarch64 target, defining the ARM architecture
+          # for the ring crate's build script. This is a workaround for the
+          # issue where the ring crate's build script is not able to detect the
+          # ARM architecture.
+          CFLAGS_aarch64_unknown_linux_gnu: "-march=armv8-a -D__ARM_ARCH=8"
       - uses: uraimo/run-on-arch-action@v2
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
