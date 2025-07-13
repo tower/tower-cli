@@ -232,19 +232,21 @@ impl App for LocalApp {
 
                 let import_paths = package.manifest.import_paths
                     .iter()
-                    .map(|p| {
-                        let path = package_path.join(p);
+                    .map(|p| package_path.join(p))
+                    .collect::<Vec<_>>();
 
-                        // need to turn this into something that is owned by the caller.
-                        path.to_string_lossy().to_string()
-                    })
-                    .collect::<Vec<_>>()
-                    .join(":");
+                let import_paths = std::env::join_paths(import_paths)?
+                    .to_string_lossy()
+                    .to_string();
 
                 if other_env_vars.contains_key("PYTHONPATH") {
                     // If we already have a PYTHONPATH, we need to append to it.
                     let existing = other_env_vars.get("PYTHONPATH").unwrap();
-                    other_env_vars.insert("PYTHONPATH".to_string(), format!("{}:{}", existing, import_paths));
+                    let pythonpath = std::env::join_paths(vec![existing, &import_paths])?
+                        .to_string_lossy()
+                        .to_string();
+
+                    other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
                 } else {
                     // Otherwise, we just set it.
                     other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
