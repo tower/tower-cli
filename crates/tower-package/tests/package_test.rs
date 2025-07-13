@@ -11,7 +11,7 @@ use tokio_stream::*;
 use async_compression::tokio::bufread::GzipDecoder;
 
 use tokio_tar::Archive;
-use tower_package::{Package, PackageSpec};
+use tower_package::{Package, PackageSpec, Manifest};
 use tower_telemetry::debug;
 use config::Towerfile;
 
@@ -180,6 +180,11 @@ async fn it_packages_import_paths() {
     assert!(files.contains_key("app/main.py"), "files {:?} was missing key app/main.py", files);
     assert!(files.contains_key("modules/shared/module/__init__.py"), "files {:?} was missing shared/module/__init__.py", files);
     assert!(files.contains_key("modules/shared/module/test.py"), "files {:?} was missing shared/module/test.py", files);
+
+    // Let's decode the manifest and make sure import paths are set correctly.
+    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap()).await.expect("Manifest was not valid JSON");
+
+    assert!(manifest.import_paths.contains(&"modules/shared".to_string()), "Import paths {:?} did not contain expected path", manifest.import_paths);
 }
 
 #[tokio::test]

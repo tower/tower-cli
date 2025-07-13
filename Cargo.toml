@@ -5,12 +5,8 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 version = "0.3.20"
-
-
-
-
 description = "Tower is the best way to host Python data apps in production"
-rust-version = "1.77"
+rust-version = "1.87"
 authors = ["Brad Heller <brad@tower.dev>"]
 license = "MIT"
 repository = "https://github.com/tower/tower-cli"

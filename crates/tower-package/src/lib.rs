@@ -46,6 +46,14 @@ pub struct Manifest {
     // import_paths are the rewritten collection of modules that this app's code goes into.
     #[serde(default)]
     pub import_paths: Vec<String>,
+
+    // app_dir_name is the name of the application directroy within the package.
+    #[serde(default)]
+    pub app_dir_name: String,
+
+    // modules_dir_name is the name of of the modules directory within the package.
+    #[serde(default)]
+    pub modules_dir_name: String,
 }
 
 impl Manifest {
@@ -53,9 +61,12 @@ impl Manifest {
         let mut file = File::open(path).await?;
         let mut contents = String::new();
         file.read_to_string(&mut contents).await?;
+        Self::from_json(&contents).await
+    }
 
-        let manifest: Self = serde_json::from_str(&contents)?;
-        Ok(manifest)
+    pub async fn from_json(data: &str) -> Result<Self, Error> {
+        let manifest: Self = serde_json::from_str(data)?;
+        Ok(manifest) 
     }
 }
 
@@ -152,6 +163,8 @@ impl Package {
                parameters: vec![],
                schedule: None,
                import_paths: vec![],
+               app_dir_name: "app".to_string(),
+               modules_dir_name: "modules".to_string(),
            },
        }
    }
@@ -193,6 +206,8 @@ impl Package {
        // and ship it to Tower.
        let mut file_globs = spec.file_globs.clone();
 
+       // If there was no source specified, we'll pull in all the source code in the current
+       // directory.
        if file_globs.is_empty() {
            debug!("no source files specified. using default paths.");
            file_globs.push("./**/*".to_string()); 
@@ -213,8 +228,8 @@ impl Package {
        for (physical_path, logical_path) in file_paths {
            // If the physical_path is a Towerfile, let's ignore it. We'll add it explicitly later
            // one to the whole thing.
-           if physical_path.ends_with("Towerfile") {
-               debug!("ignoring Towerfile: {}", physical_path.display());
+           if should_ignore_file(&physical_path) {
+               debug!("ignoring file: {}", physical_path.display());
            } else {
                // All of the app code goes into the "app" directory.
                let logical_path = app_dir.join(logical_path);
@@ -224,6 +239,7 @@ impl Package {
 
        // Module code lives in the modules dir.
        let module_dir = PathBuf::from("modules");
+       let mut import_paths = vec![];
 
        // Now we need to package up all the modules to include in the code base too.
        for import_path in &spec.import_paths {
@@ -234,19 +250,32 @@ impl Package {
            let mut file_paths = HashMap::new();
            resolve_path(&import_path, parent, &mut file_paths).await;
 
+           // The file_name should constitutde the logical path
+           let import_path = import_path.file_name().unwrap();
+           let import_path = module_dir.join(import_path);
+           let import_path_str = import_path.into_os_string().into_string().unwrap();
+           import_paths.push(import_path_str);
+
            // Now we write all of these paths to the modules directory.
            for (physical_path, logical_path) in file_paths {
-               let logical_path = module_dir.join(logical_path);
-               builder.append_path_with_name(physical_path, logical_path).await?;
+               if should_ignore_file(&physical_path) {
+                   debug!("ignoring file: {}", physical_path.display());
+               } else {
+                   let logical_path = module_dir.join(logical_path);
+                   debug!("adding file {}", logical_path.display());
+                   builder.append_path_with_name(physical_path, logical_path).await?;
+               }
            }
        }
 
        let manifest = Manifest {
+           import_paths,
            version: Some(CURRENT_PACKAGE_VERSION),
            invoke: String::from(spec.invoke),
            parameters: spec.parameters,
            schedule: spec.schedule,
-           import_paths: vec![],
+           app_dir_name: app_dir.to_string_lossy().to_string(),
+           modules_dir_name: module_dir.to_string_lossy().to_string(),
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
@@ -393,11 +422,26 @@ async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<
                 queue.push_back(entry.path());
             }
         } else {
-            let cp = physical_path.clone();
-            let logical_path = cp.strip_prefix(base_dir).unwrap();
+            if !should_ignore_file(&physical_path) {
+                let cp = physical_path.clone();
+                let logical_path = cp.strip_prefix(base_dir).unwrap();
 
-            debug!(" - resolved path {} to logical path {}", physical_path.display(), logical_path.display());
-            file_paths.insert(physical_path, logical_path.to_path_buf());
+                debug!(" - resolved path {} to logical path {}", physical_path.display(), logical_path.display());
+                file_paths.insert(physical_path, logical_path.to_path_buf());
+            }
         }
     }
+}
+
+fn should_ignore_file(p: &PathBuf) -> bool {
+    // Ignore anything that is compiled python
+    if p.ends_with(".pyc") {
+        return true;
+    }
+
+    if p.ends_with("Towerfile") {
+        return true;
+    }
+
+    return false;
 }
