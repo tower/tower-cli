@@ -15,6 +15,18 @@ use tower_package::{Package, PackageSpec, Manifest};
 use tower_telemetry::debug;
 use config::Towerfile;
 
+macro_rules! make_path {
+    ($($component:expr),+ $(,)?) => {
+        {
+            let mut path = PathBuf::new();
+            $(
+                path.push($component);
+            )+
+            &path.to_string_lossy().to_string()
+        }
+    };
+}
+
 #[tokio::test]
 async fn it_creates_package() {
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
@@ -184,7 +196,9 @@ async fn it_packages_import_paths() {
     // Let's decode the manifest and make sure import paths are set correctly.
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap()).await.expect("Manifest was not valid JSON");
 
-    assert!(manifest.import_paths.contains(&"modules/shared".to_string()), "Import paths {:?} did not contain expected path", manifest.import_paths);
+    // NOTE: These paths are joined by the OS so we need to be more specific about the expected
+    // path.
+    assert!(manifest.import_paths.contains(make_path!("modules", "shared")), "Import paths {:?} did not contain expected path", manifest.import_paths);
 }
 
 #[tokio::test]
