@@ -127,6 +127,9 @@ async fn find_bash() -> Result<PathBuf, Error> {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
+        // We need a uv instance to run the actual app.
+        let uv = tower_uv::Uv::new();
+
         let ctx = opts.ctx.clone();
         let package = opts.package;
         let environment = opts.environment;
@@ -149,69 +152,6 @@ impl App for LocalApp {
             opts.cwd.unwrap_or(package_path.to_path_buf())
         };
 
-        let mut is_virtualenv = false;
-
-        if Path::new(&working_dir.join("requirements.txt")).exists() {
-            debug!(ctx: &ctx, "requirements.txt file found. installing dependencies");
-
-            // There's a requirements.txt, so we'll create a new virtualenv and install the files
-            // taht we want in there.
-            let res = Command::new(python_path)
-                .current_dir(&working_dir)
-                .arg("-m")
-                .arg("venv")
-                .arg(".venv")
-                .kill_on_drop(true)
-                .spawn();
-
-            if let Ok(mut child) = res {
-                // Wait for the child to complete entirely.
-                child.wait().await.expect("child failed to exit");
-            } else {
-                return Err(Error::VirtualEnvCreationFailed);
-            }
-
-            let pip_path = find_pip(working_dir.join(".venv").join("bin")).await?;
-
-            // We need to update our local python, too
-            //
-            // TODO: Find a better way to operate in the context of a virtual env here.
-            python_path = find_python(Some(working_dir.join(".venv").join("bin"))).await?;
-            debug!(ctx: &ctx, "using virtualenv python at {:?}", python_path);
-
-            is_virtualenv = true;
-
-            let res = Command::new(pip_path)
-                .current_dir(&working_dir)
-                .arg("install")
-                .arg("-r")
-                .arg(working_dir.join("requirements.txt"))
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .kill_on_drop(true)
-                .spawn();
-
-            if let Ok(mut child) = res {
-                if let Some(ref sender) = opts.output_sender {
-                    // Let's also send our logs to this output channel.
-                    let stdout = child.stdout.take().expect("no stdout");
-                    tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
-
-                    let stderr = child.stderr.take().expect("no stderr");
-                    tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
-
-                }
-
-                debug!(ctx: &ctx, "waiting for dependency installation to complete");
-
-                // Wait for the child to complete entirely.
-                child.wait().await.expect("child failed to exit");
-            }
-        } else {
-            debug!(ctx: &ctx, "missing requirements.txt file found. no dependencies to install");
-        }
-
         debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
 
         let res = if package.manifest.invoke.ends_with(".sh") {
@@ -220,13 +160,12 @@ impl App for LocalApp {
             let params= opts.parameters;
             let other_env_vars = opts.env_vars;
 
-            Self::execute_bash_program(&ctx, &environment, working_dir, is_virtualenv, package_path, &manifest, secrets, params, other_env_vars).await
+            Self::execute_bash_program(&ctx, &environment, working_dir, package_path, &manifest, secrets, params, other_env_vars).await
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
-            let params= opts.parameters;
-            let mut other_env_vars = opts.env_vars;
-
+            let params = opts.parameters;
+            let other_env_vars = opts.env_vars;
             if !package.manifest.import_paths.is_empty() {
                 debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
 
@@ -252,11 +191,11 @@ impl App for LocalApp {
                     other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
                 }
             }
+            let env_vars = make_env_vars(&ctx, env, &cwd, &secrets, &params, &other_env_vars);
 
-            // We need to resolve the program 
-            let program_path = working_dir.join(manifest.invoke.clone());
-
-            Self::execute_python_program(&ctx, &environment, working_dir, is_virtualenv, python_path, program_path, &manifest, secrets, params, other_env_vars).await
+            // Now we also need to find the program to execute.
+            let program_path = package_path.join(&manifest.invoke);
+            uv.execute(package_path, program_path, env_vars, opts.output_sender).await;
         };
 
         if let Ok(mut child) = res {
@@ -267,7 +206,6 @@ impl App for LocalApp {
 
                 let stderr = child.stderr.take().expect("no stderr");
                 tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
-
             }
 
             let child = Arc::new(Mutex::new(child));
@@ -333,6 +271,7 @@ impl App for LocalApp {
 }
 
 impl LocalApp {
+<<<<<<< HEAD
     async fn execute_python_program(
         ctx: &tower_telemetry::Context,
         env: &str,
@@ -372,11 +311,12 @@ impl LocalApp {
         Ok(child)
     }
 
+=======
+>>>>>>> b76cd83 (feat: Integrate `uv` into `tower-runtime`)
     async fn execute_bash_program(
         ctx: &tower_telemetry::Context,
         env: &str,
         cwd: PathBuf,
-        is_virtualenv: bool,
         package_path: PathBuf,
         manifest: &Manifest,
         secrets: HashMap<String, String>,
@@ -394,7 +334,7 @@ impl LocalApp {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(&ctx, env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
+            .envs(make_env_vars(&ctx, env, &cwd, &secrets, &params, &other_env_vars))
             .kill_on_drop(true)
             .spawn()?;
 
@@ -411,7 +351,7 @@ fn make_env_var_key(src: &str) -> String {
     }
 }
 
-fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, is_virtualenv: bool, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
     debug!(ctx: &ctx, "converting {} env variables", (params.len() + secs.len()));
@@ -429,28 +369,6 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, is_vi
     for (key, value) in other_env_vars.into_iter() {
         debug!(ctx: &ctx, "adding key {}", &key);
         res.insert(key.to_string(), value.to_string());
-    }
-
-    // If we're in a virtual environment, we need to add the bin directory to the PATH so that we
-    // can find any executables that were installed there.
-    if is_virtualenv {
-        let venv_dir = cwd.join(".venv");
-        let venv_path = venv_dir
-            .to_string_lossy()
-            .to_string();
-
-        let bin_path = venv_dir.join("bin")
-            .to_string_lossy()
-            .to_string();
-
-        if let Ok(path) =  std::env::var("PATH") {
-            res.insert("PATH".to_string(), format!("{}:{}", bin_path, path));
-        } else {
-            res.insert("PATH".to_string(), bin_path);
-        }
-
-        // We also insert a VIRTUAL_ENV path such that we can 
-        res.insert("VIRTUAL_ENV".to_string(), venv_path);
     }
 
     // We also need a PYTHONPATH that is set to the current working directory to help with the

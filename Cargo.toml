@@ -53,6 +53,7 @@ tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 tower-telemetry = { path = "crates/tower-telemetry" }
+tower-uv = { path = "crates/tower-uv" }
 tracing = { version = "0.1" }
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }

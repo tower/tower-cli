@@ -12,3 +12,4 @@ tokio = { workspace = true }
 snafu = { workspace = true } 
 tower-package = { workspace = true } 
 tower-telemetry = { workspace = true } 
+tower-uv = { workspace = true } 
