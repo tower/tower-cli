@@ -202,6 +202,34 @@ async fn it_packages_import_paths() {
 }
 
 #[tokio::test]
+async fn it_excludes_various_content_that_should_not_be_there() {
+    let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py.pyc", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "some-app/test.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "some-app/__pycache__/test.pyc", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), ".git/some-file", "").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec![],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    assert!(!files.contains_key(".git/some-file"), "files {:?} had .git directory", files);
+    assert!(!files.contains_key("some-app/__pycache__/test.pyc"), "files {:?} contained a .pyc", files);
+    assert!(!files.contains_key("main.py.pyc"), "files {:?} contained a .pyc", files);
+}
+
+#[tokio::test]
 async fn building_package_spec_from_towerfile() {
     let toml = r#"
         [app]

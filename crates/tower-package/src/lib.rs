@@ -433,14 +433,48 @@ async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<
     }
 }
 
+fn is_in_dir(p: &PathBuf, dir: &str) -> bool {
+    let mut comps = p.components();
+    comps.any(|comp| {
+        if let std::path::Component::Normal(name) = comp {
+            name == dir
+        } else {
+            false
+        }
+    })
+}
+
+fn is_file(p: &PathBuf, name: &str) -> bool {
+    if let Some(file_name) = p.file_name() {
+        file_name == name
+    } else {
+        false
+    }
+}
+
 fn should_ignore_file(p: &PathBuf) -> bool {
     // Ignore anything that is compiled python
     if p.ends_with(".pyc") {
         return true;
     }
 
-    if p.ends_with("Towerfile") {
+    if is_file(p, "Towerfile") {
         return true;
+    }
+
+    // Ignore a .gitignore file
+    if is_file(p, ".gitignore") {
+        return true;
+    }
+
+    // Remove anything thats __pycache__
+    if is_in_dir(p, "__pycache__") {
+        return true
+    }
+
+    // Ignore anything that lives within a .git directory
+    if is_in_dir(p, ".git") {
+        return true
     }
 
     return false;
