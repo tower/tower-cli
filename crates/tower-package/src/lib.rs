@@ -250,7 +250,7 @@ impl Package {
            let mut file_paths = HashMap::new();
            resolve_path(&import_path, parent, &mut file_paths).await;
 
-           // The file_name should constitutde the logical path
+           // The file_name should constitute the logical path
            let import_path = import_path.file_name().unwrap();
            let import_path = module_dir.join(import_path);
            let import_path_str = import_path.into_os_string().into_string().unwrap();
