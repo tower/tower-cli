@@ -51,7 +51,7 @@ pub struct Manifest {
     #[serde(default)]
     pub app_dir_name: String,
 
-    // modules_dir_name is the name of of the modules directory within the package.
+    // modules_dir_name is the name of the modules directory within the package.
     #[serde(default)]
     pub modules_dir_name: String,
 }
