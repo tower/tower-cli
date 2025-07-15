@@ -459,7 +459,8 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, is_vi
     let pythonpath = if res.contains_key("PYTHONPATH") {
         // If we already have a PYTHONPATH, we need to append to it.
         let existing = res.get("PYTHONPATH").unwrap();
-        format!("{}:{}", existing, pythonpath)
+        let joined_paths = std::env::join_paths([existing, &pythonpath]).unwrap();
+        joined_paths.to_string_lossy().to_string()
     } else {
         // There was no previously set PYTHONPATH, so we just include our current directory.
         pythonpath
