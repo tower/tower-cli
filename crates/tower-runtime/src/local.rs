@@ -322,6 +322,8 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs:
         res.insert("TOWER_ENVIRONMENT".to_string(), env.to_string());
     }
 
+    res.insert("PYTHONUNBUFFERED".to_string(), "x".to_string());
+
     res
 }
 
