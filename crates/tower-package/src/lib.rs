@@ -47,7 +47,7 @@ pub struct Manifest {
     #[serde(default)]
     pub import_paths: Vec<String>,
 
-    // app_dir_name is the name of the application directroy within the package.
+    // app_dir_name is the name of the application directory within the package.
     #[serde(default)]
     pub app_dir_name: String,
 
