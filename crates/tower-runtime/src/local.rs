@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 use std::path::{Path, PathBuf};
 use std::env;
+=======
+use std::path::PathBuf;
+use std::env::{self, current_dir};
+>>>>>>> dc0898c (chore: Plumb in `tower-uv` to `tower-runtime`)
 use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -90,32 +95,6 @@ async fn find_executable_in_path(executable_name: &str) -> Option<PathBuf> {
     None
 }
 
-async fn find_pip(dir: PathBuf) -> Result<PathBuf, Error> {
-    if let Some(path) = find_executable_in_path_buf("pip", dir).await {
-        Ok(path)
-    } else {
-        Err(Error::MissingPip)
-    }
-}
-
-async fn find_python(dir: Option<PathBuf>) -> Result<PathBuf, Error> {
-    if let Some(dir) = dir {
-        // find a local python
-        if let Some(path) = find_executable_in_path_buf("python", dir).await {
-            Ok(path)
-        } else {
-            Err(Error::MissingPython)
-        }
-    } else {
-        // find the system installed python
-        if let Some(path) = find_executable_in_path("python").await {
-            Ok(path)
-        } else {
-            Err(Error::MissingPython)
-        }
-    }
-}
-
 async fn find_bash() -> Result<PathBuf, Error> {
     if let Some(path) = find_executable_in_path("bash").await {
         Ok(path)
@@ -128,7 +107,7 @@ async fn find_bash() -> Result<PathBuf, Error> {
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         // We need a uv instance to run the actual app.
-        let uv = tower_uv::Uv::new();
+        let uv = tower_uv::Uv::new().await?;
 
         let ctx = opts.ctx.clone();
         let package = opts.package;
@@ -141,10 +120,6 @@ impl App for LocalApp {
             .unwrap()
             .to_path_buf();
 
-        // We'll need the Python path for later on.
-        let mut python_path = find_python(None).await?;
-        debug!(ctx: &ctx, "using system python at {:?}", python_path);
-
         // set for later on.
         let working_dir = if package.manifest.version == Some(2) {
             package_path.join(&package.manifest.app_dir_name)
@@ -154,13 +129,13 @@ impl App for LocalApp {
 
         debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
 
-        let res = if package.manifest.invoke.ends_with(".sh") {
+        let mut child = if package.manifest.invoke.ends_with(".sh") {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
             let other_env_vars = opts.env_vars;
 
-            Self::execute_bash_program(&ctx, &environment, working_dir, package_path, &manifest, secrets, params, other_env_vars).await
+            Self::execute_bash_program(&ctx, &environment, working_dir, package_path, &manifest, secrets, params, other_env_vars).await?
         } else {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
@@ -191,39 +166,34 @@ impl App for LocalApp {
                     other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
                 }
             }
-            let env_vars = make_env_vars(&ctx, env, &cwd, &secrets, &params, &other_env_vars);
+            let env_vars = make_env_vars(&ctx, &environment, &package_path, &secrets, &params, &other_env_vars);
 
             // Now we also need to find the program to execute.
             let program_path = package_path.join(&manifest.invoke);
-            uv.execute(package_path, program_path, env_vars, opts.output_sender).await;
+            uv.execute(&package_path, &program_path, env_vars).await?
         };
 
-        if let Ok(mut child) = res {
-            if let Some(ref sender) = opts.output_sender {
-                // Let's also send our logs to this output channel.
-                let stdout = child.stdout.take().expect("no stdout");
-                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
+        if let Some(ref sender) = opts.output_sender {
+            // Let's also send our logs to this output channel.
+            let stdout = child.stdout.take().expect("no stdout");
+            tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
 
-                let stderr = child.stderr.take().expect("no stderr");
-                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
-            }
-
-            let child = Arc::new(Mutex::new(child));
-            let (sx, rx) = oneshot::channel::<i32>();
-
-            tokio::spawn(wait_for_process(ctx.clone(), sx, Arc::clone(&child)));
-
-            Ok(Self {
-                ctx,
-                package: Some(package),
-                child: Some(child),
-                waiter: Mutex::new(rx),
-                status: Mutex::new(None),
-            })
-        } else {
-            debug!(ctx: &ctx, "failed to spawn process: {}", res.err().unwrap());
-            Err(Error::SpawnFailed)
+            let stderr = child.stderr.take().expect("no stderr");
+            tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
         }
+
+        let child = Arc::new(Mutex::new(child));
+        let (sx, rx) = oneshot::channel::<i32>();
+
+        tokio::spawn(wait_for_process(ctx.clone(), sx, Arc::clone(&child)));
+
+        Ok(Self {
+            ctx,
+            package: Some(package),
+            child: Some(child),
+            waiter: Mutex::new(rx),
+            status: Mutex::new(None),
+        })
     }
 
     async fn status(&self) -> Result<Status, Error> {
@@ -271,48 +241,6 @@ impl App for LocalApp {
 }
 
 impl LocalApp {
-<<<<<<< HEAD
-    async fn execute_python_program(
-        ctx: &tower_telemetry::Context,
-        env: &str,
-        cwd: PathBuf,
-        is_virtualenv: bool,
-        python_path: PathBuf,
-        program_path: PathBuf,
-        manifest: &Manifest,
-        secrets: HashMap<String, String>,
-        params: HashMap<String, String>,
-        other_env_vars: HashMap<String, String>,
-    ) -> Result<Child, Error> {
-        let env_vars = make_env_vars(
-            &ctx,
-            env,
-            &cwd,
-            is_virtualenv,
-            &secrets,
-            &params,
-            &other_env_vars,
-        );
-
-        debug!(ctx: &ctx, " - python script {}", manifest.invoke);
-        debug!(ctx: &ctx, " - python path  {}", env_vars.get("PYTHONPATH").unwrap());
-
-        let child = Command::new(python_path)
-            .current_dir(&cwd)
-            .arg("-u")
-            .arg(program_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .envs(env_vars)
-            .kill_on_drop(true)
-            .spawn()?;
-
-        Ok(child)
-    }
-
-=======
->>>>>>> b76cd83 (feat: Integrate `uv` into `tower-runtime`)
     async fn execute_bash_program(
         ctx: &tower_telemetry::Context,
         env: &str,

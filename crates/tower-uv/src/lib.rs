@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::collections::HashMap;
+use std::process::Stdio;
 use tokio::process::{Command, Child};
 
 mod install;
@@ -104,11 +105,11 @@ impl Uv {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            .current_dir(cwd)
             .arg("run")
             .arg(program)
-            .cwd(cwd)
-            .env_vars(env_vars)
-            .spawn();
+            .envs(env_vars)
+            .spawn()?;
 
         Ok(child)
     }
