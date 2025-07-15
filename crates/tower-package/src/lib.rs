@@ -226,8 +226,6 @@ impl Package {
 
        // Now that we have all the paths, we'll append them to the builder.
        for (physical_path, logical_path) in file_paths {
-           // If the physical_path is a Towerfile, let's ignore it. We'll add it explicitly later
-           // one to the whole thing.
            if should_ignore_file(&physical_path) {
                debug!("ignoring file: {}", physical_path.display());
            } else {
