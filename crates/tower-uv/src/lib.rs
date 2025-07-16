@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::process::Stdio;
 use tokio::process::{Command, Child};
+use tower_telemetry::debug;
 
 mod install;
 
@@ -100,7 +101,39 @@ impl Uv {
         Ok(Uv { uv_path })
     }
 
-    pub async fn execute(&self, cwd: &PathBuf, program: &PathBuf, env_vars: HashMap<String, String>) -> Result<Child, Error> {
+    pub async fn venv(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
+        debug!("Executing UV ({:?}) venv in {:?}", &self.uv_path, cwd);
+
+        let child = Command::new(&self.uv_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .current_dir(cwd)
+            .arg("venv")
+            .envs(env_vars)
+            .spawn()?;
+
+        Ok(child)
+    }
+
+    pub async fn sync(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
+        debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
+
+        let child = Command::new(&self.uv_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .current_dir(cwd)
+            .arg("sync")
+            .envs(env_vars)
+            .spawn()?;
+
+        Ok(child)
+    }
+
+    pub async fn run(&self, cwd: &PathBuf, program: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
+        debug!("Executing UV ({:?}) run {:?} in {:?}", &self.uv_path, program, cwd);
+
         let child = Command::new(&self.uv_path)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

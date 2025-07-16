@@ -22,15 +22,23 @@ use crate::{
 use tokio::{
     fs,
     io::{AsyncRead, BufReader, AsyncBufReadExt},
-    time::{timeout, Duration},
-    sync::Mutex,
     process::{Child, Command}, 
-    sync::oneshot,
-    sync::oneshot::error::TryRecvError,
+    sync::{
+        Mutex,
+        oneshot::{
+            self,
+            error::TryRecvError,
+        },
+    },
+    task::JoinHandle,
+    time::{timeout, Duration},
 };
+
+use tokio_util::sync::CancellationToken;
 
 use tower_package::{Manifest, Package};
 use tower_telemetry::debug;
+use tower_uv::Uv;
 
 use crate::{
     FD,
@@ -42,15 +50,17 @@ use crate::{
 pub struct LocalApp {
     ctx: tower_telemetry::Context,
 
-    // LocalApp needs to take ownership of the package as a way of taking responsibility for it's
-    // lifetime and, most importantly, it's contents. The compiler complains that we never actually
-    // use this struct member, so we allow the dead_code attribute to silence the warning.
-    #[allow(dead_code)]
-    package: Option<Package>,
-
-    child: Option<Arc<Mutex<Child>>>,
     status: Mutex<Option<Status>>,
+
+    // waiter is what we use to communicate that the overall process is finished by the execution
+    // handle.
     waiter: Mutex<oneshot::Receiver<i32>>,
+
+    // terminator is what we use to flag that we want to terminate the child process.
+    terminator: Mutex<CancellationToken>,
+
+    // execute_handle keeps track of the current state of the execution lifecycle.
+    execute_handle: Option<JoinHandle<Result<(), Error>>>,
 }
 
 // Helper function to check if a file is executable
@@ -103,78 +113,79 @@ async fn find_bash() -> Result<PathBuf, Error> {
     }
 }
 
+async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_token: CancellationToken) -> Result<(), Error> {
+    let ctx = opts.ctx.clone();
+    let package = opts.package;
+    let environment = opts.environment;
+    let package_path = package.unpacked_path
+        .clone()
+        .unwrap()
+        .to_path_buf();
 
-impl App for LocalApp {
-    async fn start(opts: StartOptions) -> Result<Self, Error> {
-        // We need a uv instance to run the actual app.
-        let uv = tower_uv::Uv::new().await?;
+    // set for later on.
+    let working_dir = if package.manifest.version == Some(2) {
+        package_path.join(&package.manifest.app_dir_name)
+    } else {
+        opts.cwd.unwrap_or(package_path.to_path_buf())
+    };
 
-        let ctx = opts.ctx.clone();
-        let package = opts.package;
-        let environment = opts.environment;
-        debug!(ctx: &ctx, "executing app with version {:?}", package.manifest.version);
+    debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
 
-        // This is the base path of where the package was unpacked.
-        let package_path = package.unpacked_path
-            .clone()
-            .unwrap()
-            .to_path_buf();
+    let manifest = &package.manifest;
+    let secrets = opts.secrets;
+    let params = opts.parameters;
+    let other_env_vars = opts.env_vars;
 
-        // set for later on.
-        let working_dir = if package.manifest.version == Some(2) {
-            package_path.join(&package.manifest.app_dir_name)
+    if !package.manifest.import_paths.is_empty() {
+        debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
+
+        let import_paths = package.manifest.import_paths
+            .iter()
+            .map(|p| package_path.join(p))
+            .collect::<Vec<_>>();
+
+        let import_paths = std::env::join_paths(import_paths)?
+            .to_string_lossy()
+            .to_string();
+
+        if other_env_vars.contains_key("PYTHONPATH") {
+            // If we already have a PYTHONPATH, we need to append to it.
+            let existing = other_env_vars.get("PYTHONPATH").unwrap();
+            let pythonpath = std::env::join_paths(vec![existing, &import_paths])?
+                .to_string_lossy()
+                .to_string();
+
+            other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
         } else {
-            opts.cwd.unwrap_or(package_path.to_path_buf())
-        };
+            // Otherwise, we just set it.
+            other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
+        }
+    }
 
-        debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
+    if is_bash_package(&package) {
+        let child = execute_bash_program(
+            &ctx,
+            &environment,
+            working_dir,
+            package_path,
+            &manifest,
+            secrets,
+            params,
+            other_env_vars,
+        ).await?;
 
-        let mut child = if package.manifest.invoke.ends_with(".sh") {
-            let manifest = &package.manifest;
-            let secrets = opts.secrets;
-            let params= opts.parameters;
-            let other_env_vars = opts.env_vars;
+        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+    } else  {
+        let uv = Uv::new().await?;
+        let env_vars = make_env_vars(&ctx, &environment, &package_path, &secrets, &params, &other_env_vars);
 
-            Self::execute_bash_program(&ctx, &environment, working_dir, package_path, &manifest, secrets, params, other_env_vars).await?
-        } else {
-            let manifest = &package.manifest;
-            let secrets = opts.secrets;
-            let params = opts.parameters;
-            let other_env_vars = opts.env_vars;
-            if !package.manifest.import_paths.is_empty() {
-                debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
+        // Now we also need to find the program to execute.
+        let program_path = package_path.join(&manifest.invoke);
 
-                let import_paths = package.manifest.import_paths
-                    .iter()
-                    .map(|p| package_path.join(p))
-                    .collect::<Vec<_>>();
+        let mut child = uv.sync(&package_path, &env_vars).await?;
 
-                let import_paths = std::env::join_paths(import_paths)?
-                    .to_string_lossy()
-                    .to_string();
-
-                if other_env_vars.contains_key("PYTHONPATH") {
-                    // If we already have a PYTHONPATH, we need to append to it.
-                    let existing = other_env_vars.get("PYTHONPATH").unwrap();
-                    let pythonpath = std::env::join_paths(vec![existing, &import_paths])?
-                        .to_string_lossy()
-                        .to_string();
-
-                    other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
-                } else {
-                    // Otherwise, we just set it.
-                    other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
-                }
-            }
-            let env_vars = make_env_vars(&ctx, &environment, &package_path, &secrets, &params, &other_env_vars);
-
-            // Now we also need to find the program to execute.
-            let program_path = package_path.join(&manifest.invoke);
-            uv.execute(&package_path, &program_path, env_vars).await?
-        };
-
+        // Drain the logs to the output channel.
         if let Some(ref sender) = opts.output_sender {
-            // Let's also send our logs to this output channel.
             let stdout = child.stdout.take().expect("no stdout");
             tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
 
@@ -182,16 +193,43 @@ impl App for LocalApp {
             tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
         }
 
-        let child = Arc::new(Mutex::new(child));
-        let (sx, rx) = oneshot::channel::<i32>();
+        // Let's wait for the setup to finish. We don't care about the results.
+        wait_for_process(ctx.clone(), &cancel_token, child).await;
 
-        tokio::spawn(wait_for_process(ctx.clone(), sx, Arc::clone(&child)));
+        let mut child = uv.run(&package_path, &program_path, &env_vars).await?;
+
+        // Drain the logs to the output channel.
+        if let Some(ref sender) = opts.output_sender {
+            let stdout = child.stdout.take().expect("no stdout");
+            tokio::spawn(drain_output(FD::Stdout, Channel::Program, sender.clone(), BufReader::new(stdout)));
+
+            let stderr = child.stderr.take().expect("no stderr");
+            tokio::spawn(drain_output(FD::Stderr, Channel::Program, sender.clone(), BufReader::new(stderr)));
+        }
+
+        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+    }
+
+    return Ok(())
+} 
+
+impl App for LocalApp {
+    async fn start(opts: StartOptions) -> Result<Self, Error> {
+        let ctx = opts.ctx.clone();
+        let cancel_token = CancellationToken::new();
+        let terminator = Mutex::new(cancel_token.clone());
+
+        let (sx, rx) = oneshot::channel::<i32>();
+        let waiter = Mutex::new(rx);
+
+        let handle = tokio::spawn(execute_local_app(opts, sx, cancel_token));
+        let execute_handle = Some(handle);
 
         Ok(Self {
             ctx,
-            package: Some(package),
-            child: Some(child),
-            waiter: Mutex::new(rx),
+            execute_handle,
+            terminator,
+            waiter,
             status: Mutex::new(None),
         })
     }
@@ -224,50 +262,45 @@ impl App for LocalApp {
     }
 
     async fn terminate(&mut self) -> Result<(), Error> {
-        if let Some(proc) = &mut self.child {
-            let mut child = proc.lock().await;
+        let terminator = self.terminator.lock().await;
+        terminator.cancel();
 
-            if let Err(err) = child.kill().await {
-                debug!(ctx: &self.ctx, "failed to terminate app: {}", err);
-                Err(Error::TerminateFailed)
-            } else {
-                Ok(())
-            }
-        } else {
-            // Nothing to terminate. Should this be an error?
-            Ok(())
-        }
+        // Now we should wait for the join handle to finish.
+        if let Some(execute_handle) = self.execute_handle.take() {
+            execute_handle.await;
+            self.execute_handle = None;
+        } 
+
+        Ok(())
     }
 }
 
-impl LocalApp {
-    async fn execute_bash_program(
-        ctx: &tower_telemetry::Context,
-        env: &str,
-        cwd: PathBuf,
-        package_path: PathBuf,
-        manifest: &Manifest,
-        secrets: HashMap<String, String>,
-        params: HashMap<String, String>,
-        other_env_vars: HashMap<String, String>,
-    ) -> Result<Child, Error> {
-        let bash_path = find_bash().await?;
-        debug!(ctx: &ctx, "using bash at {:?}", bash_path);
+async fn execute_bash_program(
+    ctx: &tower_telemetry::Context,
+    env: &str,
+    cwd: PathBuf,
+    package_path: PathBuf,
+    manifest: &Manifest,
+    secrets: HashMap<String, String>,
+    params: HashMap<String, String>,
+    other_env_vars: HashMap<String, String>,
+) -> Result<Child, Error> {
+    let bash_path = find_bash().await?;
+    debug!(ctx: &ctx, "using bash at {:?}", bash_path);
 
-        debug!(ctx: &ctx, " - bash script {}", manifest.invoke);
+    debug!(ctx: &ctx, " - bash script {}", manifest.invoke);
 
-        let child = Command::new(bash_path)
-            .current_dir(&cwd)
-            .arg(package_path.join(manifest.invoke.clone()))
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .envs(make_env_vars(&ctx, env, &cwd, &secrets, &params, &other_env_vars))
-            .kill_on_drop(true)
-            .spawn()?;
+    let child = Command::new(bash_path)
+        .current_dir(&cwd)
+        .arg(package_path.join(manifest.invoke.clone()))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .envs(make_env_vars(&ctx, env, &cwd, &secrets, &params, &other_env_vars))
+        .kill_on_drop(true)
+        .spawn()?;
 
-        Ok(child)
-    }
+    Ok(child)
 }
 
 fn make_env_var_key(src: &str) -> String {
@@ -327,13 +360,17 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs:
     res
 }
 
-async fn wait_for_process(ctx: tower_telemetry::Context, sx: oneshot::Sender<i32>, proc: Arc<Mutex<Child>>) {
+async fn wait_for_process(ctx: tower_telemetry::Context, cancel_token: &CancellationToken, mut child: Child) -> i32 {
     let code = loop {
-        let mut child = proc.lock().await;
-        let timeout = timeout(Duration::from_millis(250), child.wait()).await;
+        if cancel_token.is_cancelled() {
+            debug!(ctx: &ctx, "process cancelled, terminating child process");
+            let _ = child.kill().await;
+            break -1; // return -1 to indicate that the process was cancelled.
+        }
+
+        let timeout = timeout(Duration::from_millis(25), child.wait()).await;
 
         if let Ok(res) = timeout {
-
             if let Ok(status) = res {
                 break status.code().expect("no status code");
             } else {
@@ -347,7 +384,7 @@ async fn wait_for_process(ctx: tower_telemetry::Context, sx: oneshot::Sender<i32
     debug!(ctx: &ctx, "process exited with code {}", code);
 
     // this just shuts up the compiler about ignoring the results.
-    let _ = sx.send(code);
+    code
 }
 
 async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: OutputSender, input: BufReader<R>) {
@@ -365,3 +402,7 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Ou
     }
 }
 
+
+fn is_bash_package(package: &Package) -> bool {
+    return package.manifest.invoke.ends_with(".sh")
+}
