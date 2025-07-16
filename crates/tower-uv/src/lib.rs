@@ -124,6 +124,9 @@ impl Uv {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .current_dir(cwd)
+            .arg("--color")
+            .arg("never")
+            .arg("--no-progress")
             .arg("sync")
             .envs(env_vars)
             .spawn()?;

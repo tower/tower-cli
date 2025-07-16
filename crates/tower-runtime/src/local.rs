@@ -184,7 +184,7 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         let env_vars = make_env_vars(&ctx, &environment, &package_path, &secrets, &params, &other_env_vars);
 
         // Now we also need to find the program to execute.
-        let program_path = package_path.join(&manifest.invoke);
+        let program_path = working_dir.join(&manifest.invoke);
 
         // Check once more if the process was cancelled before we do a uv sync. The sync itself,
         // once started, will take a while and we have logic for checking for cancellation.
@@ -194,7 +194,7 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
             return Err(Error::Cancelled);
         }
 
-        let mut child = uv.sync(&package_path, &env_vars).await?;
+        let mut child = uv.sync(&working_dir, &env_vars).await?;
 
         // Drain the logs to the output channel.
         if let Some(ref sender) = opts.output_sender {
@@ -216,7 +216,7 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
             return Err(Error::Cancelled);
         }
 
-        let mut child = uv.run(&package_path, &program_path, &env_vars).await?;
+        let mut child = uv.run(&working_dir, &program_path, &env_vars).await?;
 
         // Drain the logs to the output channel.
         if let Some(ref sender) = opts.output_sender {
