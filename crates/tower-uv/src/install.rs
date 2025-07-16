@@ -9,6 +9,9 @@ use futures_lite::io::AsyncReadExt;
 
 use tower_telemetry::debug;
 
+// Copy the UV_VERSION locally to make this a bit more ergonomic.
+const UV_VERSION: &str = crate::UV_VERSION;
+
 #[derive(Debug)]
 pub enum Error {
     IoError(std::io::Error),
@@ -194,7 +197,7 @@ fn extract_package_name(archive: String) -> String {
 
 async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf, Error> {
     debug!("Downloading UV archive: {}", archive);
-    let url = format!("https://github.com/astral-sh/uv/releases/download/0.7.13/{}", archive);
+    let url = format!("https://github.com/astral-sh/uv/releases/download/{}/{}", UV_VERSION, archive);
     
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(&path).map_err(Error::IoError)?;
