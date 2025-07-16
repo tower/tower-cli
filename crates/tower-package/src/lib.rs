@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::collections::{VecDeque, HashMap};
 use tokio::{
     fs::File,
     io::{AsyncRead, BufReader, AsyncReadExt, AsyncWriteExt},
@@ -18,7 +19,7 @@ use tower_telemetry::debug;
 mod error;
 pub use error::Error;
 
-const CURRENT_PACKAGE_VERSION: i32 = 1;
+const CURRENT_PACKAGE_VERSION: i32 = 2;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Parameter{
@@ -29,7 +30,10 @@ pub struct Parameter{
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Manifest {
+    // version is the version of the packaging format that was used.
     pub version: Option<i32>,
+
+    // invoke is the target in this package to invoke.
     pub invoke: String,
 
     #[serde(default)]
@@ -38,6 +42,18 @@ pub struct Manifest {
     // schedule is the schedule that we want to execute this app on. this is, just temporarily,
     // where it will live.
     pub schedule: Option<String>,
+
+    // import_paths are the rewritten collection of modules that this app's code goes into.
+    #[serde(default)]
+    pub import_paths: Vec<String>,
+
+    // app_dir_name is the name of the application directory within the package.
+    #[serde(default)]
+    pub app_dir_name: String,
+
+    // modules_dir_name is the name of the modules directory within the package.
+    #[serde(default)]
+    pub modules_dir_name: String,
 }
 
 impl Manifest {
@@ -45,9 +61,12 @@ impl Manifest {
         let mut file = File::open(path).await?;
         let mut contents = String::new();
         file.read_to_string(&mut contents).await?;
+        Self::from_json(&contents).await
+    }
 
-        let manifest: Self = serde_json::from_str(&contents)?;
-        Ok(manifest)
+    pub async fn from_json(data: &str) -> Result<Self, Error> {
+        let manifest: Self = serde_json::from_str(data)?;
+        Ok(manifest) 
     }
 }
 
@@ -71,6 +90,8 @@ pub struct PackageSpec {
 
     // schedule defines the frequency that this app should be run on.
     pub schedule: Option<String>,
+
+    pub import_paths: Vec<String>,
 }
 
 fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
@@ -89,7 +110,9 @@ impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
         debug!("creating package spec from towerfile: {:?}", towerfile);
         let towerfile_path = towerfile.file_path.clone();
-        let base_dir = towerfile.app.workspace.clone();
+        let base_dir = towerfile_path.parent().
+            unwrap_or_else(|| Path::new(".")).
+            to_path_buf();
 
         let schedule = if towerfile.app.schedule.is_empty() {
             None
@@ -97,10 +120,16 @@ impl PackageSpec {
             Some(towerfile.app.schedule.to_string())
         };
 
+        // We need to turn these (validated) paths into something taht we can use at runtime.
+        let import_paths = towerfile.app.import_paths.iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+
         Self {
             schedule,
             towerfile_path,
             base_dir,
+            import_paths,
             invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
             parameters: get_parameters(towerfile),
@@ -133,6 +162,9 @@ impl Package {
                invoke: "".to_string(),
                parameters: vec![],
                schedule: None,
+               import_paths: vec![],
+               app_dir_name: "app".to_string(),
+               modules_dir_name: "modules".to_string(),
            },
        }
    }
@@ -170,31 +202,70 @@ impl Package {
        let gzip = GzipEncoder::new(file);
        let mut builder = Builder::new(gzip);
 
-       for file_glob in spec.file_globs {
+       // If the user didn't specify anything here we'll package everything under this directory
+       // and ship it to Tower.
+       let mut file_globs = spec.file_globs.clone();
+
+       // If there was no source specified, we'll pull in all the source code in the current
+       // directory.
+       if file_globs.is_empty() {
+           debug!("no source files specified. using default paths.");
+           file_globs.push("./**/*".to_string()); 
+       } 
+
+       // We'll collect all the file paths in a collection here.
+       let mut file_paths = HashMap::new();
+
+       for file_glob in file_globs {
            let path = base_dir.join(file_glob);
-           let path_str = extract_glob_path(path);
-           debug!("resolving glob pattern: {}", path_str);
+           resolve_glob_path(path, &base_dir, &mut file_paths).await;
+       }
 
-           for entry in glob(&path_str).unwrap() {
-               let physical_path = entry.unwrap()
-                   .canonicalize()
-                   .unwrap();
+       // App code lives in the app dir
+       let app_dir = PathBuf::from("app");
 
-               debug!(" - adding file: {:?}", physical_path);
+       // Now that we have all the paths, we'll append them to the builder.
+       for (physical_path, logical_path) in file_paths {
+           // All of the app code goes into the "app" directory.
+           let logical_path = app_dir.join(logical_path);
+           builder.append_path_with_name(physical_path, logical_path).await?;
+       }
 
-               // turn this back in to a path that is relative to the TAR file root
-               let cp = physical_path.clone();
-               let logical_path = cp.strip_prefix(&base_dir).unwrap();
+       // Module code lives in the modules dir.
+       let module_dir = PathBuf::from("modules");
+       let mut import_paths = vec![];
 
+       // Now we need to package up all the modules to include in the code base too.
+       for import_path in &spec.import_paths {
+           // The import_path should always be relative to the base_path.
+           let import_path = base_dir.join(import_path).canonicalize()?;
+           let parent = import_path.parent().unwrap();
+
+           let mut file_paths = HashMap::new();
+           resolve_path(&import_path, parent, &mut file_paths).await;
+
+           // The file_name should constitute the logical path
+           let import_path = import_path.file_name().unwrap();
+           let import_path = module_dir.join(import_path);
+           let import_path_str = import_path.into_os_string().into_string().unwrap();
+           import_paths.push(import_path_str);
+
+           // Now we write all of these paths to the modules directory.
+           for (physical_path, logical_path) in file_paths {
+               let logical_path = module_dir.join(logical_path);
+               debug!("adding file {}", logical_path.display());
                builder.append_path_with_name(physical_path, logical_path).await?;
            }
        }
 
        let manifest = Manifest {
+           import_paths,
            version: Some(CURRENT_PACKAGE_VERSION),
            invoke: String::from(spec.invoke),
            parameters: spec.parameters,
            schedule: spec.schedule,
+           app_dir_name: app_dir.to_string_lossy().to_string(),
+           modules_dir_name: module_dir.to_string_lossy().to_string(),
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
@@ -211,18 +282,13 @@ impl Package {
            "Towerfile",
        ).await?;
 
-       // consume the builder to close it, then close the underlying gzip stream
-       let mut file = builder.into_inner().await?;
-       file.shutdown().await?;
-
-       // TODO: When we want to enable gzip compression, we can uncomment the following lines.
        // We'll need to delete the lines above here.
-       //let mut gzip = builder.into_inner().await?;
-       //gzip.shutdown().await?;
+       let mut gzip = builder.into_inner().await?;
+       gzip.shutdown().await?;
 
        //// probably not explicitly required; however, makes the test suite pass so...
-       //let mut file = gzip.into_inner();
-       //file.shutdown().await?;
+       let mut file = gzip.into_inner();
+       file.shutdown().await?;
 
        Ok(Self {
            manifest,
@@ -321,4 +387,106 @@ async fn unpack_archive<P: AsRef<Path>>(package_path: P, output_path: P) -> Resu
     archive.unpack(output_path).await?;
     
     Ok(())
+}
+
+async fn resolve_glob_path(path: PathBuf, base_dir: &PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
+   let path_str = extract_glob_path(path);
+   debug!("resolving glob pattern: {}", path_str);
+
+   for entry in glob(&path_str).unwrap() {
+       resolve_path(&entry.unwrap(), base_dir, file_paths).await;
+   }
+}
+
+async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<PathBuf, PathBuf>) {
+    let mut queue = VecDeque::new();
+    queue.push_back(path.to_path_buf());
+
+    while let Some(current_path) = queue.pop_front() {
+        let canonical_path = current_path.canonicalize();
+
+        if canonical_path.is_err() {
+            debug!(" - skipping path {}: {}", current_path.display(), canonical_path.unwrap_err());
+            continue;         
+        }
+
+        // We can safely unwrap this because we understand that it's not going to fail at this
+        // point.
+        let physical_path = canonical_path.unwrap();
+
+        if physical_path.is_dir() {
+            let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
+
+            while let Some(entry) = entries.next_entry().await.unwrap() {
+                queue.push_back(entry.path());
+            }
+        } else {
+            if !should_ignore_file(&physical_path) {
+                let cp = physical_path.clone();
+
+                match cp.strip_prefix(base_dir) {
+                    Err(err) => {
+                        debug!(" - skipping file {}: not in base directory {}: {:?}", physical_path.display(), base_dir.display(), err);
+                        continue;
+                    }
+                    Ok(logical_path) => {
+                        debug!(" - resolved path {} to logical path {}", physical_path.display(), logical_path.display());
+                        file_paths.insert(physical_path, logical_path.to_path_buf());
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn is_in_dir(p: &PathBuf, dir: &str) -> bool {
+    let mut comps = p.components();
+    comps.any(|comp| {
+        if let std::path::Component::Normal(name) = comp {
+            name == dir
+        } else {
+            false
+        }
+    })
+}
+
+fn is_file(p: &PathBuf, name: &str) -> bool {
+    if let Some(file_name) = p.file_name() {
+        file_name == name
+    } else {
+        false
+    }
+}
+
+fn should_ignore_file(p: &PathBuf) -> bool {
+    // Ignore anything that is compiled python
+    if p.ends_with(".pyc") {
+        return true;
+    }
+
+    if is_file(p, "Towerfile") {
+        return true;
+    }
+
+    // Ignore a .gitignore file
+    if is_file(p, ".gitignore") {
+        return true;
+    }
+
+    // Remove anything thats __pycache__
+    if is_in_dir(p, "__pycache__") {
+        return true
+    }
+
+    // Ignore anything that lives within a .git directory
+    if is_in_dir(p, ".git") {
+        return true
+    }
+
+    // Ignore anything that's in a virtualenv, too
+    if is_in_dir(p, ".venv") {
+        return true
+    }
+
+    return false;
 }
