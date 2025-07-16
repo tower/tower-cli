@@ -51,6 +51,22 @@ jobs:
         env:
           RUST_LOG: debug
 
+      - name: Continue to evict openssl
+        run: >
+          cargo tree -i openssl-sys
+          if [[ $? -eq 0 ]];
+          then
+            echo "openssl is present in the dependency tree. Please evict it."
+            exit 1
+          fi
+
+          cargo tree -i native-tls
+          if [[ $? -eq 0 ]];
+          then
+            echo "native-tls is present in the dependency tree. Please evict it."
+            exit 1
+          fi
+
 #  integration-test:
 #    runs-on: ${{ matrix.os }}
 #    strategy:
