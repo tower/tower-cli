@@ -52,6 +52,7 @@ jobs:
           RUST_LOG: debug
 
       - name: Continue to evict openssl
+        shell: bash
         run: >
           echo "Checking for openssl-sys in dependency tree..."
           if cargo tree -i openssl-sys >/dev/null 2>&1; then
