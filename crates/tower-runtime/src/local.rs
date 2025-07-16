@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::env::{self, current_dir};
+use std::env;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -130,24 +130,28 @@ impl App for LocalApp {
         let ctx = opts.ctx.clone();
         let package = opts.package;
         let environment = opts.environment;
+        debug!(ctx: &ctx, "executing app with version {:?}", package.manifest.version);
+
+        // This is the base path of where the package was unpacked.
         let package_path = package.unpacked_path
             .clone()
             .unwrap()
             .to_path_buf();
 
+        // We'll need the Python path for later on.
         let mut python_path = find_python(None).await?;
         debug!(ctx: &ctx, "using system python at {:?}", python_path);
 
         // set for later on.
-        let working_dir = if let Some(dir) = opts.cwd {
-            dir 
+        let working_dir = if package.manifest.version == Some(2) {
+            package_path.join(&package.manifest.app_dir_name)
         } else {
-            current_dir().unwrap()
+            opts.cwd.unwrap_or(package_path.to_path_buf())
         };
 
         let mut is_virtualenv = false;
 
-        if Path::new(&package_path.join("requirements.txt")).exists() {
+        if Path::new(&working_dir.join("requirements.txt")).exists() {
             debug!(ctx: &ctx, "requirements.txt file found. installing dependencies");
 
             // There's a requirements.txt, so we'll create a new virtualenv and install the files
@@ -221,9 +225,38 @@ impl App for LocalApp {
             let manifest = &package.manifest;
             let secrets = opts.secrets;
             let params= opts.parameters;
-            let other_env_vars = opts.env_vars;
+            let mut other_env_vars = opts.env_vars;
 
-            Self::execute_python_program(&ctx, &environment, working_dir, is_virtualenv, python_path, package_path, &manifest, secrets, params, other_env_vars).await
+            if !package.manifest.import_paths.is_empty() {
+                debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
+
+                let import_paths = package.manifest.import_paths
+                    .iter()
+                    .map(|p| package_path.join(p))
+                    .collect::<Vec<_>>();
+
+                let import_paths = std::env::join_paths(import_paths)?
+                    .to_string_lossy()
+                    .to_string();
+
+                if other_env_vars.contains_key("PYTHONPATH") {
+                    // If we already have a PYTHONPATH, we need to append to it.
+                    let existing = other_env_vars.get("PYTHONPATH").unwrap();
+                    let pythonpath = std::env::join_paths(vec![existing, &import_paths])?
+                        .to_string_lossy()
+                        .to_string();
+
+                    other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
+                } else {
+                    // Otherwise, we just set it.
+                    other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
+                }
+            }
+
+            // We need to resolve the program 
+            let program_path = working_dir.join(manifest.invoke.clone());
+
+            Self::execute_python_program(&ctx, &environment, working_dir, is_virtualenv, python_path, program_path, &manifest, secrets, params, other_env_vars).await
         };
 
         if let Ok(mut child) = res {
@@ -306,22 +339,33 @@ impl LocalApp {
         cwd: PathBuf,
         is_virtualenv: bool,
         python_path: PathBuf,
-        package_path: PathBuf,
+        program_path: PathBuf,
         manifest: &Manifest,
         secrets: HashMap<String, String>,
         params: HashMap<String, String>,
         other_env_vars: HashMap<String, String>,
     ) -> Result<Child, Error> {
+        let env_vars = make_env_vars(
+            &ctx,
+            env,
+            &cwd,
+            is_virtualenv,
+            &secrets,
+            &params,
+            &other_env_vars,
+        );
+
         debug!(ctx: &ctx, " - python script {}", manifest.invoke);
+        debug!(ctx: &ctx, " - python path  {}", env_vars.get("PYTHONPATH").unwrap());
 
         let child = Command::new(python_path)
             .current_dir(&cwd)
             .arg("-u")
-            .arg(package_path.join(manifest.invoke.clone()))
+            .arg(program_path)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(make_env_vars(&ctx, env, &cwd, is_virtualenv, &secrets, &params, &other_env_vars))
+            .envs(env_vars)
             .kill_on_drop(true)
             .spawn()?;
 
@@ -412,6 +456,16 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, is_vi
     // We also need a PYTHONPATH that is set to the current working directory to help with the
     // dependency resolution problem at runtime.
     let pythonpath = cwd.to_string_lossy().to_string();
+    let pythonpath = if res.contains_key("PYTHONPATH") {
+        // If we already have a PYTHONPATH, we need to append to it.
+        let existing = res.get("PYTHONPATH").unwrap();
+        let joined_paths = std::env::join_paths([existing, &pythonpath]).unwrap();
+        joined_paths.to_string_lossy().to_string()
+    } else {
+        // There was no previously set PYTHONPATH, so we just include our current directory.
+        pythonpath
+    };
+
     res.insert("PYTHONPATH".to_string(), pythonpath);
 
     // Inject a TOWER_ENVIRONMENT parameter so you know what environment you're running in. Empty
