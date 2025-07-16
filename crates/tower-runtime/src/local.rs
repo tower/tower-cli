@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-use std::path::{Path, PathBuf};
-use std::env;
-=======
 use std::path::PathBuf;
-use std::env::{self, current_dir};
->>>>>>> dc0898c (chore: Plumb in `tower-uv` to `tower-runtime`)
+use std::env;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -134,7 +129,7 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
     let manifest = &package.manifest;
     let secrets = opts.secrets;
     let params = opts.parameters;
-    let other_env_vars = opts.env_vars;
+    let mut other_env_vars = opts.env_vars;
 
     if !package.manifest.import_paths.is_empty() {
         debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
