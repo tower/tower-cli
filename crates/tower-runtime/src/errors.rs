@@ -61,6 +61,9 @@ pub enum Error {
 
     #[snafu(display("running Tower apps on this platform is not supported"))]
     UnsupportedPlatform,
+
+    #[snafu(display("cancelled"))]
+    Cancelled,
 }
 
 impl From<std::io::Error> for Error {

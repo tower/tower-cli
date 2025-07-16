@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::env;
 use std::process::Stdio;
-use std::sync::Arc;
 use std::collections::HashMap;
 
 #[cfg(unix)]
@@ -43,8 +42,6 @@ use crate::{
 };
 
 pub struct LocalApp {
-    ctx: tower_telemetry::Context,
-
     status: Mutex<Option<Status>>,
 
     // waiter is what we use to communicate that the overall process is finished by the execution
@@ -157,6 +154,18 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         }
     }
 
+    // We insert these checks for cancellation along the way to see if the process was
+    // terminated by someone.
+    //
+    // We do this before instantiating `Uv` because that can be somewhat time consuming. Likewise
+    // this stops us from instantiating a bash process.
+    if cancel_token.is_cancelled() {
+        // if there's a waiter, we want them to know that the process was cancelled so we have
+        // to return something on the relevant channel.
+        let _ = sx.send(-1);
+        return Err(Error::Cancelled);
+    }
+
     if is_bash_package(&package) {
         let child = execute_bash_program(
             &ctx,
@@ -177,6 +186,14 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         // Now we also need to find the program to execute.
         let program_path = package_path.join(&manifest.invoke);
 
+        // Check once more if the process was cancelled before we do a uv sync. The sync itself,
+        // once started, will take a while and we have logic for checking for cancellation.
+        if cancel_token.is_cancelled() {
+            // again tell any waiters that we cancelled.
+            let _ = sx.send(-1);
+            return Err(Error::Cancelled);
+        }
+
         let mut child = uv.sync(&package_path, &env_vars).await?;
 
         // Drain the logs to the output channel.
@@ -190,6 +207,14 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
 
         // Let's wait for the setup to finish. We don't care about the results.
         wait_for_process(ctx.clone(), &cancel_token, child).await;
+
+        // Check once more to see if the process was cancelled, this will bail us out early.
+        if cancel_token.is_cancelled() {
+            // if there's a waiter, we want them to know that the process was cancelled so we have
+            // to return something on the relevant channel.
+            let _ = sx.send(-1);
+            return Err(Error::Cancelled);
+        }
 
         let mut child = uv.run(&package_path, &program_path, &env_vars).await?;
 
@@ -205,12 +230,12 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     }
 
+    // Everything was properly executed I suppose.
     return Ok(())
 } 
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        let ctx = opts.ctx.clone();
         let cancel_token = CancellationToken::new();
         let terminator = Mutex::new(cancel_token.clone());
 
@@ -221,7 +246,6 @@ impl App for LocalApp {
         let execute_handle = Some(handle);
 
         Ok(Self {
-            ctx,
             execute_handle,
             terminator,
             waiter,
@@ -262,7 +286,7 @@ impl App for LocalApp {
 
         // Now we should wait for the join handle to finish.
         if let Some(execute_handle) = self.execute_handle.take() {
-            execute_handle.await;
+            let _  = execute_handle.await;
             self.execute_handle = None;
         } 
 
