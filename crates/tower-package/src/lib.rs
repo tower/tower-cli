@@ -423,10 +423,17 @@ async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<
         } else {
             if !should_ignore_file(&physical_path) {
                 let cp = physical_path.clone();
-                let logical_path = cp.strip_prefix(base_dir).unwrap();
 
-                debug!(" - resolved path {} to logical path {}", physical_path.display(), logical_path.display());
-                file_paths.insert(physical_path, logical_path.to_path_buf());
+                match cp.strip_prefix(base_dir) {
+                    Err(err) => {
+                        debug!(" - skipping file {}: not in base directory {}: {:?}", physical_path.display(), base_dir.display(), err);
+                        continue;
+                    }
+                    Ok(logical_path) => {
+                        debug!(" - resolved path {} to logical path {}", physical_path.display(), logical_path.display());
+                        file_paths.insert(physical_path, logical_path.to_path_buf());
+                    }
+                }
             }
         }
     }
@@ -473,6 +480,11 @@ fn should_ignore_file(p: &PathBuf) -> bool {
 
     // Ignore anything that lives within a .git directory
     if is_in_dir(p, ".git") {
+        return true
+    }
+
+    // Ignore anything that's in a virtualenv, too
+    if is_in_dir(p, ".venv") {
         return true
     }
 

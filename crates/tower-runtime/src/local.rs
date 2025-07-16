@@ -185,7 +185,7 @@ impl App for LocalApp {
                 .current_dir(&working_dir)
                 .arg("install")
                 .arg("-r")
-                .arg(package_path.join("requirements.txt"))
+                .arg(working_dir.join("requirements.txt"))
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
