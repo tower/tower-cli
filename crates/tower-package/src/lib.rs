@@ -226,13 +226,9 @@ impl Package {
 
        // Now that we have all the paths, we'll append them to the builder.
        for (physical_path, logical_path) in file_paths {
-           if should_ignore_file(&physical_path) {
-               debug!("ignoring file: {}", physical_path.display());
-           } else {
-               // All of the app code goes into the "app" directory.
-               let logical_path = app_dir.join(logical_path);
-               builder.append_path_with_name(physical_path, logical_path).await?;
-           }
+           // All of the app code goes into the "app" directory.
+           let logical_path = app_dir.join(logical_path);
+           builder.append_path_with_name(physical_path, logical_path).await?;
        }
 
        // Module code lives in the modules dir.
@@ -256,13 +252,9 @@ impl Package {
 
            // Now we write all of these paths to the modules directory.
            for (physical_path, logical_path) in file_paths {
-               if should_ignore_file(&physical_path) {
-                   debug!("ignoring file: {}", physical_path.display());
-               } else {
-                   let logical_path = module_dir.join(logical_path);
-                   debug!("adding file {}", logical_path.display());
-                   builder.append_path_with_name(physical_path, logical_path).await?;
-               }
+               let logical_path = module_dir.join(logical_path);
+               debug!("adding file {}", logical_path.display());
+               builder.append_path_with_name(physical_path, logical_path).await?;
            }
        }
 
@@ -411,7 +403,16 @@ async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<
     queue.push_back(path.to_path_buf());
 
     while let Some(current_path) = queue.pop_front() {
-        let physical_path = current_path.canonicalize().unwrap();
+        let canonical_path = current_path.canonicalize();
+
+        if canonical_path.is_err() {
+            debug!(" - skipping path {}: {}", current_path.display(), canonical_path.unwrap_err());
+            continue;         
+        }
+
+        // We can safely unwrap this because we understand that it's not going to fail at this
+        // point.
+        let physical_path = canonical_path.unwrap();
 
         if physical_path.is_dir() {
             let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
