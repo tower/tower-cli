@@ -118,7 +118,7 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
     let working_dir = if package.manifest.version == Some(2) {
         package_path.join(&package.manifest.app_dir_name)
     } else {
-        opts.cwd.unwrap_or(package_path.to_path_buf())
+        package_path.to_path_buf()
     };
 
     debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
