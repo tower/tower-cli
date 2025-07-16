@@ -58,7 +58,7 @@ async fn find_uv_binary() -> Option<PathBuf> {
         } else {
             None
         }
-    } else{
+    } else {
         None
     }
 } 

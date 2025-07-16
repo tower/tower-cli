@@ -218,8 +218,8 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
             .unpack(path)
             .await?;
 
-				let package_name = extract_package_name(archive.clone());
-				Ok(path.join(package_name).join("uv"))
+        let package_name = extract_package_name(archive.clone());
+        Ok(path.join(package_name).join("uv"))
     } else if archive.ends_with(".zip") {
         // Write zip data to a temporary file since async-zip works with files
         let temp_path = path.join("temp.zip");
@@ -252,7 +252,7 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
         std::fs::create_dir_all(&target_dir)?;
             
         // Extract the file with proper error handling for compression
-				let filename = entries[entry_index].filename().as_str().unwrap_or("uv").to_string();
+        let filename = entries[entry_index].filename().as_str().unwrap_or("uv").to_string();
         let is_exe = filename.ends_with(".exe");
         let target_path = target_dir.join(if is_exe { "uv.exe" } else { "uv" });
         
