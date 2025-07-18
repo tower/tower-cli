@@ -11,13 +11,13 @@ from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     seq: int,
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/apps/{slug}/runs/{seq}/logs/stream".format(
-            slug=slug,
+        "url": "/apps/{name}/runs/{seq}/logs/stream".format(
+            name=name,
             seq=seq,
         ),
     }
@@ -73,7 +73,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -83,7 +83,7 @@ def sync_detailed(
      Streams the logs associated with a particular run of an app in real-time.
 
     Args:
-        slug (str): The slug of the app to get logs for.
+        name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
 
     Raises:
@@ -95,7 +95,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         seq=seq,
     )
 
@@ -107,7 +107,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -117,7 +117,7 @@ def sync(
      Streams the logs associated with a particular run of an app in real-time.
 
     Args:
-        slug (str): The slug of the app to get logs for.
+        name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
 
     Raises:
@@ -129,14 +129,14 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         seq=seq,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -146,7 +146,7 @@ async def asyncio_detailed(
      Streams the logs associated with a particular run of an app in real-time.
 
     Args:
-        slug (str): The slug of the app to get logs for.
+        name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
 
     Raises:
@@ -158,7 +158,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         seq=seq,
     )
 
@@ -168,7 +168,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -178,7 +178,7 @@ async def asyncio(
      Streams the logs associated with a particular run of an app in real-time.
 
     Args:
-        slug (str): The slug of the app to get logs for.
+        name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
 
     Raises:
@@ -191,7 +191,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             seq=seq,
             client=client,
         )

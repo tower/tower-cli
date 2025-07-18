@@ -29,10 +29,10 @@ class App:
         owner (str): The account slug that owns this app
         schedule (Union[None, str]): The schedule associated with this app, null if none.
         short_description (str): A short description of the app. Can be empty.
-        slug (str): The unique slug of the app.
         version (Union[None, str]): The current version of this app, null if none.
         last_run (Union[Unset, Run]):
         run_results (Union[Unset, RunResults]):
+        slug (Union[Unset, str]): The name of the app presented as a slug to support legacy CLI clients
         status (Union[Unset, AppStatus]): The status of the app
     """
 
@@ -43,10 +43,10 @@ class App:
     owner: str
     schedule: Union[None, str]
     short_description: str
-    slug: str
     version: Union[None, str]
     last_run: Union[Unset, "Run"] = UNSET
     run_results: Union[Unset, "RunResults"] = UNSET
+    slug: Union[Unset, str] = UNSET
     status: Union[Unset, AppStatus] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,8 +69,6 @@ class App:
 
         short_description = self.short_description
 
-        slug = self.slug
-
         version: Union[None, str]
         version = self.version
 
@@ -81,6 +79,8 @@ class App:
         run_results: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.run_results, Unset):
             run_results = self.run_results.to_dict()
+
+        slug = self.slug
 
         status: Union[Unset, str] = UNSET
         if not isinstance(self.status, Unset):
@@ -96,7 +96,6 @@ class App:
                 "owner": owner,
                 "schedule": schedule,
                 "short_description": short_description,
-                "slug": slug,
                 "version": version,
             }
         )
@@ -104,6 +103,8 @@ class App:
             field_dict["last_run"] = last_run
         if run_results is not UNSET:
             field_dict["run_results"] = run_results
+        if slug is not UNSET:
+            field_dict["slug"] = slug
         if status is not UNSET:
             field_dict["status"] = status
 
@@ -147,8 +148,6 @@ class App:
 
         short_description = d.pop("short_description")
 
-        slug = d.pop("slug")
-
         def _parse_version(data: object) -> Union[None, str]:
             if data is None:
                 return data
@@ -170,6 +169,8 @@ class App:
         else:
             run_results = RunResults.from_dict(_run_results)
 
+        slug = d.pop("slug", UNSET)
+
         _status = d.pop("status", UNSET)
         status: Union[Unset, AppStatus]
         if isinstance(_status, Unset):
@@ -185,10 +186,10 @@ class App:
             owner=owner,
             schedule=schedule,
             short_description=short_description,
-            slug=slug,
             version=version,
             last_run=last_run,
             run_results=run_results,
+            slug=slug,
             status=status,
         )
 

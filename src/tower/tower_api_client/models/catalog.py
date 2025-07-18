@@ -1,9 +1,11 @@
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
+
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.catalog_property import CatalogProperty
@@ -20,16 +22,16 @@ class Catalog:
         environment (str):
         name (str):
         properties (list['CatalogProperty']):
-        slug (str):
         type_ (str):
+        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
     """
 
     created_at: datetime.datetime
     environment: str
     name: str
     properties: list["CatalogProperty"]
-    slug: str
     type_: str
+    slug: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
@@ -43,9 +45,9 @@ class Catalog:
             properties_item = properties_item_data.to_dict()
             properties.append(properties_item)
 
-        slug = self.slug
-
         type_ = self.type_
+
+        slug = self.slug
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
@@ -54,10 +56,11 @@ class Catalog:
                 "environment": environment,
                 "name": name,
                 "properties": properties,
-                "slug": slug,
                 "type": type_,
             }
         )
+        if slug is not UNSET:
+            field_dict["slug"] = slug
 
         return field_dict
 
@@ -79,17 +82,17 @@ class Catalog:
 
             properties.append(properties_item)
 
-        slug = d.pop("slug")
-
         type_ = d.pop("type")
+
+        slug = d.pop("slug", UNSET)
 
         catalog = cls(
             created_at=created_at,
             environment=environment,
             name=name,
             properties=properties,
-            slug=slug,
             type_=type_,
+            slug=slug,
         )
 
         return catalog

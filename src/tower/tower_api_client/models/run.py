@@ -7,6 +7,7 @@ from dateutil.parser import isoparse
 
 from ..models.run_status import RunStatus
 from ..models.run_status_group import RunStatusGroup
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_parameter import RunParameter
@@ -20,7 +21,6 @@ class Run:
     """
     Attributes:
         app_name (str):
-        app_slug (str):
         app_version (str):
         cancelled_at (Union[None, datetime.datetime]):
         created_at (datetime.datetime):
@@ -34,10 +34,10 @@ class Run:
         started_at (Union[None, datetime.datetime]):
         status (RunStatus):
         status_group (RunStatusGroup):
+        app_slug (Union[Unset, str]): The app name presented as app_slug to support legacy CLI clients
     """
 
     app_name: str
-    app_slug: str
     app_version: str
     cancelled_at: Union[None, datetime.datetime]
     created_at: datetime.datetime
@@ -51,11 +51,10 @@ class Run:
     started_at: Union[None, datetime.datetime]
     status: RunStatus
     status_group: RunStatusGroup
+    app_slug: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         app_name = self.app_name
-
-        app_slug = self.app_slug
 
         app_version = self.app_version
 
@@ -99,11 +98,12 @@ class Run:
 
         status_group = self.status_group.value
 
+        app_slug = self.app_slug
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "app_name": app_name,
-                "app_slug": app_slug,
                 "app_version": app_version,
                 "cancelled_at": cancelled_at,
                 "created_at": created_at,
@@ -119,6 +119,8 @@ class Run:
                 "status_group": status_group,
             }
         )
+        if app_slug is not UNSET:
+            field_dict["app_slug"] = app_slug
 
         return field_dict
 
@@ -128,8 +130,6 @@ class Run:
 
         d = dict(src_dict)
         app_name = d.pop("app_name")
-
-        app_slug = d.pop("app_slug")
 
         app_version = d.pop("app_version")
 
@@ -206,9 +206,10 @@ class Run:
 
         status_group = RunStatusGroup(d.pop("status_group"))
 
+        app_slug = d.pop("app_slug", UNSET)
+
         run = cls(
             app_name=app_name,
-            app_slug=app_slug,
             app_version=app_version,
             cancelled_at=cancelled_at,
             created_at=created_at,
@@ -222,6 +223,7 @@ class Run:
             started_at=started_at,
             status=status,
             status_group=status_group,
+            app_slug=app_slug,
         )
 
         return run
