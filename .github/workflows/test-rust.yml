@@ -51,6 +51,8 @@ jobs:
         env:
           RUST_LOG: debug
 
+      - run: bash .github/check-for-naughty-dependencies.sh
+ 
 #  integration-test:
 #    runs-on: ${{ matrix.os }}
 #    strategy:

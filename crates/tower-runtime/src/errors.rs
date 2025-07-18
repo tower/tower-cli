@@ -61,6 +61,9 @@ pub enum Error {
 
     #[snafu(display("running Tower apps on this platform is not supported"))]
     UnsupportedPlatform,
+
+    #[snafu(display("cancelled"))]
+    Cancelled,
 }
 
 impl From<std::io::Error> for Error {
@@ -72,5 +75,16 @@ impl From<std::io::Error> for Error {
 impl From<std::env::JoinPathsError> for Error {
     fn from(_: std::env::JoinPathsError) -> Self {
         Error::UnsupportedPlatform
+    }
+}
+
+impl From<tower_uv::Error> for Error {
+    fn from(err: tower_uv::Error) -> Self {
+        match err {
+           tower_uv::Error::IoError(_) => Error::SpawnFailed, 
+           tower_uv::Error::NotFound(_) => Error::SpawnFailed, 
+           tower_uv::Error::PermissionDenied(_) => Error::SpawnFailed, 
+           tower_uv::Error::Other(_) => Error::SpawnFailed, 
+        }
     }
 }

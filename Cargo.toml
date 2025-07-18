@@ -15,6 +15,7 @@ repository = "https://github.com/tower/tower-cli"
 aes-gcm = "0.10"
 anyhow = "1.0.95"
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
+async_zip = { version = "0.0.16", features = ["tokio", "tokio-fs", "deflate"] }
 base64 = "0.22"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
@@ -26,6 +27,7 @@ crypto = { path = "crates/crypto" }
 dirs = "5"
 futures = "0.3"
 futures-util = "0.3"
+futures-lite = "2.6"
 glob = "0.3"
 http = "1.1"
 indicatif = "0.17"
@@ -53,6 +55,7 @@ tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }
 tower-runtime = { path = "crates/tower-runtime" }
 tower-telemetry = { path = "crates/tower-telemetry" }
+tower-uv = { path = "crates/tower-uv" }
 tracing = { version = "0.1" }
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
