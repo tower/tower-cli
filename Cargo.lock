@@ -387,7 +387,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "chrono",
  "clap",
@@ -474,7 +474,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypto"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "pem",
  "rsa",
@@ -2751,7 +2751,7 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "tokio",
  "tower-api",
@@ -2775,7 +2775,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "reqwest",
  "serde",
@@ -2787,7 +2787,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2826,7 +2826,7 @@ checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
 
 [[package]]
 name = "tower-package"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "async-compression",
  "config",
@@ -2844,7 +2844,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "chrono",
  "snafu",
@@ -2863,7 +2863,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tower-telemetry"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "tracing",
  "tracing-appender",
@@ -2872,7 +2872,7 @@ dependencies = [
 
 [[package]]
 name = "tower-uv"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "async-compression",
  "async_zip",
@@ -2885,7 +2885,7 @@ dependencies = [
 
 [[package]]
 name = "tower-version"
-version = "0.3.20"
+version = "0.3.21-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
