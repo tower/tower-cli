@@ -194,19 +194,38 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
             return Err(Error::Cancelled);
         }
 
-        let mut child = uv.sync(&working_dir, &env_vars).await?;
+        match uv.sync(&working_dir, &env_vars).await {
+            Err(e) => {
+                // If we were missing a pyproject.toml, then that's fine for us--we'll just
+                // continue execution. 
+                //
+                // Note that we do a match here instead of an if. That's because of the way
+                // tower_uv::Error is implemented. Namely, it doesn't implement PartialEq and can't
+                // do so due to it's dependency on std::io::Error.
+                match e {
+                    tower_uv::Error::MissingPyprojectToml => {
+                        debug!(ctx: &ctx, "no pyproject.toml found, continuing without sync");
+                    },
+                    _ => {
+                        // If we got any other error, we want to return it.
+                        return Err(e.into());
+                    }
+                }
+            },
+            Ok(mut child) => {
+                // Drain the logs to the output channel.
+                if let Some(ref sender) = opts.output_sender {
+                    let stdout = child.stdout.take().expect("no stdout");
+                    tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
 
-        // Drain the logs to the output channel.
-        if let Some(ref sender) = opts.output_sender {
-            let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
+                    let stderr = child.stderr.take().expect("no stderr");
+                    tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+                }
 
-            let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+                // Let's wait for the setup to finish. We don't care about the results.
+                wait_for_process(ctx.clone(), &cancel_token, child).await;
+            }
         }
-
-        // Let's wait for the setup to finish. We don't care about the results.
-        wait_for_process(ctx.clone(), &cancel_token, child).await;
 
         // Check once more to see if the process was cancelled, this will bail us out early.
         if cancel_token.is_cancelled() {
