@@ -121,7 +121,7 @@ impl Uv {
     }
 
     pub async fn sync(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
-        // Make sure there's a pyproject.toml in the cwd. If there isn't wont, then we don't want
+        // Make sure there's a pyproject.toml in the cwd. If there isn't one, then we don't want
         // to do this otherwise uv will return an error on the CLI!
         if !cwd.join("pyproject.toml").exists() {
             return Err(Error::MissingPyprojectToml);
