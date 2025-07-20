@@ -74,7 +74,7 @@ async fn test_running_hello_world() {
 #[tokio::test]
 async fn test_running_use_faker() {
     // This test is a simple test that outputs some text to the console; however, this time it has
-    // a depedency defined in pyprojec.toml, which means that it'll have to do a uv sync first.
+    // a dependency defined in pyproject.toml, which means that it'll have to do a uv sync first.
     let use_faker_dir = get_example_app_dir("02-use-faker");
     let package = build_package_from_dir(&use_faker_dir).await;
     let (sender, receiver) = create_output_stream();
