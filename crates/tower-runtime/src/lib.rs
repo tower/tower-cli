@@ -41,7 +41,7 @@ pub struct Output {
     pub line: String,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Status {
     None,
     Running,
