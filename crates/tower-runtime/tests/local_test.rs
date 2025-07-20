@@ -35,7 +35,7 @@ async fn build_package_from_dir(dir: &PathBuf) -> Package {
     package
 }
 
-#[tokio::test(flavor = "current_thread")]
+#[tokio::test]
 async fn test_running_hello_world() {
     tower_telemetry::enable_logging(
         tower_telemetry::LogLevel::Debug,
@@ -77,7 +77,7 @@ async fn test_running_hello_world() {
     assert!(status == Status::Exited, "App should be running");
 }
 
-#[tokio::test(flavor = "current_thread")]
+#[tokio::test]
 async fn test_running_use_faker() {
     debug!("Running 02-use-faker");
     // This test is a simple test that outputs some text to the console; however, this time it has
