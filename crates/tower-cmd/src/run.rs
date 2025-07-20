@@ -342,9 +342,9 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 
 /// monitor_output is a helper function that will monitor the output of a given output channel and
 /// plops it down on stdout.
-async fn monitor_output(output: OutputReceiver) {
+async fn monitor_output(mut output: OutputReceiver) {
     loop {
-        if let Some(line) = output.lock().await.recv().await {
+        if let Some(line) = output.recv().await {
             let ts = &line.time;
             let msg = &line.line;
             output::log_line(&ts.to_rfc3339(), msg, output::LogLineType::Local);

@@ -214,13 +214,11 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
             },
             Ok(mut child) => {
                 // Drain the logs to the output channel.
-                if let Some(ref sender) = opts.output_sender {
-                    let stdout = child.stdout.take().expect("no stdout");
-                    tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
+                let stdout = child.stdout.take().expect("no stdout");
+                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, opts.output_sender.clone(), BufReader::new(stdout)));
 
-                    let stderr = child.stderr.take().expect("no stderr");
-                    tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
-                }
+                let stderr = child.stderr.take().expect("no stderr");
+                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, opts.output_sender.clone(), BufReader::new(stderr)));
 
                 // Let's wait for the setup to finish. We don't care about the results.
                 wait_for_process(ctx.clone(), &cancel_token, child).await;
@@ -238,13 +236,11 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         let mut child = uv.run(&working_dir, &program_path, &env_vars).await?;
 
         // Drain the logs to the output channel.
-        if let Some(ref sender) = opts.output_sender {
-            let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, Channel::Program, sender.clone(), BufReader::new(stdout)));
+        let stdout = child.stdout.take().expect("no stdout");
+        tokio::spawn(drain_output(FD::Stdout, Channel::Program, opts.output_sender.clone(), BufReader::new(stdout)));
 
-            let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, Channel::Program, sender.clone(), BufReader::new(stderr)));
-        }
+        let stderr = child.stderr.take().expect("no stderr");
+        tokio::spawn(drain_output(FD::Stderr, Channel::Program, opts.output_sender.clone(), BufReader::new(stderr)));
 
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     }
@@ -429,8 +425,6 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Ou
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
-        let output = output.lock().await;
-
         let _ = output.send(Output{ 
             channel,
             fd,

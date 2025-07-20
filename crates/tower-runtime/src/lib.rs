@@ -49,13 +49,9 @@ pub enum Status {
     Crashed { code: i32 },
 }
 
-type SharedReceiver<T> = Arc<Mutex<UnboundedReceiver<T>>>;
+pub type OutputReceiver = UnboundedReceiver<Output>;
 
-type SharedSender<T> = Arc<Mutex<UnboundedSender<T>>>;
-
-pub type OutputReceiver = SharedReceiver<Output>;
-
-pub type OutputSender = SharedSender<Output>;
+pub type OutputSender = UnboundedSender<Output>;
 
 pub trait App {
     // start will start the process
@@ -83,10 +79,7 @@ impl<A: App> std::default::Default for AppLauncher<A> {
 
 pub fn create_output_stream() -> (OutputSender, OutputReceiver) {
     let (sender, receiver) = unbounded_channel::<Output>();
-
-    let output_sender = Arc::new(Mutex::new(sender));
-    let output_receiver = Arc::new(Mutex::new(receiver));
-    (output_sender, output_receiver)
+    (sender, receiver)
 }
 
 impl<A: App> AppLauncher<A> {
@@ -104,7 +97,7 @@ impl<A: App> AppLauncher<A> {
 
         let opts = StartOptions {
             ctx,
-            output_sender: Some(output_sender),
+            output_sender,
             cwd: Some(cwd),
             environment,
             secrets,
@@ -152,7 +145,7 @@ pub struct StartOptions {
     pub secrets: HashMap<String, String>,
     pub parameters: HashMap<String, String>,
     pub env_vars: HashMap<String, String>,
-    pub output_sender: Option<OutputSender>,
+    pub output_sender: OutputSender,
 }
 
 pub struct ExecuteOptions {

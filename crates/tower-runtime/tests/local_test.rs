@@ -38,13 +38,13 @@ async fn build_package_from_dir(dir: &PathBuf) -> Package {
 async fn test_running_hello_world() {
     let hello_world_dir = get_example_app_dir("01-hello-world");
     let package = build_package_from_dir(&hello_world_dir).await;
-    let (sender, receiver) = create_output_stream();
+    let (sender, mut receiver) = create_output_stream();
 
     // We need to create the package, which will load the app
     let opts = StartOptions{
         ctx: tower_telemetry::Context::new(),
         package,
-        output_sender: Some(sender),
+        output_sender: sender,
         cwd: None,
         environment: "local".to_string(),
         secrets: HashMap::new(),
@@ -58,9 +58,6 @@ async fn test_running_hello_world() {
     // The status should be running
     let status = app.status().await.expect("Failed to get app status");
     assert!(status == Status::Running, "App should be running");
-
-    // Now we should wait for the output
-    let mut receiver = receiver.lock().await;
 
     while let Some(output) = receiver.recv().await {
         assert!(output.line.contains("Hello, world!"), "Log should contain 'Hello, world!'");
@@ -77,13 +74,13 @@ async fn test_running_use_faker() {
     // a dependency defined in pyproject.toml, which means that it'll have to do a uv sync first.
     let use_faker_dir = get_example_app_dir("02-use-faker");
     let package = build_package_from_dir(&use_faker_dir).await;
-    let (sender, receiver) = create_output_stream();
+    let (sender, mut receiver) = create_output_stream();
 
     // We need to create the package, which will load the app
     let opts = StartOptions{
         ctx: tower_telemetry::Context::new(),
         package,
-        output_sender: Some(sender),
+        output_sender: sender,
         cwd: None,
         environment: "local".to_string(),
         secrets: HashMap::new(),
@@ -97,9 +94,6 @@ async fn test_running_use_faker() {
     // The status should be running
     let status = app.status().await.expect("Failed to get app status");
     assert!(status == Status::Running, "App should be running");
-
-    // Now we should wait for the output
-    let mut receiver = receiver.lock().await;
 
     let mut count_setup = 0;
     let mut count_stdout = 0;
