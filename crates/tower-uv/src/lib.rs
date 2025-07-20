@@ -4,7 +4,7 @@ use std::process::Stdio;
 use tokio::process::{Command, Child};
 use tower_telemetry::debug;
 
-mod install;
+pub mod install;
 
 // UV_VERSION is the version of UV to download and install when setting up a local UV deployment.
 pub const UV_VERSION: &str = "0.7.13";
@@ -47,27 +47,8 @@ async fn find_uv_binary() -> Option<PathBuf> {
             }
         } 
     }
-
-    // First, check if uv is already in the PATH
-    let output = Command::new("which")
-        .arg("uv")
-        .output()
-        .await;
-
-    if let Ok(output) = output {
-        let path_str = String::from_utf8_lossy(&output.stdout);
-        let path = PathBuf::from(path_str.trim());
-
-        // If this is a path that actually exists, then we assume that it's `uv` and we can
-        // continue.
-        if path.exists() {
-            Some(path)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
+    
+    None
 } 
 
 async fn find_or_setup_uv() -> Result<PathBuf, Error> {
@@ -94,8 +75,18 @@ async fn find_or_setup_uv() -> Result<PathBuf, Error> {
         let target = path.join("uv");
 
         // Copy the `uv` binary into the default directory
-        std::fs::copy(&exe, &target)
-            .map_err(|e| Error::IoError(e))?;
+        tokio::fs::copy(&exe, &target)
+            .await?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&target)?.permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&target, perms)?;
+        }
+
+        debug!("Copied UV binary from {:?} to {:?}", exe, target);
 
         Ok(target)
     }
@@ -186,5 +177,12 @@ impl Uv {
             .spawn()?;
 
         Ok(child)
+    }
+
+    pub async fn is_valid(&self) -> bool {
+        match test_uv_path(&self.uv_path).await {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }

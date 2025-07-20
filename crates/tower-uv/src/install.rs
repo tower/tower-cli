@@ -303,6 +303,7 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
 }
 
 pub async fn download_uv_for_arch(path: &PathBuf) -> Result<PathBuf, Error> {
+    debug!("Starting download of UV for current architecture");
     let archive = ArchiveSelector::get_archive_name().await?;
     let path = download_uv_archive(path, archive).await?;
     debug!("Downloaded UV to: {:?}", path);

@@ -35,7 +35,7 @@ async fn build_package_from_dir(dir: &PathBuf) -> Package {
     package
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_running_hello_world() {
     tower_telemetry::enable_logging(
         tower_telemetry::LogLevel::Debug,
@@ -68,6 +68,7 @@ async fn test_running_hello_world() {
     assert!(status == Status::Running, "App should be running");
 
     while let Some(output) = receiver.recv().await {
+        debug!("Received output: {:?}", output.line);
         assert!(output.line.contains("Hello, world!"), "Log should contain 'Hello, world!'");
     }
 
@@ -76,7 +77,7 @@ async fn test_running_hello_world() {
     assert!(status == Status::Exited, "App should be running");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_running_use_faker() {
     debug!("Running 02-use-faker");
     // This test is a simple test that outputs some text to the console; however, this time it has
@@ -108,6 +109,7 @@ async fn test_running_use_faker() {
     let mut count_stdout = 0;
 
     while let Some(output) = receiver.recv().await {
+        debug!("Received output: {:?}", output.line);
         match output.channel {
             tower_runtime::Channel::Setup => {
                 count_setup += 1;
