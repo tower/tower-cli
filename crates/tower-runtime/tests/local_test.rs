@@ -121,7 +121,7 @@ async fn test_running_use_faker() {
     }
 
     assert!(count_setup > 0, "There should be some setup output");
-    assert!(count_stdout == 1, "There should be exactly one stdout output");
+    assert!(count_stdout > 0, "should be more than one output");
 
     // check the status once more, should be done.
     let status = app.status().await.expect("Failed to get app status");

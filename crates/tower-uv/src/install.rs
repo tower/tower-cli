@@ -337,10 +337,11 @@ async fn find_uv_binary() -> Option<PathBuf> {
 
 pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {
     // We only allow setup in the process space at a given time.
-    let _ = get_global_lock().lock().await;
+    let _guard = get_global_lock().lock().await;
 
     // If we get here, uv wasn't found in PATH, so let's download it
     if let Some(path) = find_uv_binary().await {
+        debug!("UV binary found at {:?}", path);
         Ok(path) 
     } else {
         let path = get_default_uv_bin_dir()?;
