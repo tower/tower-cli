@@ -30,65 +30,11 @@ impl From<std::io::Error> for Error {
 impl From<install::Error> for Error {
     fn from(err: install::Error) -> Self {
         match err {
+            install::Error::NotFound(msg) => Error::NotFound(msg),
             install::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
             install::Error::IoError(e) => Error::IoError(e),
             install::Error::Other(msg) => Error::Other(msg),
         }
-    }
-}
-
-async fn find_uv_binary() -> Option<PathBuf> {
-    if let Ok(default_path) = install::get_default_uv_bin_dir() {
-        // Check if the default path exists
-        if default_path.exists() {
-            let uv_path = default_path.join("uv");
-            if uv_path.exists() {
-                return Some(uv_path);
-            }
-        } 
-    }
-    
-    None
-} 
-
-async fn find_or_setup_uv() -> Result<PathBuf, Error> {
-    // If FORCE_DOWNLOAD_UV is set, we will always download UV
-    //
-    // If we get here, uv wasn't found in PATH, so let's download it
-    if let Some(path) = find_uv_binary().await {
-        Ok(path) 
-    } else {
-        let path = install::get_default_uv_bin_dir()?;
-        debug!("UV binary not found in PATH, setting up UV at {:?}", path);
-
-        // Create the directory if it doesn't exist
-        std::fs::create_dir_all(&path).map_err(Error::IoError)?;
-
-        let parent = path.parent()
-            .ok_or_else(|| Error::NotFound("Parent directory not found".to_string()))?
-            .to_path_buf();
-
-        // We download this code to the UV directory
-        let exe = install::download_uv_for_arch(&parent).await?;
-
-        // Target is the UV binary we want.
-        let target = path.join("uv");
-
-        // Copy the `uv` binary into the default directory
-        tokio::fs::copy(&exe, &target)
-            .await?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&target)?.permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&target, perms)?;
-        }
-
-        debug!("Copied UV binary from {:?} to {:?}", exe, target);
-
-        Ok(target)
     }
 }
 
@@ -116,7 +62,7 @@ pub struct Uv {
 
 impl Uv {
     pub async fn new() -> Result<Self, Error> {
-        let uv_path = find_or_setup_uv().await?;
+        let uv_path = install::find_or_setup_uv().await?;
         test_uv_path(&uv_path).await?;
         Ok(Uv { uv_path })
     }
