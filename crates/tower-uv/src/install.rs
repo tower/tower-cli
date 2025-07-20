@@ -14,6 +14,7 @@ const UV_VERSION: &str = crate::UV_VERSION;
 
 #[derive(Debug)]
 pub enum Error {
+    UnsupportedPlatform,
     IoError(std::io::Error),
     Other(String),
 }
@@ -31,7 +32,8 @@ impl From<String> for Error {
 }
 
 pub fn get_default_uv_bin_dir() -> Result<PathBuf, Error> {
-    Ok(PathBuf::from(".tower/bin"))
+    let dir = dirs::data_local_dir().ok_or(Error::UnsupportedPlatform)?;
+    Ok(dir.join("tower").join("bin"))
 }
 
 #[derive(Debug)]

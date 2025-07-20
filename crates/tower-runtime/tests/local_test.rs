@@ -11,6 +11,7 @@ use tower_runtime::{
 
 use config::Towerfile;
 use tower_package::{Package, PackageSpec};
+use tower_telemetry::{self, debug};
 
 fn get_example_app_dir(name: &str) -> PathBuf {
     // This is where the root of the app lives.
@@ -36,6 +37,13 @@ async fn build_package_from_dir(dir: &PathBuf) -> Package {
 
 #[tokio::test]
 async fn test_running_hello_world() {
+    tower_telemetry::enable_logging(
+        tower_telemetry::LogLevel::Debug,
+        tower_telemetry::LogFormat::Plain,
+        tower_telemetry::LogDestination::Stdout,
+    );
+
+    debug!("Running 01-hello-world");
     let hello_world_dir = get_example_app_dir("01-hello-world");
     let package = build_package_from_dir(&hello_world_dir).await;
     let (sender, mut receiver) = create_output_stream();
@@ -70,6 +78,7 @@ async fn test_running_hello_world() {
 
 #[tokio::test]
 async fn test_running_use_faker() {
+    debug!("Running 02-use-faker");
     // This test is a simple test that outputs some text to the console; however, this time it has
     // a dependency defined in pyproject.toml, which means that it'll have to do a uv sync first.
     let use_faker_dir = get_example_app_dir("02-use-faker");
