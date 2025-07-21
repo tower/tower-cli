@@ -1201,7 +1201,7 @@ wheels = [
 
 [[package]]
 name = "tower"
-version = "0.3.21rc1"
+version = "0.3.22rc2"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
