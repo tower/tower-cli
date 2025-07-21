@@ -9,6 +9,7 @@ license = { workspace = true }
 [dependencies]
 async-compression = { workspace = true }
 async_zip = { workspace = true }
+dirs = { workspace = true }
 futures-lite = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }

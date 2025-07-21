@@ -2847,6 +2847,7 @@ name = "tower-runtime"
 version = "0.3.21-rc.1"
 dependencies = [
  "chrono",
+ "config",
  "snafu",
  "tokio",
  "tokio-util",
@@ -2876,6 +2877,7 @@ version = "0.3.21-rc.1"
 dependencies = [
  "async-compression",
  "async_zip",
+ "dirs",
  "futures-lite",
  "reqwest",
  "tokio",

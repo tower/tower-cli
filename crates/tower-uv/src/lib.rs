@@ -4,7 +4,7 @@ use std::process::Stdio;
 use tokio::process::{Command, Child};
 use tower_telemetry::debug;
 
-mod install;
+pub mod install;
 
 // UV_VERSION is the version of UV to download and install when setting up a local UV deployment.
 pub const UV_VERSION: &str = "0.7.13";
@@ -15,6 +15,9 @@ pub enum Error {
     NotFound(String),
     PermissionDenied(String),
     Other(String),
+    MissingPyprojectToml,
+    InvalidUv,
+    UnsupportedPlatform,
 }
 
 impl From<std::io::Error> for Error {
@@ -27,70 +30,29 @@ impl From<std::io::Error> for Error {
 impl From<install::Error> for Error {
     fn from(err: install::Error) -> Self {
         match err {
+            install::Error::NotFound(msg) => Error::NotFound(msg),
+            install::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
             install::Error::IoError(e) => Error::IoError(e),
             install::Error::Other(msg) => Error::Other(msg),
         }
     }
 }
 
-async fn find_uv_binary() -> Option<PathBuf> {
-    if let Ok(default_path) = install::get_default_uv_bin_dir() {
-        // Check if the default path exists
-        if default_path.exists() {
-            let uv_path = default_path.join("uv");
-            if uv_path.exists() {
-                return Some(uv_path);
-            }
-        } 
-    }
-
-    // First, check if uv is already in the PATH
-    let output = Command::new("which")
-        .arg("uv")
+async fn test_uv_path(path: &PathBuf) -> Result<(), Error> {
+    let res = Command::new(&path)
+        .arg("--color")
+        .arg("never")
+        .arg("--no-progress")
+        .arg("--help")
         .output()
         .await;
 
-    if let Ok(output) = output {
-        let path_str = String::from_utf8_lossy(&output.stdout);
-        let path = PathBuf::from(path_str.trim());
-
-        // If this is a path that actually exists, then we assume that it's `uv` and we can
-        // continue.
-        if path.exists() {
-            Some(path)
-        } else {
-            None
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            debug!("Testing UV failed: {:?}", e);
+            Err(Error::InvalidUv)
         }
-    } else {
-        None
-    }
-} 
-
-async fn find_or_setup_uv() -> Result<PathBuf, Error> {
-    // If we get here, uv wasn't found in PATH, so let's download it
-    if let Some(path) = find_uv_binary().await {
-        Ok(path) 
-    } else {
-        let path = install::get_default_uv_bin_dir()?;
-
-        // Create the directory if it doesn't exist
-        std::fs::create_dir_all(&path).map_err(Error::IoError)?;
-
-        let parent = path.parent()
-            .ok_or_else(|| Error::NotFound("Parent directory not found".to_string()))?
-            .to_path_buf();
-
-        // We download this code to the UV directory
-        let exe = install::download_uv_for_arch(&parent).await?;
-
-        // Target is the UV binary we want.
-        let target = path.join("uv");
-
-        // Copy the `uv` binary into the default directory
-        std::fs::copy(&exe, &target)
-            .map_err(|e| Error::IoError(e))?;
-
-        Ok(target)
     }
 }
 
@@ -100,7 +62,8 @@ pub struct Uv {
 
 impl Uv {
     pub async fn new() -> Result<Self, Error> {
-        let uv_path = find_or_setup_uv().await?;
+        let uv_path = install::find_or_setup_uv().await?;
+        test_uv_path(&uv_path).await?;
         Ok(Uv { uv_path })
     }
 
@@ -120,21 +83,48 @@ impl Uv {
     }
 
     pub async fn sync(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
-        debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
+        // We need to figure out which sync strategy to apply. If there is a pyproject.toml, then
+        // that's easy.
+        if cwd.join("pyproject.toml").exists() {
+            debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
+            let child = Command::new(&self.uv_path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .current_dir(cwd)
+                .arg("--color")
+                .arg("never")
+                .arg("--no-progress")
+                .arg("sync")
+                .envs(env_vars)
+                .spawn()?;
 
-        let child = Command::new(&self.uv_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .current_dir(cwd)
-            .arg("--color")
-            .arg("never")
-            .arg("--no-progress")
-            .arg("sync")
-            .envs(env_vars)
-            .spawn()?;
+            Ok(child)
+        } else if cwd.join("requirements.txt").exists() {
+            debug!("Executing UV ({:?}) sync with requirements in {:?}", &self.uv_path, cwd);
 
-        Ok(child)
+            // If there is a requirements.txt, then we can use that to sync.
+            let child = Command::new(&self.uv_path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .current_dir(cwd)
+                .arg("--color")
+                .arg("never")
+                .arg("pip")
+                .arg("install")
+                .arg("-r")
+                .arg(cwd.join("requirements.txt"))
+                .envs(env_vars)
+                .spawn()?;
+
+            Ok(child)
+        } else {
+            // If there is no pyproject.toml or requirements.txt, then we can't sync.
+            Err(Error::MissingPyprojectToml)
+        }
+
+
     }
 
     pub async fn run(&self, cwd: &PathBuf, program: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
@@ -154,5 +144,9 @@ impl Uv {
             .spawn()?;
 
         Ok(child)
+    }
+
+    pub async fn is_valid(&self) -> bool {
+        test_uv_path(&self.uv_path).await.is_ok()
     }
 }

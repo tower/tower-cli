@@ -186,6 +186,26 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         // Now we also need to find the program to execute.
         let program_path = working_dir.join(&manifest.invoke);
 
+        // Quickly do a check to see if there was a cancellation before we do a subprocess spawn to
+        // ensure everything is in place.
+        if cancel_token.is_cancelled() {
+            // again tell any waiters that we cancelled.
+            let _ = sx.send(-1);
+            return Err(Error::Cancelled);
+        }
+
+        let mut child = uv.venv(&working_dir, &env_vars).await?;
+
+        // Drain the logs to the output channel.
+        let stdout = child.stdout.take().expect("no stdout");
+        tokio::spawn(drain_output(FD::Stdout, Channel::Setup, opts.output_sender.clone(), BufReader::new(stdout)));
+
+        let stderr = child.stderr.take().expect("no stderr");
+        tokio::spawn(drain_output(FD::Stderr, Channel::Setup, opts.output_sender.clone(), BufReader::new(stderr)));
+
+        // Wait for venv to finish up.
+        wait_for_process(ctx.clone(), &cancel_token, child).await;
+
         // Check once more if the process was cancelled before we do a uv sync. The sync itself,
         // once started, will take a while and we have logic for checking for cancellation.
         if cancel_token.is_cancelled() {
@@ -194,19 +214,36 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
             return Err(Error::Cancelled);
         }
 
-        let mut child = uv.sync(&working_dir, &env_vars).await?;
+        match uv.sync(&working_dir, &env_vars).await {
+            Err(e) => {
+                // If we were missing a pyproject.toml, then that's fine for us--we'll just
+                // continue execution. 
+                //
+                // Note that we do a match here instead of an if. That's because of the way
+                // tower_uv::Error is implemented. Namely, it doesn't implement PartialEq and can't
+                // do so due to it's dependency on std::io::Error.
+                match e {
+                    tower_uv::Error::MissingPyprojectToml => {
+                        debug!(ctx: &ctx, "no pyproject.toml found, continuing without sync");
+                    },
+                    _ => {
+                        // If we got any other error, we want to return it.
+                        return Err(e.into());
+                    }
+                }
+            },
+            Ok(mut child) => {
+                // Drain the logs to the output channel.
+                let stdout = child.stdout.take().expect("no stdout");
+                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, opts.output_sender.clone(), BufReader::new(stdout)));
 
-        // Drain the logs to the output channel.
-        if let Some(ref sender) = opts.output_sender {
-            let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, Channel::Setup, sender.clone(), BufReader::new(stdout)));
+                let stderr = child.stderr.take().expect("no stderr");
+                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, opts.output_sender.clone(), BufReader::new(stderr)));
 
-            let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, Channel::Setup, sender.clone(), BufReader::new(stderr)));
+                // Let's wait for the setup to finish. We don't care about the results.
+                wait_for_process(ctx.clone(), &cancel_token, child).await;
+            }
         }
-
-        // Let's wait for the setup to finish. We don't care about the results.
-        wait_for_process(ctx.clone(), &cancel_token, child).await;
 
         // Check once more to see if the process was cancelled, this will bail us out early.
         if cancel_token.is_cancelled() {
@@ -219,13 +256,11 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         let mut child = uv.run(&working_dir, &program_path, &env_vars).await?;
 
         // Drain the logs to the output channel.
-        if let Some(ref sender) = opts.output_sender {
-            let stdout = child.stdout.take().expect("no stdout");
-            tokio::spawn(drain_output(FD::Stdout, Channel::Program, sender.clone(), BufReader::new(stdout)));
+        let stdout = child.stdout.take().expect("no stdout");
+        tokio::spawn(drain_output(FD::Stdout, Channel::Program, opts.output_sender.clone(), BufReader::new(stdout)));
 
-            let stderr = child.stderr.take().expect("no stderr");
-            tokio::spawn(drain_output(FD::Stderr, Channel::Program, sender.clone(), BufReader::new(stderr)));
-        }
+        let stderr = child.stderr.take().expect("no stderr");
+        tokio::spawn(drain_output(FD::Stderr, Channel::Program, opts.output_sender.clone(), BufReader::new(stderr)));
 
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     }
@@ -410,8 +445,6 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Ou
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
-        let output = output.lock().await;
-
         let _ = output.send(Output{ 
             channel,
             fd,
@@ -420,7 +453,6 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Ou
         });
     }
 }
-
 
 fn is_bash_package(package: &Package) -> bool {
     return package.manifest.invoke.ends_with(".sh")

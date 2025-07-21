@@ -1,8 +1,12 @@
 use std::env;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 use tokio_tar::Archive;
-use tokio::process::Command;
+use tokio::{
+    sync::Mutex,
+    process::Command,
+};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_zip::tokio::read::seek::ZipFileReader;
 use futures_lite::io::AsyncReadExt;
@@ -12,8 +16,16 @@ use tower_telemetry::debug;
 // Copy the UV_VERSION locally to make this a bit more ergonomic.
 const UV_VERSION: &str = crate::UV_VERSION;
 
+static GLOBAL_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn get_global_lock() -> &'static Mutex<()> {
+    GLOBAL_LOCK.get_or_init(|| Mutex::new(()))
+}
+
 #[derive(Debug)]
 pub enum Error {
+    NotFound(String),
+    UnsupportedPlatform,
     IoError(std::io::Error),
     Other(String),
 }
@@ -31,7 +43,8 @@ impl From<String> for Error {
 }
 
 pub fn get_default_uv_bin_dir() -> Result<PathBuf, Error> {
-    Ok(PathBuf::from(".tower/bin"))
+    let dir = dirs::data_local_dir().ok_or(Error::UnsupportedPlatform)?;
+    Ok(dir.join("tower").join("bin"))
 }
 
 #[derive(Debug)]
@@ -301,8 +314,66 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
 }
 
 pub async fn download_uv_for_arch(path: &PathBuf) -> Result<PathBuf, Error> {
+    debug!("Starting download of UV for current architecture");
     let archive = ArchiveSelector::get_archive_name().await?;
     let path = download_uv_archive(path, archive).await?;
     debug!("Downloaded UV to: {:?}", path);
     Ok(path)
+}
+
+async fn find_uv_binary() -> Option<PathBuf> {
+    if let Ok(default_path) = get_default_uv_bin_dir() {
+        // Check if the default path exists
+        if default_path.exists() {
+            let uv_path = default_path.join("uv");
+            if uv_path.exists() {
+                return Some(uv_path);
+            }
+        } 
+    }
+    
+    None
+} 
+
+pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {
+    // We only allow setup in the process space at a given time.
+    let _guard = get_global_lock().lock().await;
+
+    // If we get here, uv wasn't found in PATH, so let's download it
+    if let Some(path) = find_uv_binary().await {
+        debug!("UV binary found at {:?}", path);
+        Ok(path) 
+    } else {
+        let path = get_default_uv_bin_dir()?;
+        debug!("UV binary not found in PATH, setting up UV at {:?}", path);
+
+        // Create the directory if it doesn't exist
+        std::fs::create_dir_all(&path).map_err(Error::IoError)?;
+
+        let parent = path.parent()
+            .ok_or_else(|| Error::NotFound("Parent directory not found".to_string()))?
+            .to_path_buf();
+
+        // We download this code to the UV directory
+        let exe = download_uv_for_arch(&parent).await?;
+
+        // Target is the UV binary we want.
+        let target = path.join("uv");
+
+        // Copy the `uv` binary into the default directory
+        tokio::fs::copy(&exe, &target)
+            .await?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&target)?.permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&target, perms)?;
+        }
+
+        debug!("Copied UV binary from {:?} to {:?}", exe, target);
+
+        Ok(target)
+    }
 }

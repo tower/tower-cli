@@ -6,6 +6,8 @@ use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
 
+use tokio::sync::mpsc::unbounded_channel;
+
 use crate::{
     output,
     api,
@@ -133,7 +135,7 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
         std::process::exit(1);
     }
 
-    let (sender, receiver) = tower_runtime::create_output_stream();
+    let (sender, receiver) = unbounded_channel();
 
     output::success(&format!("Launching app `{}`", towerfile.app.name));
     let output_task = tokio::spawn(monitor_output(receiver));
@@ -342,9 +344,9 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 
 /// monitor_output is a helper function that will monitor the output of a given output channel and
 /// plops it down on stdout.
-async fn monitor_output(output: OutputReceiver) {
+async fn monitor_output(mut output: OutputReceiver) {
     loop {
-        if let Some(line) = output.lock().await.recv().await {
+        if let Some(line) = output.recv().await {
             let ts = &line.time;
             let msg = &line.line;
             output::log_line(&ts.to_rfc3339(), msg, output::LogLineType::Local);

@@ -85,6 +85,9 @@ impl From<tower_uv::Error> for Error {
            tower_uv::Error::NotFound(_) => Error::SpawnFailed, 
            tower_uv::Error::PermissionDenied(_) => Error::SpawnFailed, 
            tower_uv::Error::Other(_) => Error::SpawnFailed, 
+           tower_uv::Error::MissingPyprojectToml => Error::SpawnFailed, 
+           tower_uv::Error::InvalidUv => Error::SpawnFailed, 
+           tower_uv::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
         }
     }
 }
