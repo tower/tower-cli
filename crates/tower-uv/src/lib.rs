@@ -147,9 +147,6 @@ impl Uv {
     }
 
     pub async fn is_valid(&self) -> bool {
-        match test_uv_path(&self.uv_path).await {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        test_uv_path(&self.uv_path).await.is_ok()
     }
 }
