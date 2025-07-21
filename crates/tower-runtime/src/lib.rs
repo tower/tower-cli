@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::{
     UnboundedReceiver,
     UnboundedSender,
-    unbounded_channel,
 };
 use chrono::{DateTime, Utc};
 
@@ -73,11 +72,6 @@ impl<A: App> std::default::Default for AppLauncher<A> {
             app: None,
         }
     }
-}
-
-pub fn create_output_stream() -> (OutputSender, OutputReceiver) {
-    let (sender, receiver) = unbounded_channel::<Output>();
-    (sender, receiver)
 }
 
 impl<A: App> AppLauncher<A> {

@@ -5,13 +5,14 @@ use tower_runtime::{
     App,
     StartOptions,
     Status,
-    create_output_stream,
     local::LocalApp,
 };
 
 use config::Towerfile;
 use tower_package::{Package, PackageSpec};
 use tower_telemetry::{self, debug};
+
+use tokio::sync::mpsc::unbounded_channel;
 
 fn get_example_app_dir(name: &str) -> PathBuf {
     // This is where the root of the app lives.
@@ -46,7 +47,7 @@ async fn test_running_hello_world() {
     debug!("Running 01-hello-world");
     let hello_world_dir = get_example_app_dir("01-hello-world");
     let package = build_package_from_dir(&hello_world_dir).await;
-    let (sender, mut receiver) = create_output_stream();
+    let (sender, mut receiver) = unbounded_channel();
 
     // We need to create the package, which will load the app
     let opts = StartOptions{
@@ -88,7 +89,7 @@ async fn test_running_use_faker() {
     // a dependency defined in pyproject.toml, which means that it'll have to do a uv sync first.
     let use_faker_dir = get_example_app_dir("02-use-faker");
     let package = build_package_from_dir(&use_faker_dir).await;
-    let (sender, mut receiver) = create_output_stream();
+    let (sender, mut receiver) = unbounded_channel();
 
     // We need to create the package, which will load the app
     let opts = StartOptions{
@@ -139,7 +140,7 @@ async fn test_running_legacy_app() {
     // a dependency defined in pyproject.toml, which means that it'll have to do a uv sync first.
     let legacy_app_dir = get_example_app_dir("03-legacy-app");
     let package = build_package_from_dir(&legacy_app_dir).await;
-    let (sender, mut receiver) = create_output_stream();
+    let (sender, mut receiver) = unbounded_channel();
 
     // We need to create the package, which will load the app
     let opts = StartOptions{

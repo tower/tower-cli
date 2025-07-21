@@ -6,6 +6,8 @@ use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
 
+use tokio::sync::mpsc::unbounded_channel;
+
 use crate::{
     output,
     api,
@@ -133,7 +135,7 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
         std::process::exit(1);
     }
 
-    let (sender, receiver) = tower_runtime::create_output_stream();
+    let (sender, receiver) = unbounded_channel();
 
     output::success(&format!("Launching app `{}`", towerfile.app.name));
     let output_task = tokio::spawn(monitor_output(receiver));
