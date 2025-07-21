@@ -83,27 +83,48 @@ impl Uv {
     }
 
     pub async fn sync(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
-        // Make sure there's a pyproject.toml in the cwd. If there isn't one, then we don't want
-        // to do this otherwise uv will return an error on the CLI!
-        if !cwd.join("pyproject.toml").exists() {
-            return Err(Error::MissingPyprojectToml);
-        } 
+        // We need to figure out which sync strategy to apply. If there is a pyproject.toml, then
+        // that's easy.
+        if cwd.join("pyproject.toml").exists() {
+            debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
+            let child = Command::new(&self.uv_path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .current_dir(cwd)
+                .arg("--color")
+                .arg("never")
+                .arg("--no-progress")
+                .arg("sync")
+                .envs(env_vars)
+                .spawn()?;
 
-        debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
+            Ok(child)
+        } else if cwd.join("requirements.txt").exists() {
+            debug!("Executing UV ({:?}) sync with requirements in {:?}", &self.uv_path, cwd);
 
-        let child = Command::new(&self.uv_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .current_dir(cwd)
-            .arg("--color")
-            .arg("never")
-            .arg("--no-progress")
-            .arg("sync")
-            .envs(env_vars)
-            .spawn()?;
+            // If there is a requirements.txt, then we can use that to sync.
+            let child = Command::new(&self.uv_path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .current_dir(cwd)
+                .arg("--color")
+                .arg("never")
+                .arg("pip")
+                .arg("install")
+                .arg("-r")
+                .arg(cwd.join("requirements.txt"))
+                .envs(env_vars)
+                .spawn()?;
 
-        Ok(child)
+            Ok(child)
+        } else {
+            // If there is no pyproject.toml or requirements.txt, then we can't sync.
+            Err(Error::MissingPyprojectToml)
+        }
+
+
     }
 
     pub async fn run(&self, cwd: &PathBuf, program: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {

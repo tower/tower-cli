@@ -186,6 +186,26 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         // Now we also need to find the program to execute.
         let program_path = working_dir.join(&manifest.invoke);
 
+        // Quickly do a check to see if there was a cancellation before we do a subprocess spawn to
+        // ensure everything is in place.
+        if cancel_token.is_cancelled() {
+            // again tell any waiters that we cancelled.
+            let _ = sx.send(-1);
+            return Err(Error::Cancelled);
+        }
+
+        let mut child = uv.venv(&working_dir, &env_vars).await?;
+
+        // Drain the logs to the output channel.
+        let stdout = child.stdout.take().expect("no stdout");
+        tokio::spawn(drain_output(FD::Stdout, Channel::Setup, opts.output_sender.clone(), BufReader::new(stdout)));
+
+        let stderr = child.stderr.take().expect("no stderr");
+        tokio::spawn(drain_output(FD::Stderr, Channel::Setup, opts.output_sender.clone(), BufReader::new(stderr)));
+
+        // Wait for venv to finish up.
+        wait_for_process(ctx.clone(), &cancel_token, child).await;
+
         // Check once more if the process was cancelled before we do a uv sync. The sync itself,
         // once started, will take a while and we have logic for checking for cancellation.
         if cancel_token.is_cancelled() {
@@ -433,7 +453,6 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Ou
         });
     }
 }
-
 
 fn is_bash_package(package: &Package) -> bool {
     return package.manifest.invoke.ends_with(".sh")
