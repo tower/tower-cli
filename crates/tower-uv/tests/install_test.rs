@@ -9,7 +9,7 @@ async fn test_installing_uv() {
     let default_uv_bin_dir = get_default_uv_bin_dir().unwrap();
     let _ = tokio::fs::remove_dir_all(&default_uv_bin_dir).await;
 
-    // Now if we instantiate a Uv instance, it should install the `uv` bianry.
+    // Now if we instantiate a Uv instance, it should install the `uv` binary.
     let uv = Uv::new().await.expect("Failed to create a Uv instance");
     assert!(uv.is_valid().await);
 }
