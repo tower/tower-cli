@@ -9,6 +9,11 @@ license = { workspace = true }
 [dependencies]
 chrono = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 snafu = { workspace = true } 
 tower-package = { workspace = true } 
 tower-telemetry = { workspace = true } 
+tower-uv = { workspace = true } 
+
+[dev-dependencies]
+config = { workspace = true }

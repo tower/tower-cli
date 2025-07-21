@@ -1,0 +1,3 @@
+[app]
+name = "02-use-faker"
+script = "./main.py"
