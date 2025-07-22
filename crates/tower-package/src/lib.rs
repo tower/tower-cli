@@ -154,6 +154,10 @@ pub struct Package {
 
     // unpacked_path is the path to the unpackaged package on disk.
     pub unpacked_path: Option<PathBuf>,
+
+    // package_file_hash is an integrity hash of the package file.
+    pub package_file_hash: Option<String>,
+
 }
 
 impl Package {
@@ -161,6 +165,7 @@ impl Package {
        Self {
            tmp_dir: None,
            package_file_path: None,
+           package_file_hash: None,
            unpacked_path: None,
            manifest: Manifest {
                version: Some(CURRENT_PACKAGE_VERSION),
@@ -182,6 +187,7 @@ impl Package {
        Self {
            tmp_dir: None,
            package_file_path: None,
+           package_file_hash: None,
            unpacked_path: Some(path),
            manifest,
        }
@@ -306,15 +312,18 @@ impl Package {
        let mut gzip = builder.into_inner().await?;
        gzip.shutdown().await?;
 
-       //// probably not explicitly required; however, makes the test suite pass so...
+       // probably not explicitly required; however, makes the test suite pass so...
        let mut file = gzip.into_inner();
        file.shutdown().await?;
+
+       let package_hash = compute_sha256_file(&package_path).await?; 
 
        Ok(Self {
            manifest,
            unpacked_path: None,
            tmp_dir: Some(tmp_dir),
            package_file_path: Some(package_path),
+           package_file_hash: Some(package_hash),
        })
    }
 
