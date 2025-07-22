@@ -17,6 +17,7 @@ pub async fn upload_file_with_progress(
     api_config: &Configuration,
     endpoint_url: String,
     file_path: PathBuf,
+    package_hash: &str,
     content_type: &str,
     progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
@@ -34,6 +35,7 @@ pub async fn upload_file_with_progress(
     let client = ReqwestClient::new();
     let mut req = client
         .request(Method::POST, endpoint_url)
+        .header("X-Tower-Package-Hash", package_hash)
         .header("Content-Type", content_type)
         .header("Content-Encoding", "gzip")
         .body(Body::wrap_stream(progress_stream));
@@ -91,6 +93,10 @@ pub async fn deploy_app_package(
         output::die("An error happened in Tower CLI that it couldn't recover from.");
     });
 
+    let package_hash = package.package_file_hash.unwrap_or_else(|| {
+        "".to_string()
+    });
+
     // Create the URL for the API endpoint
     let base_url = &api_config.base_path;
     let url = format!("{}/apps/{}/deploy", base_url, app_name);
@@ -100,6 +106,7 @@ pub async fn deploy_app_package(
         api_config,
         url,
         package_path,
+        &package_hash,
         "application/tar",
         progress_callback,
     )
