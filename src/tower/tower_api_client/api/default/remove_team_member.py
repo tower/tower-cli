@@ -11,7 +11,7 @@ from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
     body: RemoveTeamMemberParams,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/teams/{slug}/members".format(
-            slug=slug,
+        "url": "/teams/{name}/members".format(
+            name=name,
         ),
     }
 
@@ -58,7 +58,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RemoveTeamMemberParams,
@@ -68,7 +68,7 @@ def sync_detailed(
      Remove a new team
 
     Args:
-        slug (str): The slug of the team to remove someone from
+        name (str): The name of the team to remove someone from
         body (RemoveTeamMemberParams):
 
     Raises:
@@ -80,7 +80,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -92,7 +92,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RemoveTeamMemberParams,
@@ -102,7 +102,7 @@ def sync(
      Remove a new team
 
     Args:
-        slug (str): The slug of the team to remove someone from
+        name (str): The name of the team to remove someone from
         body (RemoveTeamMemberParams):
 
     Raises:
@@ -114,14 +114,14 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RemoveTeamMemberParams,
@@ -131,7 +131,7 @@ async def asyncio_detailed(
      Remove a new team
 
     Args:
-        slug (str): The slug of the team to remove someone from
+        name (str): The name of the team to remove someone from
         body (RemoveTeamMemberParams):
 
     Raises:
@@ -143,7 +143,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -153,7 +153,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RemoveTeamMemberParams,
@@ -163,7 +163,7 @@ async def asyncio(
      Remove a new team
 
     Args:
-        slug (str): The slug of the team to remove someone from
+        name (str): The name of the team to remove someone from
         body (RemoveTeamMemberParams):
 
     Raises:
@@ -176,7 +176,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             body=body,
         )

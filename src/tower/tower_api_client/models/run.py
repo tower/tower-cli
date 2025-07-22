@@ -34,7 +34,7 @@ class Run:
         started_at (Union[None, datetime.datetime]):
         status (RunStatus):
         status_group (RunStatusGroup):
-        app_slug (Union[Unset, str]): The app name presented as app_slug to support legacy CLI clients
+        app_slug (Union[Unset, str]): This property is deprecated. Please use app_name instead.
     """
 
     app_name: str

@@ -9,16 +9,16 @@ if TYPE_CHECKING:
     from ..models.account import Account
 
 
-T = TypeVar("T", bound="UpdateAccountSlugResponse")
+T = TypeVar("T", bound="UpdateAccountNameResponse")
 
 
 @_attrs_define
-class UpdateAccountSlugResponse:
+class UpdateAccountNameResponse:
     """
     Attributes:
         account (Account):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/UpdateAccountSlugResponse.json.
+            https://api.tower.dev/v1/schemas/UpdateAccountNameResponse.json.
     """
 
     account: "Account"
@@ -49,9 +49,9 @@ class UpdateAccountSlugResponse:
 
         schema = d.pop("$schema", UNSET)
 
-        update_account_slug_response = cls(
+        update_account_name_response = cls(
             account=account,
             schema=schema,
         )
 
-        return update_account_slug_response
+        return update_account_name_response

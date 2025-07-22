@@ -11,7 +11,7 @@ from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
     body: UpdateTeamParams,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/teams/{slug}".format(
-            slug=slug,
+        "url": "/teams/{name}".format(
+            name=name,
         ),
     }
 
@@ -58,18 +58,18 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateTeamParams,
 ) -> Response[UpdateTeamResponse]:
     """Update team
 
-     Update a team with a new name or slug. Note that updating the team with a new slug will cause all
+     Update a team with a new name or name. Note that updating the team with a new name will cause all
     your URLs to change!
 
     Args:
-        slug (str): The slug of the team to update
+        name (str): The name of the team to update
         body (UpdateTeamParams):
 
     Raises:
@@ -81,7 +81,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -93,18 +93,18 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateTeamParams,
 ) -> Optional[UpdateTeamResponse]:
     """Update team
 
-     Update a team with a new name or slug. Note that updating the team with a new slug will cause all
+     Update a team with a new name or name. Note that updating the team with a new name will cause all
     your URLs to change!
 
     Args:
-        slug (str): The slug of the team to update
+        name (str): The name of the team to update
         body (UpdateTeamParams):
 
     Raises:
@@ -116,25 +116,25 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateTeamParams,
 ) -> Response[UpdateTeamResponse]:
     """Update team
 
-     Update a team with a new name or slug. Note that updating the team with a new slug will cause all
+     Update a team with a new name or name. Note that updating the team with a new name will cause all
     your URLs to change!
 
     Args:
-        slug (str): The slug of the team to update
+        name (str): The name of the team to update
         body (UpdateTeamParams):
 
     Raises:
@@ -146,7 +146,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -156,18 +156,18 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateTeamParams,
 ) -> Optional[UpdateTeamResponse]:
     """Update team
 
-     Update a team with a new name or slug. Note that updating the team with a new slug will cause all
+     Update a team with a new name or name. Note that updating the team with a new name will cause all
     your URLs to change!
 
     Args:
-        slug (str): The slug of the team to update
+        name (str): The name of the team to update
         body (UpdateTeamParams):
 
     Raises:
@@ -180,7 +180,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             body=body,
         )

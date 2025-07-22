@@ -5,22 +5,22 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.update_account_slug_params import UpdateAccountSlugParams
-from ...models.update_account_slug_response import UpdateAccountSlugResponse
+from ...models.update_account_name_params import UpdateAccountNameParams
+from ...models.update_account_name_response import UpdateAccountNameResponse
 from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
-    body: UpdateAccountSlugParams,
+    body: UpdateAccountNameParams,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/accounts/{slug}".format(
-            slug=slug,
+        "url": "/accounts/{name}".format(
+            name=name,
         ),
     }
 
@@ -35,9 +35,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdateAccountSlugResponse]:
+) -> Optional[UpdateAccountNameResponse]:
     if response.status_code == 200:
-        response_200 = UpdateAccountSlugResponse.from_dict(response.json())
+        response_200 = UpdateAccountNameResponse.from_dict(response.json())
 
         return response_200
     if client.raise_on_unexpected_status:
@@ -48,7 +48,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdateAccountSlugResponse]:
+) -> Response[UpdateAccountNameResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,29 +58,29 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Response[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateAccountNameParams,
+) -> Response[UpdateAccountNameResponse]:
+    """Update account name
 
-     Update the slug for an account
+     Update the name for an account
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        name (str): The name of the account to update
+        body (UpdateAccountNameParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAccountSlugResponse]
+        Response[UpdateAccountNameResponse]
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -92,58 +92,58 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Optional[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateAccountNameParams,
+) -> Optional[UpdateAccountNameResponse]:
+    """Update account name
 
-     Update the slug for an account
+     Update the name for an account
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        name (str): The name of the account to update
+        body (UpdateAccountNameParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAccountSlugResponse
+        UpdateAccountNameResponse
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Response[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateAccountNameParams,
+) -> Response[UpdateAccountNameResponse]:
+    """Update account name
 
-     Update the slug for an account
+     Update the name for an account
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        name (str): The name of the account to update
+        body (UpdateAccountNameParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAccountSlugResponse]
+        Response[UpdateAccountNameResponse]
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -153,30 +153,30 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Optional[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateAccountNameParams,
+) -> Optional[UpdateAccountNameResponse]:
+    """Update account name
 
-     Update the slug for an account
+     Update the name for an account
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        name (str): The name of the account to update
+        body (UpdateAccountNameParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAccountSlugResponse
+        UpdateAccountNameResponse
     """
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             body=body,
         )

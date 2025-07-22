@@ -13,19 +13,19 @@ class UpdateMyTeamInvitationParams:
     """
     Attributes:
         accepted (bool): Whether or not the invitation was accepted. If false, it's considered rejected.
-        slug (str): The slug of the team invitation to update
+        name (str): The name of the team invitation to update
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateMyTeamInvitationParams.json.
     """
 
     accepted: bool
-    slug: str
+    name: str
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         accepted = self.accepted
 
-        slug = self.slug
+        name = self.name
 
         schema = self.schema
 
@@ -33,7 +33,7 @@ class UpdateMyTeamInvitationParams:
         field_dict.update(
             {
                 "accepted": accepted,
-                "slug": slug,
+                "name": name,
             }
         )
         if schema is not UNSET:
@@ -46,13 +46,13 @@ class UpdateMyTeamInvitationParams:
         d = dict(src_dict)
         accepted = d.pop("accepted")
 
-        slug = d.pop("slug")
+        name = d.pop("name")
 
         schema = d.pop("$schema", UNSET)
 
         update_my_team_invitation_params = cls(
             accepted=accepted,
-            slug=slug,
+            name=name,
             schema=schema,
         )
 

@@ -133,8 +133,8 @@ from .team import Team
 from .team_invitation import TeamInvitation
 from .token import Token
 from .unverified_authenticator import UnverifiedAuthenticator
-from .update_account_slug_params import UpdateAccountSlugParams
-from .update_account_slug_response import UpdateAccountSlugResponse
+from .update_account_name_params import UpdateAccountNameParams
+from .update_account_name_response import UpdateAccountNameResponse
 from .update_app_params import UpdateAppParams
 from .update_app_response import UpdateAppResponse
 from .update_catalog_params import UpdateCatalogParams
@@ -288,8 +288,8 @@ __all__ = (
     "TeamInvitation",
     "Token",
     "UnverifiedAuthenticator",
-    "UpdateAccountSlugParams",
-    "UpdateAccountSlugResponse",
+    "UpdateAccountNameParams",
+    "UpdateAccountNameResponse",
     "UpdateAppParams",
     "UpdateAppResponse",
     "UpdateCatalogParams",

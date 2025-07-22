@@ -12,21 +12,20 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct EncryptedCatalogProperty {
-    #[serde(rename = "encrypted_value")]
-    pub encrypted_value: String,
+pub struct UpdateAccountNameParams {
+    /// A URL to the JSON Schema for this object.
+    #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    /// The new name for the account
     #[serde(rename = "name")]
     pub name: String,
-    #[serde(rename = "preview")]
-    pub preview: String,
 }
 
-impl EncryptedCatalogProperty {
-    pub fn new(encrypted_value: String, name: String, preview: String) -> EncryptedCatalogProperty {
-        EncryptedCatalogProperty {
-            encrypted_value,
+impl UpdateAccountNameParams {
+    pub fn new(name: String) -> UpdateAccountNameParams {
+        UpdateAccountNameParams {
+            schema: None,
             name,
-            preview,
         }
     }
 }

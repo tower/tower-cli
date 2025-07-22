@@ -32,7 +32,7 @@ class App:
         version (Union[None, str]): The current version of this app, null if none.
         last_run (Union[Unset, Run]):
         run_results (Union[Unset, RunResults]):
-        slug (Union[Unset, str]): The name of the app presented as a slug to support legacy CLI clients
+        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
         status (Union[Unset, AppStatus]): The status of the app
     """
 
