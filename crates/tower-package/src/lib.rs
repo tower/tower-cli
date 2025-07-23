@@ -285,7 +285,7 @@ impl Package {
            schedule: spec.schedule,
            app_dir_name: app_dir.to_string_lossy().to_string(),
            modules_dir_name: module_dir.to_string_lossy().to_string(),
-           checksum: compute_sha256_package(&path_hashes).await?,
+           checksum: compute_sha256_package(&path_hashes)?,
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
@@ -510,7 +510,7 @@ fn should_ignore_file(p: &PathBuf) -> bool {
     return false;
 }
 
-async fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<String, Error> {
+fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<String, Error> {
     let mut sorted_keys: Vec<&PathBuf> = path_hashes.keys().collect();
     sorted_keys.sort();
 
@@ -520,7 +520,9 @@ async fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Resul
     for key in sorted_keys {
         // We need to sort the keys so that we can compute a consistent hash.
         let value = path_hashes.get(key).unwrap();
-        hasher.update(value.as_bytes());
+
+        let combined = format!("{}:{}", key.display(), value);
+        hasher.update(combined.as_bytes());
     }
     
     // Finalize and get the hash result
