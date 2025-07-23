@@ -201,7 +201,7 @@ async fn it_packages_import_paths() {
     assert!(manifest.import_paths.contains(make_path!("modules", "shared")), "Import paths {:?} did not contain expected path", manifest.import_paths);
 
     // We should have some integrity check here too.
-    assert!(!manifest.integrity_hash.is_empty(), "Manifest integrity check was not set");
+    assert!(!manifest.checksum.is_empty(), "Manifest integrity check was not set");
 }
 
 #[tokio::test]

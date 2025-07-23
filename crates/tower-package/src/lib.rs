@@ -56,9 +56,9 @@ pub struct Manifest {
     #[serde(default)]
     pub modules_dir_name: String,
 
-    // integrity_hash contains a hash of all the content in the package.
+    // checksum contains a hash of all the content in the package.
     #[serde(default)]
-    pub integrity_hash: String,
+    pub checksum: String,
 }
 
 impl Manifest {
@@ -154,10 +154,6 @@ pub struct Package {
 
     // unpacked_path is the path to the unpackaged package on disk.
     pub unpacked_path: Option<PathBuf>,
-
-    // package_file_hash is an integrity hash of the package file.
-    pub package_file_hash: Option<String>,
-
 }
 
 impl Package {
@@ -165,7 +161,6 @@ impl Package {
        Self {
            tmp_dir: None,
            package_file_path: None,
-           package_file_hash: None,
            unpacked_path: None,
            manifest: Manifest {
                version: Some(CURRENT_PACKAGE_VERSION),
@@ -175,7 +170,7 @@ impl Package {
                import_paths: vec![],
                app_dir_name: "app".to_string(),
                modules_dir_name: "modules".to_string(),
-               integrity_hash: "".to_string(),
+               checksum: "".to_string(),
            },
        }
    }
@@ -187,7 +182,6 @@ impl Package {
        Self {
            tmp_dir: None,
            package_file_path: None,
-           package_file_hash: None,
            unpacked_path: Some(path),
            manifest,
        }
@@ -291,7 +285,7 @@ impl Package {
            schedule: spec.schedule,
            app_dir_name: app_dir.to_string_lossy().to_string(),
            modules_dir_name: module_dir.to_string_lossy().to_string(),
-           integrity_hash: compute_sha256_package(&path_hashes).await?,
+           checksum: compute_sha256_package(&path_hashes).await?,
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
@@ -308,7 +302,6 @@ impl Package {
            "Towerfile",
        ).await?;
 
-       // We'll need to delete the lines above here.
        let mut gzip = builder.into_inner().await?;
        gzip.shutdown().await?;
 
@@ -316,14 +309,11 @@ impl Package {
        let mut file = gzip.into_inner();
        file.shutdown().await?;
 
-       let package_hash = compute_sha256_file(&package_path).await?; 
-
        Ok(Self {
            manifest,
            unpacked_path: None,
            tmp_dir: Some(tmp_dir),
            package_file_path: Some(package_path),
-           package_file_hash: Some(package_hash),
        })
    }
 
@@ -540,7 +530,7 @@ async fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Resul
     Ok(format!("{:x}", result))
 }
 
-async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
+pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
     // Open the file
     let file = File::open(file_path).await?;
     let mut reader = BufReader::new(file);
