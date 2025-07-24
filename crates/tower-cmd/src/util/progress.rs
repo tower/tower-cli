@@ -35,8 +35,10 @@ impl<R: Stream<Item = Result<bytes::Bytes, std::io::Error>> + Unpin> Stream for 
             Poll::Ready(Some(Ok(chunk))) => {
                 let chunk_size = chunk.len() as u64;
                 let mut progress = self.progress.lock().unwrap();
+
                 *progress += chunk_size;
                 (self.progress_cb)(*progress, self.total_size);
+
                 Poll::Ready(Some(Ok(chunk)))
             }
             other => other,
