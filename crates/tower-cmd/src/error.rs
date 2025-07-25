@@ -11,6 +11,9 @@ pub enum Error {
 
     #[snafu(display("cryptography error"))]
     CryptographyError,
+
+    #[snafu(display("run completed"))]
+    RunCompleted,
 }
 
 impl From<crypto::Error> for Error {

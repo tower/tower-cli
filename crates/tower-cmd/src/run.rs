@@ -199,7 +199,7 @@ async fn do_run_remote(
             spinner.success();
 
             if should_follow_run {
-
+                do_follow_run(config.clone(), res.run.clone()).await;
             } else {
                 let line = format!(
                     "Run #{} for app `{}` has been scheduled",
@@ -216,6 +216,21 @@ async fn do_follow_run(
     run: Run,
 ) {
     let mut spinner = output::spinner("Waiting for run to start...");
+
+    match wait_for_run(&config, &run).await {
+        Err(err) => {
+            spinner.failure();
+            debug!("Failed to wait for run to start: {}", err);
+            output::tower_error(err);
+            return;
+        },
+        Ok(()) => {
+            spinner.success();
+
+            // Now we follow the logs from the run. We can stream them from the cloud to here using
+            // the stream_logs API endpoint.
+        }
+    }
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
@@ -413,8 +428,25 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
 
 /// wait_for_run waits for the run to enter a "start" state. It polls the API every 1 second to see
 /// if it's started yet.
-async fn wait_for_run(config: &Config, run: Run) -> Result<(), Error> {
+async fn wait_for_run(config: &Config, run: &Run) -> Result<(), Error> {
     loop {
-        match api::describe_run(config, )
+        let res = api::describe_run(config, run.app_name.clone(), run.number).await?;
+
+        if is_run_started(&res)? {
+            break
+        } else {
+            // Wait half a second to to try again.
+            tokio::time::sleep(tokio::time::Duration::from_secs(0.5)).await;
+        }
     }  
+
+    Ok(())
+}
+
+fn is_run_started(run: &Run) -> Result<bool, Error> {
+    match run.status.as_str() {
+        "running" => Ok(true),
+        "pending" | "scheduled" => Ok(false),
+        _ => Err(Error::RunCompleted),
+    }
 }

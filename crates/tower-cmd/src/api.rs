@@ -216,6 +216,17 @@ pub async fn refresh_session(config: &Config) -> Result<tower_api::models::Refre
     unwrap_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
 }
 
+pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Result<tower_api::models::StreamRunLogsResponse, Error<tower_api::apis::default_api::StreamRunLogsError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::StreamRunLogsParams {
+        slug: app_name.to_string(),
+        seq,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::stream_run_logs(api_config, params)).await
+}
+
 /// Helper function to handle Tower API responses and extract the relevant data
 async fn unwrap_api_response<T, F, V>(api_call: F) -> Result<T::Data, Error<V>>
 where
