@@ -1,34 +1,38 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="UpdateAccountSlugParams")
+if TYPE_CHECKING:
+    from ..models.schedule import Schedule
+
+
+T = TypeVar("T", bound="CreateScheduleResponse")
 
 
 @_attrs_define
-class UpdateAccountSlugParams:
+class CreateScheduleResponse:
     """
     Attributes:
-        new_slug (str): The new slug for the account
+        schedule (Schedule):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/UpdateAccountSlugParams.json.
+            https://api.tower.dev/v1/schemas/CreateScheduleResponse.json.
     """
 
-    new_slug: str
+    schedule: "Schedule"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        new_slug = self.new_slug
+        schedule = self.schedule.to_dict()
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "new_slug": new_slug,
+                "schedule": schedule,
             }
         )
         if schema is not UNSET:
@@ -38,14 +42,16 @@ class UpdateAccountSlugParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.schedule import Schedule
+
         d = dict(src_dict)
-        new_slug = d.pop("new_slug")
+        schedule = Schedule.from_dict(d.pop("schedule"))
 
         schema = d.pop("$schema", UNSET)
 
-        update_account_slug_params = cls(
-            new_slug=new_slug,
+        create_schedule_response = cls(
+            schedule=schedule,
             schema=schema,
         )
 
-        return update_account_slug_params
+        return create_schedule_response

@@ -30,7 +30,6 @@ pub struct Token {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Team {
-    pub slug: String,
     pub name: String,
     pub token: Token,
     pub team_type: String,
@@ -189,7 +188,6 @@ impl Session {
             .teams
             .iter()
             .map(|team_api| Team {
-                slug: team_api.slug.clone(),
                 name: team_api.name.clone(),
                 token: if let Some(token) = &team_api.token {
                     Token {
@@ -232,7 +230,6 @@ impl Session {
             .teams
             .iter()
             .map(|t| Team {
-                slug: t.slug.clone(),
                 name: t.name.clone(),
                 team_type: t.r#type.clone(),
                 token: Token {

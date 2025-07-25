@@ -6,17 +6,26 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_catalog_response import DeleteCatalogResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
+    *,
+    environment: Union[Unset, str] = "default",
 ) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+
+    params["environment"] = environment
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/catalogs/{slug}".format(
-            slug=slug,
+        "url": "/catalogs/{name}".format(
+            name=name,
         ),
+        "params": params,
     }
 
     return _kwargs
@@ -47,16 +56,19 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = "default",
 ) -> Response[DeleteCatalogResponse]:
     """Delete catalog
 
      Delete a new catalog object in the currently authenticated account.
 
     Args:
-        slug (str): The slug of the catalog to update.
+        name (str): The name of the catalog to update.
+        environment (Union[Unset, str]): The environment of the catalog to delete. Default:
+            'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -67,7 +79,8 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -78,16 +91,19 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = "default",
 ) -> Optional[DeleteCatalogResponse]:
     """Delete catalog
 
      Delete a new catalog object in the currently authenticated account.
 
     Args:
-        slug (str): The slug of the catalog to update.
+        name (str): The name of the catalog to update.
+        environment (Union[Unset, str]): The environment of the catalog to delete. Default:
+            'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,22 +114,26 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
+        environment=environment,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = "default",
 ) -> Response[DeleteCatalogResponse]:
     """Delete catalog
 
      Delete a new catalog object in the currently authenticated account.
 
     Args:
-        slug (str): The slug of the catalog to update.
+        name (str): The name of the catalog to update.
+        environment (Union[Unset, str]): The environment of the catalog to delete. Default:
+            'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,7 +144,8 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -133,16 +154,19 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = "default",
 ) -> Optional[DeleteCatalogResponse]:
     """Delete catalog
 
      Delete a new catalog object in the currently authenticated account.
 
     Args:
-        slug (str): The slug of the catalog to update.
+        name (str): The name of the catalog to update.
+        environment (Union[Unset, str]): The environment of the catalog to delete. Default:
+            'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,7 +178,8 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
+            environment=environment,
         )
     ).parsed

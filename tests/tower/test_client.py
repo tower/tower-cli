@@ -25,7 +25,6 @@ def mock_api_config():
 def mock_run_response_factory():
     """Factory to create consistent run response objects."""
     def _create_run_response(
-        app_slug: str = "my-app",
         app_version: str = "v6",
         number: int = 0,
         run_id: str = "50ac9bc1-c783-4359-9917-a706f20dc02c",
@@ -40,7 +39,6 @@ def mock_run_response_factory():
         return {
             "run": {
                 "app_name": "my-app",
-                "app_slug": app_slug,
                 "app_version": app_version,
                 "cancelled_at": None,
                 "created_at": "2025-04-25T20:54:58.762547Z",
@@ -64,7 +62,6 @@ def mock_run_response_factory():
 def create_run_object():
     """Factory to create Run objects for testing."""
     def _create_run(
-        app_slug: str = "my-app",
         app_version: str = "v6",
         number: int = 0,
         run_id: str = "50ac9bc1-c783-4359-9917-a706f20dc02c",
@@ -79,7 +76,6 @@ def create_run_object():
         return Run(
             app_name="my-app",
             exit_code=None,
-            app_slug=app_slug,
             app_version=app_version,
             cancelled_at=None,
             created_at="2025-04-25T20:54:58.762547Z",
@@ -112,7 +108,6 @@ def test_running_apps(httpx_mock, mock_api_config, mock_run_response_factory):
 
     # Assert the response
     assert run is not None
-    assert run.app_slug == "my-app"
     assert run.status == "pending"
 
 

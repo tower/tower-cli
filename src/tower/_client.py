@@ -45,19 +45,19 @@ DEFAULT_NUM_TIMEOUT_RETRIES = 5
 
 
 def run_app(
-    slug: str,
+    name: str,
     environment: Optional[str] = None,
     parameters: Optional[Dict[str, str]] = None,
 ) -> Run:
     """
     Run a Tower application with specified parameters and environment.
 
-    This function initiates a new run of a Tower application identified by its slug.
+    This function initiates a new run of a Tower application identified by its name.
     The run can be configured with an optional environment override and runtime parameters.
     If no environment is specified, the default environment from the Tower context is used.
 
     Args:
-        slug (str): The unique identifier of the application to run.
+        name (str): The unique identifier of the application to run.
         environment (Optional[str]): The environment to run the application in.
             If not provided, uses the default environment from the Tower context.
         parameters (Optional[Dict[str, str]]): A dictionary of key-value pairs
@@ -65,7 +65,7 @@ def run_app(
 
     Returns:
         Run: A Run object containing information about the initiated application run,
-            including the app_slug and run number.
+            including the app_name and run number.
 
     Raises:
         RuntimeError: If there is an error initiating the run or if the Tower API
@@ -88,7 +88,7 @@ def run_app(
 
     try:
         output: Optional[Union[ErrorModel, RunAppResponse]] = run_app_api.sync(
-            slug=slug, client=client, body=input_body
+            name=name, client=client, body=input_body
         )
 
         if output is None:
@@ -101,9 +101,9 @@ def run_app(
     except UnexpectedStatus as e:
         # Raise an AppNotFoundError here if the app was, indeed, not found.
         if e.status_code == 404:
-            raise AppNotFoundError(slug)
+            raise AppNotFoundError(name)
         else:
-            raise UnknownException(f"Unexpected status code {e.status_code} when running app {slug}")
+            raise UnknownException(f"Unexpected status code {e.status_code} when running app {name}")
 
 def wait_for_run(
     run: Run,
@@ -118,7 +118,7 @@ def wait_for_run(
     a terminal state (exited, errored, cancelled, or crashed).
 
     Args:
-        run (Run): The Run object containing the app_slug and number of the run to monitor.
+        run (Run): The Run object containing the app_name and number of the run to monitor.
         timeout (Optional[float]): Maximum time to wait in seconds before raising a
             TimeoutException. Defaults to one day (86,400 seconds).
         raise_on_failure (bool): If True, raises a RunFailedError when the run fails.
@@ -158,7 +158,7 @@ def wait_for_run(
                 return desc
             elif _is_failed_run(desc):
                 if raise_on_failure:
-                    raise RunFailedError(desc.app_slug, desc.number, desc.status)
+                    raise RunFailedError(desc.app_name, desc.number, desc.status)
                 else:
                     return desc
 
@@ -235,7 +235,7 @@ def wait_for_runs(
                 successful_runs.append(desc)
             elif _is_failed_run(desc):
                 if raise_on_failure:
-                    raise RunFailedError(desc.app_slug, desc.number, desc.status)
+                    raise RunFailedError(desc.app_name, desc.number, desc.status)
                 else:
                     failed_runs.append(desc)
 
@@ -344,7 +344,7 @@ def _check_run_status(
 
     try:
         output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(
-            slug=run.app_slug,
+            name=run.app_name,
             seq=run.number,
             client=client
         )

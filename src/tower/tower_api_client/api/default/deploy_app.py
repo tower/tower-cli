@@ -11,7 +11,7 @@ from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
     content_encoding: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
@@ -21,8 +21,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/apps/{slug}/deploy".format(
-            slug=slug,
+        "url": "/apps/{name}/deploy".format(
+            name=name,
         ),
     }
 
@@ -67,7 +67,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
@@ -78,7 +78,7 @@ def sync_detailed(
     and creates a new deployment for an app based on that file.
 
     Args:
-        slug (str): The slug of the app to deploy.
+        name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
 
     Raises:
@@ -90,7 +90,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         content_encoding=content_encoding,
     )
 
@@ -102,7 +102,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
@@ -113,7 +113,7 @@ def sync(
     and creates a new deployment for an app based on that file.
 
     Args:
-        slug (str): The slug of the app to deploy.
+        name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
 
     Raises:
@@ -125,14 +125,14 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         content_encoding=content_encoding,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
@@ -143,7 +143,7 @@ async def asyncio_detailed(
     and creates a new deployment for an app based on that file.
 
     Args:
-        slug (str): The slug of the app to deploy.
+        name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
 
     Raises:
@@ -155,7 +155,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         content_encoding=content_encoding,
     )
 
@@ -165,7 +165,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
@@ -176,7 +176,7 @@ async def asyncio(
     and creates a new deployment for an app based on that file.
 
     Args:
-        slug (str): The slug of the app to deploy.
+        name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
 
     Raises:
@@ -189,7 +189,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             content_encoding=content_encoding,
         )

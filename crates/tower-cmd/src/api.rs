@@ -14,11 +14,11 @@ pub trait ResponseEntity {
     fn extract_data(self) -> Option<Self::Data>;
 }
 
-pub async fn describe_app(config: &Config, slug: &str) -> Result<tower_api::models::DescribeAppResponse, Error<tower_api::apis::default_api::DescribeAppError>> {
+pub async fn describe_app(config: &Config, name: &str) -> Result<tower_api::models::DescribeAppResponse, Error<tower_api::apis::default_api::DescribeAppError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeAppParams {
-        slug: slug.to_string(),
+        name: name.to_string(),
         runs: None,
         start_at: None,
         end_at: None,
@@ -43,47 +43,47 @@ pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsRes
     unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
 }
 
-pub async fn create_app(config: &Config, name: &str, slug: &str, description: &str) -> Result<tower_api::models::CreateAppResponse, Error<tower_api::apis::default_api::CreateAppError>> {
+pub async fn create_app(config: &Config, name: &str, description: &str) -> Result<tower_api::models::CreateAppResponse, Error<tower_api::apis::default_api::CreateAppError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::CreateAppParams {
         create_app_params: tower_api::models::CreateAppParams{
             name: name.to_string(),
-            slug: Some(slug.to_string()),
             short_description: Some(description.to_string()),
             schema: None,
+            slug: None,
         },
     };
 
     unwrap_api_response(tower_api::apis::default_api::create_app(api_config, params)).await 
 }
 
-pub async fn delete_app(config: &Config, slug: &str) -> Result<tower_api::models::DeleteAppResponse, Error<tower_api::apis::default_api::DeleteAppError>> {
+pub async fn delete_app(config: &Config, name: &str) -> Result<tower_api::models::DeleteAppResponse, Error<tower_api::apis::default_api::DeleteAppError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DeleteAppParams {
-        slug: slug.to_string(),
+        name: name.to_string(),
     };
 
     unwrap_api_response(tower_api::apis::default_api::delete_app(api_config, params)).await
 }
 
-pub async fn describe_run_logs(config: &Config, slug: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
+pub async fn describe_run_logs(config: &Config, name: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeRunLogsParams {
-        slug: slug.to_string(),
+        name: name.to_string(),
         seq,
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_run_logs(api_config, params)).await
 }
 
-pub async fn run_app(config: &Config, slug: &str, env: &str, params: HashMap<String, String>) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
+pub async fn run_app(config: &Config, name: &str, env: &str, params: HashMap<String, String>) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::RunAppParams {
-        slug: slug.to_string(),
+        name: name.to_string(),
         run_app_params: tower_api::models::RunAppParams {
             schema: None,
             environment: env.to_string(),
