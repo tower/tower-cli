@@ -62,9 +62,16 @@ pub struct Uv {
 
 impl Uv {
     pub async fn new() -> Result<Self, Error> {
-        let uv_path = install::find_or_setup_uv().await?;
-        test_uv_path(&uv_path).await?;
-        Ok(Uv { uv_path })
+        match install::find_or_setup_uv().await {
+            Ok(uv_path) => {
+                test_uv_path(&uv_path).await?;
+                Ok(Uv { uv_path })
+            },
+            Err(e) => {
+                debug!("Error setting up UV: {:?}", e);
+                Err(e.into())
+            }
+        }
     }
 
     pub async fn venv(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
