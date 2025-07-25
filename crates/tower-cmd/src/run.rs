@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
+use tower_api::models::Run;
 
 use tokio::sync::mpsc::unbounded_channel;
 
@@ -33,8 +34,8 @@ pub fn run_cmd() -> Command {
         )
         .arg(
             Arg::new("environment")
-                .short('e')
                 .long("environment")
+                .short('e')
                 .help("The environment to invoke the app in")
                 .default_value("default"),
         )
@@ -44,6 +45,13 @@ pub fn run_cmd() -> Command {
                 .long("parameter")
                 .help("Parameters (key=value) to pass to the app")
                 .action(clap::ArgAction::Append),
+        )
+        .arg(
+            Arg::new("detach")
+                .long("detach")
+                .short('t')
+                .help("Don't follow the run output in your CLI")
+                .action(clap::ArgAction::SetTrue),
         )
         .about("Run your code in Tower or locally")
 }
@@ -73,7 +81,8 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
                     do_run_local(config, path, env, params).await;
                 }
             } else {
-                do_run_remote(config, path, env, params, app_name).await;
+                let follow = should_follow_run(args);
+                do_run_remote(config, path, env, params, app_name, follow).await;
             }
         }
         Err(err) => {
@@ -169,6 +178,7 @@ async fn do_run_remote(
     env: &str,
     params: HashMap<String, String>,
     app_name: Option<String>,
+    should_follow_run: bool,
 ) {
     let app_slug = app_name.unwrap_or_else(|| {
         // Load the Towerfile
@@ -188,13 +198,24 @@ async fn do_run_remote(
         Ok(res) => {
             spinner.success();
 
-            let line = format!(
-                "Run #{} for app `{}` has been scheduled",
-                res.run.number, app_slug
-            );
-            output::success(&line);
+            if should_follow_run {
+
+            } else {
+                let line = format!(
+                    "Run #{} for app `{}` has been scheduled",
+                    res.run.number, app_slug
+                );
+                output::success(&line);
+            }
         }
     }
+}
+
+async fn do_follow_run(
+    config: Config,
+    run: Run,
+) {
+    let mut spinner = output::spinner("Waiting for run to start...");
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
@@ -211,6 +232,13 @@ fn get_run_parameters(
     let app_name = get_app_name(cmd);
 
     Ok((local, path, params, app_name))
+}
+
+fn should_follow_run(
+    args: &ArgMatches,
+) -> bool {
+    let local = *args.get_one::<bool>("detach").unwrap();
+    !local
 }
 
 /// Parses `--parameter` arguments into a HashMap of key-value pairs.
@@ -383,3 +411,10 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
     format!("PYICEBERG_CATALOG__{}__{}", catalog_name, property_name)
 }
 
+/// wait_for_run waits for the run to enter a "start" state. It polls the API every 1 second to see
+/// if it's started yet.
+async fn wait_for_run(config: &Config, run: Run) -> Result<(), Error> {
+    loop {
+        match api::describe_run(config, )
+    }  
+}

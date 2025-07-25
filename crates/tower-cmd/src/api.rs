@@ -68,6 +68,17 @@ pub async fn delete_app(config: &Config, name: &str) -> Result<tower_api::models
     unwrap_api_response(tower_api::apis::default_api::delete_app(api_config, params)).await
 }
 
+pub async fn describe_run(config: &Config, app_name: &str, seq: i64) -> Result<tower_api::models::DescribeRunResponse, Error<tower_api::apis::default_api::DescribeRunError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeRunParams {
+        app_name: app_name.to_string(),
+        seq,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::describe_run(api_config, params)).await
+}
+
 pub async fn describe_run_logs(config: &Config, name: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
     let api_config = &config.into();
 
@@ -423,6 +434,17 @@ impl ResponseEntity for tower_api::apis::default_api::RefreshSessionSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::DescribeSessionSuccess {
     type Data = tower_api::models::DescribeSessionResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeRunSuccess {
+    type Data = tower_api::models::DescribeRunResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
