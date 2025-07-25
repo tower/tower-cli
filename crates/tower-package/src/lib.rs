@@ -10,6 +10,7 @@ use config::Towerfile;
 use tokio_tar::{Archive, Builder};
 use glob::glob;
 use tmpdir::TmpDir;
+use sha2::{Sha256, Digest};
 
 use async_compression::tokio::write::GzipEncoder;
 use async_compression::tokio::bufread::GzipDecoder;
@@ -54,6 +55,10 @@ pub struct Manifest {
     // modules_dir_name is the name of the modules directory within the package.
     #[serde(default)]
     pub modules_dir_name: String,
+
+    // checksum contains a hash of all the content in the package.
+    #[serde(default)]
+    pub checksum: String,
 }
 
 impl Manifest {
@@ -165,6 +170,7 @@ impl Package {
                import_paths: vec![],
                app_dir_name: "app".to_string(),
                modules_dir_name: "modules".to_string(),
+               checksum: "".to_string(),
            },
        }
    }
@@ -202,6 +208,11 @@ impl Package {
        let gzip = GzipEncoder::new(file);
        let mut builder = Builder::new(gzip);
 
+       // These help us compute the integrity of the package contents overall. For each path, we'll
+       // store a hash of the contents written to the file. Then we'll hash the final content to
+       // create a fingerprint of the data.
+       let mut path_hashes = HashMap::new();
+
        // If the user didn't specify anything here we'll package everything under this directory
        // and ship it to Tower.
        let mut file_globs = spec.file_globs.clone();
@@ -228,6 +239,10 @@ impl Package {
        for (physical_path, logical_path) in file_paths {
            // All of the app code goes into the "app" directory.
            let logical_path = app_dir.join(logical_path);
+
+           let hash = compute_sha256_file(&physical_path).await?;
+           path_hashes.insert(logical_path.clone(), hash);
+
            builder.append_path_with_name(physical_path, logical_path).await?;
        }
 
@@ -253,6 +268,10 @@ impl Package {
            // Now we write all of these paths to the modules directory.
            for (physical_path, logical_path) in file_paths {
                let logical_path = module_dir.join(logical_path);
+
+               let hash = compute_sha256_file(&physical_path).await?;
+               path_hashes.insert(logical_path.clone(), hash);
+
                debug!("adding file {}", logical_path.display());
                builder.append_path_with_name(physical_path, logical_path).await?;
            }
@@ -266,6 +285,7 @@ impl Package {
            schedule: spec.schedule,
            app_dir_name: app_dir.to_string_lossy().to_string(),
            modules_dir_name: module_dir.to_string_lossy().to_string(),
+           checksum: compute_sha256_package(&path_hashes)?,
        };
 
        // the whole manifest needs to be written to a file as a convenient way to avoid having to
@@ -282,11 +302,10 @@ impl Package {
            "Towerfile",
        ).await?;
 
-       // We'll need to delete the lines above here.
        let mut gzip = builder.into_inner().await?;
        gzip.shutdown().await?;
 
-       //// probably not explicitly required; however, makes the test suite pass so...
+       // probably not explicitly required; however, makes the test suite pass so...
        let mut file = gzip.into_inner();
        file.shutdown().await?;
 
@@ -489,4 +508,51 @@ fn should_ignore_file(p: &PathBuf) -> bool {
     }
 
     return false;
+}
+
+fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<String, Error> {
+    let mut sorted_keys: Vec<&PathBuf> = path_hashes.keys().collect();
+    sorted_keys.sort();
+
+    // hasher that we'll use for computing the overall SHA256 hash.
+    let mut hasher = Sha256::new();
+
+    for key in sorted_keys {
+        // We need to sort the keys so that we can compute a consistent hash.
+        let value = path_hashes.get(key).unwrap();
+
+        let combined = format!("{}:{}", key.display(), value);
+        hasher.update(combined.as_bytes());
+    }
+    
+    // Finalize and get the hash result
+    let result = hasher.finalize();
+    
+    // Convert to hex string
+    Ok(format!("{:x}", result))
+}
+
+pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
+    // Open the file
+    let file = File::open(file_path).await?;
+    let mut reader = BufReader::new(file);
+    
+    // Create a SHA256 hasher
+    let mut hasher = Sha256::new();
+    
+    // Read file in chunks to handle large files efficiently
+    let mut buffer = [0; 8192]; // 8KB buffer
+    loop {
+        let bytes_read = reader.read(&mut buffer).await?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+    
+    // Finalize and get the hash result
+    let result = hasher.finalize();
+    
+    // Convert to hex string
+    Ok(format!("{:x}", result))
 }
