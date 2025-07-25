@@ -4,6 +4,10 @@ use http::StatusCode;
 use std::collections::HashMap;
 use tower_api::apis::ResponseContent;
 use tower_telemetry::debug;
+use tokio::sync::mpsc;
+use reqwest_eventsource::{Event, EventSource};
+use tower_api::apis::configuration;
+use futures_util::StreamExt;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -72,7 +76,7 @@ pub async fn describe_run(config: &Config, app_name: &str, seq: i64) -> Result<t
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeRunParams {
-        app_name: app_name.to_string(),
+        name: app_name.to_string(),
         seq,
     };
 
@@ -216,15 +220,87 @@ pub async fn refresh_session(config: &Config) -> Result<tower_api::models::Refre
     unwrap_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
 }
 
-pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Result<tower_api::models::StreamRunLogsResponse, Error<tower_api::apis::default_api::StreamRunLogsError>> {
-    let api_config = &config.into();
+enum LogStreamEvent {
+    EventLog(tower_api::models::EventLog),
+    EventWarning(tower_api::models::EventWarning),
+}
 
-    let params = tower_api::apis::default_api::StreamRunLogsParams {
-        slug: app_name.to_string(),
-        seq,
+enum LogStreamError {
+    Reqwest(reqwest::Error),
+    Unknown,
+}
+
+impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
+    fn from(err: reqwest_eventsource::CannotCloneRequestError) -> Self {
+        LogStreamError::Reqwest(reqwest_eventsource::Error::Transport(err))
+    }
+}
+
+async fn drain_run_logs_stream(mut source: EventSource, _tx: mpsc::Sender<LogStreamEvent>) {
+    while let Some(event) = source.next().await {
+        match event {
+            Ok(reqwest_eventsource::Event::Open) => {
+                // TODO: This hsouldn't happen.
+            }
+            Ok(Event::Message(message)) => {
+                debug!("Message: {:?}", message);
+            },
+            Err(err) => {
+                debug!("Error in log stream: {}", err);
+                break; // Exit on error
+            }
+        } 
+    }
+}
+
+pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Result<mpsc::Receiver<LogStreamEvent>, LogStreamError>  { 
+    let api_config: configuration::Configuration = config.into();
+
+    // These represent the messages that we'll stream to the client.
+    let (tx, rx) = mpsc::channel(1);
+
+    // This code is copied from tower-api. Since that code is generated, there's not really a good
+    // way to share this code between here and the rest of the app.
+    let name = tower_api::apis::urlencode(app_name);
+    let uri = format!("{}/apps/{name}/runs/{seq}/logs/stream", api_config.base_path, name=name, seq=seq);
+    let mut builder = api_config.client.request(reqwest::Method::GET, &uri);
+
+    if let Some(ref user_agent) = api_config.user_agent {
+        builder = builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    if let Some(ref token) = api_config.bearer_access_token {
+        builder = builder.bearer_auth(token.to_owned());
     };
 
-    unwrap_api_response(tower_api::apis::default_api::stream_run_logs(api_config, params)).await
+    // Now let's try to open the event source with the server.
+    let mut source = EventSource::new(builder)?;
+
+    if let Some(event) = source.next().await {
+        match event {
+            Ok(Event::Open) => {
+                tokio::spawn(drain_run_logs_stream(source, tx));
+                Ok(rx)
+            },
+            Err(err) => {
+                match err {
+                    reqwest_eventsource::Error::Transport(e) => {
+                        LogStreamError::Reqwest(e)
+                    },
+                    reqwest_eventsource::Error::StreamEnded => {
+                        drop(tx);
+                        Ok(rx)
+                    },
+                    _ => {
+                        LogStreamError::Unknown
+                    }
+                }
+            }
+        }
+    } else {
+        // If we didn't get an event, we can't stream logs.
+        Err(LogStreamError::Unknown)
+    }
 }
 
 /// Helper function to handle Tower API responses and extract the relevant data

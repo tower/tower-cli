@@ -199,7 +199,7 @@ async fn do_run_remote(
             spinner.success();
 
             if should_follow_run {
-                do_follow_run(config.clone(), res.run.clone()).await;
+                do_follow_run(config, &res.run).await;
             } else {
                 let line = format!(
                     "Run #{} for app `{}` has been scheduled",
@@ -213,7 +213,7 @@ async fn do_run_remote(
 
 async fn do_follow_run(
     config: Config,
-    run: Run,
+    run: &Run,
 ) {
     let mut spinner = output::spinner("Waiting for run to start...");
 
@@ -430,13 +430,13 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
 /// if it's started yet.
 async fn wait_for_run(config: &Config, run: &Run) -> Result<(), Error> {
     loop {
-        let res = api::describe_run(config, run.app_name.clone(), run.number).await?;
+        let res = api::describe_run(config, &run.app_name, run.number).await?;
 
-        if is_run_started(&res)? {
+        if is_run_started(&res.run)? {
             break
         } else {
             // Wait half a second to to try again.
-            tokio::time::sleep(tokio::time::Duration::from_secs(0.5)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
     }  
 
@@ -444,9 +444,12 @@ async fn wait_for_run(config: &Config, run: &Run) -> Result<(), Error> {
 }
 
 fn is_run_started(run: &Run) -> Result<bool, Error> {
-    match run.status.as_str() {
-        "running" => Ok(true),
-        "pending" | "scheduled" => Ok(false),
+    match run.status {
+        tower_api::models::run::Status::Running => Ok(true),
+        tower_api::models::run::Status::Exited => Ok(false),
+        tower_api::models::run::Status::Errored => Ok(false),
+        tower_api::models::run::Status::Cancelled => Ok(false),
+        tower_api::models::run::Status::Crashed => Ok(false),
         _ => Err(Error::RunCompleted),
     }
 }

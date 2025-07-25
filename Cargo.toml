@@ -37,6 +37,7 @@ pem = "3"
 promptly = "0.3"
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+reqwest-eventsource = { version = "0.6" }
 rpassword = "7"
 rsa = "0.9"
 serde = "1"
