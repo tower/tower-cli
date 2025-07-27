@@ -376,7 +376,7 @@ class Llm:
         self.context = context
 
         self.inference_router = context.inference_router
-        self.inference_router_api_key = getattr(context,'inference_router_api_key', None)
+        self.inference_router_api_key = context.inference_router_api_key
         self.inference_service = context.inference_service
 
         if self.inference_router is None and self.context.is_local():
