@@ -221,16 +221,40 @@ async fn do_follow_run(
         Err(err) => {
             spinner.failure();
             debug!("Failed to wait for run to start: {}", err);
-            output::tower_error(err);
-            return;
+            let msg = format!("An error occured while waiting for the run to start. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+            output::failure(&msg);
         },
         Ok(()) => {
             spinner.success();
 
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
+            match api::stream_run_logs(&config, &run.app_name, run.number).await {
+                Ok(mut output) => {
+                    // We will monitor the output channel and print it to stdout.
+                    while let Some(event) = output.recv().await {
+                        match event {
+                            api::LogStreamEvent::EventLog(log) => {
+                                output::log_line(
+                                    &log.reported_at,
+                                    &log.content,
+                                    output::LogLineType::Remote,
+                                );
+                            }
+                            api::LogStreamEvent::EventWarning(warning) => {
+                                debug!("warning: {:?}", warning);
+                            }
+                        }
+                    }
+                },
+                Err(err) => {
+                    debug!("Failed to stream run logs: {:?}", err);
+                    let msg = format!("An error occured while waiting streaming logs from Tower to your console. You can get more details at {:?} or by contacting support.", run.dollar_link);
+                    output::failure(&msg);
+                }
+            }
         }
-    }
+    };
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
@@ -445,11 +469,9 @@ async fn wait_for_run(config: &Config, run: &Run) -> Result<(), Error> {
 
 fn is_run_started(run: &Run) -> Result<bool, Error> {
     match run.status {
+        tower_api::models::run::Status::Scheduled => Ok(false),
+        tower_api::models::run::Status::Pending => Ok(false),
         tower_api::models::run::Status::Running => Ok(true),
-        tower_api::models::run::Status::Exited => Ok(false),
-        tower_api::models::run::Status::Errored => Ok(false),
-        tower_api::models::run::Status::Cancelled => Ok(false),
-        tower_api::models::run::Status::Crashed => Ok(false),
         _ => Err(Error::RunCompleted),
     }
 }

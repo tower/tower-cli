@@ -220,30 +220,56 @@ pub async fn refresh_session(config: &Config) -> Result<tower_api::models::Refre
     unwrap_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
 }
 
-enum LogStreamEvent {
-    EventLog(tower_api::models::EventLog),
+pub enum LogStreamEvent {
+    EventLog(tower_api::models::LogLine),
     EventWarning(tower_api::models::EventWarning),
 }
 
-enum LogStreamError {
+#[derive(Debug)]
+pub enum LogStreamError {
     Reqwest(reqwest::Error),
     Unknown,
 }
 
 impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
     fn from(err: reqwest_eventsource::CannotCloneRequestError) -> Self {
-        LogStreamError::Reqwest(reqwest_eventsource::Error::Transport(err))
+        debug!("Failed to clone request {:?}", err);
+        LogStreamError::Unknown
     }
 }
 
-async fn drain_run_logs_stream(mut source: EventSource, _tx: mpsc::Sender<LogStreamEvent>) {
+async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStreamEvent>) {
     while let Some(event) = source.next().await {
         match event {
             Ok(reqwest_eventsource::Event::Open) => {
                 // TODO: This hsouldn't happen.
             }
             Ok(Event::Message(message)) => {
-                debug!("Message: {:?}", message);
+                match message.event.as_str() {
+                "log" => {
+                    let event_log = serde_json::from_str(&message.data);
+
+                    match event_log {
+                        Ok(event) => {
+                            tx.send(LogStreamEvent::EventLog(event)).await.ok();
+                        },
+                        Err(err) => {
+                            debug!("Failed to parse log message: {}. Error: {}", message.data, err);
+                        }
+                    };
+                },
+                "warning" => {
+                    let event_warning = serde_json::from_str(&message.data);
+                    if let Ok(event) = event_warning {
+                        tx.send(LogStreamEvent::EventWarning(event)).await.ok();
+                    } else {
+                        debug!("Failed to parse warning message: {:?}", message.data);
+                    }    
+                }
+                _ => {
+                    debug!("Unknown or unsupported log message: {:?}", message);
+                }
+                };
             },
             Err(err) => {
                 debug!("Error in log stream: {}", err);
@@ -282,17 +308,21 @@ pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Resul
                 tokio::spawn(drain_run_logs_stream(source, tx));
                 Ok(rx)
             },
+            Ok(Event::Message(message)) => {
+                // This is a bug in the program and should never happen.
+                panic!("Received message when expected an open event. Message: {:?}", message);
+            },
             Err(err) => {
                 match err {
                     reqwest_eventsource::Error::Transport(e) => {
-                        LogStreamError::Reqwest(e)
+                        Err(LogStreamError::Reqwest(e))
                     },
                     reqwest_eventsource::Error::StreamEnded => {
                         drop(tx);
                         Ok(rx)
                     },
                     _ => {
-                        LogStreamError::Unknown
+                        Err(LogStreamError::Unknown)
                     }
                 }
             }

@@ -150,6 +150,8 @@ pub mod exported_secret;
 pub use self::exported_secret::ExportedSecret;
 pub mod featurebase_identity;
 pub use self::featurebase_identity::FeaturebaseIdentity;
+pub mod features;
+pub use self::features::Features;
 pub mod generate_app_statistics_response;
 pub use self::generate_app_statistics_response::GenerateAppStatisticsResponse;
 pub mod generate_authenticator_response;
