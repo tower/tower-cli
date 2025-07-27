@@ -1,3 +1,4 @@
+import datetime
 from http import HTTPStatus
 from typing import Any, Optional, Union
 
@@ -10,20 +11,35 @@ from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
     params["runs"] = runs
 
+    json_start_at: Union[Unset, str] = UNSET
+    if not isinstance(start_at, Unset):
+        json_start_at = start_at.isoformat()
+    params["start_at"] = json_start_at
+
+    json_end_at: Union[Unset, str] = UNSET
+    if not isinstance(end_at, Unset):
+        json_end_at = end_at.isoformat()
+    params["end_at"] = json_end_at
+
+    params["timezone"] = timezone
+
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/apps/{slug}".format(
-            slug=slug,
+        "url": "/apps/{name}".format(
+            name=name,
         ),
         "params": params,
     }
@@ -56,18 +72,27 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Response[DescribeAppResponse]:
     """Describe app
 
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -78,8 +103,11 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         runs=runs,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     )
 
     response = client.get_httpx_client().request(
@@ -90,18 +118,27 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Optional[DescribeAppResponse]:
     """Describe app
 
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -112,25 +149,37 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         runs=runs,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Response[DescribeAppResponse]:
     """Describe app
 
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -141,8 +190,11 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         runs=runs,
+        start_at=start_at,
+        end_at=end_at,
+        timezone=timezone,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -151,18 +203,27 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
+    end_at: Union[Unset, datetime.datetime] = UNSET,
+    timezone: Union[Unset, str] = "UTC",
 ) -> Optional[DescribeAppResponse]:
     """Describe app
 
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
+        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+            (inclusive). Provide timestamps in ISO-8601 format.
+        timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
+            Defaults to UTC. Default: 'UTC'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -174,8 +235,11 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             runs=runs,
+            start_at=start_at,
+            end_at=end_at,
+            timezone=timezone,
         )
     ).parsed

@@ -13,17 +13,15 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     *,
     alert_type: Union[Unset, str] = UNSET,
-    acked: Union[Unset, bool] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    acked: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
     params["alert_type"] = alert_type
-
-    params["acked"] = acked
 
     json_start_at: Union[Unset, str] = UNSET
     if not isinstance(start_at, Unset):
@@ -38,6 +36,8 @@ def _get_kwargs(
     params["page"] = page
 
     params["page_size"] = page_size
+
+    params["acked"] = acked
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -78,11 +78,11 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     alert_type: Union[Unset, str] = UNSET,
-    acked: Union[Unset, bool] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    acked: Union[Unset, str] = UNSET,
 ) -> Response[ListAlertsResponse]:
     """List alerts
 
@@ -90,14 +90,13 @@ def sync_detailed(
 
     Args:
         alert_type (Union[Unset, str]): Filter alerts by alert type
-        acked (Union[Unset, bool]): Filter by acknowledgement status (true=acknowledged,
-            false=unacknowledged)
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        acked (Union[Unset, str]): Filter alerts by acknowledged status.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -109,11 +108,11 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         alert_type=alert_type,
-        acked=acked,
         start_at=start_at,
         end_at=end_at,
         page=page,
         page_size=page_size,
+        acked=acked,
     )
 
     response = client.get_httpx_client().request(
@@ -127,11 +126,11 @@ def sync(
     *,
     client: AuthenticatedClient,
     alert_type: Union[Unset, str] = UNSET,
-    acked: Union[Unset, bool] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    acked: Union[Unset, str] = UNSET,
 ) -> Optional[ListAlertsResponse]:
     """List alerts
 
@@ -139,14 +138,13 @@ def sync(
 
     Args:
         alert_type (Union[Unset, str]): Filter alerts by alert type
-        acked (Union[Unset, bool]): Filter by acknowledgement status (true=acknowledged,
-            false=unacknowledged)
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        acked (Union[Unset, str]): Filter alerts by acknowledged status.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,11 +157,11 @@ def sync(
     return sync_detailed(
         client=client,
         alert_type=alert_type,
-        acked=acked,
         start_at=start_at,
         end_at=end_at,
         page=page,
         page_size=page_size,
+        acked=acked,
     ).parsed
 
 
@@ -171,11 +169,11 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     alert_type: Union[Unset, str] = UNSET,
-    acked: Union[Unset, bool] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    acked: Union[Unset, str] = UNSET,
 ) -> Response[ListAlertsResponse]:
     """List alerts
 
@@ -183,14 +181,13 @@ async def asyncio_detailed(
 
     Args:
         alert_type (Union[Unset, str]): Filter alerts by alert type
-        acked (Union[Unset, bool]): Filter by acknowledgement status (true=acknowledged,
-            false=unacknowledged)
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        acked (Union[Unset, str]): Filter alerts by acknowledged status.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -202,11 +199,11 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         alert_type=alert_type,
-        acked=acked,
         start_at=start_at,
         end_at=end_at,
         page=page,
         page_size=page_size,
+        acked=acked,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -218,11 +215,11 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     alert_type: Union[Unset, str] = UNSET,
-    acked: Union[Unset, bool] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    acked: Union[Unset, str] = UNSET,
 ) -> Optional[ListAlertsResponse]:
     """List alerts
 
@@ -230,14 +227,13 @@ async def asyncio(
 
     Args:
         alert_type (Union[Unset, str]): Filter alerts by alert type
-        acked (Union[Unset, bool]): Filter by acknowledgement status (true=acknowledged,
-            false=unacknowledged)
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        acked (Union[Unset, str]): Filter alerts by acknowledged status.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -251,10 +247,10 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             alert_type=alert_type,
-            acked=acked,
             start_at=start_at,
             end_at=end_at,
             page=page,
             page_size=page_size,
+            acked=acked,
         )
     ).parsed

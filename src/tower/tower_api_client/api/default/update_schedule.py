@@ -5,22 +5,22 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.update_account_slug_params import UpdateAccountSlugParams
-from ...models.update_account_slug_response import UpdateAccountSlugResponse
+from ...models.update_schedule_params import UpdateScheduleParams
+from ...models.update_schedule_response import UpdateScheduleResponse
 from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    id: str,
     *,
-    body: UpdateAccountSlugParams,
+    body: UpdateScheduleParams,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/accounts/{slug}".format(
-            slug=slug,
+        "url": "/schedules/{id}".format(
+            id=id,
         ),
     }
 
@@ -35,9 +35,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdateAccountSlugResponse]:
+) -> Optional[UpdateScheduleResponse]:
     if response.status_code == 200:
-        response_200 = UpdateAccountSlugResponse.from_dict(response.json())
+        response_200 = UpdateScheduleResponse.from_dict(response.json())
 
         return response_200
     if client.raise_on_unexpected_status:
@@ -48,7 +48,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdateAccountSlugResponse]:
+) -> Response[UpdateScheduleResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,29 +58,29 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Response[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateScheduleParams,
+) -> Response[UpdateScheduleResponse]:
+    """Update schedule
 
-     Update the slug for an account
+     Update an existing schedule for an app.
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        id (str): The ID of the schedule to update.
+        body (UpdateScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAccountSlugResponse]
+        Response[UpdateScheduleResponse]
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        id=id,
         body=body,
     )
 
@@ -92,58 +92,58 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Optional[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateScheduleParams,
+) -> Optional[UpdateScheduleResponse]:
+    """Update schedule
 
-     Update the slug for an account
+     Update an existing schedule for an app.
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        id (str): The ID of the schedule to update.
+        body (UpdateScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAccountSlugResponse
+        UpdateScheduleResponse
     """
 
     return sync_detailed(
-        slug=slug,
+        id=id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Response[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateScheduleParams,
+) -> Response[UpdateScheduleResponse]:
+    """Update schedule
 
-     Update the slug for an account
+     Update an existing schedule for an app.
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        id (str): The ID of the schedule to update.
+        body (UpdateScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAccountSlugResponse]
+        Response[UpdateScheduleResponse]
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        id=id,
         body=body,
     )
 
@@ -153,30 +153,30 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountSlugParams,
-) -> Optional[UpdateAccountSlugResponse]:
-    """Update account slug
+    body: UpdateScheduleParams,
+) -> Optional[UpdateScheduleResponse]:
+    """Update schedule
 
-     Update the slug for an account
+     Update an existing schedule for an app.
 
     Args:
-        slug (str): The slug of the account to update
-        body (UpdateAccountSlugParams):
+        id (str): The ID of the schedule to update.
+        body (UpdateScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAccountSlugResponse
+        UpdateScheduleResponse
     """
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            id=id,
             client=client,
             body=body,
         )

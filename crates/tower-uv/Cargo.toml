@@ -1,0 +1,17 @@
+[package]
+name = "tower-uv"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+async-compression = { workspace = true }
+async_zip = { workspace = true }
+dirs = { workspace = true }
+futures-lite = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+tokio-tar = { workspace = true }
+tower-telemetry = { workspace = true }

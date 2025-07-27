@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
-use tower_package::Package;
+use tower_package::{Package, compute_sha256_file};
+use tower_telemetry::debug;
 
 use tower_api::apis::configuration::Configuration;
 use tower_api::apis::ResponseContent;
@@ -19,6 +20,14 @@ pub async fn upload_file_with_progress(
     content_type: &str,
     progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
+    let package_hash = match compute_sha256_file(&file_path).await {
+        Ok(hash) => hash,
+        Err(e) => {
+            debug!("Failed to compute package hash: {}", e);
+            output::die("Tower CLI failed to properly prepare your package for deployment. Check that you have permissions to read/write to your temporary directory, and if it keeps happening contact Tower support at https://tower.dev");
+        }
+    };
+
     // Get the file and its metadata
     let file = File::open(file_path).await?;
     let metadata = file.metadata().await?;
@@ -33,6 +42,7 @@ pub async fn upload_file_with_progress(
     let client = ReqwestClient::new();
     let mut req = client
         .request(Method::POST, endpoint_url)
+        .header("X-Tower-Checksum-SHA256", package_hash)
         .header("Content-Type", content_type)
         .header("Content-Encoding", "gzip")
         .body(Body::wrap_stream(progress_stream));
@@ -86,7 +96,7 @@ pub async fn deploy_app_package(
 
     // Get the package file path
     let package_path = package.package_file_path.unwrap_or_else(|| {
-        log::debug!("No package file path found");
+        debug!("No package file path found");
         output::die("An error happened in Tower CLI that it couldn't recover from.");
     });
 

@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
+use tower_telemetry::{Context, debug};
+
+use tokio::sync::mpsc::unbounded_channel;
 
 use crate::{
     output,
@@ -50,9 +53,13 @@ pub fn run_cmd() -> Command {
 pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     let res = get_run_parameters(args, cmd);
 
+    // We always expect there to be an environment due to the fact that there is a
+    // default value.
+    let env = args.get_one::<String>("environment").unwrap();
+
     match res {
         Ok((local, path, params, app_name)) => {
-            log::debug!(
+            debug!(
                 "Running app at {}, local: {}",
                 path.to_str().unwrap(),
                 local
@@ -63,13 +70,9 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
                 if app_name.is_some() {
                     output::die("Running apps by name locally is not supported yet.");
                 } else {
-                    do_run_local(config, path, params).await;
+                    do_run_local(config, path, env, params).await;
                 }
             } else {
-                // We always expect there to be an environmnt due to the fact that there is a
-                // default value.
-                let env = args.get_one::<String>("environment").unwrap();
-
                 do_run_remote(config, path, env, params, app_name).await;
             }
         }
@@ -82,10 +85,7 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String, String>) {
-    // There is always an implicit `local` environment when running in a local context.
-    let env = "local".to_string();
-
+async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) {
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     // Load all the secrets and catalogs from the server
@@ -103,6 +103,18 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
 
     spinner.success();
 
+    // We prepare all the other misc environment variables that we need to inject
+    let mut env_vars = HashMap::new();
+    env_vars.extend(catalogs);
+    env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
+
+    // There should always be a session, if there isn't one then I'm not sure how we got here?
+    let session = config.session.unwrap_or_else(|| {
+        output::die("No session found. Please log in to Tower first.");
+    });
+
+    env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
+
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
     let towerfile = load_towerfile(&towerfile_path);
@@ -118,27 +130,27 @@ async fn do_run_local(config: Config, path: PathBuf, mut params: HashMap<String,
 
     // Unpack the package
     if let Err(err) = package.unpack().await {
-        log::debug!("Failed to unpack package: {}", err);
+        debug!("Failed to unpack package: {}", err);
         output::package_error(err);
         std::process::exit(1);
     }
 
+    let (sender, receiver) = unbounded_channel();
+
+    output::success(&format!("Launching app `{}`", towerfile.app.name));
+    let output_task = tokio::spawn(monitor_output(receiver));
+
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher
-        .launch(package, env, secrets, params, catalogs)
+        .launch(Context::new(), sender, package, env.to_string(), secrets, params, env_vars)
         .await
     {
         output::runtime_error(err);
         return;
     }
 
-    output::success(&format!("App `{}` has been launched", towerfile.app.name));
-
     // Monitor app output and status concurrently
     let app = launcher.app.unwrap();
-    let output = app.output().await.unwrap();
-
-    let output_task = tokio::spawn(monitor_output(output));
     let status_task = tokio::spawn(monitor_status(app));
 
     let (res1, res2) = tokio::join!(output_task, status_task);
@@ -170,7 +182,7 @@ async fn do_run_remote(
     match api::run_app(&config, &app_slug, env, params).await {
         Err(err) => {
             spinner.failure();
-            log::debug!("Failed to schedule run: {}", err);
+            debug!("Failed to schedule run: {}", err);
             output::tower_error(err);
         }, 
         Ok(res) => {
@@ -305,7 +317,7 @@ async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, Stri
 /// error.
 fn load_towerfile(path: &PathBuf) -> Towerfile {
     Towerfile::from_path(path.clone()).unwrap_or_else(|err| {
-        log::debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
+        debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
         output::config_error(err);
         std::process::exit(1);
     })
@@ -323,7 +335,7 @@ async fn build_package(towerfile: &Towerfile) -> Package {
         }
         Err(err) => {
             spinner.failure();
-            log::debug!("Failed to build package: {}", err);
+            debug!("Failed to build package: {}", err);
             output::package_error(err);
             std::process::exit(1);
         }
@@ -332,9 +344,9 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 
 /// monitor_output is a helper function that will monitor the output of a given output channel and
 /// plops it down on stdout.
-async fn monitor_output(output: OutputReceiver) {
+async fn monitor_output(mut output: OutputReceiver) {
     loop {
-        if let Some(line) = output.lock().await.recv().await {
+        if let Some(line) = output.recv().await {
             let ts = &line.time;
             let msg = &line.line;
             output::log_line(&ts.to_rfc3339(), msg, output::LogLineType::Local);
@@ -346,7 +358,7 @@ async fn monitor_output(output: OutputReceiver) {
 
 /// monitor_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_status(mut app: LocalApp) {
+async fn monitor_status(app: LocalApp) {
     loop {
         if let Ok(status) = app.status().await {
             match status {

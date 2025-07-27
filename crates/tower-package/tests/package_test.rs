@@ -11,15 +11,24 @@ use tokio_stream::*;
 use async_compression::tokio::bufread::GzipDecoder;
 
 use tokio_tar::Archive;
-use tower_package::{Package, PackageSpec};
+use tower_package::{Package, PackageSpec, Manifest};
+use tower_telemetry::debug;
 use config::Towerfile;
+
+macro_rules! make_path {
+    ($($component:expr),+ $(,)?) => {
+        {
+            let mut path = PathBuf::new();
+            $(
+                path.push($component);
+            )+
+            &path.to_string_lossy().to_string()
+        }
+    };
+}
 
 #[tokio::test]
 async fn it_creates_package() {
-    // We enable env_logger here as a way of debugging this test. There might be a way of doing
-    // this globally...but I don't know what it is.
-    let _ = env_logger::try_init();
-
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
@@ -32,11 +41,12 @@ async fn it_creates_package() {
         file_globs: vec!["*.py".to_string()],
         parameters: vec![],
         schedule: None,
+        import_paths: vec![],
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, Some(1));
+    assert_eq!(package.manifest.version, Some(2));
     assert_eq!(package.manifest.invoke, "main.py");
 
     let package_file_path = package.package_file_path.clone().unwrap();
@@ -44,16 +54,12 @@ async fn it_creates_package() {
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("app/main.py"), "files {:?} was missing key main.py", files);
     assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
 }
 
 #[tokio::test]
 async fn it_respects_complex_file_globs() {
-    // We enable env_logger here as a way of debugging this test. There might be a way of doing
-    // this globally...but I don't know what it is.
-    let _ = env_logger::try_init();
-
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
@@ -70,11 +76,12 @@ async fn it_respects_complex_file_globs() {
         ],
         parameters: vec![],
         schedule: Some("every 1 minute".to_string()),
+        import_paths: vec![],
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, Some(1));
+    assert_eq!(package.manifest.version, Some(2));
     assert_eq!(package.manifest.invoke, "main.py");
     assert_eq!(package.manifest.schedule, Some("every 1 minute".to_string()));
 
@@ -83,15 +90,78 @@ async fn it_respects_complex_file_globs() {
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("app/main.py"), "files {:?} was missing key main.py", files);
     assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
-    assert!(files.contains_key("pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
+    assert!(files.contains_key("app/pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
 }
 
 #[tokio::test]
-async fn it_respects_workspace_settings() {
-    let _ = env_logger::try_init();
+async fn it_packages_all_files_by_default() {
+    let tmp_dir = TmpDir::new("all-files-by-default").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
 
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec![],
+        parameters: vec![],
+        schedule: Some("every 1 minute".to_string()),
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+
+    let package_file_path = package.package_file_path.clone().unwrap();
+    assert!(!package_file_path.as_os_str().is_empty());
+
+    let files = read_package_files(package).await;
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
+    assert!(files.contains_key("app/main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("app/pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
+    assert!(files.contains_key("app/pack/pack.py"), "files {:?} was missing pack/__init__.py", files);
+}
+
+#[tokio::test]
+async fn it_packages_directory_contents() {
+    let tmp_dir = TmpDir::new("directory-contents").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "pack/submodule/pack.py", "").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec![
+            "main.py".to_string(),
+            "pack".to_string(), 
+        ],
+        parameters: vec![],
+        schedule: Some("every 1 minute".to_string()),
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+
+    let package_file_path = package.package_file_path.clone().unwrap();
+    assert!(!package_file_path.as_os_str().is_empty());
+
+    let files = read_package_files(package).await;
+    assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
+    assert!(files.contains_key("app/main.py"), "files {:?} was missing key main.py", files);
+    assert!(files.contains_key("app/pack/__init__.py"), "files {:?} was missing pack/__init__.py", files);
+    assert!(files.contains_key("app/pack/pack.py"), "files {:?} was missing pack/__init__.py", files);
+    assert!(files.contains_key("app/pack/submodule/pack.py"), "files {:?} was missing pack/submodule/pack.py", files);
+}
+
+#[tokio::test]
+async fn it_packages_import_paths() {
     let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
     create_test_file(tmp_dir.to_path_buf(), "app/Towerfile", "").await;
     create_test_file(tmp_dir.to_path_buf(), "app/main.py", "print('Hello, world!')").await;
@@ -99,28 +169,67 @@ async fn it_respects_workspace_settings() {
     create_test_file(tmp_dir.to_path_buf(), "shared/module/test.py", "").await;
 
     let spec = PackageSpec {
-        invoke: "app/main.py".to_string(),
-        base_dir: tmp_dir.to_path_buf(),
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf().join("app"),
         towerfile_path: tmp_dir.to_path_buf().join("app").join("Towerfile").to_path_buf(),
         file_globs: vec![
             "**/*.py".to_string(),
         ],
         parameters: vec![],
         schedule: None,
+        import_paths: vec!["../shared".to_string()],
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, Some(1));
-    assert_eq!(package.manifest.invoke, "app/main.py");
+    assert_eq!(package.manifest.version, Some(2));
+    assert_eq!(package.manifest.invoke, "main.py");
     assert_eq!(package.manifest.schedule, None);
 
     let files = read_package_files(package).await;
 
-    assert!(files.contains_key("app/main.py"), "files {:?} was missing key app/main.py", files);
     assert!(files.contains_key("MANIFEST"), "files {:?} was missing MANIFEST", files);
-    assert!(files.contains_key("shared/module/__init__.py"), "files {:?} was missing shared/module/__init__.py", files);
-    assert!(files.contains_key("shared/module/test.py"), "files {:?} was missing shared/module/test.py", files);
+    assert!(files.contains_key("app/main.py"), "files {:?} was missing key app/main.py", files);
+    assert!(files.contains_key("modules/shared/module/__init__.py"), "files {:?} was missing shared/module/__init__.py", files);
+    assert!(files.contains_key("modules/shared/module/test.py"), "files {:?} was missing shared/module/test.py", files);
+
+    // Let's decode the manifest and make sure import paths are set correctly.
+    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap()).await.expect("Manifest was not valid JSON");
+
+    // NOTE: These paths are joined by the OS so we need to be more specific about the expected
+    // path.
+    assert!(manifest.import_paths.contains(make_path!("modules", "shared")), "Import paths {:?} did not contain expected path", manifest.import_paths);
+
+    // We should have some integrity check here too.
+    assert!(!manifest.checksum.is_empty(), "Manifest integrity check was not set");
+}
+
+#[tokio::test]
+async fn it_excludes_various_content_that_should_not_be_there() {
+    let tmp_dir = TmpDir::new("example").await.expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py.pyc", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "some-app/test.py", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), "some-app/__pycache__/test.pyc", "print('Hello, world!')").await;
+    create_test_file(tmp_dir.to_path_buf(), ".git/some-file", "").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec![],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    assert!(!files.contains_key(".git/some-file"), "files {:?} had .git directory", files);
+    assert!(!files.contains_key("some-app/__pycache__/test.pyc"), "files {:?} contained a .pyc", files);
+    assert!(!files.contains_key("main.py.pyc"), "files {:?} contained a .pyc", files);
 }
 
 #[tokio::test]
@@ -182,7 +291,7 @@ async fn create_test_file(tempdir: PathBuf, path: &str, contents: &str) {
         }
     }
 
-    log::debug!("creating test file at: {:?} with content {:?}", path, contents);
+    debug!("creating test file at: {:?} with content {:?}", path, contents);
     let mut file = File::create(&path).await.expect("Failed to create file");
     file.write_all(contents.as_bytes()).await.expect("Failed to write content to file")
 }

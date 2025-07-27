@@ -12,24 +12,18 @@ T = TypeVar("T", bound="UpdateTeamParams")
 class UpdateTeamParams:
     """
     Attributes:
-        name (Union[None, str]): The name of the team to create. This is optional, if you supply null it will not update
-            the team name.
-        slug (Union[None, str]): The new slug that you want the team to use. This is optional, if you supply null it
-            will not update the slug.
+        name (Union[None, str]): The name of the team to to update. This is optional, if you supply null it will not
+            update the team name.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateTeamParams.json.
     """
 
     name: Union[None, str]
-    slug: Union[None, str]
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name: Union[None, str]
         name = self.name
-
-        slug: Union[None, str]
-        slug = self.slug
 
         schema = self.schema
 
@@ -37,7 +31,6 @@ class UpdateTeamParams:
         field_dict.update(
             {
                 "name": name,
-                "slug": slug,
             }
         )
         if schema is not UNSET:
@@ -56,18 +49,10 @@ class UpdateTeamParams:
 
         name = _parse_name(d.pop("name"))
 
-        def _parse_slug(data: object) -> Union[None, str]:
-            if data is None:
-                return data
-            return cast(Union[None, str], data)
-
-        slug = _parse_slug(d.pop("slug"))
-
         schema = d.pop("$schema", UNSET)
 
         update_team_params = cls(
             name=name,
-            slug=slug,
             schema=schema,
         )
 

@@ -1,4 +1,5 @@
 use snafu::prelude::*;
+use tower_telemetry::debug;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -14,14 +15,14 @@ pub enum Error {
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        log::debug!("IO error: {}", err);
+        debug!("IO error: {}", err);
         Error::NoManifest
     }
 }
 
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
-        log::debug!("JSON error: {}", err);
+        debug!("JSON error: {}", err);
         Error::InvalidManifest
     }
 }

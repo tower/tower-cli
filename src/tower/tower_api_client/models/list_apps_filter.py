@@ -1,11 +1,10 @@
 from enum import Enum
 
 
-class ListAppsStatusItem(str, Enum):
-    ACTIVE = "active"
+class ListAppsFilter(str, Enum):
     DISABLED = "disabled"
-    FAILED = "failed"
     RUNNING = "running"
+    WITHWARNING = "withWarning"
 
     def __str__(self) -> str:
         return str(self.value)

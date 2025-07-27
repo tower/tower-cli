@@ -32,7 +32,7 @@ pub struct App {
     pub description: String,
 
     #[serde(default)]
-    pub workspace: PathBuf,
+    pub import_paths: Vec<PathBuf>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -59,7 +59,7 @@ impl Towerfile {
                 source: vec![],
                 schedule: String::from("0 0 * * *"),
                 description: String::from(""),
-                workspace: PathBuf::new(),
+                import_paths: vec![],
             },
         }
     }
@@ -84,16 +84,6 @@ impl Towerfile {
 
         let mut towerfile = Self::from_toml(&std::fs::read_to_string(path.to_path_buf())?)?;
         towerfile.file_path = path;
-
-        // We set the workspace to the directory of the Towerfile if it's not set because that's
-        // the implicit behavior overall for legacy Towerfiles.
-        if towerfile.app.workspace.as_os_str().is_empty() {
-            log::debug!("Setting workspace to the directory of the Towerfile");
-            towerfile.app.workspace = towerfile.file_path
-                .parent()
-                .map(|p| p.to_path_buf())
-                .unwrap();
-        }
 
         Ok(towerfile)
     }
@@ -259,20 +249,5 @@ mod test {
         assert_eq!(towerfile.parameters.len(), 2);
         assert_eq!(towerfile.parameters[0].name, "my_first_param");
         assert_eq!(towerfile.parameters[1].name, "my_second_param");
-    }
-
-    #[test]
-    fn test_parsing_workspaces() {
-        let toml = r#"
-            [app]
-            name = "my-app"
-            script = "my-app/script.py"
-            source = ["*.py"]
-            workspace = "../"
-        "#;
-
-        // All we want need to do is to ensure that the workspace is set accordingly.
-        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
-        assert_eq!(towerfile.app.workspace, PathBuf::from("../"));
     }
 }

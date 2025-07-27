@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 use std::future::Future;
-use std::sync::Arc;
 use std::collections::HashMap;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc::{
     UnboundedReceiver,
     UnboundedSender,
@@ -10,6 +8,7 @@ use tokio::sync::mpsc::{
 use chrono::{DateTime, Utc};
 
 use tower_package::Package;
+use tower_telemetry::debug;
 
 pub mod local;
 pub mod errors;
@@ -39,7 +38,7 @@ pub struct Output {
     pub line: String,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Status {
     None,
     Running,
@@ -47,13 +46,9 @@ pub enum Status {
     Crashed { code: i32 },
 }
 
-type SharedReceiver<T> = Arc<Mutex<UnboundedReceiver<T>>>;
+pub type OutputReceiver = UnboundedReceiver<Output>;
 
-type SharedSender<T> = Arc<Mutex<UnboundedSender<T>>>;
-
-pub type OutputReceiver = SharedReceiver<Output>;
-
-pub type OutputSender = SharedSender<Output>;
+pub type OutputSender = UnboundedSender<Output>;
 
 pub trait App {
     // start will start the process
@@ -64,21 +59,26 @@ pub trait App {
     fn terminate(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 
     // status checks the status of an app 
-    fn status(&mut self) -> impl Future<Output = Result<Status, Error>> + Send;
-
-    // output returns a reader that contains a combination of the stdout and stderr messages from
-    // the child process
-    fn output(&self) -> impl Future<Output = Result<OutputReceiver, Error>> + Send;
+    fn status(&self) -> impl Future<Output = Result<Status, Error>> + Send;
 }
 
-#[derive(Default)]
 pub struct AppLauncher<A: App> {
     pub app: Option<A>,
+}
+
+impl<A: App> std::default::Default for AppLauncher<A> {
+    fn default() -> Self {
+        Self {
+            app: None,
+        }
+    }
 }
 
 impl<A: App> AppLauncher<A> {
     pub async fn launch(
         &mut self,
+        ctx: tower_telemetry::Context,
+        output_sender: OutputSender,
         package: Package,
         environment: String,
         secrets: HashMap<String, String>,
@@ -88,6 +88,8 @@ impl<A: App> AppLauncher<A> {
         let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
 
         let opts = StartOptions {
+            ctx,
+            output_sender,
             cwd: Some(cwd),
             environment,
             secrets,
@@ -114,7 +116,7 @@ impl<A: App> AppLauncher<A> {
     pub async fn terminate(&mut self) -> Result<(), Error> {
         if let Some(app) = &mut self.app {
             if let Err(err) = app.terminate().await {
-                log::debug!("failed to terminate app: {}", err);
+                debug!("failed to terminate app: {}", err);
                 Err(err)
             } else {
                 self.app = None;
@@ -128,12 +130,14 @@ impl<A: App> AppLauncher<A> {
 }
 
 pub struct StartOptions {
+    pub ctx: tower_telemetry::Context,
     pub package: Package,
     pub cwd: Option<PathBuf>,
     pub environment: String,
     pub secrets: HashMap<String, String>,
     pub parameters: HashMap<String, String>,
     pub env_vars: HashMap<String, String>,
+    pub output_sender: OutputSender,
 }
 
 pub struct ExecuteOptions {

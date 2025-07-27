@@ -11,13 +11,13 @@ from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     seq: int,
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/apps/{slug}/runs/{seq}".format(
-            slug=slug,
+        "url": "/apps/{name}/runs/{seq}".format(
+            name=name,
             seq=seq,
         ),
     }
@@ -58,7 +58,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -68,7 +68,7 @@ def sync_detailed(
      Describe a run of an app.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         seq (int): The number of the run to fetch.
 
     Raises:
@@ -80,7 +80,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         seq=seq,
     )
 
@@ -92,7 +92,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -102,7 +102,7 @@ def sync(
      Describe a run of an app.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         seq (int): The number of the run to fetch.
 
     Raises:
@@ -114,14 +114,14 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         seq=seq,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -131,7 +131,7 @@ async def asyncio_detailed(
      Describe a run of an app.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         seq (int): The number of the run to fetch.
 
     Raises:
@@ -143,7 +143,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         seq=seq,
     )
 
@@ -153,7 +153,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     seq: int,
     *,
     client: AuthenticatedClient,
@@ -163,7 +163,7 @@ async def asyncio(
      Describe a run of an app.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         seq (int): The number of the run to fetch.
 
     Raises:
@@ -176,7 +176,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             seq=seq,
             client=client,
         )
