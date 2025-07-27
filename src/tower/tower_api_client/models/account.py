@@ -1,7 +1,9 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="Account")
 
@@ -11,11 +13,11 @@ class Account:
     """
     Attributes:
         name (str):
-        slug (str):
+        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
     """
 
     name: str
-    slug: str
+    slug: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -26,9 +28,10 @@ class Account:
         field_dict.update(
             {
                 "name": name,
-                "slug": slug,
             }
         )
+        if slug is not UNSET:
+            field_dict["slug"] = slug
 
         return field_dict
 
@@ -37,7 +40,7 @@ class Account:
         d = dict(src_dict)
         name = d.pop("name")
 
-        slug = d.pop("slug")
+        slug = d.pop("slug", UNSET)
 
         account = cls(
             name=name,

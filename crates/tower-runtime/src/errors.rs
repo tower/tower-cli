@@ -56,12 +56,38 @@ pub enum Error {
     #[snafu(display("failed to create a virtual environment"))]
     VirtualEnvCreationFailed,
 
-    #[snafu(display("watier channel closed unexpectedly when polled"))]
+    #[snafu(display("waiter channel closed unexpectedly when polled"))]
     WaiterClosed,
+
+    #[snafu(display("running Tower apps on this platform is not supported"))]
+    UnsupportedPlatform,
+
+    #[snafu(display("cancelled"))]
+    Cancelled,
 }
 
 impl From<std::io::Error> for Error {
     fn from(_: std::io::Error) -> Self {
         Error::SpawnFailed
+    }
+}
+
+impl From<std::env::JoinPathsError> for Error {
+    fn from(_: std::env::JoinPathsError) -> Self {
+        Error::UnsupportedPlatform
+    }
+}
+
+impl From<tower_uv::Error> for Error {
+    fn from(err: tower_uv::Error) -> Self {
+        match err {
+           tower_uv::Error::IoError(_) => Error::SpawnFailed, 
+           tower_uv::Error::NotFound(_) => Error::SpawnFailed, 
+           tower_uv::Error::PermissionDenied(_) => Error::SpawnFailed, 
+           tower_uv::Error::Other(_) => Error::SpawnFailed, 
+           tower_uv::Error::MissingPyprojectToml => Error::SpawnFailed, 
+           tower_uv::Error::InvalidUv => Error::SpawnFailed, 
+           tower_uv::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
+        }
     }
 }

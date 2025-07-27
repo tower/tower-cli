@@ -3,6 +3,7 @@ use clap::Command;
 use config::{Config, Session};
 use tokio::{time, time::Duration};
 use tower_api::models::CreateDeviceLoginTicketResponse;
+use tower_telemetry::debug;
 
 use crate::api;
 
@@ -33,7 +34,7 @@ async fn handle_device_login(
 ) {
     // Try to open the login URL in browser
     if let Err(err) = webbrowser::open(&claim.login_url) {
-        log::debug!("failed to open web browser: {}", err);
+        debug!("failed to open web browser: {}", err);
 
         let line = format!(
             "Please open the following URL in your browser: {}\n",
@@ -41,7 +42,7 @@ async fn handle_device_login(
         );
         output::write(&line);
     } else {
-        log::debug!("opened browser to {}", claim.login_url);
+        debug!("opened browser to {}", claim.login_url);
     }
 
     let mut spinner = output::spinner("Waiting for login...");

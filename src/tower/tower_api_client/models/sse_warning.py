@@ -5,14 +5,14 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
-T = TypeVar("T", bound="LogLineError")
+T = TypeVar("T", bound="SSEWarning")
 
 
 @_attrs_define
-class LogLineError:
+class SSEWarning:
     """
     Attributes:
-        content (str): Contents of the error.
+        content (str): Contents of the warning.
         reported_at (datetime.datetime): Timestamp of the event.
     """
 
@@ -41,9 +41,9 @@ class LogLineError:
 
         reported_at = isoparse(d.pop("reported_at"))
 
-        log_line_error = cls(
+        sse_warning = cls(
             content=content,
             reported_at=reported_at,
         )
 
-        return log_line_error
+        return sse_warning

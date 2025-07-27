@@ -16,7 +16,7 @@ class CreateAppParams:
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateAppParams.json.
         short_description (Union[Unset, str]): A description of the app.
-        slug (Union[Unset, str]): A slug for the app.
+        slug (Union[Unset, str]): The slug of the app. Legacy CLI will send it but we don't need it.
     """
 
     name: str

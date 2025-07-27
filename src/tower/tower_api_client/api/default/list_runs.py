@@ -12,10 +12,10 @@ from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -49,8 +49,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/apps/{slug}/runs".format(
-            slug=slug,
+        "url": "/apps/{name}/runs".format(
+            name=name,
         ),
         "params": params,
     }
@@ -83,11 +83,11 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -98,9 +98,9 @@ def sync_detailed(
     parameters passed in.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        name (str): The name of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -117,7 +117,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         page=page,
         page_size=page_size,
         status=status,
@@ -133,11 +133,11 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -148,9 +148,9 @@ def sync(
     parameters passed in.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        name (str): The name of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -167,7 +167,7 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         page=page,
         page_size=page_size,
@@ -178,11 +178,11 @@ def sync(
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -193,9 +193,9 @@ async def asyncio_detailed(
     parameters passed in.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        name (str): The name of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -212,7 +212,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         page=page,
         page_size=page_size,
         status=status,
@@ -226,11 +226,11 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
@@ -241,9 +241,9 @@ async def asyncio(
     parameters passed in.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        name (str): The name of the app to fetch runs for.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
             separated for multiple).
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
@@ -261,7 +261,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             page=page,
             page_size=page_size,

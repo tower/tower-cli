@@ -7,6 +7,7 @@ use url::Url;
 
 use crate::error::Error;
 use tower_api::apis::default_api::describe_session;
+use tower_telemetry::debug;
 
 const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
 
@@ -29,7 +30,6 @@ pub struct Token {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Team {
-    pub slug: String,
     pub name: String,
     pub token: Token,
     pub team_type: String,
@@ -81,16 +81,16 @@ pub fn get_last_version_check_timestamp() -> DateTime<Utc> {
                 if let Ok(dt) = DateTime::parse_from_rfc3339(&last_version_check) {
                     dt.into()
                 } else {
-                    log::debug!("Error parsing last version check timestamp: {}", last_version_check);
+                    debug!("Error parsing last version check timestamp: {}", last_version_check);
                     default
                 }
             } else {
-                log::debug!("Error reading last version check timestamp");
+                debug!("Error reading last version check timestamp");
                 default
             }
         },
         Err(err) => {
-            log::debug!("Error finding config dir: {}", err);
+            debug!("Error finding config dir: {}", err);
             default
         }
     }
@@ -102,11 +102,11 @@ pub fn set_last_version_check_timestamp(dt: DateTime<Utc>) {
             let dt_str = dt.to_rfc3339();
 
             if let Err(err) = fs::write(path.join("last_version_check.txt"), dt_str) {
-                log::debug!("Error writing last version check timestamp: {}", err);
+                debug!("Error writing last version check timestamp: {}", err);
             }
         },
         Err(err) => {
-            log::debug!("Error finding config dir: {}", err);
+            debug!("Error finding config dir: {}", err);
         }
     }
 }
@@ -188,7 +188,6 @@ impl Session {
             .teams
             .iter()
             .map(|team_api| Team {
-                slug: team_api.slug.clone(),
                 name: team_api.name.clone(),
                 token: if let Some(token) = &team_api.token {
                     Token {
@@ -231,7 +230,6 @@ impl Session {
             .teams
             .iter()
             .map(|t| Team {
-                slug: t.slug.clone(),
                 name: t.name.clone(),
                 team_type: t.r#type.clone(),
                 token: Token {
@@ -294,13 +292,13 @@ impl Session {
                         Ok(session)
                     }
                     tower_api::apis::default_api::DescribeSessionSuccess::UnknownValue(val) => {
-                        log::error!("Unknown value while describing session: {}", val);
+                        debug!("Unknown value while describing session: {}", val);
                         Err(Error::UnknownDescribeSessionValue { value: val })
                     }
                 }
             }
             Err(err) => {
-                log::error!("Error describing session: {}", err);
+                debug!("Error describing session: {}", err);
                 Err(Error::DescribeSessionError { err })
             }
         }

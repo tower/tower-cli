@@ -17,21 +17,17 @@ class UpdateCatalogParams:
     """
     Attributes:
         environment (str): New environment for the catalog
-        name (str): New name for the catalog
         properties (list['EncryptedCatalogProperty']):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateCatalogParams.json.
     """
 
     environment: str
-    name: str
     properties: list["EncryptedCatalogProperty"]
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         environment = self.environment
-
-        name = self.name
 
         properties = []
         for properties_item_data in self.properties:
@@ -44,7 +40,6 @@ class UpdateCatalogParams:
         field_dict.update(
             {
                 "environment": environment,
-                "name": name,
                 "properties": properties,
             }
         )
@@ -60,8 +55,6 @@ class UpdateCatalogParams:
         d = dict(src_dict)
         environment = d.pop("environment")
 
-        name = d.pop("name")
-
         properties = []
         _properties = d.pop("properties")
         for properties_item_data in _properties:
@@ -73,7 +66,6 @@ class UpdateCatalogParams:
 
         update_catalog_params = cls(
             environment=environment,
-            name=name,
             properties=properties,
             schema=schema,
         )

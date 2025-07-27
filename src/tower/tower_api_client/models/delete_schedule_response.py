@@ -5,30 +5,30 @@ from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="UpdateAccountSlugParams")
+T = TypeVar("T", bound="DeleteScheduleResponse")
 
 
 @_attrs_define
-class UpdateAccountSlugParams:
+class DeleteScheduleResponse:
     """
     Attributes:
-        new_slug (str): The new slug for the account
+        id (str): The ID of the deleted schedule.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/UpdateAccountSlugParams.json.
+            https://api.tower.dev/v1/schemas/DeleteScheduleResponse.json.
     """
 
-    new_slug: str
+    id: str
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        new_slug = self.new_slug
+        id = self.id
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "new_slug": new_slug,
+                "id": id,
             }
         )
         if schema is not UNSET:
@@ -39,13 +39,13 @@ class UpdateAccountSlugParams:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        new_slug = d.pop("new_slug")
+        id = d.pop("id")
 
         schema = d.pop("$schema", UNSET)
 
-        update_account_slug_params = cls(
-            new_slug=new_slug,
+        delete_schedule_response = cls(
+            id=id,
             schema=schema,
         )
 
-        return update_account_slug_params
+        return delete_schedule_response

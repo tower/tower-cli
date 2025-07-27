@@ -5,11 +5,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
-from ..models.alert_alert_type import AlertAlertType
-from ..models.alert_status import AlertStatus
-
 if TYPE_CHECKING:
-    from ..models.alert_detail import AlertDetail
+    from ..models.run_failure_alert import RunFailureAlert
 
 
 T = TypeVar("T", bound="Alert")
@@ -19,40 +16,42 @@ T = TypeVar("T", bound="Alert")
 class Alert:
     """
     Attributes:
-        alert_type (AlertAlertType): Type of the alert
-        created_at (datetime.datetime): Time when the alert was created
-        details (list['AlertDetail']): Detailed description of the alert
-        id (str): Unique identifier for the alert
-        status (AlertStatus): Status of the alert
+        acked (bool):
+        alert_type (str):
+        created_at (datetime.datetime):
+        detail (RunFailureAlert):
+        seq (int):
+        status (str):
     """
 
-    alert_type: AlertAlertType
+    acked: bool
+    alert_type: str
     created_at: datetime.datetime
-    details: list["AlertDetail"]
-    id: str
-    status: AlertStatus
+    detail: "RunFailureAlert"
+    seq: int
+    status: str
 
     def to_dict(self) -> dict[str, Any]:
-        alert_type = self.alert_type.value
+        acked = self.acked
+
+        alert_type = self.alert_type
 
         created_at = self.created_at.isoformat()
 
-        details = []
-        for details_item_data in self.details:
-            details_item = details_item_data.to_dict()
-            details.append(details_item)
+        detail = self.detail.to_dict()
 
-        id = self.id
+        seq = self.seq
 
-        status = self.status.value
+        status = self.status
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
+                "acked": acked,
                 "alert_type": alert_type,
                 "created_at": created_at,
-                "details": details,
-                "id": id,
+                "detail": detail,
+                "seq": seq,
                 "status": status,
             }
         )
@@ -61,29 +60,27 @@ class Alert:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.alert_detail import AlertDetail
+        from ..models.run_failure_alert import RunFailureAlert
 
         d = dict(src_dict)
-        alert_type = AlertAlertType(d.pop("alert_type"))
+        acked = d.pop("acked")
+
+        alert_type = d.pop("alert_type")
 
         created_at = isoparse(d.pop("created_at"))
 
-        details = []
-        _details = d.pop("details")
-        for details_item_data in _details:
-            details_item = AlertDetail.from_dict(details_item_data)
+        detail = RunFailureAlert.from_dict(d.pop("detail"))
 
-            details.append(details_item)
+        seq = d.pop("seq")
 
-        id = d.pop("id")
-
-        status = AlertStatus(d.pop("status"))
+        status = d.pop("status")
 
         alert = cls(
+            acked=acked,
             alert_type=alert_type,
             created_at=created_at,
-            details=details,
-            id=id,
+            detail=detail,
+            seq=seq,
             status=status,
         )
 

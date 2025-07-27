@@ -6,33 +6,33 @@ from attrs import define as _attrs_define
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.account import Account
+    from ..models.verified_authenticator import VerifiedAuthenticator
 
 
-T = TypeVar("T", bound="UpdateAccountSlugResponse")
+T = TypeVar("T", bound="DeleteAuthenticatorResponse")
 
 
 @_attrs_define
-class UpdateAccountSlugResponse:
+class DeleteAuthenticatorResponse:
     """
     Attributes:
-        account (Account):
+        authenticator (VerifiedAuthenticator):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/UpdateAccountSlugResponse.json.
+            https://api.tower.dev/v1/schemas/DeleteAuthenticatorResponse.json.
     """
 
-    account: "Account"
+    authenticator: "VerifiedAuthenticator"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        account = self.account.to_dict()
+        authenticator = self.authenticator.to_dict()
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "account": account,
+                "authenticator": authenticator,
             }
         )
         if schema is not UNSET:
@@ -42,16 +42,16 @@ class UpdateAccountSlugResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.account import Account
+        from ..models.verified_authenticator import VerifiedAuthenticator
 
         d = dict(src_dict)
-        account = Account.from_dict(d.pop("account"))
+        authenticator = VerifiedAuthenticator.from_dict(d.pop("authenticator"))
 
         schema = d.pop("$schema", UNSET)
 
-        update_account_slug_response = cls(
-            account=account,
+        delete_authenticator_response = cls(
+            authenticator=authenticator,
             schema=schema,
         )
 
-        return update_account_slug_response
+        return delete_authenticator_response

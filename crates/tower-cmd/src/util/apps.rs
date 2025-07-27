@@ -9,15 +9,18 @@ use tower_api::models::CreateAppParams as CreateAppParamsModel;
 
 pub async fn ensure_app_exists(
     api_config: &Configuration,
-    app_slug: &str,
+    app_name: &str,
     description: &str,
 ) -> Result<(), tower_api::apis::Error<default_api::DescribeAppError>> {
     // Try to describe the app first
     let describe_result = default_api::describe_app(
         api_config,
         DescribeAppParams {
-            slug: app_slug.to_string(),
+            name: app_name.to_string(),
             runs: None,
+            start_at: None,
+            end_at: None,
+            timezone: None,
         },
     )
     .await;
@@ -49,7 +52,7 @@ pub async fn ensure_app_exists(
     let create_app = prompt_default(
         format!(
             "App '{}' does not exist. Would you like to create it?",
-            app_slug
+            app_name
         ),
         false,
     )
@@ -66,9 +69,9 @@ pub async fn ensure_app_exists(
         CreateAppParams {
             create_app_params: CreateAppParamsModel {
                 schema: None,
-                name: app_slug.to_string(),
-                slug: Some(app_slug.to_string()),
+                name: app_name.to_string(),
                 short_description: Some(description.to_string()),
+                slug: None,
             },
         },
     )
@@ -76,7 +79,7 @@ pub async fn ensure_app_exists(
 
     match create_result {
         Ok(_) => {
-            output::success(&format!("Created app '{}'", app_slug));
+            output::success(&format!("Created app '{}'", app_name));
             Ok(())
         }
         Err(create_err) => {

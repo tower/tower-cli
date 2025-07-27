@@ -1,8 +1,8 @@
 use anyhow::Result;
-use log;
 use reqwest;
 use serde_json::Value;
 use chrono::{Utc, Duration};
+use tower_telemetry::debug;
 
 pub fn current_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -28,7 +28,7 @@ pub async fn check_latest_version() -> Result<Option<String>> {
         .await?;
         
     let status = resp.status();
-    log::debug!("PyPI returned status code: {}", status);
+    debug!("PyPI returned status code: {}", status);
     
     if status.is_success() {
         // Update the config so we don't check more often.

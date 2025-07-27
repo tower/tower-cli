@@ -35,7 +35,11 @@ def in_memory_catalog():
     yield catalog
 
     # Clean up after the catalog
-    shutil.rmtree(temp_dir)
+    try:
+        shutil.rmtree(temp_dir)
+    except FileNotFoundError:
+        # Directory was already cleaned up, which is fine
+        pass
 
 
 def test_reading_and_writing_to_tables(in_memory_catalog):

@@ -11,7 +11,6 @@ chrono = { workspace = true }
 clap = { workspace = true }
 dirs = { workspace = true } 
 futures = { workspace = true }
-log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 snafu = { workspace = true }
@@ -20,3 +19,4 @@ toml = { workspace = true }
 testutils = { workspace = true }
 url = { workspace = true }
 tower-api = { workspace = true }
+tower-telemetry = { workspace = true }

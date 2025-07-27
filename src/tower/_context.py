@@ -3,10 +3,11 @@ import os
 class TowerContext:
     def __init__(self, tower_url: str, environment: str, api_key: str = None, 
                  inference_router: str = None, inference_router_api_key: str = None,
-                 inference_service: str = None):
+                 inference_service: str = None, jwt: str = None):
         self.tower_url = tower_url
         self.environment = environment
         self.api_key = api_key
+        self.jwt = jwt
         self.inference_router = inference_router
         self.inference_router_api_key = inference_router_api_key
         self.inference_service = inference_service
@@ -21,15 +22,15 @@ class TowerContext:
 
     @classmethod
     def build(cls):
-        tower_url = os.getenv("TOWER_URL")
-        tower_environment = os.getenv("TOWER_ENVIRONMENT")
+        tower_url = os.getenv("TOWER_URL", "https://api.tower.dev")
+        tower_environment = os.getenv("TOWER_ENVIRONMENT", "default")
         tower_api_key = os.getenv("TOWER_API_KEY")
+        tower_jwt = os.getenv("TOWER_JWT")
 
         # Replaces the deprecated hugging_face_provider and hugging_face_api_key
         inference_router = os.getenv("TOWER_INFERENCE_ROUTER")
         inference_router_api_key = os.getenv("TOWER_INFERENCE_ROUTER_API_KEY")
         inference_service = os.getenv("TOWER_INFERENCE_SERVICE")
-
 
         return cls(
             tower_url = tower_url,
@@ -38,5 +39,6 @@ class TowerContext:
             inference_router = inference_router,
             inference_router_api_key = inference_router_api_key,
             inference_service = inference_service,
+            jwt = tower_jwt,
         )
 

@@ -7,6 +7,7 @@ from dateutil.parser import isoparse
 
 from ..models.run_status import RunStatus
 from ..models.run_status_group import RunStatusGroup
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_parameter import RunParameter
@@ -19,12 +20,13 @@ T = TypeVar("T", bound="Run")
 class Run:
     """
     Attributes:
-        app_slug (str):
+        app_name (str):
         app_version (str):
         cancelled_at (Union[None, datetime.datetime]):
         created_at (datetime.datetime):
         ended_at (Union[None, datetime.datetime]):
         environment (str):
+        exit_code (Union[None, int]): Exit code of the run, if the run is completed. Null if there is no exit code
         number (int):
         parameters (list['RunParameter']): Parameters used to invoke this run.
         run_id (str):
@@ -32,14 +34,16 @@ class Run:
         started_at (Union[None, datetime.datetime]):
         status (RunStatus):
         status_group (RunStatusGroup):
+        app_slug (Union[Unset, str]): This property is deprecated. Please use app_name instead.
     """
 
-    app_slug: str
+    app_name: str
     app_version: str
     cancelled_at: Union[None, datetime.datetime]
     created_at: datetime.datetime
     ended_at: Union[None, datetime.datetime]
     environment: str
+    exit_code: Union[None, int]
     number: int
     parameters: list["RunParameter"]
     run_id: str
@@ -47,9 +51,10 @@ class Run:
     started_at: Union[None, datetime.datetime]
     status: RunStatus
     status_group: RunStatusGroup
+    app_slug: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        app_slug = self.app_slug
+        app_name = self.app_name
 
         app_version = self.app_version
 
@@ -68,6 +73,9 @@ class Run:
             ended_at = self.ended_at
 
         environment = self.environment
+
+        exit_code: Union[None, int]
+        exit_code = self.exit_code
 
         number = self.number
 
@@ -90,15 +98,18 @@ class Run:
 
         status_group = self.status_group.value
 
+        app_slug = self.app_slug
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "app_slug": app_slug,
+                "app_name": app_name,
                 "app_version": app_version,
                 "cancelled_at": cancelled_at,
                 "created_at": created_at,
                 "ended_at": ended_at,
                 "environment": environment,
+                "exit_code": exit_code,
                 "number": number,
                 "parameters": parameters,
                 "run_id": run_id,
@@ -108,6 +119,8 @@ class Run:
                 "status_group": status_group,
             }
         )
+        if app_slug is not UNSET:
+            field_dict["app_slug"] = app_slug
 
         return field_dict
 
@@ -116,7 +129,7 @@ class Run:
         from ..models.run_parameter import RunParameter
 
         d = dict(src_dict)
-        app_slug = d.pop("app_slug")
+        app_name = d.pop("app_name")
 
         app_version = d.pop("app_version")
 
@@ -154,6 +167,13 @@ class Run:
 
         environment = d.pop("environment")
 
+        def _parse_exit_code(data: object) -> Union[None, int]:
+            if data is None:
+                return data
+            return cast(Union[None, int], data)
+
+        exit_code = _parse_exit_code(d.pop("exit_code"))
+
         number = d.pop("number")
 
         parameters = []
@@ -186,13 +206,16 @@ class Run:
 
         status_group = RunStatusGroup(d.pop("status_group"))
 
+        app_slug = d.pop("app_slug", UNSET)
+
         run = cls(
-            app_slug=app_slug,
+            app_name=app_name,
             app_version=app_version,
             cancelled_at=cancelled_at,
             created_at=created_at,
             ended_at=ended_at,
             environment=environment,
+            exit_code=exit_code,
             number=number,
             parameters=parameters,
             run_id=run_id,
@@ -200,6 +223,7 @@ class Run:
             started_at=started_at,
             status=status,
             status_group=status_group,
+            app_slug=app_slug,
         )
 
         return run

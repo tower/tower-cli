@@ -1,4 +1,5 @@
 use snafu::prelude::*;
+use tower_telemetry::debug;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -14,7 +15,7 @@ pub enum Error {
 
 impl From<crypto::Error> for Error {
     fn from(err: crypto::Error) -> Self {
-        log::debug!("cryptography error: {:?}", err);
+        debug!("cryptography error: {:?}", err);
         Self::CryptographyError
     }
 }

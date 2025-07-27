@@ -1,4 +1,5 @@
 use snafu::prelude::*;
+use tower_telemetry::debug;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -20,8 +21,8 @@ pub enum Error {
     #[snafu(display("Missing required app field `{}` in Towerfile", field))]
     MissingRequiredAppField { field: String },
 
-    #[snafu(display("Team with slug {} not found!", team_slug))]
-    TeamNotFound { team_slug: String },
+    #[snafu(display("Team with name {} not found!", team_name))]
+    TeamNotFound { team_name: String },
 
     #[snafu(display("Unknown describe session value: {}", value))]
     UnknownDescribeSessionValue { value: serde_json::Value },
@@ -43,8 +44,7 @@ impl From<serde_json::Error> for Error {
 
 impl From<toml::de::Error> for Error {
     fn from(err: toml::de::Error) -> Self {
-        log::debug!("error parsing Towerfile TOMl: {}", err);
-        println!("error parsing Towerfile TOML: {}", err);
+        debug!("error parsing Towerfile TOMl: {}", err);
         Error::InvalidTowerfile
     }
 }

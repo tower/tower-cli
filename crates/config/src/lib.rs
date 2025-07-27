@@ -129,7 +129,7 @@ impl Config {
     }
 
     /// Sets the active team in the session by team slug and saves it
-    pub fn set_active_team_by_slug(&self, team_slug: &str) -> Result<(), Error> {
+    pub fn set_active_team_by_name(&self, name: &str) -> Result<(), Error> {
         // Get the current session
         let mut session = Session::from_config_dir()?;
 
@@ -137,10 +137,10 @@ impl Config {
         let team = session
             .teams
             .iter()
-            .find(|team| team.slug == team_slug)
+            .find(|team| team.name == name)
             .cloned()
             .ok_or(Error::TeamNotFound {
-                team_slug: team_slug.to_string(),
+                team_name: name.to_string(),
             })?;
 
         // Set the active team
