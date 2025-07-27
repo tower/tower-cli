@@ -223,7 +223,19 @@ def parse_parameter_size(size_str: str) -> float:
 
 
 def resolve_model_name(ctx: TowerContext, requested_model: str) -> str:
-  
+    """
+    Resolve the model name based on the inference router and requested model.
+
+    Args:
+        ctx (TowerContext): The context containing the inference router and other settings.
+        requested_model (str): The name of the model requested by the user.
+
+    Returns:
+        str: The resolved model name.
+
+    Raises:
+        ValueError: If the inference router specified in the context is not supported.
+    """
     if ctx.inference_router not in INFERENCE_ROUTERS:
         raise ValueError(f"Inference router {ctx.inference_router} not supported.")
 
