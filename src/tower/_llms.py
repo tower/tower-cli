@@ -496,7 +496,7 @@ def chat_completion_with_ollama(ctx: TowerContext, model: str, messages: list, i
             # (or if it exists) will start it for us.
             pull(model=model)
 
-            # Retry the inference after the model hasbeen pulled.
+            # Retry the inference after the model has been pulled.
             return chat_completion_with_ollama(ctx, model, messages, is_retry=True)
 
         # Couldn't figure out what the error was, so we'll just raise it accordingly.
