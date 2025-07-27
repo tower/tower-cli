@@ -4,8 +4,6 @@
 __pycache__
 
 
-.vscode
-
 # may contain sensitive data
 pytest.ini
 
