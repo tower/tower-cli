@@ -238,7 +238,7 @@ async fn do_follow_run(
 
             // We do this here, explicitly, to not double-monitor our API via the
             // `wait_for_run_start` function above.
-            let mut rx = monitor_run_completion(&config, run);
+            let mut run_complete = monitor_run_completion(&config, run);
 
             // We set a Ctrl+C handler here, if invoked it will print a message that shows where
             // the user can follow the run.
@@ -273,7 +273,7 @@ async fn do_follow_run(
                     loop {
                         tokio::select! {
                             Some(event) = output.recv() => print_log_stream_event(event),
-                            res = &mut rx => {
+                            res = &mut run_complete => {
                                 match res {
                                     Ok(run) => print_run_completion(&run),
                                     Err(err) => {
