@@ -4,6 +4,10 @@ use http::StatusCode;
 use std::collections::HashMap;
 use tower_api::apis::ResponseContent;
 use tower_telemetry::debug;
+use tokio::sync::mpsc;
+use reqwest_eventsource::{Event, EventSource};
+use tower_api::apis::configuration;
+use futures_util::StreamExt;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -66,6 +70,17 @@ pub async fn delete_app(config: &Config, name: &str) -> Result<tower_api::models
     };
 
     unwrap_api_response(tower_api::apis::default_api::delete_app(api_config, params)).await
+}
+
+pub async fn describe_run(config: &Config, app_name: &str, seq: i64) -> Result<tower_api::models::DescribeRunResponse, Error<tower_api::apis::default_api::DescribeRunError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeRunParams {
+        name: app_name.to_string(),
+        seq,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::describe_run(api_config, params)).await
 }
 
 pub async fn describe_run_logs(config: &Config, name: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
@@ -203,6 +218,119 @@ pub async fn refresh_session(config: &Config) -> Result<tower_api::models::Refre
     };
 
     unwrap_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
+}
+
+pub enum LogStreamEvent {
+    EventLog(tower_api::models::LogLine),
+    EventWarning(tower_api::models::EventWarning),
+}
+
+#[derive(Debug)]
+pub enum LogStreamError {
+    Reqwest(reqwest::Error),
+    Unknown,
+}
+
+impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
+    fn from(err: reqwest_eventsource::CannotCloneRequestError) -> Self {
+        debug!("Failed to clone request {:?}", err);
+        LogStreamError::Unknown
+    }
+}
+
+async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStreamEvent>) {
+    while let Some(event) = source.next().await {
+        match event {
+            Ok(reqwest_eventsource::Event::Open) => {
+                panic!("Received unexpected open event in log stream. This shouldn't happen.");
+            }
+            Ok(Event::Message(message)) => {
+                match message.event.as_str() {
+                "log" => {
+                    let event_log = serde_json::from_str(&message.data);
+
+                    match event_log {
+                        Ok(event) => {
+                            tx.send(LogStreamEvent::EventLog(event)).await.ok();
+                        },
+                        Err(err) => {
+                            debug!("Failed to parse log message: {}. Error: {}", message.data, err);
+                        }
+                    };
+                },
+                "warning" => {
+                    let event_warning = serde_json::from_str(&message.data);
+                    if let Ok(event) = event_warning {
+                        tx.send(LogStreamEvent::EventWarning(event)).await.ok();
+                    } else {
+                        debug!("Failed to parse warning message: {:?}", message.data);
+                    }    
+                }
+                _ => {
+                    debug!("Unknown or unsupported log message: {:?}", message);
+                }
+                };
+            },
+            Err(err) => {
+                debug!("Error in log stream: {}", err);
+                break; // Exit on error
+            }
+        } 
+    }
+}
+
+pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Result<mpsc::Receiver<LogStreamEvent>, LogStreamError>  { 
+    let api_config: configuration::Configuration = config.into();
+
+    // These represent the messages that we'll stream to the client.
+    let (tx, rx) = mpsc::channel(1);
+
+    // This code is copied from tower-api. Since that code is generated, there's not really a good
+    // way to share this code between here and the rest of the app.
+    let name = tower_api::apis::urlencode(app_name);
+    let uri = format!("{}/apps/{name}/runs/{seq}/logs/stream", api_config.base_path, name=name, seq=seq);
+    let mut builder = api_config.client.request(reqwest::Method::GET, &uri);
+
+    if let Some(ref user_agent) = api_config.user_agent {
+        builder = builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    if let Some(ref token) = api_config.bearer_access_token {
+        builder = builder.bearer_auth(token.to_owned());
+    };
+
+    // Now let's try to open the event source with the server.
+    let mut source = EventSource::new(builder)?;
+
+    if let Some(event) = source.next().await {
+        match event {
+            Ok(Event::Open) => {
+                tokio::spawn(drain_run_logs_stream(source, tx));
+                Ok(rx)
+            },
+            Ok(Event::Message(message)) => {
+                // This is a bug in the program and should never happen.
+                panic!("Received message when expected an open event. Message: {:?}", message);
+            },
+            Err(err) => {
+                match err {
+                    reqwest_eventsource::Error::Transport(e) => {
+                        Err(LogStreamError::Reqwest(e))
+                    },
+                    reqwest_eventsource::Error::StreamEnded => {
+                        drop(tx);
+                        Ok(rx)
+                    },
+                    _ => {
+                        Err(LogStreamError::Unknown)
+                    }
+                }
+            }
+        }
+    } else {
+        // If we didn't get an event, we can't stream logs.
+        Err(LogStreamError::Unknown)
+    }
 }
 
 /// Helper function to handle Tower API responses and extract the relevant data
@@ -423,6 +551,17 @@ impl ResponseEntity for tower_api::apis::default_api::RefreshSessionSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::DescribeSessionSuccess {
     type Data = tower_api::models::DescribeSessionResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeRunSuccess {
+    type Data = tower_api::models::DescribeRunResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {

@@ -12,11 +12,13 @@ cli-table = { workspace = true }
 colored = { workspace = true }
 config = { workspace = true }
 crypto = { workspace = true }
+ctrlc = { workspace = true }
 futures-util = { workspace = true }
 http = { workspace = true }
 indicatif = { workspace = true }
 promptly = { workspace = true }
 reqwest = { workspace = true }
+reqwest-eventsource = { workspace = true }
 rpassword = { workspace = true }
 rsa = { workspace = true }
 serde = { workspace = true }

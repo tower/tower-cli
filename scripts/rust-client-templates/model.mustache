@@ -1,6 +1,6 @@
 {{>partial_header}}
 use crate::models;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer};
 {{#models}}
 {{#model}}
 {{^isEnum}}{{#vendorExtensions.x-rust-has-byte-array}}
@@ -61,6 +61,26 @@ impl std::fmt::Display for {{{classname}}} {
             Self::{{{name}}} => write!(f, "{{{value}}}"),
             {{/enumVars}}
             {{/allowableValues}}
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for {{{classname}}} {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            {{#allowableValues}}
+            {{#enumVars}}
+            "{{{value}}}" => Self::{{{name}}},
+            {{/enumVars}}
+            {{/allowableValues}}
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &[{{#allowableValues}}{{#enumVars}}"{{{value}}}"{{^-last}}, {{/-last}}{{/enumVars}}{{/allowableValues}}],
+            )),
         }
     }
 }
@@ -201,7 +221,7 @@ impl Default for {{classname}} {
 {{#vars}}
 {{#isEnum}}
 /// {{{description}}}
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum {{{enumName}}} {
 {{#allowableValues}}
 {{#enumVars}}
@@ -216,6 +236,26 @@ impl Default for {{{enumName}}} {
         {{#allowableValues}}
         Self::{{ enumVars.0.name }}
         {{/allowableValues}}
+    }
+}
+
+impl<'de> Deserialize<'de> for {{{enumName}}} {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            {{#allowableValues}}
+            {{#enumVars}}
+            "{{{value}}}" => Ok(Self::{{{name}}}),
+            {{/enumVars}}
+            {{/allowableValues}}
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &[{{#allowableValues}}{{#enumVars}}"{{{value}}}"{{^-last}}, {{/-last}}{{/enumVars}}{{/allowableValues}}],
+            )),
+        }
     }
 }
 {{/isEnum}}

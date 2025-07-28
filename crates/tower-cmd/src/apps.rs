@@ -5,6 +5,7 @@ use config::Config;
 use tower_api::models::Run;
 
 use crate::{
+    util::dates,
     output,
     api,
 };
@@ -55,7 +56,8 @@ pub async fn do_logs(config: Config, cmd: &ArgMatches) {
 
     if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
         for line in resp.log_lines {
-            output::log_line(&line.timestamp, &line.message, output::LogLineType::Remote);
+            let ts = dates::format_str(&line.timestamp);
+            output::log_line(&ts, &line.message, output::LogLineType::Remote);
         }
     }
 }
