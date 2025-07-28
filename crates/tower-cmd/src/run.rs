@@ -231,7 +231,7 @@ async fn do_follow_run(
         Err(err) => {
             spinner.failure();
             debug!("Failed to wait for run to start: {}", err);
-            let msg = format!("An error occured while waiting for the run to start. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+            let msg = format!("An error occurred while waiting for the run to start. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
             output::failure(&msg);
         },
         Ok(()) => {
