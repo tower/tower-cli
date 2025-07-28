@@ -25,7 +25,6 @@ pub fn run_cmd() -> Command {
         .arg(
             Arg::new("dir")
                 .long("dir")
-                .short('d')
                 .help("The directory containing the Towerfile")
                 .default_value("."),
         )
@@ -51,9 +50,9 @@ pub fn run_cmd() -> Command {
                 .action(clap::ArgAction::Append),
         )
         .arg(
-            Arg::new("detach")
+            Arg::new("detached")
                 .long("detached")
-                .short('t')
+                .short('d')
                 .help("Don't follow the run output in your CLI")
                 .action(clap::ArgAction::SetTrue),
         )
@@ -318,7 +317,7 @@ fn get_run_parameters(
 fn should_follow_run(
     args: &ArgMatches,
 ) -> bool {
-    let local = *args.get_one::<bool>("detach").unwrap();
+    let local = *args.get_one::<bool>("detached").unwrap();
     !local
 }
 
