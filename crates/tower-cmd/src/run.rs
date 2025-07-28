@@ -7,13 +7,13 @@ use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
 use tower_api::models::Run;
 
-use chrono::{DateTime, Utc}; 
 use tokio::sync::{
     oneshot::self,
     mpsc::unbounded_channel,
 };
 
 use crate::{
+    util::dates,
     output,
     api,
     Error,
@@ -430,7 +430,7 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 async fn monitor_output(mut output: OutputReceiver) {
     loop {
         if let Some(line) = output.recv().await {
-            let ts = line.time.format("%Y-%m-%d %H:%M:%S").to_string();
+            let ts = dates::format(line.time);
             let msg = &line.line;
             output::log_line(&ts, msg, output::LogLineType::Local);
         } else {
@@ -542,13 +542,7 @@ fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> 
 fn print_log_stream_event(event: api::LogStreamEvent) {
     match event {
         api::LogStreamEvent::EventLog(log) => {
-            // We need to parse the reported_at timestamp, which is in
-            // RFC 3339 format, and turn it into our preferred format.
-            let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(&log.reported_at)
-                .unwrap()
-                .with_timezone(&Utc);
-
-            let ts = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+            let ts = dates::format_str(&log.reported_at);
 
             output::log_line(
                 &ts,
