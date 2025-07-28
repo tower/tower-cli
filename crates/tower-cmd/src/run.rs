@@ -7,6 +7,7 @@ use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
 use tower_api::models::Run;
 
+use chrono::{DateTime, Utc}; 
 use tokio::sync::{
     oneshot::self,
     mpsc::unbounded_channel,
@@ -256,8 +257,16 @@ async fn do_follow_run(
                             Some(event) = output.recv() => {
                                 match event {
                                     api::LogStreamEvent::EventLog(log) => {
+                                        // We need to parse the reported_at timestamp, which is in
+                                        // RFC 3339 format, and turn it into our preferred format.
+                                        let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(&log.reported_at)
+                                            .unwrap()
+                                            .with_timezone(&Utc);
+
+                                        let ts = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+
                                         output::log_line(
-                                            &log.reported_at,
+                                            &ts,
                                             &log.content,
                                             output::LogLineType::Remote,
                                         );
@@ -440,9 +449,9 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 async fn monitor_output(mut output: OutputReceiver) {
     loop {
         if let Some(line) = output.recv().await {
-            let ts = &line.time;
+            let ts = line.time.format("%Y-%m-%d %H:%M:%S").to_string();
             let msg = &line.line;
-            output::log_line(&ts.to_rfc3339(), msg, output::LogLineType::Local);
+            output::log_line(&ts, msg, output::LogLineType::Local);
         } else {
             break;
         }
@@ -510,6 +519,7 @@ async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<(), Error
     Ok(())
 }
 
+/// is_run_started checks if the run has started by looking at its status. 
 fn is_run_started(run: &Run) -> Result<bool, Error> {
     match run.status {
         tower_api::models::run::Status::Scheduled => Ok(false),
@@ -519,6 +529,7 @@ fn is_run_started(run: &Run) -> Result<bool, Error> {
     }
 }
 
+/// is_run_finished checks if the run has finished by looking at its status.
 fn is_run_finished(run: &Run) -> bool {
     match run.status {
         tower_api::models::run::Status::Scheduled => false,
