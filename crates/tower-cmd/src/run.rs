@@ -7,7 +7,10 @@ use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
 use tower_api::models::Run;
 
-use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::{
+    oneshot::self,
+    mpsc::unbounded_channel,
+};
 
 use crate::{
     output,
@@ -215,9 +218,24 @@ async fn do_follow_run(
     config: Config,
     run: &Run,
 ) {
+    // we'll use this as a way of monitoring for when the run has reached a terminal state.
+    let (tx, mut rx) = oneshot::channel();
+
+    // We need to spawn a task that will wait for run completion, and we need copies of these
+    // objects in order for them to run elsewhere.
+    let config_clone = config.clone();
+    let run_clone = run.clone();
+
+    tokio::spawn(async move {
+       let _ = wait_for_run_completion(&config_clone, &run_clone).await;
+
+       // This should probably panic?
+       let _ = tx.send(());
+    });
+
     let mut spinner = output::spinner("Waiting for run to start...");
 
-    match wait_for_run(&config, &run).await {
+    match wait_for_run_start(&config, &run).await {
         Err(err) => {
             spinner.failure();
             debug!("Failed to wait for run to start: {}", err);
@@ -232,19 +250,27 @@ async fn do_follow_run(
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
                 Ok(mut output) => {
                     // We will monitor the output channel and print it to stdout.
-                    while let Some(event) = output.recv().await {
-                        match event {
-                            api::LogStreamEvent::EventLog(log) => {
-                                output::log_line(
-                                    &log.reported_at,
-                                    &log.content,
-                                    output::LogLineType::Remote,
-                                );
-                            }
-                            api::LogStreamEvent::EventWarning(warning) => {
-                                debug!("warning: {:?}", warning);
-                            }
-                        }
+                    loop {
+                        // we need a local version of this each iteration.
+                        tokio::select! {
+                            Some(event) = output.recv() => {
+                                match event {
+                                    api::LogStreamEvent::EventLog(log) => {
+                                        output::log_line(
+                                            &log.reported_at,
+                                            &log.content,
+                                            output::LogLineType::Remote,
+                                        );
+                                    }
+                                    api::LogStreamEvent::EventWarning(warning) => {
+                                        debug!("warning: {:?}", warning);
+                                    }
+                                }
+                            },
+                            _ = &mut rx => {
+                                break;
+                            },
+                        };
                     }
                 },
                 Err(err) => {
@@ -450,13 +476,30 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
     format!("PYICEBERG_CATALOG__{}__{}", catalog_name, property_name)
 }
 
-/// wait_for_run waits for the run to enter a "start" state. It polls the API every 1 second to see
+/// wait_for_run_start waits for the run to enter a "running" state. It polls the API every 500ms to see
 /// if it's started yet.
-async fn wait_for_run(config: &Config, run: &Run) -> Result<(), Error> {
+async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
     loop {
         let res = api::describe_run(config, &run.app_name, run.number).await?;
 
         if is_run_started(&res.run)? {
+            break
+        } else {
+            // Wait half a second to to try again.
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+    }  
+
+    Ok(())
+}
+
+/// wait_for_run_completion waits for the run to enter an terminal state. It polls the API every
+/// 500ms to see if it's started yet.
+async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<(), Error> {
+    loop {
+        let res = api::describe_run(config, &run.app_name, run.number).await?;
+
+        if is_run_finished(&res.run) {
             break
         } else {
             // Wait half a second to to try again.
@@ -473,5 +516,14 @@ fn is_run_started(run: &Run) -> Result<bool, Error> {
         tower_api::models::run::Status::Pending => Ok(false),
         tower_api::models::run::Status::Running => Ok(true),
         _ => Err(Error::RunCompleted),
+    }
+}
+
+fn is_run_finished(run: &Run) -> bool {
+    match run.status {
+        tower_api::models::run::Status::Scheduled => false,
+        tower_api::models::run::Status::Pending => false,
+        tower_api::models::run::Status::Running => false,
+        _ => true,
     }
 }
