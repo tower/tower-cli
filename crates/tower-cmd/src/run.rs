@@ -278,7 +278,7 @@ async fn do_follow_run(
                                     Ok(run) => print_run_completion(&run),
                                     Err(err) => {
                                         debug!("Failed to monitor run completion: {:?}", err);
-                                        let msg = format!("An error occured while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+                                        let msg = format!("An error occurred while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
                                         output::failure(&msg);
                                     }
                                 }
