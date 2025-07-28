@@ -12,6 +12,7 @@ cli-table = { workspace = true }
 colored = { workspace = true }
 config = { workspace = true }
 crypto = { workspace = true }
+ctrlc = { workspace = true }
 futures-util = { workspace = true }
 http = { workspace = true }
 indicatif = { workspace = true }

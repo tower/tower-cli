@@ -242,7 +242,7 @@ async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStre
     while let Some(event) = source.next().await {
         match event {
             Ok(reqwest_eventsource::Event::Open) => {
-                // TODO: This shouldn't happen.
+                panic!("Received unexpected open event in log stream. This shouldn't happen.");
             }
             Ok(Event::Message(message)) => {
                 match message.event.as_str() {

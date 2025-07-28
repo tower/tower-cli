@@ -26,6 +26,7 @@ cli-table = "0.4"
 colored = "2"
 config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
+ctrlc = "3"
 dirs = "5"
 futures = "0.3"
 futures-util = "0.3"

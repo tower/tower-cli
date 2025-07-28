@@ -241,6 +241,32 @@ async fn do_follow_run(
             // `wait_for_run_start` function above.
             let mut rx = monitor_run_completion(&config, run);
 
+            // We set a Ctrl+C handler here, if invoked it will print a message that shows where
+            // the user can follow the run.
+            let run_copy = run.clone();
+
+            ctrlc::set_handler(move || {
+                output::newline();
+
+                let msg = format!(
+                    "Run #{} for app `{}` is still running.",
+                    run_copy.number, run_copy.app_name
+                );
+                output::write(&msg);
+                output::newline();
+
+                let msg = format!(
+                    "You can follow it at {}",
+                    run_copy.dollar_link
+                );
+                output::write(&msg);
+                output::newline();
+
+                // According to
+                // https://www.agileconnection.com/article/overview-linux-exit-codes...
+                std::process::exit(130);
+            }).expect("Failed to set Ctrl+C handler");
+
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
