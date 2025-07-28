@@ -558,7 +558,6 @@ fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> 
            await.
            unwrap();
 
-       // this should probably panic?
        let _ = tx.send(run);
     });
 
