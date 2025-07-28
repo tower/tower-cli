@@ -20,7 +20,6 @@ class CreateCatalogParams:
         environment (str):
         name (str):
         properties (list['EncryptedCatalogProperty']):
-        slug (str):
         type_ (CreateCatalogParamsType):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateCatalogParams.json.
@@ -29,7 +28,6 @@ class CreateCatalogParams:
     environment: str
     name: str
     properties: list["EncryptedCatalogProperty"]
-    slug: str
     type_: CreateCatalogParamsType
     schema: Union[Unset, str] = UNSET
 
@@ -43,8 +41,6 @@ class CreateCatalogParams:
             properties_item = properties_item_data.to_dict()
             properties.append(properties_item)
 
-        slug = self.slug
-
         type_ = self.type_.value
 
         schema = self.schema
@@ -55,7 +51,6 @@ class CreateCatalogParams:
                 "environment": environment,
                 "name": name,
                 "properties": properties,
-                "slug": slug,
                 "type": type_,
             }
         )
@@ -80,8 +75,6 @@ class CreateCatalogParams:
 
             properties.append(properties_item)
 
-        slug = d.pop("slug")
-
         type_ = CreateCatalogParamsType(d.pop("type"))
 
         schema = d.pop("$schema", UNSET)
@@ -90,7 +83,6 @@ class CreateCatalogParams:
             environment=environment,
             name=name,
             properties=properties,
-            slug=slug,
             type_=type_,
             schema=schema,
         )

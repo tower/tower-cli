@@ -11,7 +11,7 @@ from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
     runs: Union[Unset, int] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
@@ -38,8 +38,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/apps/{slug}".format(
-            slug=slug,
+        "url": "/apps/{name}".format(
+            name=name,
         ),
         "params": params,
     }
@@ -72,7 +72,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
@@ -85,7 +85,7 @@ def sync_detailed(
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
@@ -103,7 +103,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         runs=runs,
         start_at=start_at,
         end_at=end_at,
@@ -118,7 +118,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
@@ -131,7 +131,7 @@ def sync(
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
@@ -149,7 +149,7 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         runs=runs,
         start_at=start_at,
@@ -159,7 +159,7 @@ def sync(
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
@@ -172,7 +172,7 @@ async def asyncio_detailed(
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
@@ -190,7 +190,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         runs=runs,
         start_at=start_at,
         end_at=end_at,
@@ -203,7 +203,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     runs: Union[Unset, int] = UNSET,
@@ -216,7 +216,7 @@ async def asyncio(
      Get all the runs for the current account.
 
     Args:
-        slug (str): The slug of the app to fetch.
+        name (str): The name of the app to fetch.
         runs (Union[Unset, int]): The number of recent runs to fetch for the app.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
@@ -235,7 +235,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             runs=runs,
             start_at=start_at,

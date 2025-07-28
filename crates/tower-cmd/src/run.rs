@@ -5,10 +5,15 @@ use std::path::PathBuf;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
 use tower_telemetry::{Context, debug};
+use tower_api::models::Run;
 
-use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::{
+    oneshot::self,
+    mpsc::unbounded_channel,
+};
 
 use crate::{
+    util::dates,
     output,
     api,
     Error,
@@ -20,7 +25,6 @@ pub fn run_cmd() -> Command {
         .arg(
             Arg::new("dir")
                 .long("dir")
-                .short('d')
                 .help("The directory containing the Towerfile")
                 .default_value("."),
         )
@@ -33,8 +37,8 @@ pub fn run_cmd() -> Command {
         )
         .arg(
             Arg::new("environment")
-                .short('e')
                 .long("environment")
+                .short('e')
                 .help("The environment to invoke the app in")
                 .default_value("default"),
         )
@@ -44,6 +48,13 @@ pub fn run_cmd() -> Command {
                 .long("parameter")
                 .help("Parameters (key=value) to pass to the app")
                 .action(clap::ArgAction::Append),
+        )
+        .arg(
+            Arg::new("detached")
+                .long("detached")
+                .short('d')
+                .help("Don't follow the run output in your CLI")
+                .action(clap::ArgAction::SetTrue),
         )
         .about("Run your code in Tower or locally")
 }
@@ -73,7 +84,8 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
                     do_run_local(config, path, env, params).await;
                 }
             } else {
-                do_run_remote(config, path, env, params, app_name).await;
+                let follow = should_follow_run(args);
+                do_run_remote(config, path, env, params, app_name, follow).await;
             }
         }
         Err(err) => {
@@ -169,6 +181,7 @@ async fn do_run_remote(
     env: &str,
     params: HashMap<String, String>,
     app_name: Option<String>,
+    should_follow_run: bool,
 ) {
     let app_slug = app_name.unwrap_or_else(|| {
         // Load the Towerfile
@@ -188,13 +201,101 @@ async fn do_run_remote(
         Ok(res) => {
             spinner.success();
 
-            let line = format!(
-                "Run #{} for app `{}` has been scheduled",
-                res.run.number, app_slug
-            );
-            output::success(&line);
+            let run = res.run;
+
+            if should_follow_run {
+                do_follow_run(config, &run).await;
+            } else {
+                let line = format!(
+                    "Run #{} for app `{}` has been scheduled",
+                    run.number, app_slug
+                );
+                output::success(&line);
+
+                let link_line = format!("  See more: {}", run.dollar_link);
+                output::write(&link_line);
+                output::newline();
+            }
         }
     }
+}
+
+async fn do_follow_run(
+    config: Config,
+    run: &Run,
+) {
+    let mut spinner = output::spinner("Waiting for run to start...");
+
+    match wait_for_run_start(&config, &run).await {
+        Err(err) => {
+            spinner.failure();
+            debug!("Failed to wait for run to start: {}", err);
+            let msg = format!("An error occurred while waiting for the run to start. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+            output::failure(&msg);
+        },
+        Ok(()) => {
+            spinner.success();
+
+            // We do this here, explicitly, to not double-monitor our API via the
+            // `wait_for_run_start` function above.
+            let mut run_complete = monitor_run_completion(&config, run);
+
+            // We set a Ctrl+C handler here, if invoked it will print a message that shows where
+            // the user can follow the run.
+            let run_copy = run.clone();
+
+            ctrlc::set_handler(move || {
+                output::newline();
+
+                let msg = format!(
+                    "Run #{} for app `{}` is still running.",
+                    run_copy.number, run_copy.app_name
+                );
+                output::write(&msg);
+                output::newline();
+
+                let msg = format!(
+                    "You can follow it at {}",
+                    run_copy.dollar_link
+                );
+                output::write(&msg);
+                output::newline();
+
+                // According to
+                // https://www.agileconnection.com/article/overview-linux-exit-codes...
+                std::process::exit(130);
+            }).expect("Failed to set Ctrl+C handler");
+
+            // Now we follow the logs from the run. We can stream them from the cloud to here using
+            // the stream_logs API endpoint.
+            match api::stream_run_logs(&config, &run.app_name, run.number).await {
+                Ok(mut output) => {
+                    loop {
+                        tokio::select! {
+                            Some(event) = output.recv() => print_log_stream_event(event),
+                            res = &mut run_complete => {
+                                match res {
+                                    Ok(run) => print_run_completion(&run),
+                                    Err(err) => {
+                                        debug!("Failed to monitor run completion: {:?}", err);
+                                        let msg = format!("An error occurred while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+                                        output::failure(&msg);
+                                    }
+                                }
+
+                                break;
+                            },
+                        };
+                    }
+                },
+                Err(err) => {
+                    debug!("Failed to stream run logs: {:?}", err);
+                    let msg = format!("An error occurred while streaming logs from Tower to your console. You can get more details at {:?} or by contacting support.", run.dollar_link);
+                    output::failure(&msg);
+                }
+            }
+        }
+    };
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
@@ -211,6 +312,13 @@ fn get_run_parameters(
     let app_name = get_app_name(cmd);
 
     Ok((local, path, params, app_name))
+}
+
+fn should_follow_run(
+    args: &ArgMatches,
+) -> bool {
+    let local = *args.get_one::<bool>("detached").unwrap();
+    !local
 }
 
 /// Parses `--parameter` arguments into a HashMap of key-value pairs.
@@ -347,9 +455,9 @@ async fn build_package(towerfile: &Towerfile) -> Package {
 async fn monitor_output(mut output: OutputReceiver) {
     loop {
         if let Some(line) = output.recv().await {
-            let ts = &line.time;
+            let ts = dates::format(line.time);
             let msg = &line.line;
-            output::log_line(&ts.to_rfc3339(), msg, output::LogLineType::Local);
+            output::log_line(&ts, msg, output::LogLineType::Local);
         } else {
             break;
         }
@@ -383,3 +491,129 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
     format!("PYICEBERG_CATALOG__{}__{}", catalog_name, property_name)
 }
 
+/// wait_for_run_start waits for the run to enter a "running" state. It polls the API every 500ms to see
+/// if it's started yet.
+async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
+    loop {
+        let res = api::describe_run(config, &run.app_name, run.number).await?;
+
+        if is_run_started(&res.run)? {
+            break
+        } else {
+            // Wait half a second to to try again.
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+    }  
+
+    Ok(())
+}
+
+/// wait_for_run_completion waits for the run to enter an terminal state. It polls the API every
+/// 500ms to see if it's started yet.
+async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<Run, Error> {
+    loop {
+        let res = api::describe_run(config, &run.app_name, run.number).await?;
+
+        if is_run_finished(&res.run) {
+            return Ok(res.run)
+        } else {
+            // Wait half a second to to try again.
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+    }  
+}
+
+/// is_run_started checks if the run has started by looking at its status. 
+fn is_run_started(run: &Run) -> Result<bool, Error> {
+    match run.status {
+        tower_api::models::run::Status::Scheduled => Ok(false),
+        tower_api::models::run::Status::Pending => Ok(false),
+        tower_api::models::run::Status::Running => Ok(true),
+        _ => Err(Error::RunCompleted),
+    }
+}
+
+/// is_run_finished checks if the run has finished by looking at its status.
+fn is_run_finished(run: &Run) -> bool {
+    match run.status {
+        tower_api::models::run::Status::Scheduled => false,
+        tower_api::models::run::Status::Pending => false,
+        tower_api::models::run::Status::Running => false,
+        _ => true,
+    }
+}
+
+fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> {
+    // we'll use this as a way of monitoring for when the run has reached a terminal state.
+    let (tx, rx) = oneshot::channel();
+
+    // We need to spawn a task that will wait for run completion, and we need copies of these
+    // objects in order for them to run elsewhere.
+    let config_clone = config.clone();
+    let run_clone = run.clone();
+
+    tokio::spawn(async move {
+       let run = wait_for_run_completion(&config_clone, &run_clone).
+           await.
+           unwrap();
+
+       let _ = tx.send(run);
+    });
+
+    rx
+}
+
+fn print_log_stream_event(event: api::LogStreamEvent) {
+    match event {
+        api::LogStreamEvent::EventLog(log) => {
+            let ts = dates::format_str(&log.reported_at);
+
+            output::log_line(
+                &ts,
+                &log.content,
+                output::LogLineType::Remote,
+            );
+        }
+        api::LogStreamEvent::EventWarning(warning) => {
+            debug!("warning: {:?}", warning);
+        }
+    }
+}
+
+fn print_run_completion(run: &Run) {
+    let link_line = format!("  See more: {}", run.dollar_link);
+
+    match run.status {
+        tower_api::models::run::Status::Errored => {
+            let line = format!(
+                "Run #{} for app `{}` had an error",
+                run.number, run.app_name
+            );
+            output::failure(&line);
+        },
+        tower_api::models::run::Status::Crashed => {
+            let line = format!(
+                "Run #{} for app `{}` crashed",
+                run.number, run.app_name
+            );
+            output::failure(&line);
+        },
+        tower_api::models::run::Status::Cancelled => {
+            let line = format!(
+                "Run #{} for app `{}` was cancelled",
+                run.number, run.app_name
+            );
+            output::failure(&line);
+        },
+        _ => {
+            let line = format!(
+                "Run #{} for app `{}` has exited successfully",
+                run.number, run.app_name
+            );
+            output::success(&line);
+        }
+    }
+
+    output::write(&link_line);
+    output::newline();
+}

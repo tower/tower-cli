@@ -17,22 +17,22 @@ class Team:
     """
     Attributes:
         name (str):
-        slug (str):
         type_ (str): The type of team, either 'personal' or 'team'.
+        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
         token (Union[Unset, Token]):
     """
 
     name: str
-    slug: str
     type_: str
+    slug: Union[Unset, str] = UNSET
     token: Union[Unset, "Token"] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
-        slug = self.slug
-
         type_ = self.type_
+
+        slug = self.slug
 
         token: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.token, Unset):
@@ -42,10 +42,11 @@ class Team:
         field_dict.update(
             {
                 "name": name,
-                "slug": slug,
                 "type": type_,
             }
         )
+        if slug is not UNSET:
+            field_dict["slug"] = slug
         if token is not UNSET:
             field_dict["token"] = token
 
@@ -58,9 +59,9 @@ class Team:
         d = dict(src_dict)
         name = d.pop("name")
 
-        slug = d.pop("slug")
-
         type_ = d.pop("type")
+
+        slug = d.pop("slug", UNSET)
 
         _token = d.pop("token", UNSET)
         token: Union[Unset, Token]
@@ -71,8 +72,8 @@ class Team:
 
         team = cls(
             name=name,
-            slug=slug,
             type_=type_,
+            slug=slug,
             token=token,
         )
 

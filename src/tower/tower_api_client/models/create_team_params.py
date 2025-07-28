@@ -13,19 +13,15 @@ class CreateTeamParams:
     """
     Attributes:
         name (str): The name of the team to create
-        slug (str): The slug of the team to create
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateTeamParams.json.
     """
 
     name: str
-    slug: str
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
-
-        slug = self.slug
 
         schema = self.schema
 
@@ -33,7 +29,6 @@ class CreateTeamParams:
         field_dict.update(
             {
                 "name": name,
-                "slug": slug,
             }
         )
         if schema is not UNSET:
@@ -46,13 +41,10 @@ class CreateTeamParams:
         d = dict(src_dict)
         name = d.pop("name")
 
-        slug = d.pop("slug")
-
         schema = d.pop("$schema", UNSET)
 
         create_team_params = cls(
             name=name,
-            slug=slug,
             schema=schema,
         )
 

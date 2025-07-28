@@ -4,7 +4,8 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.22"
+version = "0.3.23"
+
 
 
 description = "Tower is the best way to host Python data apps in production"
@@ -26,6 +27,7 @@ cli-table = "0.4"
 colored = "2"
 config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
+ctrlc = "3"
 dirs = "5"
 futures = "0.3"
 futures-util = "0.3"
@@ -37,6 +39,7 @@ pem = "3"
 promptly = "0.3"
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+reqwest-eventsource = { version = "0.6" }
 rpassword = "7"
 rsa = "0.9"
 serde = "1"

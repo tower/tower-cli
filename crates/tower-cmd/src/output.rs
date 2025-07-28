@@ -87,8 +87,8 @@ pub fn config_error(err: config::Error) {
         config::Error::MissingRequiredAppField { ref field } => {
             format!("Missing required app field `{}` in Towerfile", field)
         }
-        config::Error::TeamNotFound { ref team_slug } => {
-            format!("Team with slug `{}` not found!", team_slug)
+        config::Error::TeamNotFound { ref team_name } => {
+            format!("Team with name `{}` not found!", team_name)
         }
         config::Error::UnknownDescribeSessionValue { value: _ } => {
             "An error occured while describing the session associated with the JWT you provided. Maybe your CLI is out of date?".to_string()

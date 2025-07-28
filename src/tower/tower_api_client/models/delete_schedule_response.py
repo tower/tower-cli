@@ -1,38 +1,34 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-if TYPE_CHECKING:
-    from ..models.account import Account
-
-
-T = TypeVar("T", bound="UpdateAccountSlugResponse")
+T = TypeVar("T", bound="DeleteScheduleResponse")
 
 
 @_attrs_define
-class UpdateAccountSlugResponse:
+class DeleteScheduleResponse:
     """
     Attributes:
-        account (Account):
+        id (str): The ID of the deleted schedule.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/UpdateAccountSlugResponse.json.
+            https://api.tower.dev/v1/schemas/DeleteScheduleResponse.json.
     """
 
-    account: "Account"
+    id: str
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        account = self.account.to_dict()
+        id = self.id
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "account": account,
+                "id": id,
             }
         )
         if schema is not UNSET:
@@ -42,16 +38,14 @@ class UpdateAccountSlugResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.account import Account
-
         d = dict(src_dict)
-        account = Account.from_dict(d.pop("account"))
+        id = d.pop("id")
 
         schema = d.pop("$schema", UNSET)
 
-        update_account_slug_response = cls(
-            account=account,
+        delete_schedule_response = cls(
+            id=id,
             schema=schema,
         )
 
-        return update_account_slug_response
+        return delete_schedule_response

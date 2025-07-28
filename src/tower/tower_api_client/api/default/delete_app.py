@@ -10,12 +10,12 @@ from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/apps/{slug}".format(
-            slug=slug,
+        "url": "/apps/{name}".format(
+            name=name,
         ),
     }
 
@@ -47,7 +47,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[DeleteAppResponse]:
@@ -56,7 +56,7 @@ def sync_detailed(
      Delete one of your apps, the associated code, and all the runs as well.
 
     Args:
-        slug (str): The slug of the app to delete.
+        name (str): The name of the app to delete.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -67,7 +67,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
     )
 
     response = client.get_httpx_client().request(
@@ -78,7 +78,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Optional[DeleteAppResponse]:
@@ -87,7 +87,7 @@ def sync(
      Delete one of your apps, the associated code, and all the runs as well.
 
     Args:
-        slug (str): The slug of the app to delete.
+        name (str): The name of the app to delete.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,13 +98,13 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[DeleteAppResponse]:
@@ -113,7 +113,7 @@ async def asyncio_detailed(
      Delete one of your apps, the associated code, and all the runs as well.
 
     Args:
-        slug (str): The slug of the app to delete.
+        name (str): The name of the app to delete.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,7 +124,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -133,7 +133,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Optional[DeleteAppResponse]:
@@ -142,7 +142,7 @@ async def asyncio(
      Delete one of your apps, the associated code, and all the runs as well.
 
     Args:
-        slug (str): The slug of the app to delete.
+        name (str): The name of the app to delete.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,7 +154,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
         )
     ).parsed

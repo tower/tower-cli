@@ -12,7 +12,7 @@ from ...types import Response
 
 
 def _get_kwargs(
-    slug: str,
+    name: str,
     *,
     body: RunAppParams,
 ) -> dict[str, Any]:
@@ -20,8 +20,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/apps/{slug}/runs".format(
-            slug=slug,
+        "url": "/apps/{name}/runs".format(
+            name=name,
         ),
     }
 
@@ -67,7 +67,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
@@ -77,7 +77,7 @@ def sync_detailed(
      Runs an app with the supplied parameters.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         body (RunAppParams):
 
     Raises:
@@ -89,7 +89,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -101,7 +101,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
@@ -111,7 +111,7 @@ def sync(
      Runs an app with the supplied parameters.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         body (RunAppParams):
 
     Raises:
@@ -123,14 +123,14 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        name=name,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
@@ -140,7 +140,7 @@ async def asyncio_detailed(
      Runs an app with the supplied parameters.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         body (RunAppParams):
 
     Raises:
@@ -152,7 +152,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        name=name,
         body=body,
     )
 
@@ -162,7 +162,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    name: str,
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
@@ -172,7 +172,7 @@ async def asyncio(
      Runs an app with the supplied parameters.
 
     Args:
-        slug (str): The slug of the app to fetch runs for.
+        name (str): The name of the app to fetch runs for.
         body (RunAppParams):
 
     Raises:
@@ -185,7 +185,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            name=name,
             client=client,
             body=body,
         )
