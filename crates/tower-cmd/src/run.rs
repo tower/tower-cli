@@ -265,7 +265,7 @@ async fn do_follow_run(
                 },
                 Err(err) => {
                     debug!("Failed to stream run logs: {:?}", err);
-                    let msg = format!("An error occured while waiting streaming logs from Tower to your console. You can get more details at {:?} or by contacting support.", run.dollar_link);
+                    let msg = format!("An error occurred while streaming logs from Tower to your console. You can get more details at {:?} or by contacting support.", run.dollar_link);
                     output::failure(&msg);
                 }
             }
