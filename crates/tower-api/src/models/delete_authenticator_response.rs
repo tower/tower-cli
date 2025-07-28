@@ -17,14 +17,14 @@ pub struct DeleteAuthenticatorResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "authenticator")]
-    pub authenticator: Box<models::VerifiedAuthenticator>,
+    pub authenticator: models::VerifiedAuthenticator,
 }
 
 impl DeleteAuthenticatorResponse {
     pub fn new(authenticator: models::VerifiedAuthenticator) -> DeleteAuthenticatorResponse {
         DeleteAuthenticatorResponse {
             schema: None,
-            authenticator: Box::new(authenticator),
+            authenticator,
         }
     }
 }

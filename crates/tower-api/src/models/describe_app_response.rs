@@ -17,7 +17,7 @@ pub struct DescribeAppResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "app")]
-    pub app: Box<models::App>,
+    pub app: models::App,
     #[serde(rename = "runs")]
     pub runs: Vec<models::Run>,
 }
@@ -26,7 +26,7 @@ impl DescribeAppResponse {
     pub fn new(app: models::App, runs: Vec<models::Run>) -> DescribeAppResponse {
         DescribeAppResponse {
             schema: None,
-            app: Box::new(app),
+            app,
             runs,
         }
     }

@@ -14,22 +14,22 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Session {
     #[serde(rename = "featurebase_identity")]
-    pub featurebase_identity: Box<models::FeaturebaseIdentity>,
+    pub featurebase_identity: models::FeaturebaseIdentity,
     #[serde(rename = "teams")]
     pub teams: Vec<models::Team>,
     #[serde(rename = "token")]
-    pub token: Box<models::Token>,
+    pub token: models::Token,
     #[serde(rename = "user")]
-    pub user: Box<models::User>,
+    pub user: models::User,
 }
 
 impl Session {
     pub fn new(featurebase_identity: models::FeaturebaseIdentity, teams: Vec<models::Team>, token: models::Token, user: models::User) -> Session {
         Session {
-            featurebase_identity: Box::new(featurebase_identity),
+            featurebase_identity,
             teams,
-            token: Box::new(token),
-            user: Box::new(user),
+            token,
+            user,
         }
     }
 }

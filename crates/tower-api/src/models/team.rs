@@ -19,7 +19,7 @@ pub struct Team {
     #[serde(rename = "slug", skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     #[serde(rename = "token", skip_serializing_if = "Option::is_none")]
-    pub token: Option<Box<models::Token>>,
+    pub token: Option<models::Token>,
     /// The type of team, either 'personal' or 'team'.
     #[serde(rename = "type")]
     pub r#type: String,

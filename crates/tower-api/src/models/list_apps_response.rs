@@ -19,7 +19,7 @@ pub struct ListAppsResponse {
     #[serde(rename = "apps")]
     pub apps: Vec<models::AppSummary>,
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
 }
 
 impl ListAppsResponse {
@@ -27,7 +27,7 @@ impl ListAppsResponse {
         ListAppsResponse {
             schema: None,
             apps,
-            pages: Box::new(pages),
+            pages,
         }
     }
 }

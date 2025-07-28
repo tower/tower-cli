@@ -22,7 +22,7 @@ pub struct Plan {
     #[serde(rename = "end_at", skip_serializing_if = "Option::is_none")]
     pub end_at: Option<String>,
     #[serde(rename = "features")]
-    pub features: Box<models::Features>,
+    pub features: models::Features,
     #[serde(rename = "id")]
     pub id: String,
     #[serde(rename = "start_at")]
@@ -38,7 +38,7 @@ impl Plan {
             base_plan_name,
             created_at,
             end_at: None,
-            features: Box::new(features),
+            features,
             id,
             start_at,
             status,

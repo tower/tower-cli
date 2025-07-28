@@ -52,7 +52,7 @@ pub fn run_cmd() -> Command {
         )
         .arg(
             Arg::new("detach")
-                .long("detach")
+                .long("detached")
                 .short('t')
                 .help("Don't follow the run output in your CLI")
                 .action(clap::ArgAction::SetTrue),
@@ -202,14 +202,20 @@ async fn do_run_remote(
         Ok(res) => {
             spinner.success();
 
+            let run = res.run;
+
             if should_follow_run {
-                do_follow_run(config, &res.run).await;
+                do_follow_run(config, &run).await;
             } else {
                 let line = format!(
                     "Run #{} for app `{}` has been scheduled",
-                    res.run.number, app_slug
+                    run.number, app_slug
                 );
                 output::success(&line);
+
+                let link_line = format!("  See more: {}", run.dollar_link);
+                output::write(&link_line);
+                output::newline();
             }
         }
     }
@@ -219,21 +225,6 @@ async fn do_follow_run(
     config: Config,
     run: &Run,
 ) {
-    // we'll use this as a way of monitoring for when the run has reached a terminal state.
-    let (tx, mut rx) = oneshot::channel();
-
-    // We need to spawn a task that will wait for run completion, and we need copies of these
-    // objects in order for them to run elsewhere.
-    let config_clone = config.clone();
-    let run_clone = run.clone();
-
-    tokio::spawn(async move {
-       let _ = wait_for_run_completion(&config_clone, &run_clone).await;
-
-       // This should probably panic?
-       let _ = tx.send(());
-    });
-
     let mut spinner = output::spinner("Waiting for run to start...");
 
     match wait_for_run_start(&config, &run).await {
@@ -246,37 +237,27 @@ async fn do_follow_run(
         Ok(()) => {
             spinner.success();
 
+            // We do this here, explicitly, to not double-monitor our API via the
+            // `wait_for_run_start` function above.
+            let mut rx = monitor_run_completion(&config, run);
+
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
                 Ok(mut output) => {
-                    // We will monitor the output channel and print it to stdout.
                     loop {
-                        // we need a local version of this each iteration.
                         tokio::select! {
-                            Some(event) = output.recv() => {
-                                match event {
-                                    api::LogStreamEvent::EventLog(log) => {
-                                        // We need to parse the reported_at timestamp, which is in
-                                        // RFC 3339 format, and turn it into our preferred format.
-                                        let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(&log.reported_at)
-                                            .unwrap()
-                                            .with_timezone(&Utc);
-
-                                        let ts = dt.format("%Y-%m-%d %H:%M:%S").to_string();
-
-                                        output::log_line(
-                                            &ts,
-                                            &log.content,
-                                            output::LogLineType::Remote,
-                                        );
-                                    }
-                                    api::LogStreamEvent::EventWarning(warning) => {
-                                        debug!("warning: {:?}", warning);
+                            Some(event) = output.recv() => print_log_stream_event(event),
+                            res = &mut rx => {
+                                match res {
+                                    Ok(run) => print_run_completion(&run),
+                                    Err(err) => {
+                                        debug!("Failed to monitor run completion: {:?}", err);
+                                        let msg = format!("An error occured while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+                                        output::failure(&msg);
                                     }
                                 }
-                            },
-                            _ = &mut rx => {
+
                                 break;
                             },
                         };
@@ -504,19 +485,17 @@ async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
 
 /// wait_for_run_completion waits for the run to enter an terminal state. It polls the API every
 /// 500ms to see if it's started yet.
-async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<(), Error> {
+async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<Run, Error> {
     loop {
         let res = api::describe_run(config, &run.app_name, run.number).await?;
 
         if is_run_finished(&res.run) {
-            break
+            return Ok(res.run)
         } else {
             // Wait half a second to to try again.
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
     }  
-
-    Ok(())
 }
 
 /// is_run_started checks if the run has started by looking at its status. 
@@ -537,4 +516,86 @@ fn is_run_finished(run: &Run) -> bool {
         tower_api::models::run::Status::Running => false,
         _ => true,
     }
+}
+
+fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> {
+    // we'll use this as a way of monitoring for when the run has reached a terminal state.
+    let (tx, rx) = oneshot::channel();
+
+    // We need to spawn a task that will wait for run completion, and we need copies of these
+    // objects in order for them to run elsewhere.
+    let config_clone = config.clone();
+    let run_clone = run.clone();
+
+    tokio::spawn(async move {
+       let run = wait_for_run_completion(&config_clone, &run_clone).
+           await.
+           unwrap();
+
+       // this should probably panic?
+       let _ = tx.send(run);
+    });
+
+    rx
+}
+
+fn print_log_stream_event(event: api::LogStreamEvent) {
+    match event {
+        api::LogStreamEvent::EventLog(log) => {
+            // We need to parse the reported_at timestamp, which is in
+            // RFC 3339 format, and turn it into our preferred format.
+            let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(&log.reported_at)
+                .unwrap()
+                .with_timezone(&Utc);
+
+            let ts = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+
+            output::log_line(
+                &ts,
+                &log.content,
+                output::LogLineType::Remote,
+            );
+        }
+        api::LogStreamEvent::EventWarning(warning) => {
+            debug!("warning: {:?}", warning);
+        }
+    }
+}
+
+fn print_run_completion(run: &Run) {
+    let link_line = format!("  See more: {}", run.dollar_link);
+
+    match run.status {
+        tower_api::models::run::Status::Errored => {
+            let line = format!(
+                "Run #{} for app `{}` had an error",
+                run.number, run.app_name
+            );
+            output::failure(&line);
+        },
+        tower_api::models::run::Status::Crashed => {
+            let line = format!(
+                "Run #{} for app `{}` crashed",
+                run.number, run.app_name
+            );
+            output::failure(&line);
+        },
+        tower_api::models::run::Status::Cancelled => {
+            let line = format!(
+                "Run #{} for app `{}` was cancelled",
+                run.number, run.app_name
+            );
+            output::failure(&line);
+        },
+        _ => {
+            let line = format!(
+                "Run #{} for app `{}` has exited successfully",
+                run.number, run.app_name
+            );
+            output::success(&line);
+        }
+    }
+
+    output::write(&link_line);
+    output::newline();
 }

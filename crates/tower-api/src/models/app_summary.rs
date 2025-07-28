@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppSummary {
     #[serde(rename = "app")]
-    pub app: Box<models::App>,
+    pub app: models::App,
     #[serde(rename = "runs")]
     pub runs: Vec<models::Run>,
 }
@@ -22,7 +22,7 @@ pub struct AppSummary {
 impl AppSummary {
     pub fn new(app: models::App, runs: Vec<models::Run>) -> AppSummary {
         AppSummary {
-            app: Box::new(app),
+            app,
             runs,
         }
     }

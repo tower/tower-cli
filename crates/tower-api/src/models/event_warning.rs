@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EventWarning {
     #[serde(rename = "data")]
-    pub data: Box<models::SseWarning>,
+    pub data: models::SseWarning,
     /// The event name.
     #[serde(rename = "event")]
     pub event: Event,
@@ -29,7 +29,7 @@ pub struct EventWarning {
 impl EventWarning {
     pub fn new(data: models::SseWarning, event: Event) -> EventWarning {
         EventWarning {
-            data: Box::new(data),
+            data,
             event,
             id: None,
             retry: None,

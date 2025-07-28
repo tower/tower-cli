@@ -18,14 +18,14 @@ pub struct DeleteTeamResponse {
     pub schema: Option<String>,
     /// The team that was just created
     #[serde(rename = "team")]
-    pub team: Box<models::Team>,
+    pub team: models::Team,
 }
 
 impl DeleteTeamResponse {
     pub fn new(team: models::Team) -> DeleteTeamResponse {
         DeleteTeamResponse {
             schema: None,
-            team: Box::new(team),
+            team,
         }
     }
 }

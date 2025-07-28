@@ -17,14 +17,14 @@ pub struct RunAppResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "run")]
-    pub run: Box<models::Run>,
+    pub run: models::Run,
 }
 
 impl RunAppResponse {
     pub fn new(run: models::Run) -> RunAppResponse {
         RunAppResponse {
             schema: None,
-            run: Box::new(run),
+            run,
         }
     }
 }

@@ -18,14 +18,14 @@ pub struct ResendTeamInvitationResponse {
     pub schema: Option<String>,
     /// The team invitations that were resent
     #[serde(rename = "team_invitation")]
-    pub team_invitation: Box<models::TeamInvitation>,
+    pub team_invitation: models::TeamInvitation,
 }
 
 impl ResendTeamInvitationResponse {
     pub fn new(team_invitation: models::TeamInvitation) -> ResendTeamInvitationResponse {
         ResendTeamInvitationResponse {
             schema: None,
-            team_invitation: Box::new(team_invitation),
+            team_invitation,
         }
     }
 }

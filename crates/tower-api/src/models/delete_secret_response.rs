@@ -17,14 +17,14 @@ pub struct DeleteSecretResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "secret")]
-    pub secret: Box<models::Secret>,
+    pub secret: models::Secret,
 }
 
 impl DeleteSecretResponse {
     pub fn new(secret: models::Secret) -> DeleteSecretResponse {
         DeleteSecretResponse {
             schema: None,
-            secret: Box::new(secret),
+            secret,
         }
     }
 }

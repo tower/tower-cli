@@ -18,14 +18,14 @@ pub struct RemoveTeamMemberResponse {
     pub schema: Option<String>,
     /// The team member that was just removed
     #[serde(rename = "team_member")]
-    pub team_member: Box<models::User>,
+    pub team_member: models::User,
 }
 
 impl RemoveTeamMemberResponse {
     pub fn new(team_member: models::User) -> RemoveTeamMemberResponse {
         RemoveTeamMemberResponse {
             schema: None,
-            team_member: Box::new(team_member),
+            team_member,
         }
     }
 }

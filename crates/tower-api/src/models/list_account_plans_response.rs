@@ -17,7 +17,7 @@ pub struct ListAccountPlansResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
     #[serde(rename = "plans")]
     pub plans: Vec<models::Plan>,
 }
@@ -26,7 +26,7 @@ impl ListAccountPlansResponse {
     pub fn new(pages: models::Pagination, plans: Vec<models::Plan>) -> ListAccountPlansResponse {
         ListAccountPlansResponse {
             schema: None,
-            pages: Box::new(pages),
+            pages,
             plans,
         }
     }

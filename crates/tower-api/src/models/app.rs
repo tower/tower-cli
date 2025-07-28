@@ -21,7 +21,7 @@ pub struct App {
     pub health_status: HealthStatus,
     /// The last run of this app, null if none.
     #[serde(rename = "last_run", skip_serializing_if = "Option::is_none")]
-    pub last_run: Option<Box<models::Run>>,
+    pub last_run: Option<models::Run>,
     /// The name of the app.
     #[serde(rename = "name")]
     pub name: String,
@@ -33,7 +33,7 @@ pub struct App {
     pub owner: String,
     /// The stats of all the runs of this app
     #[serde(rename = "run_results", skip_serializing_if = "Option::is_none")]
-    pub run_results: Option<Box<models::RunResults>>,
+    pub run_results: Option<models::RunResults>,
     /// The schedule associated with this app, null if none.
     #[serde(rename = "schedule", deserialize_with = "Option::deserialize")]
     pub schedule: Option<String>,

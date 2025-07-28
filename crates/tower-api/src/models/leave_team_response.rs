@@ -18,14 +18,14 @@ pub struct LeaveTeamResponse {
     pub schema: Option<String>,
     /// The team that you just left
     #[serde(rename = "team")]
-    pub team: Box<models::Team>,
+    pub team: models::Team,
 }
 
 impl LeaveTeamResponse {
     pub fn new(team: models::Team) -> LeaveTeamResponse {
         LeaveTeamResponse {
             schema: None,
-            team: Box::new(team),
+            team,
         }
     }
 }

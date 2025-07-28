@@ -17,14 +17,14 @@ pub struct GenerateRunnerCredentialsResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "credentials")]
-    pub credentials: Box<models::RunnerCredentials>,
+    pub credentials: models::RunnerCredentials,
 }
 
 impl GenerateRunnerCredentialsResponse {
     pub fn new(credentials: models::RunnerCredentials) -> GenerateRunnerCredentialsResponse {
         GenerateRunnerCredentialsResponse {
             schema: None,
-            credentials: Box::new(credentials),
+            credentials,
         }
     }
 }

@@ -18,7 +18,7 @@ pub struct TeamInvitation {
     #[serde(rename = "invitation_sent_at")]
     pub invitation_sent_at: String,
     #[serde(rename = "team")]
-    pub team: Box<models::Team>,
+    pub team: models::Team,
 }
 
 impl TeamInvitation {
@@ -26,7 +26,7 @@ impl TeamInvitation {
         TeamInvitation {
             email,
             invitation_sent_at,
-            team: Box::new(team),
+            team,
         }
     }
 }

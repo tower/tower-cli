@@ -19,9 +19,9 @@ pub struct GenerateRunStatisticsResponse {
     #[serde(rename = "series")]
     pub series: Vec<models::RunTimeseriesPoint>,
     #[serde(rename = "settings")]
-    pub settings: Box<models::StatisticsSettings>,
+    pub settings: models::StatisticsSettings,
     #[serde(rename = "stats")]
-    pub stats: Box<models::RunStatistics>,
+    pub stats: models::RunStatistics,
 }
 
 impl GenerateRunStatisticsResponse {
@@ -29,8 +29,8 @@ impl GenerateRunStatisticsResponse {
         GenerateRunStatisticsResponse {
             schema: None,
             series,
-            settings: Box::new(settings),
-            stats: Box::new(stats),
+            settings,
+            stats,
         }
     }
 }

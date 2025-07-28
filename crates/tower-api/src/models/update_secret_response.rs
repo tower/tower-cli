@@ -17,14 +17,14 @@ pub struct UpdateSecretResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "secret")]
-    pub secret: Box<models::Secret>,
+    pub secret: models::Secret,
 }
 
 impl UpdateSecretResponse {
     pub fn new(secret: models::Secret) -> UpdateSecretResponse {
         UpdateSecretResponse {
             schema: None,
-            secret: Box::new(secret),
+            secret,
         }
     }
 }

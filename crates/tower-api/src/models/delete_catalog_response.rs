@@ -17,14 +17,14 @@ pub struct DeleteCatalogResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "catalog")]
-    pub catalog: Box<models::Catalog>,
+    pub catalog: models::Catalog,
 }
 
 impl DeleteCatalogResponse {
     pub fn new(catalog: models::Catalog) -> DeleteCatalogResponse {
         DeleteCatalogResponse {
             schema: None,
-            catalog: Box::new(catalog),
+            catalog,
         }
     }
 }

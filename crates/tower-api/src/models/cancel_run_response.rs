@@ -17,14 +17,14 @@ pub struct CancelRunResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "run")]
-    pub run: Box<models::Run>,
+    pub run: models::Run,
 }
 
 impl CancelRunResponse {
     pub fn new(run: models::Run) -> CancelRunResponse {
         CancelRunResponse {
             schema: None,
-            run: Box::new(run),
+            run,
         }
     }
 }

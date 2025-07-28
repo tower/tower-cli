@@ -17,14 +17,14 @@ pub struct CreateAppResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "app")]
-    pub app: Box<models::App>,
+    pub app: models::App,
 }
 
 impl CreateAppResponse {
     pub fn new(app: models::App) -> CreateAppResponse {
         CreateAppResponse {
             schema: None,
-            app: Box::new(app),
+            app,
         }
     }
 }

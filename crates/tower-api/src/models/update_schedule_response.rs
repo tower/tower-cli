@@ -17,14 +17,14 @@ pub struct UpdateScheduleResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "schedule")]
-    pub schedule: Box<models::Schedule>,
+    pub schedule: models::Schedule,
 }
 
 impl UpdateScheduleResponse {
     pub fn new(schedule: models::Schedule) -> UpdateScheduleResponse {
         UpdateScheduleResponse {
             schema: None,
-            schedule: Box::new(schedule),
+            schedule,
         }
     }
 }

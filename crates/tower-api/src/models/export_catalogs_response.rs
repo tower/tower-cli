@@ -19,7 +19,7 @@ pub struct ExportCatalogsResponse {
     #[serde(rename = "catalogs")]
     pub catalogs: Vec<models::ExportedCatalog>,
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
 }
 
 impl ExportCatalogsResponse {
@@ -27,7 +27,7 @@ impl ExportCatalogsResponse {
         ExportCatalogsResponse {
             schema: None,
             catalogs,
-            pages: Box::new(pages),
+            pages,
         }
     }
 }

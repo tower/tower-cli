@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StreamRunLogs200ResponseInner {
-    EventLog(Box<models::EventLog>),
-    EventWarning(Box<models::EventWarning>),
+    EventLog(models::EventLog),
+    EventWarning(models::EventWarning),
 }
 
 impl Default for StreamRunLogs200ResponseInner {

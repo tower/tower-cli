@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EventLog {
     #[serde(rename = "data")]
-    pub data: Box<models::LogLine>,
+    pub data: models::LogLine,
     /// The event name.
     #[serde(rename = "event")]
     pub event: Event,
@@ -29,7 +29,7 @@ pub struct EventLog {
 impl EventLog {
     pub fn new(data: models::LogLine, event: Event) -> EventLog {
         EventLog {
-            data: Box::new(data),
+            data,
             event,
             id: None,
             retry: None,

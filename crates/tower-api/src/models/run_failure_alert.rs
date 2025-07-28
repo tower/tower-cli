@@ -15,17 +15,17 @@ use serde::{Deserialize, Serialize, Deserializer};
 pub struct RunFailureAlert {
     /// App that the failed Run belongs to
     #[serde(rename = "app")]
-    pub app: Box<models::App>,
+    pub app: models::App,
     /// Run that failed
     #[serde(rename = "run")]
-    pub run: Box<models::Run>,
+    pub run: models::Run,
 }
 
 impl RunFailureAlert {
     pub fn new(app: models::App, run: models::Run) -> RunFailureAlert {
         RunFailureAlert {
-            app: Box::new(app),
-            run: Box::new(run),
+            app,
+            run,
         }
     }
 }

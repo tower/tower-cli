@@ -17,14 +17,14 @@ pub struct UpdateEnvironmentResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "environment")]
-    pub environment: Box<models::Environment>,
+    pub environment: models::Environment,
 }
 
 impl UpdateEnvironmentResponse {
     pub fn new(environment: models::Environment) -> UpdateEnvironmentResponse {
         UpdateEnvironmentResponse {
             schema: None,
-            environment: Box::new(environment),
+            environment,
         }
     }
 }

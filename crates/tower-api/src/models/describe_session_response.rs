@@ -18,14 +18,14 @@ pub struct DescribeSessionResponse {
     pub schema: Option<String>,
     /// The current session associated with your authentication method.
     #[serde(rename = "session")]
-    pub session: Box<models::Session>,
+    pub session: models::Session,
 }
 
 impl DescribeSessionResponse {
     pub fn new(session: models::Session) -> DescribeSessionResponse {
         DescribeSessionResponse {
             schema: None,
-            session: Box::new(session),
+            session,
         }
     }
 }

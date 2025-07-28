@@ -21,7 +21,7 @@ pub struct ListAlertsResponse {
     pub alerts: Vec<models::Alert>,
     /// Pagination information
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
 }
 
 impl ListAlertsResponse {
@@ -29,7 +29,7 @@ impl ListAlertsResponse {
         ListAlertsResponse {
             schema: None,
             alerts,
-            pages: Box::new(pages),
+            pages,
         }
     }
 }

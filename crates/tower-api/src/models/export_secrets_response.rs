@@ -17,7 +17,7 @@ pub struct ExportSecretsResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
     #[serde(rename = "secrets")]
     pub secrets: Vec<models::ExportedSecret>,
 }
@@ -26,7 +26,7 @@ impl ExportSecretsResponse {
     pub fn new(pages: models::Pagination, secrets: Vec<models::ExportedSecret>) -> ExportSecretsResponse {
         ExportSecretsResponse {
             schema: None,
-            pages: Box::new(pages),
+            pages,
             secrets,
         }
     }

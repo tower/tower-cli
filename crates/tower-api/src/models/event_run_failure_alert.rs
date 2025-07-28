@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EventRunFailureAlert {
     #[serde(rename = "data")]
-    pub data: Box<models::RunFailureAlert>,
+    pub data: models::RunFailureAlert,
     /// The event name.
     #[serde(rename = "event")]
     pub event: Event,
@@ -29,7 +29,7 @@ pub struct EventRunFailureAlert {
 impl EventRunFailureAlert {
     pub fn new(data: models::RunFailureAlert, event: Event) -> EventRunFailureAlert {
         EventRunFailureAlert {
-            data: Box::new(data),
+            data,
             event,
             id: None,
             retry: None,

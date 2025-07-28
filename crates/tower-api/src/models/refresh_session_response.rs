@@ -21,7 +21,7 @@ pub struct RefreshSessionResponse {
     pub refreshed_at: String,
     /// Refresh the current session and return the updated session information.
     #[serde(rename = "session")]
-    pub session: Box<models::Session>,
+    pub session: models::Session,
 }
 
 impl RefreshSessionResponse {
@@ -29,7 +29,7 @@ impl RefreshSessionResponse {
         RefreshSessionResponse {
             schema: None,
             refreshed_at,
-            session: Box::new(session),
+            session,
         }
     }
 }

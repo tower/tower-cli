@@ -18,14 +18,14 @@ pub struct CreateSessionResponse {
     pub schema: Option<String>,
     /// The new session information.
     #[serde(rename = "session")]
-    pub session: Box<models::Session>,
+    pub session: models::Session,
 }
 
 impl CreateSessionResponse {
     pub fn new(session: models::Session) -> CreateSessionResponse {
         CreateSessionResponse {
             schema: None,
-            session: Box::new(session),
+            session,
         }
     }
 }

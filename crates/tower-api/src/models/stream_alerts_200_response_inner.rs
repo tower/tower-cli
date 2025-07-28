@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize, Deserializer};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StreamAlerts200ResponseInner {
-    EventError(Box<models::EventError>),
-    EventRunFailureAlert(Box<models::EventRunFailureAlert>),
+    EventError(models::EventError),
+    EventRunFailureAlert(models::EventRunFailureAlert),
 }
 
 impl Default for StreamAlerts200ResponseInner {

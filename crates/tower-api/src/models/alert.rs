@@ -20,7 +20,7 @@ pub struct Alert {
     #[serde(rename = "created_at")]
     pub created_at: String,
     #[serde(rename = "detail")]
-    pub detail: Box<models::RunFailureAlert>,
+    pub detail: models::RunFailureAlert,
     #[serde(rename = "seq")]
     pub seq: i64,
     #[serde(rename = "status")]
@@ -33,7 +33,7 @@ impl Alert {
             acked,
             alert_type,
             created_at,
-            detail: Box::new(detail),
+            detail,
             seq,
             status,
         }

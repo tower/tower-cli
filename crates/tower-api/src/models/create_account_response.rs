@@ -17,14 +17,14 @@ pub struct CreateAccountResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "session")]
-    pub session: Box<models::Session>,
+    pub session: models::Session,
 }
 
 impl CreateAccountResponse {
     pub fn new(session: models::Session) -> CreateAccountResponse {
         CreateAccountResponse {
             schema: None,
-            session: Box::new(session),
+            session,
         }
     }
 }

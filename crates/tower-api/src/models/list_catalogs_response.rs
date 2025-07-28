@@ -19,7 +19,7 @@ pub struct ListCatalogsResponse {
     #[serde(rename = "catalogs")]
     pub catalogs: Vec<models::Catalog>,
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
 }
 
 impl ListCatalogsResponse {
@@ -27,7 +27,7 @@ impl ListCatalogsResponse {
         ListCatalogsResponse {
             schema: None,
             catalogs,
-            pages: Box::new(pages),
+            pages,
         }
     }
 }

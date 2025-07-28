@@ -18,14 +18,14 @@ pub struct DeleteApiKeyResponse {
     pub schema: Option<String>,
     /// Created API key
     #[serde(rename = "api_key")]
-    pub api_key: Box<models::ApiKey>,
+    pub api_key: models::ApiKey,
 }
 
 impl DeleteApiKeyResponse {
     pub fn new(api_key: models::ApiKey) -> DeleteApiKeyResponse {
         DeleteApiKeyResponse {
             schema: None,
-            api_key: Box::new(api_key),
+            api_key,
         }
     }
 }

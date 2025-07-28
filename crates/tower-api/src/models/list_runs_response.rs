@@ -17,7 +17,7 @@ pub struct ListRunsResponse {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde(rename = "pages")]
-    pub pages: Box<models::Pagination>,
+    pub pages: models::Pagination,
     #[serde(rename = "runs")]
     pub runs: Vec<models::Run>,
 }
@@ -26,7 +26,7 @@ impl ListRunsResponse {
     pub fn new(pages: models::Pagination, runs: Vec<models::Run>) -> ListRunsResponse {
         ListRunsResponse {
             schema: None,
-            pages: Box::new(pages),
+            pages,
             runs,
         }
     }
