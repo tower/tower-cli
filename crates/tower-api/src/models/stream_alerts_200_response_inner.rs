@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -24,7 +24,7 @@ impl Default for StreamAlerts200ResponseInner {
     }
 }
 /// The event name.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Event {
     #[serde(rename = "run_failure_alert")]
     RunFailureAlert,
@@ -33,6 +33,22 @@ pub enum Event {
 impl Default for Event {
     fn default() -> Event {
         Self::RunFailureAlert
+    }
+}
+
+impl<'de> Deserialize<'de> for Event {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "run_failure_alert" => Ok(Self::RunFailureAlert),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["run_failure_alert"],
+            )),
+        }
     }
 }
 

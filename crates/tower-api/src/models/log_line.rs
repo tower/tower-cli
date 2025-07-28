@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LogLine {
@@ -42,7 +42,7 @@ impl LogLine {
     }
 }
 /// The channel (either Program or Setup) this log line belongs to.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Channel {
     #[serde(rename = "program")]
     Program,
@@ -53,6 +53,23 @@ pub enum Channel {
 impl Default for Channel {
     fn default() -> Channel {
         Self::Program
+    }
+}
+
+impl<'de> Deserialize<'de> for Channel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "program" => Ok(Self::Program),
+            "setup" => Ok(Self::Setup),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["program", "setup"],
+            )),
+        }
     }
 }
 

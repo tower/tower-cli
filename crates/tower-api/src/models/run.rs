@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Run {
@@ -74,7 +74,7 @@ impl Run {
     }
 }
 /// 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Status {
     #[serde(rename = "scheduled")]
     Scheduled,
@@ -97,8 +97,30 @@ impl Default for Status {
         Self::Scheduled
     }
 }
+
+impl<'de> Deserialize<'de> for Status {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "scheduled" => Ok(Self::Scheduled),
+            "pending" => Ok(Self::Pending),
+            "running" => Ok(Self::Running),
+            "crashed" => Ok(Self::Crashed),
+            "errored" => Ok(Self::Errored),
+            "exited" => Ok(Self::Exited),
+            "cancelled" => Ok(Self::Cancelled),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["scheduled", "pending", "running", "crashed", "errored", "exited", "cancelled"],
+            )),
+        }
+    }
+}
 /// 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum StatusGroup {
     #[serde(rename = "successful")]
     Successful,
@@ -111,6 +133,24 @@ pub enum StatusGroup {
 impl Default for StatusGroup {
     fn default() -> StatusGroup {
         Self::Successful
+    }
+}
+
+impl<'de> Deserialize<'de> for StatusGroup {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "successful" => Ok(Self::Successful),
+            "failed" => Ok(Self::Failed),
+            "" => Ok(Self::Empty),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["successful", "failed", ""],
+            )),
+        }
     }
 }
 

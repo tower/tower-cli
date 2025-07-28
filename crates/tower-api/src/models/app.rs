@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct App {
@@ -70,7 +70,7 @@ impl App {
     }
 }
 /// The health status of this app
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum HealthStatus {
     #[serde(rename = "healthy")]
     Healthy,
@@ -83,8 +83,25 @@ impl Default for HealthStatus {
         Self::Healthy
     }
 }
+
+impl<'de> Deserialize<'de> for HealthStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "healthy" => Ok(Self::Healthy),
+            "warning" => Ok(Self::Warning),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["healthy", "warning"],
+            )),
+        }
+    }
+}
 /// The status of the app
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Status {
     #[serde(rename = "active")]
     Active,
@@ -95,6 +112,23 @@ pub enum Status {
 impl Default for Status {
     fn default() -> Status {
         Self::Active
+    }
+}
+
+impl<'de> Deserialize<'de> for Status {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "active" => Ok(Self::Active),
+            "disabled" => Ok(Self::Disabled),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["active", "disabled"],
+            )),
+        }
     }
 }
 

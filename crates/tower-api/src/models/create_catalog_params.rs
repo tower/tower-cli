@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateCatalogParams {
@@ -38,7 +38,7 @@ impl CreateCatalogParams {
     }
 }
 /// 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Type {
     #[serde(rename = "snowflake-open-catalog")]
     SnowflakeOpenCatalog,
@@ -53,6 +53,25 @@ pub enum Type {
 impl Default for Type {
     fn default() -> Type {
         Self::SnowflakeOpenCatalog
+    }
+}
+
+impl<'de> Deserialize<'de> for Type {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "snowflake-open-catalog" => Ok(Self::SnowflakeOpenCatalog),
+            "apache-polaris" => Ok(Self::ApachePolaris),
+            "cloudflare-r2-catalog" => Ok(Self::CloudflareR2Catalog),
+            "lakekeeper" => Ok(Self::Lakekeeper),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["snowflake-open-catalog", "apache-polaris", "cloudflare-r2-catalog", "lakekeeper"],
+            )),
+        }
     }
 }
 
