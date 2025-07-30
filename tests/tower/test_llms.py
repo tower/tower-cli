@@ -11,7 +11,7 @@ def mock_ollama_context():
     context = MagicMock(spec=TowerContext)
     context.is_local.return_value = True
     context.inference_router = "ollama"
-    context.inference_service = "ollama"
+    context.inference_provider = "ollama"
     context.inference_router_api_key = None
     return context
 
@@ -22,7 +22,7 @@ def mock_hf_together_context():
     context.is_local.return_value = False
     context.inference_router = "hugging_face_hub"
     context.inference_router_api_key = os.getenv("TOWER_INFERENCE_ROUTER_API_KEY")
-    context.inference_service = "together"
+    context.inference_provider = "together"
     return context
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def mock_hf_context():
     context.is_local.return_value = False
     context.inference_router = "hugging_face_hub"
     context.inference_router_api_key = os.getenv("TOWER_INFERENCE_ROUTER_API_KEY")
-    context.inference_service = None
+    context.inference_provider = None
     return context
 
 
@@ -43,7 +43,7 @@ def mock_ollama_response():
     response.message.content = "This is a test response"
     return response
 
-def test_llms_nameres_with_model_family_locally_1(mock_ollama_context, mock_ollama_response):
+def test_llms_nameres_with_model_family_locally_1(mock_ollama_context):
     """
     Test resolving a model family name to a particular model.
     Run this test with ollama locally installed.
@@ -51,17 +51,15 @@ def test_llms_nameres_with_model_family_locally_1(mock_ollama_context, mock_olla
     """
     # Mock the TowerContext.build() to return our mock context
     with patch('tower._llms.TowerContext.build', return_value=mock_ollama_context):
-        # Mock the chat function to return our mock response
-        with patch('tower._llms.chat', return_value=mock_ollama_response):
             
-            # Create LLM instance based on model family name
-            llm = llms("deepseek-r1")
+        # Create LLM instance based on model family name
+        llm = llms("deepseek-r1")
             
-            # Verify it's an Llm instance
-            assert isinstance(llm, Llm)
+        # Verify it's an Llm instance
+        assert isinstance(llm, Llm)
 
-            # Verify the resolved model was found locally
-            assert llm.model_name.startswith("deepseek-r1:")
+        # Verify the resolved model was found locally
+        assert llm.model_name.startswith("deepseek-r1:")
             
 def test_llms_nameres_with_model_family_on_hugging_face_hub_1(mock_hf_together_context):
     """
@@ -71,20 +69,20 @@ def test_llms_nameres_with_model_family_on_hugging_face_hub_1(mock_hf_together_c
     """
     # Mock the TowerContext.build() to return our mock context
     with patch('tower._llms.TowerContext.build', return_value=mock_hf_together_context):
+            
+        assert mock_hf_together_context.inference_router_api_key is not None
         
-        with patch('tower._llms.InferenceClient') as mock_client:
+        # Create LLM instance
+        llm = llms("deepseek-r1")
             
-            # Create LLM instance
-            llm = llms("deepseek-r1")
-            
-            # Verify it's an Llm instance
-            assert isinstance(llm, Llm)
+        # Verify it's an Llm instance
+        assert isinstance(llm, Llm)
 
-            # Verify the resolved model was found on the Hub
-            assert llm.model_name.startswith("deepseek-ai")
+        # Verify the resolved model was found on the Hub
+        assert llm.model_name.startswith("deepseek-ai")
             
 
-def test_llms_nameres_with_model_family_locally_2(mock_ollama_context, mock_ollama_response):
+def test_llms_nameres_with_model_family_locally_2(mock_ollama_context):
     """
     Test resolving a model family name to a particular model.
     Run this test with ollama locally installed.
@@ -93,17 +91,15 @@ def test_llms_nameres_with_model_family_locally_2(mock_ollama_context, mock_olla
     """
     # Mock the TowerContext.build() to return our mock context
     with patch('tower._llms.TowerContext.build', return_value=mock_ollama_context):
-        # Mock the chat function to return our mock response
-        with patch('tower._llms.chat', return_value=mock_ollama_response):
+        
+        # Create LLM instance based on model family name
+        llm = llms("llama3.2")
             
-            # Create LLM instance based on model family name
-            llm = llms("llama3.2")
-            
-            # Verify it's an Llm instance
-            assert isinstance(llm, Llm)
+        # Verify it's an Llm instance
+        assert isinstance(llm, Llm)
 
-            # Verify the resolved model was found locally
-            assert llm.model_name.startswith("llama3.2:")
+        # Verify the resolved model was found locally
+        assert llm.model_name.startswith("llama3.2:")
             
 def test_llms_nameres_with_model_family_on_hugging_face_hub_2(mock_hf_together_context):
     """
@@ -114,17 +110,17 @@ def test_llms_nameres_with_model_family_on_hugging_face_hub_2(mock_hf_together_c
     """
     # Mock the TowerContext.build() to return our mock context
     with patch('tower._llms.TowerContext.build', return_value=mock_hf_together_context):
-        
-        with patch('tower._llms.InferenceClient') as mock_client:
-            
-            # Create LLM instance
-            llm = llms("llama3.2")
-            
-            # Verify it's an Llm instance
-            assert isinstance(llm, Llm)
 
-            # Verify the resolved model was found on the Hub
-            assert "llama" in llm.model_name
+        assert mock_hf_together_context.inference_router_api_key is not None
+        
+        # Create LLM instance
+        llm = llms("llama3.2")
+            
+        # Verify it's an Llm instance
+        assert isinstance(llm, Llm)
+
+        # Verify the resolved model was found on the Hub
+        assert "llama" in llm.model_name
 
 
 
@@ -136,37 +132,62 @@ def test_llms_nameres_with_nonexistent_model_locally(mock_ollama_context):
         with patch('tower._llms.get_local_ollama_models', return_value=[]):
             # Test with a non-existent model
             with pytest.raises(ValueError) as exc_info:
-                llms("nonexistent-model")
+                llm = llms("nonexistent-model")
             
             # Verify the error message
-            assert "Model nonexistent-model is not available" in str(exc_info.value)
+            assert "No models found" in str(exc_info.value)
 
-def test_llms_nameres_with_exact_model_name_on_hugging_face_hub(mock_hf_together_context):
-    """Test finding a particular model on Hugging Face Hub."""
+
+def test_llms_nameres_with_nonexistent_model_on_hugging_face_hub(mock_hf_together_context):
+    """Test llms function with a model that doesn't exist on huggingface hub."""
     # Mock the TowerContext.build() to return our mock context
     with patch('tower._llms.TowerContext.build', return_value=mock_hf_together_context):
-        # Mock the Hugging Face Hub client
-        mock_completion = MagicMock()
-        mock_completion.choices = [MagicMock(message=MagicMock(content="This is a test response"))]
+
+        with pytest.raises(ValueError) as exc_info:
+            llm = llms("nonexistent-model")
+            
+        # Verify the error message
+        assert "No models found" in str(exc_info.value)
+
+
+
+def test_llms_nameres_with_exact_model_name_on_hugging_face_hub(mock_hf_together_context):
+    """Test specifying the exact name of a model on Hugging Face Hub."""
+    # Mock the TowerContext.build() to return our mock context
+    with patch('tower._llms.TowerContext.build', return_value=mock_hf_together_context):
         
-        with patch('tower._llms.InferenceClient') as mock_client:
-            mock_client.return_value.chat_completion.return_value = mock_completion
+        assert mock_hf_together_context.inference_router_api_key is not None
+        
+        # Create LLM instance
+        llm = llms("deepseek-ai/DeepSeek-R1")
             
-            # Create LLM instance
-            llm = llms("deepseek-ai/DeepSeek-R1")
-            
-            # Verify it's an Llm instance
-            assert isinstance(llm, Llm)
+        # Verify it's an Llm instance
+        assert isinstance(llm, Llm)
 
-            # Verify the context was set
-            assert llm.context == mock_hf_together_context
-
-            # Test a simple prompt
-            response = llm.prompt("Hello, how are you?")
-            assert response == "This is a test response"
+        # Verify the context was set
+        assert llm.context == mock_hf_together_context
             
-            # Verify the resolved model was found on the Hub
-            assert llm.model_name.startswith("deepseek-ai/DeepSeek-R1")
+        # Verify the resolved model was found on the Hub
+        assert llm.model_name.startswith("deepseek-ai/DeepSeek-R1")
+
+def test_llms_nameres_with_partial_model_name_on_hugging_face_hub(mock_hf_context):
+    """Test specifying a partial model name on Hugging Face Hub."""
+    # Mock the TowerContext.build() to return our mock context
+    with patch('tower._llms.TowerContext.build', return_value=mock_hf_context):
+            
+        assert mock_hf_context.inference_router_api_key is not None
+        
+        # Create LLM instance
+        llm = llms("google/gemma-3")
+            
+        # Verify it's an Llm instance
+        assert isinstance(llm, Llm)
+
+        # Verify the context was set
+        assert llm.context == mock_hf_context
+
+        # Verify the resolved model was found on the Hub
+        assert llm.model_name.startswith("google/gemma-3")
 
 
 def test_llms_inference_with_hugging_face_hub_1(mock_hf_together_context):
@@ -174,6 +195,8 @@ def test_llms_inference_with_hugging_face_hub_1(mock_hf_together_context):
     # Mock the TowerContext.build() to return our mock context
     with patch('tower._llms.TowerContext.build', return_value=mock_hf_together_context):
             
+        assert mock_hf_together_context.inference_router_api_key is not None
+        
         # Create LLM instance
         llm = llms("deepseek-ai/DeepSeek-R1")
             
@@ -198,22 +221,6 @@ def test_llms_inference_locally_1(mock_ollama_context, mock_ollama_response):
             
 
 
-def test_llms_nameres_with_partial_model_name_on_hugging_face_hub(mock_hf_context):
-    """Test llms function with Hugging Face Hub inference."""
-    # Mock the TowerContext.build() to return our mock context
-    with patch('tower._llms.TowerContext.build', return_value=mock_hf_context):
-            
-        # Create LLM instance
-        llm = llms("google/gemma-3")
-            
-        # Verify it's an Llm instance
-        assert isinstance(llm, Llm)
-
-        # Verify the context was set
-        assert llm.context == mock_hf_context
-
-        # Verify the resolved model was found on the Hub
-        assert llm.model_name.startswith("google/gemma-3")
 
 
 

@@ -4,16 +4,16 @@ from ollama import chat, pull
 from ollama import ChatResponse
 from ollama import ResponseError
 from ollama import list as ollama_list_models
-#import psutil # TODO: add this back in when implementing memory checking for LLMs
 
 from huggingface_hub import InferenceClient, ChatCompletionOutput
 from huggingface_hub import HfApi
+from huggingface_hub.utils import RepositoryNotFoundError
 
 from ._context import TowerContext
 
+# TODO: add vllm back in when we have a way to use it
 LOCAL_INFERENCE_ROUTERS = [
     "ollama", 
-    "vllm",
 ]
 
 INFERENCE_ROUTERS = LOCAL_INFERENCE_ROUTERS + [
@@ -241,8 +241,6 @@ def resolve_model_name(ctx: TowerContext, requested_model: str) -> str:
 
     if ctx.inference_router == "ollama":
         return resolve_ollama_model_name(ctx,requested_model)
-    elif ctx.inference_router == "vllm":
-        return resolve_vllm_model_name(ctx,requested_model)
     elif ctx.inference_router == "hugging_face_hub":
         return resolve_hugging_face_hub_model_name(ctx,requested_model)
 
@@ -306,15 +304,11 @@ def resolve_ollama_model_name(ctx: TowerContext, requested_model: str) -> str:
         else:
             # TODO: add this back in when implementing memory checking for LLMs
             # raise ValueError(f"No models in family {requested_model} fit in available memory ({memory['available'] / (1024**3):.2f} GB) with max memory threshold {MEMORY_THRESHOLD} or are not available locally. Please pull a model first using 'ollama pull {requested_model}'")
-            raise ValueError(f"No models in family {requested_model} are available locally. Please pull a model first using 'ollama pull {requested_model}'")
+            raise ValueError(f"No models found with name {requested_model}. Please pull a model first using 'ollama pull {requested_model}'")
     elif requested_model in local_model_names:
         return requested_model
     else:
-        raise ValueError(f"Model {requested_model} is not available locally. Please pull it first using 'ollama pull {requested_model}'")
-
-def resolve_vllm_model_name(ctx: TowerContext, requested_model: str) -> str:
-    raise NotImplementedError("vLLM is not supported yet.")
-    return requested_model
+        raise ValueError(f"No models found with name {requested_model}. Please pull a model first using 'ollama pull {requested_model}'")
 
 def resolve_hugging_face_hub_model_name(ctx: TowerContext, requested_model: str) -> str:
     """
@@ -323,45 +317,56 @@ def resolve_hugging_face_hub_model_name(ctx: TowerContext, requested_model: str)
     """
     api = HfApi(token=ctx.inference_router_api_key)
 
-    models = []
+    models = None
 
     try:
         model_info = api.model_info(requested_model, expand="inferenceProviderMapping")
         models = [model_info]
-    except Exception as e:
-        # If model_info fails, fall back to search
+    except RepositoryNotFoundError as e:
+        # If model_info fails, it means the model does not exist under this exact name
+        # Therefore, fall back to "search" and look for models that partially match the name
+        # In Hugging Face Hub terminology Repository = Model / Dataset / Space.
         pass
+    except Exception as e:
+        # for the rest of the errors, we will raise an error
+        raise RuntimeError(f"Error while getting model_info for {requested_model}: {str(e)}")
 
-    # If inference_service is specified, filter by inference provider
-    # We will use search instead of filter because only search allows searching inside the model name
+
+    # If inference_provider is specified, search by inference provider
+    # We will use "search" instead of "filter" because only search allows searching inside the model name
     # TODO: Add more filtering options e.g. by number of parameters, so that we do not have to retrieve so many models
     # TODO: We need to retrieve >1 model because "search" returns a full text match in both model IDs and Descriptions
     
-    if len(models) == 0:
-        if ctx.inference_service is not None:
+    if models is None:
+        if ctx.inference_provider is not None:
             models = api.list_models(
-                search=f"{requested_model}", 
-                inference_provider=ctx.inference_service, 
+                search=f"{requested_model}",
+                #filter=f"inference_provider:{ctx.inference_provider}",
+                # this is supposed to work in recent HF versions, but it doesn't work for me
+                # we will do the filtering manually below
                 expand="inferenceProviderMapping",
-                limit=10)
+                limit=20)
         else:
             models = api.list_models(
                 search=f"{requested_model}", 
                 expand="inferenceProviderMapping",
-                limit=10)
+                limit=20)
 
     # Create a list of models with their inference provider mappings
     model_list = []
     try:
         for model in models:
+            # Handle the case where inference_provider_mapping might be None or empty
+            inference_provider_mapping = getattr(model, 'inference_provider_mapping', []) or []
+            
             model_info = {
                 'model_name': model.id,
-                'inference_providers': model.inference_provider_mapping
+                'inference_provider_mapping': inference_provider_mapping
             }
             
-            # If inference_service is specified, only add models that support it
-            if ctx.inference_service is not None:
-                if ctx.inference_service not in [mapping.provider for mapping in model.inference_provider_mapping]:
+            # If inference_provider is specified, only add models that support it
+            if ctx.inference_provider is not None:
+                if ctx.inference_provider not in [mapping.provider for mapping in inference_provider_mapping]:
                     continue
             
             # Check that requested_model is partially contained in model.id
@@ -373,7 +378,7 @@ def resolve_hugging_face_hub_model_name(ctx: TowerContext, requested_model: str)
         raise RuntimeError(f"Error while iterating: {str(e)}")
 
     if not model_list:
-        raise ValueError(f"No models found matching '{requested_model}' on Hugging Face Hub")
+        raise ValueError(f"No models found with name {requested_model} on Hugging Face Hub")
     
     return model_list[0]['model_name']
 
@@ -389,14 +394,14 @@ class Llm:
 
         self.inference_router = context.inference_router
         self.inference_router_api_key = context.inference_router_api_key
-        self.inference_service = context.inference_service
+        self.inference_provider = context.inference_provider
 
         if self.inference_router is None and self.context.is_local():
             self.inference_router = "ollama"
 
         # for local routers, the service is also the router
         if self.inference_router in LOCAL_INFERENCE_ROUTERS:
-            self.inference_service = self.inference_router
+            self.inference_provider = self.inference_router
 
         # Check that we know this router. This will also check that router was set when not in local mode.
         if context.inference_router not in INFERENCE_ROUTERS:
@@ -406,7 +411,7 @@ class Llm:
             self.context, self.requested_model_name)
         
 
-    def chat_completion(self, messages: List) -> str:
+    def complete_chat(self, messages: List) -> str:
         """
         Mimics the OpenAI Chat Completions API by sending a list of messages to the language model
         and returning the generated response.
@@ -427,18 +432,18 @@ class Llm:
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "Hello, how are you?"}
             ]
-            response = llm.chat_completion(messages)
+            response = llm.complete_chat(messages)
         """
 
         if self.inference_router == "ollama":
             # Use Ollama for local inference
-            response = chat_completion_with_ollama(
+            response = complete_chat_with_ollama(
                 ctx = self.context,
                 model = self.model_name,
                 messages = messages
             )
         elif self.inference_router == "hugging_face_hub":
-            response = chat_completion_with_hugging_face_hub(
+            response = complete_chat_with_hugging_face_hub(
                 ctx = self.context,
                 model = self.model_name,
                 messages = messages, 
@@ -454,7 +459,7 @@ class Llm:
         
         This function provides a simple interface for single-prompt interactions, similar to the
         legacy OpenAI /v1/completions endpoint. It internally converts the prompt to a chat message
-        format and uses the chat_completion method.
+        format and uses the complete_chat method.
         
         Args:
             prompt: A single string containing the prompt to send to the language model.
@@ -465,7 +470,7 @@ class Llm:
         Example:
             response = llm.prompt("What is the capital of France?")
         """
-        return self.chat_completion([{
+        return self.complete_chat([{
             "role": "user",
             "content": prompt,
         }])
@@ -483,10 +488,10 @@ def extract_ollama_message(resp: ChatResponse) -> str:
 def extract_hugging_face_hub_message(resp: ChatCompletionOutput) -> str:
     return resp.choices[0].message.content
 
-def chat_completion_with_ollama(ctx: TowerContext, model: str, messages: list, is_retry: bool = False) -> str:
+def complete_chat_with_ollama(ctx: TowerContext, model: str, messages: list, is_retry: bool = False) -> str:
     
     # TODO: remove the try/except and don't pull the model if it doesn't exist. sso 7/20/25
-
+    # the except code is not reachable right now because we always call this function with a model that exists
     try:
         response: ChatResponse = chat(model=model, messages=messages)
         return extract_ollama_message(response)
@@ -497,19 +502,19 @@ def chat_completion_with_ollama(ctx: TowerContext, model: str, messages: list, i
             pull(model=model)
 
             # Retry the inference after the model has been pulled.
-            return chat_completion_with_ollama(ctx, model, messages, is_retry=True)
+            return complete_chat_with_ollama(ctx, model, messages, is_retry=True)
 
         # Couldn't figure out what the error was, so we'll just raise it accordingly.
         raise e
 
-def chat_completion_with_hugging_face_hub(ctx: TowerContext, model: str, messages: List, **kwargs) -> str:
+def complete_chat_with_hugging_face_hub(ctx: TowerContext, model: str, messages: List, **kwargs) -> str:
     """
     Uses the Hugging Face Hub API to perform inference. Will use configuration
     supplied by the environment to determine which client to connect to and all
     that.
     """
     client = InferenceClient(
-        provider=ctx.inference_service,
+        provider=ctx.inference_provider,
         api_key=ctx.inference_router_api_key
     )
 
@@ -521,7 +526,6 @@ def chat_completion_with_hugging_face_hub(ctx: TowerContext, model: str, message
     return extract_hugging_face_hub_message(completion)
 
 
-# TODO: add this back in when implementing memory checking for LLMs
 # TODO: add this back in when implementing memory checking for LLMs
 # def get_available_memory() -> dict:
 #     """
