@@ -3,6 +3,10 @@
 *.pyc
 __pycache__
 
+
+# may contain sensitive data
+pytest.ini
+
 # 
 # Artifacts from the Rust client generation process
 #
