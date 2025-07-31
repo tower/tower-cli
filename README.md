@@ -189,3 +189,7 @@ uv run pytest tests
 
 If you need to get the latest OpenAPI SDK, you can run
 `./scripts/generate-python-api-client.sh`.
+
+## Testing
+We use pytest to run tests. Copy `pytest.ini.template` to `pytest.ini` and 
+replace the values of environment variables 

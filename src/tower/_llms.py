@@ -3,78 +3,474 @@ from typing import List
 from ollama import chat, pull
 from ollama import ChatResponse
 from ollama import ResponseError
+from ollama import list as ollama_list_models
 
 from huggingface_hub import InferenceClient, ChatCompletionOutput
+from huggingface_hub import HfApi
+from huggingface_hub.utils import RepositoryNotFoundError
 
 from ._context import TowerContext
 
-"""
-OLLAMA_MODELS and HUGGING_FACE_MODELS are dictionaries that map published model
-names to the internal names used by Tower when routing LLM requests to the
-underlying provider.
-"""
-OLLAMA_MODELS = {
-    "deepseek-r1": "deepseek-r1:14b",
-}
+# TODO: add vllm back in when we have a way to use it
+LOCAL_INFERENCE_ROUTERS = [
+    "ollama", 
+]
 
-HUGGING_FACE_MODELS = {
-    "deepseek-r1": "deepseek-ai/DeepSeek-R1",
-}
+INFERENCE_ROUTERS = LOCAL_INFERENCE_ROUTERS + [
+    "hugging_face_hub"
+]
 
-def extract_model_name(ctx: TowerContext, supported_model: str) -> str:
+RAW_MODEL_FAMILIES = [
+    "all-minilm",
+    "aya",
+    "aya-expanse",
+    "athene-v2",
+    "bakllava",
+    "bge-large",
+    "bge-m3",
+    "cogito",
+    "codegemma",
+    "codegeex4",
+    "codeqwen",
+    "codestral",
+    "codeup",
+    "codellama",
+    "command-a",
+    "command-r",
+    "command-r-plus",
+    "command-r7b",
+    "deepcoder",
+    "deepseek-coder",
+    "deepseek-coder-v2",
+    "deepseek-llm",
+    "deepseek-r1",
+    "deepseek-v2",
+    "deepseek-v2.5",
+    "deepseek-v3",
+    "deepscaler",
+    "devstral",
+    "dbrx",
+    "dolphin-mistral",
+    "dolphin-mixtral",
+    "dolphin-phi",
+    "dolphin3",
+    "dolphincoder",
+    "exaone-deep",
+    "exaone3.5",
+    "everythinglm",
+    "falcon",
+    "falcon3",
+    "gemma",
+    "gemma2",
+    "gemma3",
+    "gemma3n",
+    "glm4",
+    "goliath",
+    "granite-code",
+    "granite-embedding",
+    "granite3-dense",
+    "granite3-guardian",
+    "granite3-moe",
+    "granite3.1-dense",
+    "granite3.1-moe",
+    "granite3.2",
+    "granite3.2-vision",
+    "granite3.3",
+    "hermes3",
+    "internlm2",
+    "lafrican",
+    "llama-pro",
+    "llama-guard3",
+    "llama2",
+    "llama2-chinese",
+    "llama2-uncensored",
+    "llama3",
+    "llama3-chatqa",
+    "llama3-groq-tool-use",
+    "llama3-gradient",
+    "llama3.1",
+    "llama3.2",
+    "llama3.2-vision",
+    "llama3.3",
+    "llama4",
+    "llava",
+    "llava-llama3",
+    "llava-phi3",
+    "magicoder",
+    "magistral",
+    "marco-o1",
+    "mathstral",
+    "meditron",
+    "medllama2",
+    "megadolphin",
+    "minicpm-v",
+    "mistral",
+    "mistral-large",
+    "mistral-nemo",
+    "mistral-openorca",
+    "mistral-small",
+    "mistral-small3.1",
+    "mistral-small3.2",
+    "mistrallite",
+    "moondream",
+    "mxbai-embed-large",
+    "nemotron",
+    "nemotron-mini",
+    "neural-chat",
+    "nexusraven",
+    "notus",
+    "nous-hermes",
+    "nous-hermes2",
+    "nous-hermes2-mixtral",
+    "nomic-embed-text",
+    "notux",
+    "olmo2",
+    "opencoder",
+    "openchat",
+    "openthinker",
+    "openhermes",
+    "orca-mini",
+    "orca2",
+    "paraphrase-multilingual",
+    "phi",
+    "phi3",
+    "phi3.5",
+    "phi4",
+    "phi4-mini",
+    "phi4-mini-reasoning",
+    "phi4-reasoning",
+    "phind-codellama",
+    "qwen",
+    "qwen2",
+    "qwen2-math",
+    "qwen2.5",
+    "qwen2.5-coder",
+    "qwen2.5vl",
+    "qwen3",
+    "qwq",
+    "r1-1776",
+    "reader-lm",
+    "reflection",
+    "sailor2",
+    "samatha-mistral",
+    "shieldgemma",
+    "smallthinker",
+    "smollm",
+    "smollm2",
+    "snowflake-arctic-embed",
+    "snowflake-arctic-embed2",
+    "solar",
+    "solar-pro",
+    "sqlcoder",
+    "stable-beluga",
+    "stable-code",
+    "stablelm-zephyr",
+    "stablelm2",
+    "starcoder",
+    "starcoder2",
+    "starling-lm",
+    "sunbeam",
+    "tulu3",
+    "tinydolphin",
+    "tinyllama",
+    "vicuna",
+    "wizard-math",
+    "wizard-vicuna",
+    "wizard-vicuna-uncensored",
+    "wizardcoder",
+    "wizardlm",
+    "wizardlm-uncensored",
+    "wizardlm2",
+    "xwinlm",
+    "yarn-llama2",
+    "yarn-mistral",
+    "yi",
+    "yi-coder",
+    "zephyr"
+]
+
+def normalize_model_family(name: str) -> str:
     """
-    extract_model_name maps the relevant supported model into a model for the
-    underlying LLM provider that we want to use.
+    Normalize a model family name by removing '-' and '.' characters.
+    Args:
+        name (str): The model family name to normalize.
+    Returns:
+        str: The normalized model family name.
     """
-    if ctx.is_local():
-        if supported_model not in OLLAMA_MODELS:
-            raise ValueError(f"Model {supported_model} not supported for Ollama.")
-        return OLLAMA_MODELS[supported_model]
+    return name.replace('-', '').replace('.', '').lower()
+
+
+MODEL_FAMILIES = {normalize_model_family(name) : name for name in RAW_MODEL_FAMILIES}
+
+# the %-ge of memory that we can use for inference
+# TODO: add this back in when implementing memory checking for LLMs
+# MEMORY_THRESHOLD = 0.8
+
+
+
+def parse_parameter_size(size_str: str) -> float:
+    """
+    Convert parameter size string (e.g., '8.0B', '7.2B') to number of parameters.
+    """
+    if not size_str:
+        return 0
+    multiplier = {'B': 1e9, 'M': 1e6, 'K': 1e3}
+    size_str = size_str.upper()
+    for suffix, mult in multiplier.items():
+        if suffix in size_str:
+            return float(size_str.replace(suffix, '')) * mult
+    return float(size_str)
+
+
+def resolve_model_name(ctx: TowerContext, requested_model: str) -> str:
+    """
+    Resolve the model name based on the inference router and requested model.
+
+    Args:
+        ctx (TowerContext): The context containing the inference router and other settings.
+        requested_model (str): The name of the model requested by the user.
+
+    Returns:
+        str: The resolved model name.
+
+    Raises:
+        ValueError: If the inference router specified in the context is not supported.
+    """
+    if ctx.inference_router not in INFERENCE_ROUTERS:
+        raise ValueError(f"Inference router {ctx.inference_router} not supported.")
+
+    if ctx.inference_router == "ollama":
+        return resolve_ollama_model_name(ctx,requested_model)
+    elif ctx.inference_router == "hugging_face_hub":
+        return resolve_hugging_face_hub_model_name(ctx,requested_model)
+
+def get_local_ollama_models() -> List[dict]:
+    """
+    Get a list of locally installed Ollama models with their details.
+    Returns a list of dictionaries containing:
+    - name: model name with tag
+    - model_family: model family without tag
+    - size: model size in bytes
+    - parameter_size: number of parameters
+    - quantization_level: quantization level if specified
+    """
+    try:
+        models = ollama_list_models()
+        model_list = []
+        for model in models['models']:
+            model_name = model.get('model', '')
+            model_family = model_name.split(':')[0]
+            size = model.get('size', 0)
+            details = model.get('details', {})
+            parameter_size=details.get('parameter_size', '')
+            quantization_level=details.get('quantization_level', '')
+
+            model_list.append({
+                'model': model_name,
+                'model_family': model_family,
+                'size': size,
+                'parameter_size': parameter_size,
+                'quantization_level': quantization_level
+            })
+        return model_list
+    except Exception as e:
+        raise RuntimeError(f"Failed to list Ollama models: {str(e)}")
+
+
+def resolve_ollama_model_name(ctx: TowerContext, requested_model: str) -> str:
+    """
+    Resolve the Ollama model name to use.
+    """
+    local_models = get_local_ollama_models()
+    local_model_names = [model['model'] for model in local_models]
+    
+    # TODO: add this back in when implementing memory checking for LLMs
+    #memory = get_available_memory()
+    #memory_threshold = memory['available'] * MEMORY_THRESHOLD
+
+    if normalize_model_family(requested_model) in MODEL_FAMILIES:
+        # Filter models by family
+        matching_models = [model for model in local_models if model['model_family'] == requested_model]
+
+        # TODO: add this back in when implementing memory checking for LLMs
+        # Filter models by memory
+        # if check_for_memory:
+        #    matching_models = [model for model in matching_models if model['size'] < memory_threshold]
+
+        # Return the model with the largest parameter size
+        if matching_models:
+            best_model = max(matching_models, key=lambda x: parse_parameter_size(x['parameter_size']))['model']
+            return best_model
+        else:
+            # TODO: add this back in when implementing memory checking for LLMs
+            # raise ValueError(f"No models in family {requested_model} fit in available memory ({memory['available'] / (1024**3):.2f} GB) with max memory threshold {MEMORY_THRESHOLD} or are not available locally. Please pull a model first using 'ollama pull {requested_model}'")
+            raise ValueError(f"No models found with name {requested_model}. Please pull a model first using 'ollama pull {requested_model}'")
+    elif requested_model in local_model_names:
+        return requested_model
     else:
-        if supported_model not in HUGGING_FACE_MODELS:
-            raise ValueError(f"Model {supported_model} not supported for Hugging Face Hub.")
-        return HUGGING_FACE_MODELS[supported_model]
+        raise ValueError(f"No models found with name {requested_model}. Please pull a model first using 'ollama pull {requested_model}'")
+
+def resolve_hugging_face_hub_model_name(ctx: TowerContext, requested_model: str) -> str:
+    """
+    Resolve the Hugging Face Hub model name to use.
+    Returns a list of models with their inference provider mappings.
+    """
+    api = HfApi(token=ctx.inference_router_api_key)
+
+    models = None
+
+    try:
+        model_info = api.model_info(requested_model, expand="inferenceProviderMapping")
+        models = [model_info]
+    except RepositoryNotFoundError as e:
+        # If model_info fails, it means the model does not exist under this exact name
+        # Therefore, fall back to "search" and look for models that partially match the name
+        # In Hugging Face Hub terminology Repository = Model / Dataset / Space.
+        pass
+    except Exception as e:
+        # for the rest of the errors, we will raise an error
+        raise RuntimeError(f"Error while getting model_info for {requested_model}: {str(e)}")
+
+
+    # If inference_provider is specified, search by inference provider
+    # We will use "search" instead of "filter" because only search allows searching inside the model name
+    # TODO: Add more filtering options e.g. by number of parameters, so that we do not have to retrieve so many models
+    # TODO: We need to retrieve >1 model because "search" returns a full text match in both model IDs and Descriptions
+    
+    if models is None:
+        if ctx.inference_provider is not None:
+            models = api.list_models(
+                search=f"{requested_model}",
+                #filter=f"inference_provider:{ctx.inference_provider}",
+                # this is supposed to work in recent HF versions, but it doesn't work for me
+                # we will do the filtering manually below
+                expand="inferenceProviderMapping",
+                limit=20)
+        else:
+            models = api.list_models(
+                search=f"{requested_model}", 
+                expand="inferenceProviderMapping",
+                limit=20)
+
+    # Create a list of models with their inference provider mappings
+    model_list = []
+    try:
+        for model in models:
+            # Handle the case where inference_provider_mapping might be None or empty
+            inference_provider_mapping = getattr(model, 'inference_provider_mapping', []) or []
+            
+            model_info = {
+                'model_name': model.id,
+                'inference_provider_mapping': inference_provider_mapping
+            }
+            
+            # If inference_provider is specified, only add models that support it
+            if ctx.inference_provider is not None:
+                if ctx.inference_provider not in [mapping.provider for mapping in inference_provider_mapping]:
+                    continue
+            
+            # Check that requested_model is partially contained in model.id
+            if normalize_model_family(requested_model) not in normalize_model_family(model.id):
+                continue
+            
+            model_list.append(model_info)
+    except Exception as e:
+        raise RuntimeError(f"Error while iterating: {str(e)}")
+
+    if not model_list:
+        raise ValueError(f"No models found with name {requested_model} on Hugging Face Hub")
+    
+    return model_list[0]['model_name']
+
 
 class Llm:
     def __init__(self, context: TowerContext, model_name: str, max_tokens: int = 1000):
         """
         Wraps up interfacing with a language model in the Tower system.
         """
-        self.model_name = model_name
+        self.requested_model_name = model_name
         self.max_tokens = max_tokens
         self.context = context
 
-    def inference(self, messages: List) -> str:
-        """
-        Simulate the inference process of a language model.
-        In a real-world scenario, this would involve calling an API or using a library to get the model's response.
-        """
-        model_name = extract_model_name(self.context, self.model_name)
+        self.inference_router = context.inference_router
+        self.inference_router_api_key = context.inference_router_api_key
+        self.inference_provider = context.inference_provider
 
-        if self.context.is_local():
-            # Use Ollama for local inference using Apple GPUs
-            response = infer_with_ollama(
+        if self.inference_router is None and self.context.is_local():
+            self.inference_router = "ollama"
+
+        # for local routers, the service is also the router
+        if self.inference_router in LOCAL_INFERENCE_ROUTERS:
+            self.inference_provider = self.inference_router
+
+        # Check that we know this router. This will also check that router was set when not in local mode.
+        if context.inference_router not in INFERENCE_ROUTERS:
+            raise ValueError(f"Inference router {context.inference_router} not supported.")
+        
+        self.model_name = resolve_model_name(
+            self.context, self.requested_model_name)
+        
+
+    def complete_chat(self, messages: List) -> str:
+        """
+        Mimics the OpenAI Chat Completions API by sending a list of messages to the language model
+        and returning the generated response.
+        
+        This function provides a unified interface for chat-based interactions with different
+        language model providers (Ollama, Hugging Face Hub, etc.) while maintaining compatibility
+        with the OpenAI Chat Completions API format.
+        
+        Args:
+            messages: A list of message dictionaries, each containing 'role' and 'content' keys.
+                     Follows the OpenAI Chat Completions API message format.
+                     
+        Returns:
+            str: The generated response from the language model.
+            
+        Example:
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Hello, how are you?"}
+            ]
+            response = llm.complete_chat(messages)
+        """
+
+        if self.inference_router == "ollama":
+            # Use Ollama for local inference
+            response = complete_chat_with_ollama(
                 ctx = self.context,
-                model = model_name,
+                model = self.model_name,
                 messages = messages
             )
-        else:
-            max_tokens = self.max_tokens
-            response = infer_with_hugging_face_hub(
+        elif self.inference_router == "hugging_face_hub":
+            response = complete_chat_with_hugging_face_hub(
                 ctx = self.context,
-                model = model_name,
+                model = self.model_name,
                 messages = messages, 
-                max_tokens=max_tokens
+                max_tokens=self.max_tokens
             )
 
         return response
 
     def prompt(self, prompt: str) -> str:
         """
-        Prompt a language model with a string. This basically will format the
-        relevant messages internally to send to the model.
+        Mimics the old-style OpenAI Completions API (not Chat Completions!) by sending a single prompt string 
+        to the language model and returning the generated response.
+        
+        This function provides a simple interface for single-prompt interactions, similar to the
+        legacy OpenAI /v1/completions endpoint. It internally converts the prompt to a chat message
+        format and uses the complete_chat method.
+        
+        Args:
+            prompt: A single string containing the prompt to send to the language model.
+                   
+        Returns:
+            str: The generated response from the language model.
+            
+        Example:
+            response = llm.prompt("What is the capital of France?")
         """
-        return self.inference([{
+        return self.complete_chat([{
             "role": "user",
             "content": prompt,
         }])
@@ -92,7 +488,10 @@ def extract_ollama_message(resp: ChatResponse) -> str:
 def extract_hugging_face_hub_message(resp: ChatCompletionOutput) -> str:
     return resp.choices[0].message.content
 
-def infer_with_ollama(ctx: TowerContext, model: str, messages: list, is_retry: bool = False) -> str:
+def complete_chat_with_ollama(ctx: TowerContext, model: str, messages: list, is_retry: bool = False) -> str:
+    
+    # TODO: remove the try/except and don't pull the model if it doesn't exist. sso 7/20/25
+    # the except code is not reachable right now because we always call this function with a model that exists
     try:
         response: ChatResponse = chat(model=model, messages=messages)
         return extract_ollama_message(response)
@@ -102,21 +501,21 @@ def infer_with_ollama(ctx: TowerContext, model: str, messages: list, is_retry: b
             # (or if it exists) will start it for us.
             pull(model=model)
 
-            # Retry the inference after the model hasbeen pulled.
-            return infer_with_ollama(ctx, model, messages, is_retry=True)
+            # Retry the inference after the model has been pulled.
+            return complete_chat_with_ollama(ctx, model, messages, is_retry=True)
 
         # Couldn't figure out what the error was, so we'll just raise it accordingly.
         raise e
 
-def infer_with_hugging_face_hub(ctx: TowerContext, model: str, messages: List, **kwargs) -> str:
+def complete_chat_with_hugging_face_hub(ctx: TowerContext, model: str, messages: List, **kwargs) -> str:
     """
     Uses the Hugging Face Hub API to perform inference. Will use configuration
     supplied by the environment to determine which client to connect to and all
     that.
     """
     client = InferenceClient(
-        provider=ctx.hugging_face_provider,
-        api_key=ctx.hugging_face_api_key
+        provider=ctx.inference_provider,
+        api_key=ctx.inference_router_api_key
     )
 
     completion = client.chat_completion(messages,
@@ -125,3 +524,27 @@ def infer_with_hugging_face_hub(ctx: TowerContext, model: str, messages: List, *
     )
 
     return extract_hugging_face_hub_message(completion)
+
+
+# TODO: add this back in when implementing memory checking for LLMs
+# def get_available_memory() -> dict:
+#     """
+#     Get available system memory information.
+#     Returns a dictionary containing:
+#     - total: total physical memory in bytes
+#     - available: available memory in bytes
+#     - used: used memory in bytes
+#     - percent: memory usage percentage
+#     """
+#     try:
+#         memory = psutil.virtual_memory()
+#         return {
+#             'total': memory.total,
+#             'available': memory.available,
+#             'used': memory.used,
+#             'percent': memory.percent
+#         }
+#     except Exception as e:
+#         raise RuntimeError(f"Failed to get memory information: {str(e)}")
+
+

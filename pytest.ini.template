@@ -1,0 +1,12 @@
+[pytest]
+pythonpath = src
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = -v --tb=short
+filterwarnings =
+    ignore::DeprecationWarning
+    ignore::PendingDeprecationWarning
+env =
+    TOWER_INFERENCE_ROUTER_API_KEY=<hf_1234567890>
