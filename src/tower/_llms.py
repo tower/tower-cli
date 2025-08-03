@@ -384,6 +384,43 @@ def resolve_hugging_face_hub_model_name(ctx: TowerContext, requested_model: str)
 
 
 class Llm:
+    """
+    This class provides a unified interface for interacting with language models through
+    different inference providers (e.g. Ollama for local inference, Hugging Face Hub for remote).
+    It abstracts away model name resolution, inference provider selection, and local/remote inference API differences 
+    to provide a consistent interface for text generation tasks.
+    
+    The class supports both chat-based interactions (similar to OpenAI Chat Completions API)
+    and simple prompt-based interactions (similar to legacy OpenAI Completions API).
+
+    This class is typically instantiated through the llms() factory function rather than
+    directly.
+    
+    Attributes:
+        context (TowerContext): The Tower context containing configuration and settings.
+        requested_model_name (str): The original model name requested by the user.
+        model_name (str): The resolved model name after provider-specific resolution.
+        max_tokens (int): Maximum number of tokens to generate in responses.
+        inference_router (str): The inference router to use (e.g., "ollama", "hugging_face_hub").
+        inference_provider (str): The inference provider (same as router when in local mode).
+        inference_router_api_key (str): API key for the inference router if required.
+    
+    Example:
+        # Create an Llm instance (typically done via the llms() factory function)
+        llm = tower.llms("llama3.2", max_tokens=1000)
+        
+        # Use for chat completions
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello!"}
+        ]
+        response = llm.complete_chat(messages)
+        
+        # Use for simple prompts
+        response = llm.prompt("What is the capital of France?")
+    
+    """
+    
     def __init__(self, context: TowerContext, model_name: str, max_tokens: int = 1000):
         """
         Wraps up interfacing with a language model in the Tower system.
@@ -475,11 +512,46 @@ class Llm:
             "content": prompt,
         }])
 
-def llms(model_name: str) -> Llm:
+def llms(model_name: str, max_tokens: int = 1000) -> Llm:
+    """
+   
+    This factory function creates an Llm instance configured with the specified model parameters. 
+    It automatically resolves the model name based on the available inference providers 
+    (Ollama for local inference, Hugging Face Hub for remote).
+    The max_tokens parameter is used to set the maximum number of tokens to generate in responses.
+    
+    Args:
+        model_name: Can be a model family name (e.g., "llama3.2", "gemma3.2", "deepseek-r1") 
+                    or a specific model identifier (e.g., "deepseek-r1:14b", "deepseek-ai/DeepSeek-R1-0528").
+                    The function will automatically resolve the exact model name based on
+                    available models in the configured inference provider.
+        max_tokens: Maximum number of tokens to generate in responses. Defaults to 1000.
+                   
+    Returns:
+        Llm: A configured language model instance that can be used for text generation,
+             chat completions, and other language model interactions.
+             
+    Raises:
+        ValueError: If the configured inference router is not supported or if the model
+                   cannot be resolved.
+                   
+    Example:
+        # Create a language model instance
+        llm = llms("llama3.2", max_tokens=500)
+        
+        # Use for chat completions
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello!"}
+        ]
+        response = llm.complete_chat(messages)
+        
+    """
     ctx = TowerContext.build()
     return Llm(
         context = ctx,
-        model_name=model_name
+        model_name=model_name,
+        max_tokens=max_tokens
     )
 
 def extract_ollama_message(resp: ChatResponse) -> str:
