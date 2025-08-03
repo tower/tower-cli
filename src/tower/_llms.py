@@ -514,7 +514,6 @@ class Llm:
 
 def llms(model_name: str, max_tokens: int = 1000) -> Llm:
     """
-   
     This factory function creates an Llm instance configured with the specified model parameters. 
     It automatically resolves the model name based on the available inference providers 
     (Ollama for local inference, Hugging Face Hub for remote).
