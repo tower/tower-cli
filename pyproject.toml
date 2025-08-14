@@ -45,7 +45,7 @@ dependencies = [
   "httpx==0.28.1",
   "huggingface-hub>=0.34.3",
   "ollama>=0.5.3",
-  "pydantic-core==2.27.2",
+  "pydantic-core==2.27.0",
   "pyiceberg==0.9.1",
   "python-dateutil==2.9.0.post0",
 ]
