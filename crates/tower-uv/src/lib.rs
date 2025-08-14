@@ -78,6 +78,7 @@ impl Uv {
         debug!("Executing UV ({:?}) venv in {:?}", &self.uv_path, cwd);
 
         let child = Command::new(&self.uv_path)
+            .kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -95,6 +96,7 @@ impl Uv {
         if cwd.join("pyproject.toml").exists() {
             debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
             let child = Command::new(&self.uv_path)
+                .kill_on_drop(true)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -112,6 +114,7 @@ impl Uv {
 
             // If there is a requirements.txt, then we can use that to sync.
             let child = Command::new(&self.uv_path)
+                .kill_on_drop(true)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -138,6 +141,7 @@ impl Uv {
         debug!("Executing UV ({:?}) run {:?} in {:?}", &self.uv_path, program, cwd);
 
         let child = Command::new(&self.uv_path)
+            .kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

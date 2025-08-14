@@ -269,6 +269,13 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
     return Ok(())
 } 
 
+impl Drop for LocalApp {
+    fn drop(&mut self) {
+        // We want to ensure that we cancel the process if it is still running.
+        let _ = self.terminate();
+    }
+}
+
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         let cancel_token = CancellationToken::new();
