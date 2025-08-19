@@ -151,8 +151,7 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
         },
         StatusCode::UNPROCESSABLE_ENTITY => {
             // Show the main error message from the detail field
-            let line = format!("{} {}\n", "Validation error:".red(), "You need to fix one or more validation errors");
-            io::stdout().write_all(line.as_bytes()).unwrap();
+            error("The request was syntactically correct, but the Tower API couldn't process it.");
 
             // Show any additional error details from the errors field
             if let Some(errors) = &error_model.errors {
