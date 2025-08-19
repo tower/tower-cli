@@ -116,56 +116,55 @@ pub fn runtime_error(err: tower_runtime::errors::Error) {
     io::stdout().write_all(line.as_bytes()).unwrap();
 }
 
+// Outputs both the model.detail and the model.errors fields in a human readable format.
+pub fn output_full_error_details(model: &ErrorModel) {
+    // Show the main detail message if available
+    if let Some(detail) = &model.detail {
+        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+        writeln!(io::stdout(), "{}", detail.red()).unwrap();
+    }
+    
+    // Show any additional error details from the errors field
+    if let Some(errors) = &model.errors {
+        if !errors.is_empty() {
+            if model.detail.is_none() {
+                writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+            }
+            for error in errors {
+                let msg = format!(
+                    "  • {}",
+                    error.message.as_deref().unwrap_or("Unknown error")
+                );
+                writeln!(io::stdout(), "{}", msg.red()).unwrap();
+            }
+        }
+    }
+}
+
 fn output_response_content_error<T>(err: ResponseContent<T>) {
     // Attempt to deserialize the error content into an ErrorModel.
-    let error_model: ErrorModel = match serde_json::from_str(&err.content) {
-        Ok(model) => model,
+    let error_model = match serde_json::from_str::<ErrorModel>(&err.content) {
+        Ok(model) => {
+            debug!("Error model (status: {}): {:?}", err.status, model);
+            model
+        },
         Err(e) => {
             debug!("Failed to parse error content as JSON: {}", e);
             debug!("Raw error content: {}", err.content);
-            error("An unexpected error occurred while processing the response.");
+            // Show the raw error content if JSON parsing fails
+            writeln!(io::stdout(), "\n{}", "API Error:".yellow()).unwrap();
+            writeln!(io::stdout(), "{}", err.content.red()).unwrap();
             return;
         }
     };
-    debug!("Error model (status: {}): {:?}", err.status, error_model);
 
     match err.status {
         StatusCode::CONFLICT => {
-            // Show the main error message from the detail field
             error("There was a conflict while trying to do that!");
-
-            // Show any additional error details from the errors field
-            if let Some(errors) = &error_model.errors {
-                if !errors.is_empty() {
-                    writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
-                    for error in errors {
-                        let msg = format!(
-                            "  • {}",
-                            error.message.as_deref().unwrap_or("Unknown error")
-                        );
-                        writeln!(io::stdout(), "{}", msg.red()).unwrap();
-                    }
-                }
-            }
-            
+            output_full_error_details(&error_model);
         },
         StatusCode::UNPROCESSABLE_ENTITY => {
-            // Show the main error message from the detail field
-            error("The request was syntactically correct, but the Tower API couldn't process it.");
-
-            // Show any additional error details from the errors field
-            if let Some(errors) = &error_model.errors {
-                if !errors.is_empty() {
-                    writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
-                    for error in errors {
-                        let msg = format!(
-                            "  • {}",
-                            error.message.as_deref().unwrap_or("Unknown error")
-                        );
-                        writeln!(io::stdout(), "{}", msg.red()).unwrap();
-                    }
-                }
-            }
+            output_full_error_details(&error_model);
         },
         StatusCode::INTERNAL_SERVER_ERROR => {
             error("The Tower API encountered an internal error. Maybe try again later on.");
