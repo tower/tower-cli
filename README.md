@@ -188,7 +188,7 @@ claude mcp add tower tower mcp-server
 Or using JSON configuration:
 
 ```bash
-claude mcp add-json '{"tower": {"command": "tower", "args": ["mcp-server"], "env": {}}}'
+claude mcp add-json tower '{"command": "tower", "args": ["mcp-server"], "env": {}}'
 ```
 
 ##### Cursor
