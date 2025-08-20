@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
@@ -59,9 +60,16 @@ pub fn run_cmd() -> Command {
         .about("Run your code in Tower or locally")
 }
 
+pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
+    if let Err(e) = do_run_inner(config, args, cmd).await {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
+}
+
 /// do_run is the primary entrypoint into running apps both locally and remotely in Tower. It will
 /// use the configuration to determine the requested way of running a Tower app.
-pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
+pub async fn do_run_inner(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Result<()> {
     let res = get_run_parameters(args, cmd);
 
     // We always expect there to be an environment due to the fact that there is a
@@ -79,17 +87,17 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
             if local {
                 // For the time being, we should report that we can't run an app by name locally.
                 if app_name.is_some() {
-                    output::die("Running apps by name locally is not supported yet.");
+                    anyhow::bail!("Running apps by name locally is not supported yet.");
                 } else {
-                    do_run_local(config, path, env, params).await;
+                    do_run_local(config, path, env, params).await
                 }
             } else {
                 let follow = should_follow_run(args);
-                do_run_remote(config, path, env, params, app_name, follow).await;
+                do_run_remote(config, path, env, params, app_name, follow).await
             }
         }
         Err(err) => {
-            output::config_error(err);
+            Err(err.into())
         }
     }
 }
@@ -97,21 +105,12 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) {
+async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) -> Result<()> {
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     // Load all the secrets and catalogs from the server
-    let secrets = if let Ok(secs) = get_secrets(&config, &env).await {
-        secs
-    } else {
-        output::die("Something went wrong loading secrets into your environment");
-    };
-
-    let catalogs = if let Ok(cats) = get_catalogs(&config, &env).await {
-        cats
-    } else {
-        output::die("Something went wrong loading catalogs into your environment");
-    };
+    let secrets = get_secrets(&config, &env).await?;
+    let catalogs = get_catalogs(&config, &env).await?;
 
     spinner.success();
 
@@ -121,15 +120,13 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
     env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
 
     // There should always be a session, if there isn't one then I'm not sure how we got here?
-    let session = config.session.unwrap_or_else(|| {
-        output::die("No session found. Please log in to Tower first.");
-    });
+    let session = config.session.ok_or_else(|| anyhow::anyhow!("No session found. Please log in to Tower first."))?;
 
     env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
-    let towerfile = load_towerfile(&towerfile_path);
+    let towerfile = load_towerfile(&towerfile_path)?;
 
     for param in &towerfile.parameters {
         if !params.contains_key(&param.name) {
@@ -138,14 +135,10 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
     }
 
     // Build the package
-    let mut package = build_package(&towerfile).await;
+    let mut package = build_package(&towerfile).await?;
 
     // Unpack the package
-    if let Err(err) = package.unpack().await {
-        debug!("Failed to unpack package: {}", err);
-        output::package_error(err);
-        std::process::exit(1);
-    }
+    package.unpack().await?;
 
     let (sender, receiver) = unbounded_channel();
 
@@ -153,13 +146,9 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
     let output_task = tokio::spawn(monitor_output(receiver));
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    if let Err(err) = launcher
+    launcher
         .launch(Context::new(), sender, package, env.to_string(), secrets, params, env_vars)
-        .await
-    {
-        output::runtime_error(err);
-        return;
-    }
+        .await?;
 
     // Monitor app output and status concurrently
     let app = launcher.app.unwrap();
@@ -171,6 +160,8 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
     // internally.
     res1.unwrap();
     res2.unwrap();
+
+    Ok(())
 }
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
@@ -182,13 +173,15 @@ async fn do_run_remote(
     params: HashMap<String, String>,
     app_name: Option<String>,
     should_follow_run: bool,
-) {
-    let app_slug = app_name.unwrap_or_else(|| {
+) -> Result<()> {
+    let app_slug = if let Some(name) = app_name {
+        name
+    } else {
         // Load the Towerfile
         let towerfile_path = path.join("Towerfile");
-        let towerfile = load_towerfile(&towerfile_path);
+        let towerfile = load_towerfile(&towerfile_path)?;
         towerfile.app.name
-    });
+    };
 
     let mut spinner = output::spinner("Scheduling run...");
 
@@ -196,7 +189,7 @@ async fn do_run_remote(
         Err(err) => {
             spinner.failure();
             debug!("Failed to schedule run: {}", err);
-            output::tower_error(err);
+            Err(err.into())
         }, 
         Ok(res) => {
             spinner.success();
@@ -216,6 +209,7 @@ async fn do_run_remote(
                 output::write(&link_line);
                 output::newline();
             }
+            Ok(())
         }
     }
 }
@@ -374,23 +368,19 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    match api::export_secrets(&config, env, false, public_key).await {
-        Ok(res) => {
-            let mut secrets = HashMap::new();
+    let res = api::export_secrets(&config, env, false, public_key).await.map_err(|err| {
+        debug!("API error fetching secrets: {:?}", err);
+        Error::FetchingSecretsFailed
+    })?;
+    let mut secrets = HashMap::new();
 
-            for secret in res.secrets {
-                // we will decrypt each property and inject it into the vals map.
-                let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
-                secrets.insert(secret.name, decrypted_value);
-            }
-
-            Ok(secrets)
-        },
-        Err(err) => {
-            output::tower_error(err);
-            Err(Error::FetchingSecretsFailed)
-        }
+    for secret in res.secrets {
+        // we will decrypt each property and inject it into the vals map.
+        let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
+        secrets.insert(secret.name, decrypted_value);
     }
+
+    Ok(secrets)
 }
 
 /// get_catalogs manages the process of exporting catalogs, decrypting their properties, and
@@ -398,54 +388,48 @@ async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, Strin
 async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    match api::export_catalogs(&config, env, false, public_key).await {
-        Ok(res) => {
-            let mut vals = HashMap::new();
+    let res = api::export_catalogs(&config, env, false, public_key).await.map_err(|err| {
+        debug!("API error fetching catalogs: {:?}", err);
+        Error::FetchingCatalogsFailed
+    })?;
+    let mut vals = HashMap::new();
 
-            for catalog in res.catalogs {
-                // we will decrypt each property and inject it into the vals map.
-                for property in catalog.properties {
-                    let decrypted_value = crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
-                    let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
-                    vals.insert(name, decrypted_value);
-                }
-            }
-
-            Ok(vals)
-        },
-        Err(err) => {
-            output::tower_error(err);
-            Err(Error::FetchingCatalogsFailed)
+    for catalog in res.catalogs {
+        // we will decrypt each property and inject it into the vals map.
+        for property in catalog.properties {
+            let decrypted_value = crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
+            let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
+            vals.insert(name, decrypted_value);
         }
     }
+
+    Ok(vals)
 }
 
 /// load_towerfile manages the process of loading a Towerfile from a given path in an interactive
 /// way. That means it will not return if the Towerfile can't be loaded and instead will publish an
 /// error.
-fn load_towerfile(path: &PathBuf) -> Towerfile {
-    Towerfile::from_path(path.clone()).unwrap_or_else(|err| {
+fn load_towerfile(path: &PathBuf) -> Result<Towerfile> {
+    Towerfile::from_path(path.clone()).map_err(|err| {
         debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
-        output::config_error(err);
-        std::process::exit(1);
+        anyhow::anyhow!("Failed to load Towerfile from {}: {}", path.display(), err)
     })
 }
 
 /// build_package manages the process of building a package in an interactive way for local app
 /// execution. If the pacakge fails to build for wahatever reason, the app will exit.
-async fn build_package(towerfile: &Towerfile) -> Package {
+async fn build_package(towerfile: &Towerfile) -> Result<Package> {
     let mut spinner = output::spinner("Building package...");
     let package_spec = PackageSpec::from_towerfile(towerfile);
     match Package::build(package_spec).await {
         Ok(package) => {
             spinner.success();
-            package
+            Ok(package)
         }
         Err(err) => {
             spinner.failure();
             debug!("Failed to build package: {}", err);
-            output::package_error(err);
-            std::process::exit(1);
+            Err(err.into())
         }
     }
 }
