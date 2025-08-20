@@ -6,20 +6,22 @@ use anyhow::Result;
 use serde_json::{json, Value, Map};
 use std::sync::Arc;
 use futures_util::FutureExt;
+use crypto;
+use rsa::pkcs1::DecodeRsaPublicKey;
 
-struct Param {
+pub(crate) struct Param {
     name: &'static str,
     description: &'static str,
     required: bool,
 }
 
-struct ToolDef {
+pub(crate) struct ToolDef {
     name: &'static str,
     description: &'static str,
     params: &'static [Param],
 }
 
-const TOOLS: &[ToolDef] = &[
+pub(crate) const TOOLS: &[ToolDef] = &[
     ToolDef {
         name: "tower_apps_list",
         description: "List all Tower apps in your account",
@@ -44,6 +46,46 @@ const TOOLS: &[ToolDef] = &[
         ],
     },
     ToolDef {
+        name: "tower_apps_delete",
+        description: "Delete a Tower app",
+        params: &[Param { name: "name", description: "App name", required: true }],
+    },
+    ToolDef {
+        name: "tower_secrets_list",
+        description: "List secrets in your Tower account (shows only previews for security)",
+        params: &[
+            Param { name: "environment", description: "Environment name", required: false },
+            Param { name: "all", description: "Show secrets from all environments", required: false },
+        ],
+    },
+    ToolDef {
+        name: "tower_secrets_create",
+        description: "Create a new secret in Tower",
+        params: &[
+            Param { name: "name", description: "Secret name", required: true },
+            Param { name: "value", description: "Secret value", required: true },
+            Param { name: "environment", description: "Environment name", required: false },
+        ],
+    },
+    ToolDef {
+        name: "tower_secrets_delete",
+        description: "Delete a secret from Tower",
+        params: &[
+            Param { name: "environment", description: "Environment name", required: true },
+            Param { name: "name", description: "Secret name", required: true },
+        ],
+    },
+    ToolDef {
+        name: "tower_teams_list",
+        description: "List teams you belong to",
+        params: &[],
+    },
+    ToolDef {
+        name: "tower_teams_switch",
+        description: "Switch context to a different team",
+        params: &[Param { name: "name", description: "Team name", required: true }],
+    },
+    ToolDef {
         name: "tower_deploy",
         description: "Deploy your app to Tower cloud",
         params: &[Param { name: "path", description: "Directory containing your Tower app", required: false }],
@@ -55,7 +97,7 @@ const TOOLS: &[ToolDef] = &[
     },
 ];
 
-fn build_tools() -> Vec<rmcp::model::Tool> {
+pub(crate) fn build_tools() -> Vec<rmcp::model::Tool> {
     TOOLS.iter().map(|def| {
         let properties: Map<String, Value> = def.params.iter()
             .map(|p| (p.name.to_string(), json!({"type": "string", "description": p.description})))
@@ -92,29 +134,41 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
     tracing::info!("Starting Tower CLI MCP server");
 
     #[derive(Clone)]
-    struct TowerService {
+    pub(crate) struct TowerService {
         config: Config,
     }
 
     impl TowerService {
-        fn new(config: Config) -> Self {
+        pub(crate) fn new(config: Config) -> Self {
             Self { config }
         }
 
-        fn get_param<'a>(&self, request: &'a CallToolRequestParam, name: &str) -> Result<&'a str, McpError> {
+        pub(crate) fn get_param<'a>(&self, request: &'a CallToolRequestParam, name: &str) -> Result<&'a str, McpError> {
             request.arguments.as_ref()
                 .and_then(|args| args.get(name))
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| McpError::invalid_params("parameter missing", None))
         }
 
-        fn success<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
+        pub(crate) fn get_optional_param<'a>(&self, request: &'a CallToolRequestParam, name: &str) -> Option<&'a str> {
+            request.arguments.as_ref()
+                .and_then(|args| args.get(name))
+                .and_then(|v| v.as_str())
+        }
+
+        pub(crate) fn get_bool_param(&self, request: &CallToolRequestParam, name: &str) -> bool {
+            self.get_optional_param(request, name)
+                .map(|v| v == "true")
+                .unwrap_or(false)
+        }
+
+        pub(crate) fn success<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
             let text = serde_json::to_string_pretty(&data)
                 .map_err(|_| McpError::invalid_params("serialization failed", None))?;
             Ok(CallToolResult::success(vec![Content::text(text)]))
         }
 
-        fn error(message: &str) -> Result<CallToolResult, McpError> {
+        pub(crate) fn error(message: &str) -> Result<CallToolResult, McpError> {
             Ok(CallToolResult::error(vec![Content::text(message.to_string())]))
         }
 
@@ -180,7 +234,7 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
             }
         }
 
-        async fn handle_apps_logs(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+        pub(crate) async fn handle_apps_logs(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
             let name = self.get_param(request, "name")?;
             let seq_str = self.get_param(request, "seq")?;
             let seq: i64 = seq_str.parse()
@@ -228,6 +282,84 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
                 Err(_) => Self::error("Local run failed - check Towerfile and login status"),
             }
         }
+
+        async fn handle_apps_delete(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let name = self.get_param(request, "name")?;
+            match api::delete_app(&self.config, name).await {
+                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Deleted app '{}'", name))])),
+                Err(e) => Self::error(&format!("Failed to delete app: {}", e)),
+            }
+        }
+
+        async fn handle_secrets_list(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let environment = self.get_optional_param(request, "environment").unwrap_or("default");
+            let all = self.get_bool_param(request, "all");
+            
+            match api::list_secrets(&self.config, environment, all).await {
+                Ok(response) => Self::success(json!({"secrets": response.secrets})),
+                Err(e) => Self::error(&format!("Failed to list secrets: {}", e)),
+            }
+        }
+
+        async fn handle_secrets_create(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let name = self.get_param(request, "name")?;
+            let value = self.get_param(request, "value")?;
+            let environment = self.get_optional_param(request, "environment").unwrap_or("default");
+
+            let key_response = api::describe_secrets_key(&self.config).await
+                .map_err(|_| McpError::invalid_params("Failed to get key", None))?;
+            
+            let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
+                .map_err(|_| McpError::invalid_params("Invalid public key", None))?;
+
+            let encrypted_value = crypto::encrypt(public_key, value.to_string())
+                .map_err(|_| McpError::invalid_params("Encryption failed", None))?;
+            
+            let preview = if value.len() <= 10 { "XXXXXXXXXX".to_string() } 
+                         else { format!("XXXXXX{}", &value[value.len()-4..]) };
+
+            match api::create_secret(&self.config, name, environment, &encrypted_value, &preview).await {
+                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Created secret '{}' in environment '{}'", name, environment))])),
+                Err(e) => Self::error(&format!("Failed to create secret: {}", e)),
+            }
+        }
+
+        async fn handle_secrets_delete(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let name = self.get_param(request, "name")?;
+            let environment = self.get_param(request, "environment")?;
+            
+            match api::delete_secret(&self.config, name, environment).await {
+                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Deleted secret '{}' from environment '{}'", name, environment))])),
+                Err(e) => Self::error(&format!("Failed to delete secret: {}", e)),
+            }
+        }
+
+        async fn handle_teams_list(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let response = api::refresh_session(&self.config).await
+                .map_err(|_| McpError::invalid_params("Failed to refresh session", None))?;
+            
+            let mut session = self.config.get_current_session()
+                .map_err(|_| McpError::invalid_params("No valid session", None))?;
+            
+            session.update_from_api_response(&response)
+                .map_err(|_| McpError::invalid_params("Failed to update session", None))?;
+
+            let active_team_name = session.active_team.as_ref().map(|t| &t.name);
+            let teams: Vec<Value> = session.teams.into_iter()
+                .map(|team| json!({"name": team.name, "active": Some(&team.name) == active_team_name}))
+                .collect();
+            
+            Self::success(json!({"teams": teams}))
+        }
+
+        async fn handle_teams_switch(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let name = self.get_param(request, "name")?;
+            
+            match self.config.set_active_team_by_name(name) {
+                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Switched to team: {}", name))])),
+                Err(e) => Self::error(&format!("Failed to switch team: {}", e)),
+            }
+        }
     }
 
     impl ServerHandler for TowerService {
@@ -246,6 +378,12 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
                     "tower_apps_create" => self.handle_apps_create(&request).await,
                     "tower_apps_show" => self.handle_apps_show(&request).await,
                     "tower_apps_logs" => self.handle_apps_logs(&request).await,
+                    "tower_apps_delete" => self.handle_apps_delete(&request).await,
+                    "tower_secrets_list" => self.handle_secrets_list(&request).await,
+                    "tower_secrets_create" => self.handle_secrets_create(&request).await,
+                    "tower_secrets_delete" => self.handle_secrets_delete(&request).await,
+                    "tower_teams_list" => self.handle_teams_list(&request).await,
+                    "tower_teams_switch" => self.handle_teams_switch(&request).await,
                     "tower_deploy" => self.handle_deploy(&request).await,
                     "tower_run" => self.handle_run(&request).await,
                     _ => Self::error(&format!("Unknown tool: {}", request.name))
@@ -259,3 +397,6 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
     server.waiting().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

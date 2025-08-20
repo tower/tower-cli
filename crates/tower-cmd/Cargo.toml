@@ -35,3 +35,6 @@ tower-version = { path = "../tower-version" }
 webbrowser = { workspace = true }
 rmcp = { version = "0.5.0", features = ["server", "transport-io"] }
 tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+testutils = { workspace = true }
