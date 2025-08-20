@@ -6,11 +6,12 @@ use rmcp::{
     handler::server::{tool::{Parameters, ToolRouter}},
     model::*,
     schemars::{self, JsonSchema},
-    tool, tool_router,
+    tool, tool_handler, tool_router,
     transport::stdio,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::future::Future;
 use futures_util::FutureExt;
 use crypto;
 use rsa::pkcs1::DecodeRsaPublicKey;
@@ -253,9 +254,10 @@ impl TowerService {
     async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
         let config = self.config.clone();
         Self::run_with_panic_handling(
-            move || {
+            move || async move {
                 let matches = clap::ArgMatches::default();
-                deploy::do_deploy(config, &matches)
+                deploy::do_deploy(config, &matches).await;
+                Ok(())
             },
             "App deployed",
             "Deploy failed - check Towerfile and login status"
@@ -265,14 +267,11 @@ impl TowerService {
     #[tool(description = "Run your app locally")]
     async fn tower_run(&self) -> Result<CallToolResult, McpError> {
         let config = self.config.clone();
-        Self::run_with_panic_handling(
-            move || {
-                let matches = clap::ArgMatches::default();
-                run::do_run(config, &matches, None)
-            },
-            "App ran locally",
-            "Local run failed - check Towerfile and login status"
-        ).await
+        let matches = clap::ArgMatches::default();
+        match run::do_run_inner(config, &matches, None).await {
+            Ok(_) => Self::text_success("App ran locally".to_string()),
+            Err(e) => Self::error_result("Local run failed", e),
+        }
     }
 }
 
