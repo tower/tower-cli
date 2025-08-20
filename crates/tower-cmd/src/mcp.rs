@@ -1,129 +1,52 @@
+use anyhow::Result;
 use clap::Command;
 use crate::{Config, api, deploy, run};
-use rmcp::{ServerHandler, ServiceExt, transport::stdio, model::{CallToolResult, Content, CallToolRequestParam, ListToolsResult}, ErrorData as McpError, service::RequestContext, service::RoleServer};
-use tower_telemetry::tracing;
-use anyhow::Result;
-use serde_json::{json, Value, Map};
-use std::sync::Arc;
+use rmcp::{
+    ErrorData as McpError, ServerHandler, ServiceExt,
+    handler::server::{tool::{Parameters, ToolRouter}},
+    model::*,
+    schemars::{self, JsonSchema},
+    tool, tool_router,
+    transport::stdio,
+};
+use serde::Deserialize;
+use serde_json::{json, Value};
 use futures_util::FutureExt;
 use crypto;
 use rsa::pkcs1::DecodeRsaPublicKey;
 
-pub(crate) struct Param {
-    name: &'static str,
-    description: &'static str,
-    required: bool,
+#[derive(Debug, Deserialize, JsonSchema)]
+struct NameRequest {
+    name: String,
 }
 
-pub(crate) struct ToolDef {
-    name: &'static str,
-    description: &'static str,
-    params: &'static [Param],
+#[derive(Debug, Deserialize, JsonSchema)]
+struct AppLogsRequest {
+    name: String,
+    seq: String,
 }
 
-pub(crate) const TOOLS: &[ToolDef] = &[
-    ToolDef {
-        name: "tower_apps_list",
-        description: "List all Tower apps in your account",
-        params: &[],
-    },
-    ToolDef {
-        name: "tower_apps_create", 
-        description: "Create a new Tower app",
-        params: &[Param { name: "name", description: "App name", required: true }],
-    },
-    ToolDef {
-        name: "tower_apps_show",
-        description: "Show details for a Tower app and its recent runs", 
-        params: &[Param { name: "name", description: "App name", required: true }],
-    },
-    ToolDef {
-        name: "tower_apps_logs",
-        description: "Get logs for a specific Tower app run",
-        params: &[
-            Param { name: "name", description: "App name", required: true },
-            Param { name: "seq", description: "Run sequence number", required: true },
-        ],
-    },
-    ToolDef {
-        name: "tower_apps_delete",
-        description: "Delete a Tower app",
-        params: &[Param { name: "name", description: "App name", required: true }],
-    },
-    ToolDef {
-        name: "tower_secrets_list",
-        description: "List secrets in your Tower account (shows only previews for security)",
-        params: &[
-            Param { name: "environment", description: "Environment name", required: false },
-            Param { name: "all", description: "Show secrets from all environments", required: false },
-        ],
-    },
-    ToolDef {
-        name: "tower_secrets_create",
-        description: "Create a new secret in Tower",
-        params: &[
-            Param { name: "name", description: "Secret name", required: true },
-            Param { name: "value", description: "Secret value", required: true },
-            Param { name: "environment", description: "Environment name", required: false },
-        ],
-    },
-    ToolDef {
-        name: "tower_secrets_delete",
-        description: "Delete a secret from Tower",
-        params: &[
-            Param { name: "environment", description: "Environment name", required: true },
-            Param { name: "name", description: "Secret name", required: true },
-        ],
-    },
-    ToolDef {
-        name: "tower_teams_list",
-        description: "List teams you belong to",
-        params: &[],
-    },
-    ToolDef {
-        name: "tower_teams_switch",
-        description: "Switch context to a different team",
-        params: &[Param { name: "name", description: "Team name", required: true }],
-    },
-    ToolDef {
-        name: "tower_deploy",
-        description: "Deploy your app to Tower cloud",
-        params: &[Param { name: "path", description: "Directory containing your Tower app", required: false }],
-    },
-    ToolDef {
-        name: "tower_run",
-        description: "Run your app locally",
-        params: &[Param { name: "path", description: "Directory containing your Tower app", required: false }],
-    },
-];
-
-pub(crate) fn build_tools() -> Vec<rmcp::model::Tool> {
-    TOOLS.iter().map(|def| {
-        let properties: Map<String, Value> = def.params.iter()
-            .map(|p| (p.name.to_string(), json!({"type": "string", "description": p.description})))
-            .collect();
-        
-        let required = def.params.iter()
-            .filter(|p| p.required)
-            .map(|p| json!(p.name))
-            .collect::<Vec<_>>();
-
-        let schema = Arc::new(vec![
-            ("type".to_string(), json!("object")),
-            ("properties".to_string(), json!(properties)),
-            ("required".to_string(), json!(required)),
-        ].into_iter().collect());
-
-        rmcp::model::Tool {
-            name: def.name.into(),
-            description: Some(def.description.into()),
-            input_schema: schema,
-            annotations: None,
-            output_schema: None,
-        }
-    }).collect()
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ListSecretsRequest {
+    #[serde(default)]
+    environment: Option<String>,
+    #[serde(default)]
+    all: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+struct CreateSecretRequest {
+    name: String,
+    value: String,
+    #[serde(default)]
+    environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct DeleteSecretRequest {
+    name: String,
+    environment: String,
+}
 
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
@@ -131,271 +54,243 @@ pub fn mcp_cmd() -> Command {
 }
 
 pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<()> {
-    tracing::info!("Starting Tower CLI MCP server");
-
-    #[derive(Clone)]
-    pub(crate) struct TowerService {
-        config: Config,
-    }
-
-    impl TowerService {
-        pub(crate) fn new(config: Config) -> Self {
-            Self { config }
-        }
-
-        pub(crate) fn get_param<'a>(&self, request: &'a CallToolRequestParam, name: &str) -> Result<&'a str, McpError> {
-            request.arguments.as_ref()
-                .and_then(|args| args.get(name))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_params("parameter missing", None))
-        }
-
-        pub(crate) fn get_optional_param<'a>(&self, request: &'a CallToolRequestParam, name: &str) -> Option<&'a str> {
-            request.arguments.as_ref()
-                .and_then(|args| args.get(name))
-                .and_then(|v| v.as_str())
-        }
-
-        pub(crate) fn get_bool_param(&self, request: &CallToolRequestParam, name: &str) -> bool {
-            self.get_optional_param(request, name)
-                .map(|v| v == "true")
-                .unwrap_or(false)
-        }
-
-        pub(crate) fn success<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
-            let text = serde_json::to_string_pretty(&data)
-                .map_err(|_| McpError::invalid_params("serialization failed", None))?;
-            Ok(CallToolResult::success(vec![Content::text(text)]))
-        }
-
-        pub(crate) fn error(message: &str) -> Result<CallToolResult, McpError> {
-            Ok(CallToolResult::error(vec![Content::text(message.to_string())]))
-        }
-
-        async fn handle_apps_list(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            match api::list_apps(&self.config).await {
-                Ok(response) => {
-                    let apps: Vec<Value> = response.apps.into_iter()
-                        .map(|app_summary| {
-                            let app = app_summary.app;
-                            json!({
-                                "name": app.name,
-                                "description": app.short_description,
-                                "created_at": app.created_at,
-                                "status": format!("{:?}", app.status)
-                            })
-                        })
-                        .collect();
-                    Self::success(json!({"apps": apps}))
-                },
-                Err(e) => Self::error(&format!("Failed to list apps: {}", e)),
-            }
-        }
-
-        async fn handle_apps_create(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-
-            match api::create_app(&self.config, name, "").await {
-                Ok(response) => Ok(CallToolResult::success(vec![Content::text(
-                    format!("Created app '{}'", response.app.name)
-                )])),
-                Err(e) => Self::error(&format!("Failed to create app: {}", e)),
-            }
-        }
-
-        async fn handle_apps_show(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-
-            match api::describe_app(&self.config, name).await {
-                Ok(response) => {
-                    let app = response.app;
-                    let runs = response.runs;
-                    
-                    let data = json!({
-                        "app": {
-                            "name": app.name,
-                            "description": app.short_description,
-                            "created_at": app.created_at,
-                            "status": format!("{:?}", app.status)
-                        },
-                        "recent_runs": runs.iter().map(|run| {
-                            json!({
-                                "number": run.number,
-                                "status": format!("{:?}", run.status),
-                                "scheduled_at": run.scheduled_at,
-                                "started_at": run.started_at,
-                                "ended_at": run.ended_at
-                            })
-                        }).collect::<Vec<_>>()
-                    });
-                    Self::success(data)
-                },
-                Err(e) => Self::error(&format!("Failed to show app: {}", e)),
-            }
-        }
-
-        pub(crate) async fn handle_apps_logs(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-            let seq_str = self.get_param(request, "seq")?;
-            let seq: i64 = seq_str.parse()
-                .map_err(|_| McpError::invalid_params("seq must be a number", None))?;
-
-            match api::describe_run_logs(&self.config, name, seq).await {
-                Ok(response) => {
-                    let logs = response.log_lines.into_iter()
-                        .map(|log| format!("{}: {}", log.timestamp, log.message))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    
-                    Ok(CallToolResult::success(vec![Content::text(
-                        format!("Logs for app '{}' run {}:\n\n{}", name, seq, logs)
-                    )]))
-                },
-                Err(e) => Self::error(&format!("Failed to get logs: {}", e)),
-            }
-        }
-
-        async fn handle_deploy(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let config = self.config.clone();
-            let matches = clap::ArgMatches::default();
-            
-            let result = std::panic::AssertUnwindSafe(async move {
-                deploy::do_deploy(config, &matches).await
-            });
-            
-            match result.catch_unwind().await {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text("App deployed".to_string())])),
-                Err(_) => Self::error("Deploy failed - check Towerfile and login status"),
-            }
-        }
-
-        async fn handle_run(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let config = self.config.clone();
-            let matches = clap::ArgMatches::default();
-            
-            let result = std::panic::AssertUnwindSafe(async move {
-                run::do_run(config, &matches, None).await
-            });
-            
-            match result.catch_unwind().await {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text("App ran locally".to_string())])),
-                Err(_) => Self::error("Local run failed - check Towerfile and login status"),
-            }
-        }
-
-        async fn handle_apps_delete(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-            match api::delete_app(&self.config, name).await {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Deleted app '{}'", name))])),
-                Err(e) => Self::error(&format!("Failed to delete app: {}", e)),
-            }
-        }
-
-        async fn handle_secrets_list(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let environment = self.get_optional_param(request, "environment").unwrap_or("default");
-            let all = self.get_bool_param(request, "all");
-            
-            match api::list_secrets(&self.config, environment, all).await {
-                Ok(response) => Self::success(json!({"secrets": response.secrets})),
-                Err(e) => Self::error(&format!("Failed to list secrets: {}", e)),
-            }
-        }
-
-        async fn handle_secrets_create(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-            let value = self.get_param(request, "value")?;
-            let environment = self.get_optional_param(request, "environment").unwrap_or("default");
-
-            let key_response = api::describe_secrets_key(&self.config).await
-                .map_err(|_| McpError::invalid_params("Failed to get key", None))?;
-            
-            let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
-                .map_err(|_| McpError::invalid_params("Invalid public key", None))?;
-
-            let encrypted_value = crypto::encrypt(public_key, value.to_string())
-                .map_err(|_| McpError::invalid_params("Encryption failed", None))?;
-            
-            let preview = if value.len() <= 10 { "XXXXXXXXXX".to_string() } 
-                         else { format!("XXXXXX{}", &value[value.len()-4..]) };
-
-            match api::create_secret(&self.config, name, environment, &encrypted_value, &preview).await {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Created secret '{}' in environment '{}'", name, environment))])),
-                Err(e) => Self::error(&format!("Failed to create secret: {}", e)),
-            }
-        }
-
-        async fn handle_secrets_delete(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-            let environment = self.get_param(request, "environment")?;
-            
-            match api::delete_secret(&self.config, name, environment).await {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Deleted secret '{}' from environment '{}'", name, environment))])),
-                Err(e) => Self::error(&format!("Failed to delete secret: {}", e)),
-            }
-        }
-
-        async fn handle_teams_list(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let response = api::refresh_session(&self.config).await
-                .map_err(|_| McpError::invalid_params("Failed to refresh session", None))?;
-            
-            let mut session = self.config.get_current_session()
-                .map_err(|_| McpError::invalid_params("No valid session", None))?;
-            
-            session.update_from_api_response(&response)
-                .map_err(|_| McpError::invalid_params("Failed to update session", None))?;
-
-            let active_team_name = session.active_team.as_ref().map(|t| &t.name);
-            let teams: Vec<Value> = session.teams.into_iter()
-                .map(|team| json!({"name": team.name, "active": Some(&team.name) == active_team_name}))
-                .collect();
-            
-            Self::success(json!({"teams": teams}))
-        }
-
-        async fn handle_teams_switch(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = self.get_param(request, "name")?;
-            
-            match self.config.set_active_team_by_name(name) {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!("Switched to team: {}", name))])),
-                Err(e) => Self::error(&format!("Failed to switch team: {}", e)),
-            }
-        }
-    }
-
-    impl ServerHandler for TowerService {
-        fn list_tools(&self, _: Option<rmcp::model::PaginatedRequestParam>, _: RequestContext<RoleServer>)
-            -> impl std::future::Future<Output = Result<ListToolsResult, McpError>> + Send + '_
-        {
-            async { Ok(ListToolsResult { tools: build_tools(), next_cursor: None }) }
-        }
-
-        fn call_tool(&self, request: CallToolRequestParam, _: RequestContext<RoleServer>)
-            -> impl std::future::Future<Output = Result<CallToolResult, McpError>> + Send + '_
-        {
-            async move {
-                match request.name.as_ref() {
-                    "tower_apps_list" => self.handle_apps_list(&request).await,
-                    "tower_apps_create" => self.handle_apps_create(&request).await,
-                    "tower_apps_show" => self.handle_apps_show(&request).await,
-                    "tower_apps_logs" => self.handle_apps_logs(&request).await,
-                    "tower_apps_delete" => self.handle_apps_delete(&request).await,
-                    "tower_secrets_list" => self.handle_secrets_list(&request).await,
-                    "tower_secrets_create" => self.handle_secrets_create(&request).await,
-                    "tower_secrets_delete" => self.handle_secrets_delete(&request).await,
-                    "tower_teams_list" => self.handle_teams_list(&request).await,
-                    "tower_teams_switch" => self.handle_teams_switch(&request).await,
-                    "tower_deploy" => self.handle_deploy(&request).await,
-                    "tower_run" => self.handle_run(&request).await,
-                    _ => Self::error(&format!("Unknown tool: {}", request.name))
-                }
-            }
-        }
-    }
-
     let service = TowerService::new(config);
     let server = service.serve(stdio()).await?;
     server.waiting().await?;
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct TowerService {
+    config: Config,
+    tool_router: ToolRouter<Self>,
+}
+
+#[tool_router]
+impl TowerService {
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+            tool_router: Self::tool_router(),
+        }
+    }
+
+    fn json_success<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
+        let text = serde_json::to_string_pretty(&data)
+            .map_err(|e| McpError::internal_error("Serialization failed", Some(json!({"error": e.to_string()}))))?;
+        Ok(CallToolResult::success(vec![Content::text(text)]))
+    }
+
+    fn text_success(message: String) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::success(vec![Content::text(message)]))
+    }
+
+    fn error_result(prefix: &str, error: impl std::fmt::Display) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::error(vec![Content::text(format!("{}: {}", prefix, error))]))
+    }
+
+    async fn run_with_panic_handling<F, Fut>(operation: F, success_msg: &str, error_msg: &str) -> Result<CallToolResult, McpError>
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<(), anyhow::Error>> + Send + 'static,
+    {
+        match std::panic::AssertUnwindSafe(operation()).catch_unwind().await {
+            Ok(_) => Ok(CallToolResult::success(vec![Content::text(success_msg.to_string())])),
+            Err(_) => Ok(CallToolResult::error(vec![Content::text(error_msg.to_string())])),
+        }
+    }
+
+    #[tool(description = "List all Tower apps in your account")]
+    async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
+        match api::list_apps(&self.config).await {
+            Ok(response) => {
+                let apps: Vec<Value> = response.apps.into_iter()
+                    .map(|app_summary| {
+                        let app = app_summary.app;
+                        json!({
+                            "name": app.name,
+                            "description": app.short_description,
+                            "created_at": app.created_at,
+                            "status": format!("{:?}", app.status)
+                        })
+                    })
+                    .collect();
+                Self::json_success(json!({"apps": apps}))
+            },
+            Err(e) => Self::error_result("Failed to list apps", e),
+        }
+    }
+
+    #[tool(description = "Create a new Tower app")]
+    async fn tower_apps_create(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+        match api::create_app(&self.config, &request.name, "").await {
+            Ok(response) => Self::text_success(format!("Created app '{}'", response.app.name)),
+            Err(e) => Self::error_result("Failed to create app", e)
+        }
+    }
+
+    #[tool(description = "Show details for a Tower app and its recent runs")]
+    async fn tower_apps_show(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+        match api::describe_app(&self.config, &request.name).await {
+            Ok(response) => {
+                let data = json!({
+                    "app": {
+                        "name": response.app.name,
+                        "description": response.app.short_description,
+                        "created_at": response.app.created_at,
+                        "status": format!("{:?}", response.app.status)
+                    },
+                    "recent_runs": response.runs.iter().map(|run| json!({
+                        "number": run.number,
+                        "status": format!("{:?}", run.status),
+                        "scheduled_at": run.scheduled_at,
+                        "started_at": run.started_at,
+                        "ended_at": run.ended_at
+                    })).collect::<Vec<_>>()
+                });
+                Self::json_success(data)
+            },
+            Err(e) => Self::error_result("Failed to show app", e),
+        }
+    }
+
+    #[tool(description = "Get logs for a specific Tower app run")]
+    async fn tower_apps_logs(&self, Parameters(request): Parameters<AppLogsRequest>) -> Result<CallToolResult, McpError> {
+        let seq: i64 = request.seq.parse()
+            .map_err(|_| McpError::invalid_params("seq must be a number", None))?;
+
+        match api::describe_run_logs(&self.config, &request.name, seq).await {
+            Ok(response) => {
+                let logs = response.log_lines.into_iter()
+                    .map(|log| format!("{}: {}", log.timestamp, log.message))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                
+                let msg = format!("Logs for app '{}' run {}:\n\n{}", request.name, seq, logs);
+                Self::text_success(msg)
+            },
+            Err(e) => Self::error_result("Failed to get logs", e),
+        }
+    }
+
+    #[tool(description = "Delete a Tower app")]
+    async fn tower_apps_delete(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+        match api::delete_app(&self.config, &request.name).await {
+            Ok(_) => Self::text_success(format!("Deleted app '{}'", request.name)),
+            Err(e) => Self::error_result("Failed to delete app", e)
+        }
+    }
+
+    #[tool(description = "List secrets in your Tower account (shows only previews for security)")]
+    async fn tower_secrets_list(&self, Parameters(request): Parameters<ListSecretsRequest>) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref().unwrap_or("default");
+        let all = request.all.as_deref() == Some("true");
+        
+        match api::list_secrets(&self.config, environment, all).await {
+            Ok(response) => Self::json_success(json!({"secrets": response.secrets})),
+            Err(e) => Self::error_result("Failed to list secrets", e),
+        }
+    }
+
+    #[tool(description = "Create a new secret in Tower")]
+    async fn tower_secrets_create(&self, Parameters(request): Parameters<CreateSecretRequest>) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref().unwrap_or("default");
+
+        let key_response = api::describe_secrets_key(&self.config).await
+            .map_err(|e| McpError::internal_error("Failed to get key", Some(json!({"error": e.to_string()}))))?;
+        
+        let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
+            .map_err(|e| McpError::internal_error("Invalid public key", Some(json!({"error": e.to_string()}))))?;
+
+        let encrypted_value = crypto::encrypt(public_key, request.value.clone())
+            .map_err(|e| McpError::internal_error("Encryption failed", Some(json!({"error": e.to_string()}))))?;
+        
+        let preview = if request.value.len() <= 10 { "XXXXXXXXXX".to_string() } 
+                     else { format!("XXXXXX{}", &request.value[request.value.len()-4..]) };
+
+        match api::create_secret(&self.config, &request.name, environment, &encrypted_value, &preview).await {
+            Ok(_) => Self::text_success(format!("Created secret '{}' in environment '{}'", request.name, environment)),
+            Err(e) => Self::error_result("Failed to create secret", e),
+        }
+    }
+
+    #[tool(description = "Delete a secret from Tower")]
+    async fn tower_secrets_delete(&self, Parameters(request): Parameters<DeleteSecretRequest>) -> Result<CallToolResult, McpError> {
+        match api::delete_secret(&self.config, &request.name, &request.environment).await {
+            Ok(_) => Self::text_success(format!("Deleted secret '{}' from environment '{}'", request.name, request.environment)),
+            Err(e) => Self::error_result("Failed to delete secret", e),
+        }
+    }
+
+    #[tool(description = "List teams you belong to")]
+    async fn tower_teams_list(&self) -> Result<CallToolResult, McpError> {
+        let response = api::refresh_session(&self.config).await
+            .map_err(|e| McpError::internal_error("Failed to refresh session", Some(json!({"error": e.to_string()}))))?;
+        
+        let mut session = self.config.get_current_session()
+            .map_err(|e| McpError::internal_error("No valid session", Some(json!({"error": e.to_string()}))))?;
+        
+        session.update_from_api_response(&response)
+            .map_err(|e| McpError::internal_error("Failed to update session", Some(json!({"error": e.to_string()}))))?;
+
+        let active_team_name = session.active_team.as_ref().map(|t| &t.name);
+        let teams: Vec<Value> = session.teams.into_iter()
+            .map(|team| json!({"name": team.name, "active": Some(&team.name) == active_team_name}))
+            .collect();
+        
+        Self::json_success(json!({"teams": teams}))
+    }
+
+    #[tool(description = "Switch context to a different team")]
+    async fn tower_teams_switch(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+        match self.config.set_active_team_by_name(&request.name) {
+            Ok(_) => Self::text_success(format!("Switched to team: {}", request.name)),
+            Err(e) => Self::error_result("Failed to switch team", e)
+        }
+    }
+
+    #[tool(description = "Deploy your app to Tower cloud")]
+    async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
+        let config = self.config.clone();
+        Self::run_with_panic_handling(
+            move || {
+                let matches = clap::ArgMatches::default();
+                deploy::do_deploy(config, &matches)
+            },
+            "App deployed",
+            "Deploy failed - check Towerfile and login status"
+        ).await
+    }
+
+    #[tool(description = "Run your app locally")]
+    async fn tower_run(&self) -> Result<CallToolResult, McpError> {
+        let config = self.config.clone();
+        Self::run_with_panic_handling(
+            move || {
+                let matches = clap::ArgMatches::default();
+                run::do_run(config, &matches, None)
+            },
+            "App ran locally",
+            "Local run failed - check Towerfile and login status"
+        ).await
+    }
+}
+
+#[tool_handler]
+impl ServerHandler for TowerService {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            protocol_version: ProtocolVersion::V_2024_11_05,
+            capabilities: ServerCapabilities::builder()
+                .enable_tools()
+                .build(),
+            server_info: Implementation {
+                name: "tower-cli".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+            },
+            instructions: Some("Tower CLI MCP Server - Manage Tower apps, secrets, teams, and deployments through conversational AI. Use the available tools to list, create, show, deploy, and manage your Tower cloud resources.".to_string()),
+        }
+    }
 }
 
 #[cfg(test)]
