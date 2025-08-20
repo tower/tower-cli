@@ -12,6 +12,7 @@ mod session;
 mod teams;
 mod util;
 mod version;
+mod mcp;
 
 pub use error::Error;
 
@@ -132,6 +133,10 @@ impl App {
                     }
                 }
             }
+            Some(("mcp-server", args)) => mcp::do_mcp_server(sessionized_config, args).await.unwrap_or_else(|e| {
+                eprintln!("MCP server error: {}", e);
+                std::process::exit(1);
+            }),
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
@@ -167,4 +172,5 @@ fn root_cmd() -> Command {
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())
         .subcommand(teams::teams_cmd())
+        .subcommand(mcp::mcp_cmd())
 }
