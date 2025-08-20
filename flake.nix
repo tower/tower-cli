@@ -4,8 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    fenix = {
-      url = "github:nix-community/fenix";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     naersk = {
@@ -14,11 +14,12 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix, naersk }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, naersk }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;
+          overlays = [ rust-overlay.overlays.default ];
         };
 
         maintainer = "Tower Computing Inc. <support@tower.dev>";
@@ -62,14 +63,7 @@
 
         isMuslTarget = target: target == "x86_64-unknown-linux-musl" || target == "aarch64-unknown-linux-musl";
 
-        rustToolchain = fenix.packages.${system}.stable.toolchain;
-        rustToolchainWithMusl = fenix.packages.${system}.stable.withComponents [
-          "cargo"
-          "rustc"
-          "rust-std"
-        ] // {
-          targets.x86_64-unknown-linux-musl = fenix.packages.${system}.targets.x86_64-unknown-linux-musl.stable.rust-std;
-        };
+        rustToolchain = pkgs.rust-bin.stable.latest.default;
 
         python = pkgs.python312;
         naersk-native = naersk.lib.${system}.override {
@@ -105,11 +99,9 @@
             crossSystem = { config = crossSystemConfig; };
           };
 
-          crossRustToolchain = fenix.packages.${system}.combine [
-            fenix.packages.${system}.stable.rustc
-            fenix.packages.${system}.stable.cargo
-            fenix.packages.${system}.targets.${target}.stable.rust-std
-          ];
+          crossRustToolchain = pkgs.rust-bin.stable.latest.default.override {
+            targets = [target];
+          };
 
           naersk-cross = naersk.lib.${system}.override {
             cargo = crossRustToolchain;
