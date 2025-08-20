@@ -1,11 +1,87 @@
 use clap::Command;
 use crate::{Config, api, deploy, run};
-use rmcp::{ServerHandler, ServiceExt, transport::stdio, model::{CallToolResult, Content, CallToolRequestParam, Tool, ListToolsResult}, ErrorData as McpError, service::RequestContext, service::RoleServer};
+use rmcp::{ServerHandler, ServiceExt, transport::stdio, model::{CallToolResult, Content, CallToolRequestParam, ListToolsResult}, ErrorData as McpError, service::RequestContext, service::RoleServer};
 use tower_telemetry::tracing;
 use anyhow::Result;
 use serde_json::{json, Value, Map};
 use std::sync::Arc;
-use futures::FutureExt;
+use futures_util::FutureExt;
+
+struct Param {
+    name: &'static str,
+    description: &'static str,
+    required: bool,
+}
+
+struct ToolDef {
+    name: &'static str,
+    description: &'static str,
+    params: &'static [Param],
+}
+
+const TOOLS: &[ToolDef] = &[
+    ToolDef {
+        name: "tower_apps_list",
+        description: "List all Tower apps in your account",
+        params: &[],
+    },
+    ToolDef {
+        name: "tower_apps_create", 
+        description: "Create a new Tower app",
+        params: &[Param { name: "name", description: "App name", required: true }],
+    },
+    ToolDef {
+        name: "tower_apps_show",
+        description: "Show details for a Tower app and its recent runs", 
+        params: &[Param { name: "name", description: "App name", required: true }],
+    },
+    ToolDef {
+        name: "tower_apps_logs",
+        description: "Get logs for a specific Tower app run",
+        params: &[
+            Param { name: "name", description: "App name", required: true },
+            Param { name: "seq", description: "Run sequence number", required: true },
+        ],
+    },
+    ToolDef {
+        name: "tower_deploy",
+        description: "Deploy your app to Tower cloud",
+        params: &[Param { name: "path", description: "Directory containing your Tower app", required: false }],
+    },
+    ToolDef {
+        name: "tower_run",
+        description: "Run your app locally",
+        params: &[Param { name: "path", description: "Directory containing your Tower app", required: false }],
+    },
+];
+
+fn build_tools() -> Vec<rmcp::model::Tool> {
+    TOOLS.iter().map(|def| {
+        let properties: Map<String, Value> = def.params.iter()
+            .map(|p| (p.name.to_string(), json!({"type": "string", "description": p.description})))
+            .collect();
+        
+        let required = def.params.iter()
+            .filter(|p| p.required)
+            .map(|p| json!(p.name))
+            .collect::<Vec<_>>();
+
+        let schema = Arc::new(vec![
+            ("type".to_string(), json!("object")),
+            ("properties".to_string(), json!(properties)),
+            ("required".to_string(), json!(required)),
+        ].into_iter().collect());
+
+        rmcp::model::Tool {
+            name: def.name.into(),
+            description: Some(def.description.into()),
+            input_schema: schema,
+            annotations: None,
+            output_schema: None,
+        }
+    }).collect()
+}
+
 
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
@@ -25,54 +101,63 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
             Self { config }
         }
 
-        async fn handle_apps_list(&self) -> Result<CallToolResult, McpError> {
+        fn get_param<'a>(&self, request: &'a CallToolRequestParam, name: &str) -> Result<&'a str, McpError> {
+            request.arguments.as_ref()
+                .and_then(|args| args.get(name))
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| McpError::invalid_params("parameter missing", None))
+        }
+
+        fn success<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
+            let text = serde_json::to_string_pretty(&data)
+                .map_err(|_| McpError::invalid_params("serialization failed", None))?;
+            Ok(CallToolResult::success(vec![Content::text(text)]))
+        }
+
+        fn error(message: &str) -> Result<CallToolResult, McpError> {
+            Ok(CallToolResult::error(vec![Content::text(message.to_string())]))
+        }
+
+        async fn handle_apps_list(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
             match api::list_apps(&self.config).await {
                 Ok(response) => {
-                    let apps: Vec<Value> = response.apps.into_iter().map(|app_summary| {
-                        let app = app_summary.app;
-                        json!({
-                            "name": app.name,
-                            "description": app.short_description,
-                            "created_at": app.created_at,
-                            "status": format!("{:?}", app.status)
+                    let apps: Vec<Value> = response.apps.into_iter()
+                        .map(|app_summary| {
+                            let app = app_summary.app;
+                            json!({
+                                "name": app.name,
+                                "description": app.short_description,
+                                "created_at": app.created_at,
+                                "status": format!("{:?}", app.status)
+                            })
                         })
-                    }).collect();
-                    
-                    match serde_json::to_string_pretty(&json!({"apps": apps})) {
-                        Ok(text) => Ok(CallToolResult::success(vec![Content::text(text)])),
-                        Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("JSON serialization error: {}", e))]))
-                    }
+                        .collect();
+                    Self::success(json!({"apps": apps}))
                 },
-                Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Failed to list apps: {}", e))]))
+                Err(e) => Self::error(&format!("Failed to list apps: {}", e)),
             }
         }
 
         async fn handle_apps_create(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = request.arguments.as_ref()
-                .and_then(|args| args.get("name"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_params("name parameter is required", None))?;
+            let name = self.get_param(request, "name")?;
 
             match api::create_app(&self.config, name, "").await {
                 Ok(response) => Ok(CallToolResult::success(vec![Content::text(
-                    format!("Successfully created app '{}'", response.app.name)
+                    format!("Created app '{}'", response.app.name)
                 )])),
-                Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Failed to create app: {}", e))]))
+                Err(e) => Self::error(&format!("Failed to create app: {}", e)),
             }
         }
 
         async fn handle_apps_show(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = request.arguments.as_ref()
-                .and_then(|args| args.get("name"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_params("name parameter is required", None))?;
+            let name = self.get_param(request, "name")?;
 
             match api::describe_app(&self.config, name).await {
                 Ok(response) => {
                     let app = response.app;
                     let runs = response.runs;
                     
-                    let app_json = json!({
+                    let data = json!({
                         "app": {
                             "name": app.name,
                             "description": app.short_description,
@@ -89,210 +174,81 @@ pub async fn do_mcp_server(config: Config, _args: &clap::ArgMatches) -> Result<(
                             })
                         }).collect::<Vec<_>>()
                     });
-                    
-                    match serde_json::to_string_pretty(&app_json) {
-                        Ok(text) => Ok(CallToolResult::success(vec![Content::text(text)])),
-                        Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("JSON serialization error: {}", e))]))
-                    }
+                    Self::success(data)
                 },
-                Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Failed to show app: {}", e))]))
+                Err(e) => Self::error(&format!("Failed to show app: {}", e)),
             }
         }
 
         async fn handle_apps_logs(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let name = request.arguments.as_ref()
-                .and_then(|args| args.get("name"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_params("name parameter is required", None))?;
-
-            let seq_str = request.arguments.as_ref()
-                .and_then(|args| args.get("seq"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_params("seq parameter is required", None))?;
-
+            let name = self.get_param(request, "name")?;
+            let seq_str = self.get_param(request, "seq")?;
             let seq: i64 = seq_str.parse()
-                .map_err(|_| McpError::invalid_params("seq must be a valid integer", None))?;
+                .map_err(|_| McpError::invalid_params("seq must be a number", None))?;
 
             match api::describe_run_logs(&self.config, name, seq).await {
                 Ok(response) => {
-                    let logs: Vec<String> = response.log_lines.into_iter()
+                    let logs = response.log_lines.into_iter()
                         .map(|log| format!("{}: {}", log.timestamp, log.message))
-                        .collect();
+                        .collect::<Vec<_>>()
+                        .join("\n");
                     
                     Ok(CallToolResult::success(vec![Content::text(
-                        format!("Logs for app '{}' run {}:\n\n{}", name, seq, logs.join("\n"))
+                        format!("Logs for app '{}' run {}:\n\n{}", name, seq, logs)
                     )]))
                 },
-                Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Failed to get logs: {}", e))]))
+                Err(e) => Self::error(&format!("Failed to get logs: {}", e)),
             }
         }
 
-        async fn handle_deploy(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let _path = request.arguments.as_ref()
-                .and_then(|args| args.get("path"))
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
-
-            // Create minimal ArgMatches for deploy command
+        async fn handle_deploy(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let config = self.config.clone();
             let matches = clap::ArgMatches::default();
             
-            // Tower CLI deploy functions typically exit on error, so we catch panics
-            let result = std::panic::AssertUnwindSafe(deploy::do_deploy(self.config.clone(), &matches)).catch_unwind().await;
+            let result = std::panic::AssertUnwindSafe(async move {
+                deploy::do_deploy(config, &matches).await
+            });
             
-            match result {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text(
-                    "Successfully deployed app".to_string()
-                )])),
-                Err(_) => Ok(CallToolResult::error(vec![Content::text(
-                    "Failed to deploy - check that you have a valid Towerfile and are logged in".to_string()
-                )]))
+            match result.catch_unwind().await {
+                Ok(_) => Ok(CallToolResult::success(vec![Content::text("App deployed".to_string())])),
+                Err(_) => Self::error("Deploy failed - check Towerfile and login status"),
             }
         }
 
-        async fn handle_run(&self, request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
-            let _path = request.arguments.as_ref()
-                .and_then(|args| args.get("path"))
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
-
-            // Create minimal ArgMatches for run command  
+        async fn handle_run(&self, _request: &CallToolRequestParam) -> Result<CallToolResult, McpError> {
+            let config = self.config.clone();
             let matches = clap::ArgMatches::default();
             
-            // Tower CLI run functions typically exit on error, so we catch panics
-            let result = std::panic::AssertUnwindSafe(run::do_run(self.config.clone(), &matches, None)).catch_unwind().await;
+            let result = std::panic::AssertUnwindSafe(async move {
+                run::do_run(config, &matches, None).await
+            });
             
-            match result {
-                Ok(_) => Ok(CallToolResult::success(vec![Content::text(
-                    "Successfully ran app locally".to_string()
-                )])),
-                Err(_) => Ok(CallToolResult::error(vec![Content::text(
-                    "Failed to run locally - check that you have a valid Towerfile and are logged in".to_string()
-                )]))
+            match result.catch_unwind().await {
+                Ok(_) => Ok(CallToolResult::success(vec![Content::text("App ran locally".to_string())])),
+                Err(_) => Self::error("Local run failed - check Towerfile and login status"),
             }
         }
     }
 
     impl ServerHandler for TowerService {
-        fn list_tools(
-            &self,
-            _request: Option<rmcp::model::PaginatedRequestParam>,
-            _context: RequestContext<RoleServer>,
-        ) -> impl std::future::Future<Output = Result<ListToolsResult, McpError>> + Send + '_ {
-            async {
-                let mut schema1 = Map::new();
-                schema1.insert("type".to_string(), json!("object"));
-                schema1.insert("properties".to_string(), json!({}));
-                schema1.insert("required".to_string(), json!([]));
-
-                let mut schema2 = Map::new();
-                schema2.insert("type".to_string(), json!("object"));
-                schema2.insert("properties".to_string(), json!({
-                    "name": {
-                        "type": "string",
-                        "description": "App name"
-                    }
-                }));
-                schema2.insert("required".to_string(), json!(["name"]));
-
-                let mut schema3 = Map::new();
-                schema3.insert("type".to_string(), json!("object"));
-                schema3.insert("properties".to_string(), json!({
-                    "name": {
-                        "type": "string",
-                        "description": "App name"
-                    }
-                }));
-                schema3.insert("required".to_string(), json!(["name"]));
-
-                let mut schema4 = Map::new();
-                schema4.insert("type".to_string(), json!("object"));
-                schema4.insert("properties".to_string(), json!({
-                    "name": {
-                        "type": "string",
-                        "description": "App name"
-                    },
-                    "seq": {
-                        "type": "string",
-                        "description": "Run sequence number"
-                    }
-                }));
-                schema4.insert("required".to_string(), json!(["name", "seq"]));
-
-                let mut schema5 = Map::new();
-                schema5.insert("type".to_string(), json!("object"));
-                schema5.insert("properties".to_string(), json!({
-                    "path": {
-                        "type": "string",
-                        "description": "Path to the directory containing your Tower app (optional, defaults to current directory)"
-                    }
-                }));
-                schema5.insert("required".to_string(), json!([]));
-
-                let tools = vec![
-                    Tool {
-                        name: "tower_apps_list".into(),
-                        description: Some("List all Tower apps in your account".into()),
-                        input_schema: Arc::new(schema1),
-                        annotations: None,
-                        output_schema: None,
-                    },
-                    Tool {
-                        name: "tower_apps_create".into(),
-                        description: Some("Create a new Tower app".into()),
-                        input_schema: Arc::new(schema2),
-                        annotations: None,
-                        output_schema: None,
-                    },
-                    Tool {
-                        name: "tower_apps_show".into(),
-                        description: Some("Show details for a Tower app and its recent runs".into()),
-                        input_schema: Arc::new(schema3.clone()),
-                        annotations: None,
-                        output_schema: None,
-                    },
-                    Tool {
-                        name: "tower_apps_logs".into(),
-                        description: Some("Get logs for a specific Tower app run".into()),
-                        input_schema: Arc::new(schema4),
-                        annotations: None,
-                        output_schema: None,
-                    },
-                    Tool {
-                        name: "tower_deploy".into(),
-                        description: Some("Deploy your app to Tower cloud".into()),
-                        input_schema: Arc::new(schema5.clone()),
-                        annotations: None,
-                        output_schema: None,
-                    },
-                    Tool {
-                        name: "tower_run".into(),
-                        description: Some("Run your app locally".into()),
-                        input_schema: Arc::new(schema5),
-                        annotations: None,
-                        output_schema: None,
-                    },
-                ];
-                Ok(ListToolsResult { 
-                    tools,
-                    next_cursor: None,
-                })
-            }
+        fn list_tools(&self, _: Option<rmcp::model::PaginatedRequestParam>, _: RequestContext<RoleServer>)
+            -> impl std::future::Future<Output = Result<ListToolsResult, McpError>> + Send + '_
+        {
+            async { Ok(ListToolsResult { tools: build_tools(), next_cursor: None }) }
         }
 
-        fn call_tool(
-            &self,
-            request: CallToolRequestParam,
-            _context: RequestContext<RoleServer>,
-        ) -> impl std::future::Future<Output = Result<CallToolResult, McpError>> + Send + '_ {
+        fn call_tool(&self, request: CallToolRequestParam, _: RequestContext<RoleServer>)
+            -> impl std::future::Future<Output = Result<CallToolResult, McpError>> + Send + '_
+        {
             async move {
                 match request.name.as_ref() {
-                    "tower_apps_list" => self.handle_apps_list().await,
+                    "tower_apps_list" => self.handle_apps_list(&request).await,
                     "tower_apps_create" => self.handle_apps_create(&request).await,
                     "tower_apps_show" => self.handle_apps_show(&request).await,
                     "tower_apps_logs" => self.handle_apps_logs(&request).await,
                     "tower_deploy" => self.handle_deploy(&request).await,
                     "tower_run" => self.handle_run(&request).await,
-                    _ => Ok(CallToolResult::error(vec![Content::text(format!("Unknown tool: {}", request.name))]))
+                    _ => Self::error(&format!("Unknown tool: {}", request.name))
                 }
             }
         }
