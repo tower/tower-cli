@@ -34,9 +34,9 @@ Feature: MCP App Management
     When I call tower_file_read via MCP
     Then I should receive the parsed Towerfile configuration
 
-  Scenario: Run simple application successfully
+  Scenario: Run simple application successfully locally
     Given I have a simple hello world application
-    When I call tower_run via MCP
+    When I call tower_run_local via MCP
     Then I should receive a response about the run
 
   Scenario: Attempt remote run without deployed app
@@ -47,6 +47,6 @@ Feature: MCP App Management
 
   Scenario: Test timeout mechanism with guaranteed slow application
     Given I have a long-running application
-    When I call tower_run via MCP
+    When I call tower_run_local via MCP
     Then I should receive a timeout message
     And the MCP server should remain responsive

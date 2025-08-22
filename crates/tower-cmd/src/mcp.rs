@@ -287,7 +287,7 @@ impl TowerService {
     }
 
     #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update")]
-    async fn tower_run(&self) -> Result<CallToolResult, McpError> {
+    async fn tower_run_local(&self) -> Result<CallToolResult, McpError> {
         use std::collections::HashMap;
         use std::path::PathBuf;
         
@@ -426,7 +426,7 @@ impl TowerService {
    - tower_file_validate: Verify Towerfile is valid
 
 2. LOCAL DEVELOPMENT & TESTING:
-   - tower_run: Run your app locally to test functionality
+   - tower_run_local: Run your app locally to test functionality
 
 3. CLOUD DEPLOYMENT (for remote execution):
    - tower_apps_create: Create app on Tower cloud
@@ -442,7 +442,9 @@ impl TowerService {
    - tower_teams_list/switch: Manage team contexts
    - tower_secrets_create/list: Manage application secrets
 
-Quick Start: tower_file_generate → tower_run (test locally) → tower_apps_create → tower_deploy → tower_run_remote"#;
+Quick Start: tower_file_generate → tower_run (test locally) → tower_apps_create → tower_deploy → tower_run_remote
+
+Consider taking database username/password/url and making them into secrets to be accessed in app code"#;
 
         Self::text_success(workflow.to_string())
     }
