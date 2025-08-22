@@ -42,3 +42,7 @@ tracing-subscriber = { workspace = true }
 [dev-dependencies]
 tempfile = "3.12"
 testutils = { workspace = true }
+uuid = { version = "1.0", features = ["v4"] }
+futures = { workspace = true }
+cucumber = { version = "0.21", features = ["macros"] }
+tokio-test = "0.4"
