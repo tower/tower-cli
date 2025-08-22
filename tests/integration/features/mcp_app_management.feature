@@ -1,11 +1,10 @@
-Feature: MCP App Management (Real Integration)
+Feature: MCP App Management
   As a developer using Tower MCP server
-  I want to manage Tower applications through real MCP commands
-  So that I can create, deploy, and monitor my apps programmatically
+  I want to manage Tower applications through MCP tool commands
+  So that I can create, deploy, and monitor my apps with an LLM
 
   Background:
     Given I have a running Tower MCP server
-    And I am in a temporary directory
 
   Scenario: List existing Tower apps
     When I call tower_apps_list via MCP
@@ -16,10 +15,10 @@ Feature: MCP App Management (Real Integration)
     Then I should receive an error response
     And the MCP server should remain responsive
 
-  Scenario: Create a new Tower app (may fail due to auth)
+  # if not using mock, make sure you've logged in and have a valid session
+  Scenario: Create a new Tower app
     When I call tower_apps_create with app name "test-app-123"
-    Then I should receive a response
-    # Note: This may fail due to authentication, but shouldn't hang
+    Then I should receive a success response
 
   Scenario: Validate Towerfile without file
     When I call tower_file_validate via MCP
@@ -46,9 +45,8 @@ Feature: MCP App Management (Real Integration)
     Then I should receive an error response about app not deployed
     And the MCP server should remain responsive
 
-  # Scenario: Test timeout mechanism with guaranteed slow application
-  #   Given I have a long-running application
-  #   When I call tower_run via MCP
-  #   Then I should receive a timeout message
-  #   And the MCP server should remain responsive
-  # NOTE: Timeout test works but reveals async issue in run::do_run_inner - separate concern
+  Scenario: Test timeout mechanism with guaranteed slow application
+    Given I have a long-running application
+    When I call tower_run via MCP
+    Then I should receive a timeout message
+    And the MCP server should remain responsive

@@ -30,16 +30,6 @@ def has_text_content(response, text_check):
     return False
 
 
-@given('I have a running Tower MCP server')
-def step_start_mcp_server(context):
-    context.server_responsive = True
-
-
-@given('I am in a temporary directory')
-def step_in_temp_directory(context):
-    pass
-
-
 @given('I have a valid Towerfile in the current directory')
 def step_create_valid_towerfile(context):
     context.mcp_helper.create_towerfile("hello_world")
@@ -55,39 +45,27 @@ def step_create_long_running_app(context):
     context.mcp_helper.create_towerfile("long_running")
 
 
-@when('I call {tool_name} via MCP')
-def step_call_mcp_tool(context, tool_name):
-    start_time = time.time()
-
+def call_mcp_tool(context, tool_name, **tool_args):
     try:
         async def call_tool():
-            return await context.mcp_client.call_tool(tool_name)
+            if tool_args:
+                return await context.mcp_client.call_tool(tool_name, tool_args)
+            else:
+                return await context.mcp_client.call_tool(tool_name)
         context.mcp_response = asyncio.run(call_tool())
         context.operation_success = context.mcp_response.get("success", False)
     except Exception as e:
         context.mcp_response = {"success": False, "error": str(e)}
         context.operation_success = False
 
-    context.operation_duration = time.time() - start_time
+@when('I call {tool_name} via MCP')
+def step_call_mcp_tool(context, tool_name):
+    call_mcp_tool(context, tool_name)
 
 
 @when('I call {tool_name} with app name "{app_name}"')
 def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
-    start_time = time.time()
-
-    try:
-        async def call_tool():
-            return await context.mcp_client.call_tool(tool_name, {"name": app_name})
-        context.mcp_response = asyncio.run(call_tool())
-        context.operation_success = context.mcp_response.get("success", False)
-    except Exception as e:
-        context.mcp_response = {"success": False, "error": str(e)}
-        context.operation_success = False
-
-    context.operation_duration = time.time() - start_time
-
-
-# Timing-related steps removed - most tests don't need to care about timing
+    call_mcp_tool(context, tool_name, name=app_name)
 
 
 @then('I should receive a response')
