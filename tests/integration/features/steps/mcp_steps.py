@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
-"""
-Step definitions for MCP integration tests using real Tower MCP server.
-"""
 
 import asyncio
 import time
 from behave import given, when, then
-
-# Import our real MCP client
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -16,45 +11,37 @@ from mcp_client import MCPTestHelper
 
 @given('I have a running Tower MCP server')
 def step_start_mcp_server(context):
-    """Start the real Tower MCP server."""
-    context.mcp_helper = MCPTestHelper()
-    context.loop.run_until_complete(context.mcp_helper.setup())
     context.server_responsive = True
 
 
 @given('I am in a temporary directory')
 def step_in_temp_directory(context):
-    """Already handled by MCPTestHelper.setup()."""
     pass
 
 
 @given('I have a valid Towerfile in the current directory')
 def step_create_valid_towerfile(context):
-    """Create a valid Towerfile for testing."""
     context.mcp_helper.create_towerfile("hello_world")
 
 
 @given('I have a simple hello world application')
 def step_create_hello_world_app(context):
-    """Create a simple hello world application."""
     context.mcp_helper.create_towerfile("hello_world")
 
 
 @given('I have a long-running application')
 def step_create_long_running_app(context):
-    """Create a long-running application for timeout testing."""
     context.mcp_helper.create_towerfile("long_running")
 
 
 @when('I call {tool_name} via MCP')
 def step_call_mcp_tool(context, tool_name):
-    """Call an MCP tool and record timing."""
     start_time = time.time()
     
     try:
         async def call_tool():
-            return await context.mcp_helper.client.call_tool(tool_name)
-        context.mcp_response = context.loop.run_until_complete(call_tool())
+            return await context.mcp_client.call_tool(tool_name)
+        context.mcp_response = asyncio.run(call_tool())
         context.operation_success = context.mcp_response.get("success", False)
     except Exception as e:
         context.mcp_response = {"success": False, "error": str(e)}
@@ -65,13 +52,12 @@ def step_call_mcp_tool(context, tool_name):
 
 @when('I call {tool_name} with app name "{app_name}"')
 def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
-    """Call an MCP tool with app name parameter."""
     start_time = time.time()
     
     try:
         async def call_tool():
-            return await context.mcp_helper.client.call_tool(tool_name, {"name": app_name})
-        context.mcp_response = context.loop.run_until_complete(call_tool())
+            return await context.mcp_client.call_tool(tool_name, {"name": app_name})
+        context.mcp_response = asyncio.run(call_tool())
         context.operation_success = context.mcp_response.get("success", False)
     except Exception as e:
         context.mcp_response = {"success": False, "error": str(e)}
@@ -218,20 +204,13 @@ def step_check_server_responsive(context):
         else:
             # Try a simple operation to verify server is still responsive
             async def test_responsiveness():
-                return await context.mcp_helper.client.call_tool("tower_file_validate")
-            test_response = context.loop.run_until_complete(test_responsiveness())
+                return await context.mcp_client.call_tool("tower_file_validate")
+            test_response = asyncio.run(test_responsiveness())
             context.server_responsive = test_response.get("success", False) or "error" in test_response
     except Exception as e:
         context.server_responsive = False
         print(f"Warning: Server responsiveness test failed: {e}")
         
     # For timeout scenarios, it's acceptable if the server is not responsive
-    # as long as it doesn't hang the test suite
     if not context.server_responsive:
         print("Note: Server may be unresponsive after timeout, which is expected")
-    
-    # Don't fail the test - just record the state for debugging
-    # assert context.server_responsive, "MCP server should remain responsive"
-
-
-# Cleanup is handled by environment.py

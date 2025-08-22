@@ -1,37 +1,20 @@
-#!/usr/bin/env python3
-"""
-Environment setup for behave integration tests.
-"""
-
 import asyncio
-
+import os
+from mcp_client import MCPTestHelper
 
 def before_all(context):
-    """Set up the test environment before all tests."""
-    # Create a simple event loop for async operations
-    context.loop = asyncio.new_event_loop()
+    context.mcp_helper = None
+    context.tower_url = os.environ.get("TOWER_MOCK_API_URL")
+    print(f"TOWER_MOCK_API_URL: {context.tower_url}")
 
+def before_scenario(context, scenario):
+    context.mcp_helper = MCPTestHelper(tower_url=context.tower_url)
+    asyncio.run(context.mcp_helper.setup())
+    context.mcp_client = context.mcp_helper.client
 
 def after_scenario(context, scenario):
-    """Clean up after each scenario."""
-    if hasattr(context, 'mcp_helper') and context.mcp_helper:
-        # Clean up the MCP helper
-        try:
-            # Run cleanup in the event loop
-            if hasattr(context, 'loop') and context.loop and not context.loop.is_closed():
-                context.loop.run_until_complete(context.mcp_helper.teardown())
-            else:
-                # Fallback: create new loop for cleanup
-                loop = asyncio.new_event_loop()
-                try:
-                    loop.run_until_complete(context.mcp_helper.teardown())
-                finally:
-                    loop.close()
-        except Exception as e:
-            print(f"Warning: Error during cleanup: {e}")
-
+    if context.mcp_helper:
+        asyncio.run(context.mcp_helper.teardown())
 
 def after_all(context):
-    """Clean up after all tests."""
-    if hasattr(context, 'loop') and context.loop and not context.loop.is_closed():
-        context.loop.close()
+    pass
