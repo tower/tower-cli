@@ -271,6 +271,7 @@
             echo "Tower CLI development environment"
             echo "Python: $(python --version)"
             echo "Rust: $(rustc --version)"
+            echo "Behave: $(behave --version 2>/dev/null || echo 'not available')"
           '';
         };
 

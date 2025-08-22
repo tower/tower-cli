@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Real MCP client for integration testing Tower CLI MCP server.
-"""
 
 import asyncio
 import json
@@ -15,20 +12,59 @@ import os
 
 
 class MCPClient:
-    """A simple MCP client that talks to the Tower CLI MCP server over stdio."""
     
-    def __init__(self, tower_binary_path: str):
+    def __init__(self, tower_binary_path: str, tower_url: Optional[str] = None):
         self.tower_binary_path = tower_binary_path
+        self.tower_url = tower_url
         self.process: Optional[subprocess.Popen] = None
         self.request_id = 0
+        self.temp_config_dir: Optional[str] = None
         
     async def start_server(self) -> None:
-        """Start the Tower MCP server as a subprocess."""
         cmd = [self.tower_binary_path, "mcp-server"]
         
         # Set environment variables for testing
         test_env = os.environ.copy()
         test_env["TOWER_RUN_TIMEOUT"] = "1"  # 1 second timeout - but there might be an async issue
+        
+        # Configure Tower API URL via environment variable instead of command line
+        if self.tower_url:
+            test_env["TOWER_URL"] = self.tower_url
+            print(f"DEBUG: Setting TOWER_URL environment variable to: {self.tower_url}")
+            
+            # Use a temporary config directory to avoid session conflicts
+            import tempfile
+            import json
+            self.temp_config_dir = tempfile.mkdtemp(prefix="tower_test_config_")
+            test_env["HOME"] = self.temp_config_dir  # This will make ~/.config/tower point to temp dir
+            
+            # Create a mock session file for testing
+            config_dir = os.path.join(self.temp_config_dir, ".config", "tower")
+            os.makedirs(config_dir, exist_ok=True)
+            
+            mock_session = {
+                "user": {
+                    "id": "mock_user_id",
+                    "email": "test@example.com"
+                },
+                "teams": [
+                    {
+                        "name": "default",
+                        "type": "user",
+                        "token": {"jwt": "mock_jwt_token"}
+                    }
+                ],
+                "active_team": {
+                    "name": "default", 
+                    "type": "user",
+                    "token": {"jwt": "mock_jwt_token"}
+                },
+                "tower_url": self.tower_url
+            }
+            
+            session_file = os.path.join(config_dir, "session.json")
+            with open(session_file, 'w') as f:
+                json.dump(mock_session, f)
         
         self.process = subprocess.Popen(
             cmd,
@@ -47,7 +83,6 @@ class MCPClient:
         await self._send_initialize()
         
     async def stop_server(self) -> None:
-        """Stop the MCP server."""
         if self.process:
             # First try gentle termination
             try:
@@ -62,8 +97,16 @@ class MCPClient:
                     pass  # Process is really stuck, just move on
             self.process = None
             
+        # Clean up temporary config directory
+        if self.temp_config_dir:
+            import shutil
+            try:
+                shutil.rmtree(self.temp_config_dir)
+            except Exception as e:
+                print(f"Warning: Failed to clean up temp config dir: {e}")
+            self.temp_config_dir = None
+            
     async def _send_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Send a JSON-RPC request to the MCP server."""
         if not self.process:
             raise RuntimeError("Server not started")
             
@@ -90,12 +133,10 @@ class MCPClient:
             raise TimeoutError(f"Request {method} timed out after 30 seconds - likely a bug")
             
     async def _read_line(self) -> str:
-        """Read a line from the server stdout."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.process.stdout.readline)
         
     async def _send_initialize(self) -> None:
-        """Send the MCP initialize request."""
         params = {
             "protocolVersion": "2024-11-05",
             "capabilities": {
@@ -116,7 +157,6 @@ class MCPClient:
         await self._send_notification("notifications/initialized")
         
     async def _send_notification(self, method: str, params: Dict[str, Any] = None) -> None:
-        """Send a JSON-RPC notification."""
         if not self.process:
             raise RuntimeError("Server not started")
             
@@ -131,11 +171,9 @@ class MCPClient:
         self.process.stdin.flush()
         
     def is_server_alive(self) -> bool:
-        """Check if the server process is still running."""
         return self.process is not None and self.process.poll() is None
         
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Call a tool on the MCP server."""
         if not self.is_server_alive():
             return {"success": False, "error": "MCP server is not running"}
             
@@ -161,15 +199,14 @@ class MCPClient:
 
 
 class MCPTestHelper:
-    """Helper class for MCP integration tests."""
     
-    def __init__(self):
+    def __init__(self, tower_url: Optional[str] = None):
         self.client: Optional[MCPClient] = None
         self.temp_dir: Optional[tempfile.TemporaryDirectory] = None
         self.original_cwd: Optional[str] = None
+        self.tower_url = tower_url
         
     async def setup(self) -> None:
-        """Set up the test environment."""
         # Find the tower binary
         tower_binary = self._find_tower_binary()
         if not tower_binary:
@@ -181,11 +218,10 @@ class MCPTestHelper:
         os.chdir(self.temp_dir.name)
         
         # Start MCP client
-        self.client = MCPClient(tower_binary)
+        self.client = MCPClient(tower_binary, tower_url=self.tower_url)
         await self.client.start_server()
         
     async def teardown(self) -> None:
-        """Clean up the test environment."""
         if self.client:
             await self.client.stop_server()
             
@@ -196,7 +232,6 @@ class MCPTestHelper:
             self.temp_dir.cleanup()
             
     def _find_tower_binary(self) -> Optional[str]:
-        """Find the tower binary in the target directory."""
         # Look for debug build first
         debug_path = Path(__file__).parent.parent.parent / "target" / "debug" / "tower"
         if debug_path.exists():
@@ -210,7 +245,6 @@ class MCPTestHelper:
         return None
         
     def create_towerfile(self, app_type: str = "hello_world") -> None:
-        """Create a test Towerfile in the current directory."""
         towerfiles = {
             "hello_world": '''
 [app]
@@ -264,8 +298,7 @@ print("This should never print")
 
 # Test the client directly
 async def main():
-    """Simple test of the MCP client."""
-    helper = MCPTestHelper()
+    helper = MCPTestHelper(tower_url="http://localhost:8000")
     
     try:
         await helper.setup()

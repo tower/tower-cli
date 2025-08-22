@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: tower-mock-api
+Version: 0.1.0
+Summary: A mock API server for Tower CLI testing.
+Requires-Python: >=3.9
+Requires-Dist: fastapi==0.111.0
+Requires-Dist: uvicorn==0.30.1

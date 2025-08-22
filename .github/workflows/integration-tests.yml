@@ -1,0 +1,64 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, 'ben/*']  # Run on main branch and personal branches
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v24
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build Tower CLI
+      run: |
+        nix develop --command cargo build
+
+    - name: Set up Python and dependencies
+      run: |
+        nix develop --command bash -c "
+          cd mock-api-server && 
+          python -m venv .venv && 
+          source .venv/bin/activate && 
+          pip install -e .
+        "
+
+    - name: Start mock API server
+      run: |
+        cd mock-api-server
+        source .venv/bin/activate
+        uvicorn main:app --host 127.0.0.1 --port 8000 &
+        echo $! > mock_server.pid
+        
+        # Wait for server to be ready
+        for i in {1..30}; do
+          if curl -f http://127.0.0.1:8000/health 2>/dev/null; then
+            echo "Mock server is ready"
+            break
+          fi
+          echo "Waiting for mock server to start... ($i/30)"
+          sleep 1
+        done
+
+    - name: Run BDD integration tests
+      run: |
+        cd tests/integration
+        nix develop --command bash -c "
+          TOWER_MOCK_API_URL=http://127.0.0.1:8000 behave features/
+        "
+
+    - name: Stop mock server
+      if: always()
+      run: |
+        if [ -f mock-api-server/mock_server.pid ]; then
+          kill $(cat mock-api-server/mock_server.pid) || true
+        fi
