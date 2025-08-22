@@ -3,7 +3,6 @@ import os
 from mcp_client import MCPTestHelper
 
 def before_all(context):
-    context.mcp_helper = None
     context.tower_url = os.environ.get("TOWER_MOCK_API_URL")
     print(f"TOWER_MOCK_API_URL: {context.tower_url}")
 
