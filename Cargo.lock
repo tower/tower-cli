@@ -2719,6 +2719,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tempfile"
+version = "3.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15b61f8f20e3a6f7e0649d825294eaf317edce30f82cf6026e7e4cb9222a7d1e"
+dependencies = [
+ "fastrand",
+ "getrandom 0.3.3",
+ "once_cell",
+ "rustix 1.0.8",
+ "windows-sys 0.60.2",
+]
+
+[[package]]
 name = "termcolor"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3036,9 +3049,12 @@ dependencies = [
  "serde_json",
  "snafu",
  "spinners",
+ "tempfile",
  "testutils",
  "tokio",
  "tokio-util",
+ "toml",
+ "toml_edit",
  "tower-api",
  "tower-package",
  "tower-runtime",
