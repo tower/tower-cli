@@ -307,7 +307,7 @@ impl TowerService {
         ).await {
             Ok(Ok(_)) => Self::text_success("App ran locally successfully".to_string()),
             Ok(Err(e)) => Self::error_result("Local run failed", e),
-            Err(_) => Self::text_success(format!("App run timed out after {} seconds", timeout_secs)),
+            Err(_) => Self::error_result("App run timed out", format!("App run timed out after {} seconds", timeout_secs)),
         }
     }
 
