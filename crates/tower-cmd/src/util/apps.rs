@@ -91,7 +91,10 @@ pub async fn ensure_app_exists(
                         tower_api::apis::Error::ResponseError(resp) => resp.status,
                         _ => StatusCode::INTERNAL_SERVER_ERROR,
                     },
-                    content: create_err.to_string(),
+                    content: match &create_err {
+                        tower_api::apis::Error::ResponseError(resp) => resp.content.clone(),
+                        _ => create_err.to_string(),
+                    },
                     entity: None,
                 },
             ))
