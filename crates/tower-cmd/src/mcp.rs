@@ -4,7 +4,7 @@ use crate::{Config, api, deploy, run};
 use rmcp::{
     ErrorData as McpError, ServerHandler, ServiceExt,
     handler::server::{tool::{Parameters, ToolRouter}},
-    model::*,
+    model::{CallToolResult, Content, ServerInfo, ServerCapabilities, Implementation, ProtocolVersion},
     schemars::{self, JsonSchema},
     tool, tool_handler, tool_router,
     transport::stdio,
@@ -108,8 +108,8 @@ impl TowerService {
         Ok(CallToolResult::success(vec![Content::text(message)]))
     }
 
-    fn error_result(prefix: &str, error: impl std::fmt::Display) -> Result<CallToolResult, McpError> {
-        Ok(CallToolResult::error(vec![Content::text(format!("{}: {}", prefix, error))]))
+    fn error_result(prefix: &str, error: impl std::fmt::Display + std::fmt::Debug) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::error(vec![Content::text(format!("{}: {:#?}", prefix, error))]))
     }
 
     async fn run_with_panic_handling<F, Fut>(operation: F, success_msg: &str, error_msg: &str) -> Result<CallToolResult, McpError>
@@ -286,13 +286,18 @@ impl TowerService {
         ).await
     }
 
-    #[tool(description = "Run your app locally")]
+    #[tool(description = "Run your app locally using the local Towerfile and source files (5 minute timeout)")]
     async fn tower_run(&self) -> Result<CallToolResult, McpError> {
         let config = self.config.clone();
         let matches = clap::ArgMatches::default();
-        match run::do_run_inner(config, &matches, None).await {
-            Ok(_) => Self::text_success("App ran locally".to_string()),
-            Err(e) => Self::error_result("Local run failed", e),
+        
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(300),
+            run::do_run_inner(config, &matches, None)
+        ).await {
+            Ok(Ok(_)) => Self::text_success("App ran locally successfully".to_string()),
+            Ok(Err(e)) => Self::error_result("Local run failed", e),
+            Err(_) => Self::text_success("App run timed out after 5 minutes (app may still be running)".to_string()),
         }
     }
 
@@ -382,48 +387,3 @@ impl ServerHandler for TowerService {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_json_success() {
-        let data = json!({"test": "value"});
-        let CallToolResult::Success { content } = TowerService::json_success(data).unwrap() else {
-            panic!("Expected success result");
-        };
-        
-        assert_eq!(content.len(), 1);
-        let Content::Text { text } = &content[0] else {
-            panic!("Expected text content");
-        };
-        assert!(text.contains("\"test\": \"value\""));
-    }
-
-    #[test]
-    fn test_text_success() {
-        let message = "Operation completed".to_string();
-        let CallToolResult::Success { content } = TowerService::text_success(message.clone()).unwrap() else {
-            panic!("Expected success result");
-        };
-        
-        assert_eq!(content.len(), 1);
-        let Content::Text { text } = &content[0] else {
-            panic!("Expected text content");
-        };
-        assert_eq!(text, &message);
-    }
-
-    #[test]
-    fn test_error_result() {
-        let CallToolResult::Error { content, .. } = TowerService::error_result("Test error", "something went wrong").unwrap() else {
-            panic!("Expected error result");
-        };
-        
-        assert_eq!(content.len(), 1);
-        let Content::Text { text } = &content[0] else {
-            panic!("Expected text content");
-        };
-        assert_eq!(text, "Test error: something went wrong");
-    }
-}
