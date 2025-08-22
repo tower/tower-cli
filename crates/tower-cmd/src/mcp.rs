@@ -272,7 +272,7 @@ impl TowerService {
         }
     }
 
-    #[tool(description = "Deploy your app to Tower cloud")]
+    #[tool(description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create")]
     async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
         let config = self.config.clone();
         Self::run_with_panic_handling(
@@ -286,18 +286,65 @@ impl TowerService {
         ).await
     }
 
-    #[tool(description = "Run your app locally using the local Towerfile and source files (5 minute timeout)")]
+    #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update")]
     async fn tower_run(&self) -> Result<CallToolResult, McpError> {
+        use std::collections::HashMap;
+        use std::path::PathBuf;
+        
         let config = self.config.clone();
-        let matches = clap::ArgMatches::default();
+        let path = PathBuf::from(".");
+        let env = "default";
+        let params = HashMap::new();
+        
+        let timeout_secs = std::env::var("TOWER_RUN_TIMEOUT")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(30);
         
         match tokio::time::timeout(
-            std::time::Duration::from_secs(300),
-            run::do_run_inner(config, &matches, None)
+            std::time::Duration::from_secs(timeout_secs),
+            run::do_run_local(config, path, env, params)
         ).await {
             Ok(Ok(_)) => Self::text_success("App ran locally successfully".to_string()),
             Ok(Err(e)) => Self::error_result("Local run failed", e),
-            Err(_) => Self::text_success("App run timed out after 5 minutes (app may still be running)".to_string()),
+            Err(_) => Self::text_success(format!("App run timed out after {} seconds", timeout_secs)),
+        }
+    }
+
+    #[tool(description = "Run your app remotely on Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create, 3) Deploy with tower_deploy")]
+    async fn tower_run_remote(&self) -> Result<CallToolResult, McpError> {
+        use std::collections::HashMap;
+        use std::path::PathBuf;
+        use config::Towerfile;
+        
+        let config = self.config.clone();
+        let path = PathBuf::from(".");
+        let env = "default";
+        let params = HashMap::new();
+        
+        // Load Towerfile to get app name
+        let towerfile = match Towerfile::from_local_file() {
+            Ok(tf) => tf,
+            Err(e) => return Self::error_result("Failed to read Towerfile", e),
+        };
+        
+        // Check if app exists/is deployed
+        match api::describe_app(&config, &towerfile.app.name).await {
+            Ok(_) => {
+                // App exists, proceed with remote run
+                match tokio::time::timeout(
+                    std::time::Duration::from_secs(300), // 5 minute timeout for remote runs
+                    run::do_run_remote(config, path, env, params, None, false)
+                ).await {
+                    Ok(Ok(_)) => Self::text_success("App scheduled for remote execution successfully".to_string()),
+                    Ok(Err(e)) => Self::error_result("Remote run failed", e),
+                    Err(_) => Self::text_success("Remote run scheduling timed out after 5 minutes".to_string()),
+                }
+            },
+            Err(_) => Self::text_success(format!(
+                "App '{}' not found on Tower cloud. Complete the workflow: 1) Create app with tower_apps_create, 2) Deploy with tower_deploy, then try tower_run_remote again",
+                towerfile.app.name
+            )),
         }
     }
 
@@ -353,7 +400,7 @@ impl TowerService {
         }
     }
 
-    #[tool(description = "Generate Towerfile from pyproject.toml")]
+    #[tool(description = "Generate Towerfile from pyproject.toml. This is typically the first step in the workflow")]
     async fn tower_file_generate(&self, Parameters(request): Parameters<GenerateTowerfileRequest>) -> Result<CallToolResult, McpError> {
         let content = match TowerfileGenerator::from_pyproject(
             request.pyproject_path.as_deref(),
@@ -367,6 +414,37 @@ impl TowerService {
             Ok(_) => Self::text_success("Generated Towerfile from pyproject.toml".to_string()),
             Err(e) => Self::error_result("Failed to write Towerfile", e),
         }
+    }
+
+    #[tool(description = "Show the recommended workflow for developing and deploying Tower applications")]
+    async fn tower_workflow_help(&self) -> Result<CallToolResult, McpError> {
+        let workflow = r#"Tower Application Development Workflow:
+
+1. CREATE TOWERFILE (required for all steps):
+   - tower_file_generate: Generate from existing pyproject.toml
+   - tower_file_update: Manually create or update configuration
+   - tower_file_validate: Verify Towerfile is valid
+
+2. LOCAL DEVELOPMENT & TESTING:
+   - tower_run: Run your app locally to test functionality
+
+3. CLOUD DEPLOYMENT (for remote execution):
+   - tower_apps_create: Create app on Tower cloud
+   - tower_deploy: Deploy your code to the cloud
+   - tower_run_remote: Execute on Tower cloud infrastructure
+
+4. MANAGEMENT & MONITORING:
+   - tower_apps_list: View your deployed apps
+   - tower_apps_show: Get detailed app information and recent runs
+   - tower_apps_logs: View execution logs
+
+5. TEAM & SECRETS (optional):
+   - tower_teams_list/switch: Manage team contexts
+   - tower_secrets_create/list: Manage application secrets
+
+Quick Start: tower_file_generate → tower_run (test locally) → tower_apps_create → tower_deploy → tower_run_remote"#;
+
+        Self::text_success(workflow.to_string())
     }
 }
 
