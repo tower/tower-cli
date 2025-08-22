@@ -257,6 +257,8 @@
             python
             maturin
             python312Packages.pip
+            uv
+            behave
             pkg-config
             openssl
           ];

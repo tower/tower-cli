@@ -105,7 +105,7 @@ pub async fn do_run_inner(config: Config, args: &ArgMatches, cmd: Option<(&str, 
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) -> Result<()> {
+pub async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) -> Result<()> {
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     // Load all the secrets and catalogs from the server
@@ -166,7 +166,7 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
-async fn do_run_remote(
+pub async fn do_run_remote(
     config: Config,
     path: PathBuf,
     env: &str,
