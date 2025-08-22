@@ -10,6 +10,7 @@ mod run;
 mod secrets;
 mod session;
 mod teams;
+mod towerfile_gen;
 mod util;
 mod version;
 mod mcp;

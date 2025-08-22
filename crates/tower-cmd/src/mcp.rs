@@ -15,6 +15,8 @@ use std::future::Future;
 use futures_util::FutureExt;
 use crypto;
 use rsa::pkcs1::DecodeRsaPublicKey;
+use config::Towerfile;
+use crate::towerfile_gen::TowerfileGenerator;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct NameRequest {
@@ -29,9 +31,7 @@ struct AppLogsRequest {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ListSecretsRequest {
-    #[serde(default)]
     environment: Option<String>,
-    #[serde(default)]
     all: Option<String>,
 }
 
@@ -39,7 +39,6 @@ struct ListSecretsRequest {
 struct CreateSecretRequest {
     name: String,
     value: String,
-    #[serde(default)]
     environment: Option<String>,
 }
 
@@ -48,6 +47,29 @@ struct DeleteSecretRequest {
     name: String,
     environment: String,
 }
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct UpdateTowerfileRequest {
+    app_name: Option<String>,
+    script: Option<String>,
+    description: Option<String>,
+    schedule: Option<String>,
+    source: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct AddParameterRequest {
+    name: String,
+    description: String,
+    default: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct GenerateTowerfileRequest {
+    pyproject_path: Option<String>,
+    script_path: Option<String>,
+}
+
 
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
@@ -273,6 +295,74 @@ impl TowerService {
             Err(e) => Self::error_result("Local run failed", e),
         }
     }
+
+
+    #[tool(description = "Read and parse the current Towerfile configuration")]
+    async fn tower_file_read(&self) -> Result<CallToolResult, McpError> {
+        match Towerfile::from_local_file() {
+            Ok(towerfile) => Self::json_success(serde_json::to_value(&towerfile).unwrap()),
+            Err(e) => Self::error_result("Failed to read Towerfile", e),
+        }
+    }
+
+    #[tool(description = "Update Towerfile app configuration")]
+    async fn tower_file_update(&self, Parameters(request): Parameters<UpdateTowerfileRequest>) -> Result<CallToolResult, McpError> {
+        let mut towerfile = match Towerfile::from_local_file() {
+            Ok(tf) => tf,
+            Err(e) => return Self::error_result("Failed to read Towerfile", e),
+        };
+        
+        if let Some(name) = request.app_name { towerfile.app.name = name; }
+        if let Some(script) = request.script { towerfile.app.script = script; }
+        if let Some(description) = request.description { towerfile.app.description = description; }
+        if let Some(schedule) = request.schedule { towerfile.app.schedule = schedule; }
+        if let Some(source) = request.source { towerfile.app.source = source; }
+        
+        match towerfile.save(None) {
+            Ok(_) => Self::text_success("Towerfile updated".to_string()),
+            Err(e) => Self::error_result("Failed to save Towerfile", e),
+        }
+    }
+
+    #[tool(description = "Add a new parameter to the Towerfile")]
+    async fn tower_file_add_parameter(&self, Parameters(request): Parameters<AddParameterRequest>) -> Result<CallToolResult, McpError> {
+        let mut towerfile = match Towerfile::from_local_file() {
+            Ok(tf) => tf,
+            Err(e) => return Self::error_result("Failed to read Towerfile", e),
+        };
+        
+        let param_name = request.name.clone();
+        towerfile.add_parameter(request.name, request.description, request.default);
+        
+        match towerfile.save(None) {
+            Ok(_) => Self::text_success(format!("Added parameter '{}'", param_name)),
+            Err(e) => Self::error_result("Failed to save Towerfile", e),
+        }
+    }
+
+    #[tool(description = "Validate the current Towerfile configuration")]
+    async fn tower_file_validate(&self) -> Result<CallToolResult, McpError> {
+        match Towerfile::from_local_file() {
+            Ok(_) => Self::json_success(json!({"valid": true})),
+            Err(e) => Self::json_success(json!({"valid": false, "error": e.to_string()})),
+        }
+    }
+
+    #[tool(description = "Generate Towerfile from pyproject.toml")]
+    async fn tower_file_generate(&self, Parameters(request): Parameters<GenerateTowerfileRequest>) -> Result<CallToolResult, McpError> {
+        let content = match TowerfileGenerator::from_pyproject(
+            request.pyproject_path.as_deref(),
+            request.script_path.as_deref()
+        ) {
+            Ok(content) => content,
+            Err(e) => return Self::error_result("Failed to generate Towerfile", e),
+        };
+        
+        match std::fs::write("Towerfile", &content) {
+            Ok(_) => Self::text_success("Generated Towerfile from pyproject.toml".to_string()),
+            Err(e) => Self::error_result("Failed to write Towerfile", e),
+        }
+    }
 }
 
 #[tool_handler]
@@ -293,4 +383,47 @@ impl ServerHandler for TowerService {
 }
 
 #[cfg(test)]
-mod tests;
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_json_success() {
+        let data = json!({"test": "value"});
+        let CallToolResult::Success { content } = TowerService::json_success(data).unwrap() else {
+            panic!("Expected success result");
+        };
+        
+        assert_eq!(content.len(), 1);
+        let Content::Text { text } = &content[0] else {
+            panic!("Expected text content");
+        };
+        assert!(text.contains("\"test\": \"value\""));
+    }
+
+    #[test]
+    fn test_text_success() {
+        let message = "Operation completed".to_string();
+        let CallToolResult::Success { content } = TowerService::text_success(message.clone()).unwrap() else {
+            panic!("Expected success result");
+        };
+        
+        assert_eq!(content.len(), 1);
+        let Content::Text { text } = &content[0] else {
+            panic!("Expected text content");
+        };
+        assert_eq!(text, &message);
+    }
+
+    #[test]
+    fn test_error_result() {
+        let CallToolResult::Error { content, .. } = TowerService::error_result("Test error", "something went wrong").unwrap() else {
+            panic!("Expected error result");
+        };
+        
+        assert_eq!(content.len(), 1);
+        let Content::Text { text } = &content[0] else {
+            panic!("Expected text content");
+        };
+        assert_eq!(text, "Test error: something went wrong");
+    }
+}
