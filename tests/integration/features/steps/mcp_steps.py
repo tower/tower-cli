@@ -9,6 +9,27 @@ sys.path.append(str(Path(__file__).parent.parent))
 from mcp_client import MCPTestHelper
 
 
+def assert_has_response(context):
+    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
+    assert context.mcp_response is not None, "MCP response was None"
+
+def is_error_response(response):
+    return (
+        not response.get("success", True) or
+        "error" in response or
+        any("error" in str(content).lower() or "failed" in str(content).lower()
+            for content in response.get("content", []))
+    )
+
+def has_text_content(response, text_check):
+    for content_item in response.get("content", []):
+        if content_item.get("type") == "text":
+            text = content_item.get("text", "")
+            if text_check(text):
+                return True
+    return False
+
+
 @given('I have a running Tower MCP server')
 def step_start_mcp_server(context):
     context.server_responsive = True
@@ -37,7 +58,7 @@ def step_create_long_running_app(context):
 @when('I call {tool_name} via MCP')
 def step_call_mcp_tool(context, tool_name):
     start_time = time.time()
-    
+
     try:
         async def call_tool():
             return await context.mcp_client.call_tool(tool_name)
@@ -46,14 +67,14 @@ def step_call_mcp_tool(context, tool_name):
     except Exception as e:
         context.mcp_response = {"success": False, "error": str(e)}
         context.operation_success = False
-        
+
     context.operation_duration = time.time() - start_time
 
 
 @when('I call {tool_name} with app name "{app_name}"')
 def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
     start_time = time.time()
-    
+
     try:
         async def call_tool():
             return await context.mcp_client.call_tool(tool_name, {"name": app_name})
@@ -62,7 +83,7 @@ def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
     except Exception as e:
         context.mcp_response = {"success": False, "error": str(e)}
         context.operation_success = False
-        
+
     context.operation_duration = time.time() - start_time
 
 
@@ -71,69 +92,41 @@ def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
 
 @then('I should receive a response')
 def step_check_response_exists(context):
-    """Verify we received some response."""
-    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    assert context.mcp_response is not None, "MCP response was None"
+    assert_has_response(context)
 
 
 @then('I should receive a response with apps data')
 def step_check_apps_data_response(context):
-    """Verify the response contains apps data."""
-    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    response_content = context.mcp_response.get("content", [])
-    
-    # The response should have content
-    assert len(response_content) > 0, "Response should have content"
-    
-    # Try to find JSON content that looks like apps data
-    found_apps_data = False
-    for content_item in response_content:
-        if content_item.get("type") == "text":
-            text = content_item.get("text", "")
-            if "apps" in text.lower() or "[]" in text:
-                found_apps_data = True
-                break
-                
-    assert found_apps_data, f"Response should contain apps data, got: {response_content}"
+    assert_has_response(context)
+    assert len(context.mcp_response.get("content", [])) > 0, "Response should have content"
+
+    found_apps_data = has_text_content(
+        context.mcp_response,
+        lambda text: "apps" in text.lower() or "[]" in text
+    )
+    assert found_apps_data, f"Response should contain apps data, got: {context.mcp_response.get('content')}"
 
 
 @then('I should receive an error response')
 def step_check_error_response(context):
-    """Verify we received an error response."""
-    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
-    # Either the success flag is False, or the content indicates an error
-    is_error = (
-        not context.mcp_response.get("success", True) or
-        "error" in context.mcp_response or
-        any("error" in str(content).lower() or "failed" in str(content).lower() 
-            for content in context.mcp_response.get("content", []))
-    )
-    
-    assert is_error, f"Expected error response, got: {context.mcp_response}"
+    assert_has_response(context)
+    assert is_error_response(context.mcp_response), f"Expected error response, got: {context.mcp_response}"
 
 
 @then('I should receive an error response about missing Towerfile')
 def step_check_missing_towerfile_error(context):
-    """Verify the error mentions missing Towerfile."""
-    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
+    assert_has_response(context)
     response_text = str(context.mcp_response).lower()
     assert "towerfile" in response_text, f"Error should mention Towerfile, got: {context.mcp_response}"
 
 
 @then('I should receive a success response')
 def step_check_success_response(context):
-    """Verify we received a success response."""
-    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
-    # Check if the operation was successful
+    assert_has_response(context)
     is_success = (
         context.mcp_response.get("success", False) or
-        any("valid" in str(content).lower() and "true" in str(content).lower()
-            for content in context.mcp_response.get("content", []))
+        has_text_content(context.mcp_response, lambda text: "valid" in text.lower() and "true" in text.lower())
     )
-    
     assert is_success, f"Expected success response, got: {context.mcp_response}"
 
 
@@ -141,10 +134,10 @@ def step_check_success_response(context):
 def step_check_parsed_towerfile(context):
     """Verify the response contains parsed Towerfile data."""
     assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
+
     response_content = context.mcp_response.get("content", [])
     assert len(response_content) > 0, "Response should have content"
-    
+
     # Look for Towerfile structure in the response
     found_config = False
     for content_item in response_content:
@@ -153,7 +146,7 @@ def step_check_parsed_towerfile(context):
             if "app" in text and "name" in text and "script" in text:
                 found_config = True
                 break
-                
+
     assert found_config, f"Response should contain Towerfile config, got: {response_content}"
 
 
@@ -161,10 +154,10 @@ def step_check_parsed_towerfile(context):
 def step_check_run_response(context):
     """Verify the response is about running the application."""
     assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
+
     response_text = str(context.mcp_response).lower()
     run_keywords = ["run", "app", "local", "complet", "success", "fail"]
-    
+
     found_run_keyword = any(keyword in response_text for keyword in run_keywords)
     assert found_run_keyword, f"Response should be about app run, got: {context.mcp_response}"
 
@@ -173,10 +166,10 @@ def step_check_run_response(context):
 def step_check_timeout_message(context):
     """Verify the response indicates a timeout occurred."""
     assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
+
     response_text = str(context.mcp_response).lower()
     timeout_keywords = ["timeout", "timed out", "1 seconds"]
-    
+
     found_timeout = any(keyword in response_text for keyword in timeout_keywords)
     assert found_timeout, f"Response should indicate timeout, got: {context.mcp_response}"
 
@@ -185,10 +178,10 @@ def step_check_timeout_message(context):
 def step_check_app_not_deployed_error(context):
     """Verify the error mentions app not being deployed."""
     assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-    
+
     response_text = str(context.mcp_response).lower()
     deployment_keywords = ["not found", "deploy", "cloud", "not deployed"]
-    
+
     found_deployment_error = any(keyword in response_text for keyword in deployment_keywords)
     assert found_deployment_error, f"Error should mention deployment, got: {context.mcp_response}"
 
@@ -210,7 +203,7 @@ def step_check_server_responsive(context):
     except Exception as e:
         context.server_responsive = False
         print(f"Warning: Server responsiveness test failed: {e}")
-        
+
     # For timeout scenarios, it's acceptable if the server is not responsive
     if not context.server_responsive:
         print("Note: Server may be unresponsive after timeout, which is expected")

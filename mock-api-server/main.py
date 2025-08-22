@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import os
 import json
 import datetime
+import uuid
 
 app = FastAPI(
     title="Tower Mock API",
@@ -17,9 +18,8 @@ mock_secrets_db = {}
 mock_teams_db = {}
 mock_runs_db = {}
 
-# Helper to generate unique IDs
 def generate_id():
-    return str(datetime.datetime.now().timestamp()).replace(".", "")
+    return str(uuid.uuid4())
 
 @app.get("/")
 async def read_root():
