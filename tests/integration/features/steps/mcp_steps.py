@@ -30,6 +30,19 @@ def has_text_content(response, text_check):
     return False
 
 
+@given('I have a running Tower MCP server')
+def step_have_running_mcp_server(context):
+    # This step is handled by the before_scenario hook in environment.py
+    # Just verify the MCP helper was set up properly
+    assert hasattr(context, 'mcp_helper'), "MCP helper should be set up"
+    assert hasattr(context, 'mcp_client'), "MCP client should be set up"
+    
+    server_alive = context.mcp_helper.client.is_server_alive()
+    print(f"DEBUG: MCP server alive check: {server_alive}")
+    if not server_alive:
+        print(f"DEBUG: Process poll: {context.mcp_helper.client.process.poll() if context.mcp_helper.client.process else 'No process'}")
+    assert server_alive, "MCP server should be running"
+
 @given('I have a valid Towerfile in the current directory')
 def step_create_valid_towerfile(context):
     context.mcp_helper.create_towerfile("hello_world")
