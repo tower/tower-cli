@@ -169,27 +169,47 @@ The MCP server exposes the following tools:
 
 #### Starting the MCP Server
 
-Start the MCP server using your installed Tower CLI:
+The Tower MCP server uses Server-Sent Events (SSE) for communication and runs on port 34567 by default. Start the server:
 
 ```bash
 tower mcp-server
+```
+
+Or specify a custom port:
+
+```bash
+tower mcp-server --port 8080
+```
+
+The server will display a message showing the URL it's running on:
+```
+SSE server running on http://127.0.0.1:34567
 ```
 
 #### Editor Configuration
 
 ##### Claude Code
 
-Add the Tower MCP server to Claude Code:
+Add the Tower MCP server to Claude Code using SSE transport:
 
 ```bash
-claude mcp add tower tower mcp-server
+claude mcp add tower http://127.0.0.1:34567/sse --transport sse
 ```
 
-Or using JSON configuration:
+Or using JSON configuration with SSE:
 
-```bash
-claude mcp add-json tower '{"command": "tower", "args": ["mcp-server"], "env": {}}'
+```json
+{
+  "mcpServers": {
+    "tower": {
+      "url": "http://127.0.0.1:34567/sse",
+      "transport": "sse"
+    }
+  }
+}
 ```
+
+For custom ports, adjust the URL accordingly (e.g., `http://127.0.0.1:8080/sse`).
 
 ##### Cursor
 
@@ -199,8 +219,8 @@ Add this to your Cursor settings (`settings.json`):
 {
   "mcp.servers": {
     "tower": {
-      "command": "tower",
-      "args": ["mcp-server"]
+      "url": "http://127.0.0.1:34567/sse",
+      "transport": "sse"
     }
   }
 }
@@ -215,8 +235,8 @@ Configure in Windsurf settings:
   "mcp": {
     "servers": {
       "tower": {
-        "command": "tower",
-        "args": ["mcp-server"]
+        "url": "http://127.0.0.1:34567/sse",
+        "transport": "sse"
       }
     }
   }
@@ -232,8 +252,8 @@ Add to your Zed `settings.json`:
   "assistant": {
     "mcp_servers": {
       "tower": {
-        "command": "tower",
-        "args": ["mcp-server"]
+        "url": "http://127.0.0.1:34567/sse",
+        "transport": "sse"
       }
     }
   }
@@ -248,9 +268,8 @@ For VS Code with MCP extensions, add to your `settings.json`:
 {
   "mcp.servers": {
     "tower": {
-      "command": "tower",
-      "args": ["mcp-server"],
-      "env": {}
+      "url": "http://127.0.0.1:34567/sse",
+      "transport": "sse"
     }
   }
 }
