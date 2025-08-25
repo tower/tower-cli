@@ -18,24 +18,38 @@ use config::Towerfile;
 use crate::towerfile_gen::TowerfileGenerator;
 
 #[derive(Debug, Deserialize, JsonSchema)]
+struct CommonParams {
+    /// Optional working directory path. If not specified, uses the current directory.
+    working_directory: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 struct NameRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     name: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct AppLogsRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     name: String,
     seq: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ListSecretsRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     environment: Option<String>,
     all: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CreateSecretRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     name: String,
     value: String,
     environment: Option<String>,
@@ -43,12 +57,16 @@ struct CreateSecretRequest {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct DeleteSecretRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     name: String,
     environment: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct UpdateTowerfileRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     app_name: Option<String>,
     script: Option<String>,
     description: Option<String>,
@@ -58,6 +76,8 @@ struct UpdateTowerfileRequest {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct AddParameterRequest {
+    #[serde(flatten)]
+    common: CommonParams,
     name: String,
     description: String,
     default: String,
@@ -65,8 +85,15 @@ struct AddParameterRequest {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct GenerateTowerfileRequest {
-    pyproject_path: Option<String>,
+    #[serde(flatten)]
+    common: CommonParams,
     script_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct EmptyRequest {
+    #[serde(flatten)]
+    common: CommonParams,
 }
 
 
@@ -125,6 +152,13 @@ impl TowerService {
 
     fn error_result(prefix: &str, error: impl std::fmt::Display + std::fmt::Debug) -> Result<CallToolResult, McpError> {
         Ok(CallToolResult::error(vec![Content::text(format!("{}: {:#?}", prefix, error))]))
+    }
+    
+    fn resolve_working_directory(common: &CommonParams) -> std::path::PathBuf {
+        common.working_directory
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
     }
 
 
@@ -284,9 +318,10 @@ impl TowerService {
         Self::text_success("Deploy command completed - check output above for status".to_string())
     }
 
-    #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update")]
-    async fn tower_run_local(&self) -> Result<CallToolResult, McpError> {
-        match run::do_run_local_capture(self.config.clone(), std::path::PathBuf::from("."), "default", std::collections::HashMap::new()).await {
+    #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update. Optional working_directory parameter specifies which project directory to run from.")]
+    async fn tower_run_local(&self, Parameters(request): Parameters<EmptyRequest>) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        match run::do_run_local_capture(self.config.clone(), working_dir, "default", std::collections::HashMap::new()).await {
             Ok(output_lines) => {
                 let output = if output_lines.is_empty() {
                     "App completed successfully (no output)"
@@ -341,17 +376,19 @@ impl TowerService {
     }
 
 
-    #[tool(description = "Read and parse the current Towerfile configuration")]
-    async fn tower_file_read(&self) -> Result<CallToolResult, McpError> {
-        match Towerfile::from_local_file() {
+    #[tool(description = "Read and parse the current Towerfile configuration. Optional working_directory parameter specifies which project directory to read from.")]
+    async fn tower_file_read(&self, Parameters(request): Parameters<EmptyRequest>) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(towerfile) => Self::json_success(serde_json::to_value(&towerfile).unwrap()),
             Err(e) => Self::error_result("Failed to read Towerfile", e),
         }
     }
 
-    #[tool(description = "Update Towerfile app configuration")]
+    #[tool(description = "Update Towerfile app configuration. Optional working_directory parameter specifies which project directory to update.")]
     async fn tower_file_update(&self, Parameters(request): Parameters<UpdateTowerfileRequest>) -> Result<CallToolResult, McpError> {
-        let mut towerfile = match Towerfile::from_local_file() {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
@@ -362,15 +399,17 @@ impl TowerService {
         if let Some(schedule) = request.schedule { towerfile.app.schedule = schedule; }
         if let Some(source) = request.source { towerfile.app.source = source; }
         
-        match towerfile.save(None) {
-            Ok(_) => Self::text_success("Towerfile updated".to_string()),
+        let towerfile_path = working_dir.join("Towerfile");
+        match towerfile.save(Some(&towerfile_path)) {
+            Ok(_) => Self::text_success(format!("Towerfile updated at {}", towerfile_path.display())),
             Err(e) => Self::error_result("Failed to save Towerfile", e),
         }
     }
 
-    #[tool(description = "Add a new parameter to the Towerfile")]
+    #[tool(description = "Add a new parameter to the Towerfile. Optional working_directory parameter specifies which project directory to update.")]
     async fn tower_file_add_parameter(&self, Parameters(request): Parameters<AddParameterRequest>) -> Result<CallToolResult, McpError> {
-        let mut towerfile = match Towerfile::from_local_file() {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
@@ -378,32 +417,37 @@ impl TowerService {
         let param_name = request.name.clone();
         towerfile.add_parameter(request.name, request.description, request.default);
         
-        match towerfile.save(None) {
-            Ok(_) => Self::text_success(format!("Added parameter '{}'", param_name)),
+        let towerfile_path = working_dir.join("Towerfile");
+        match towerfile.save(Some(&towerfile_path)) {
+            Ok(_) => Self::text_success(format!("Added parameter '{}' to {}", param_name, towerfile_path.display())),
             Err(e) => Self::error_result("Failed to save Towerfile", e),
         }
     }
 
-    #[tool(description = "Validate the current Towerfile configuration")]
-    async fn tower_file_validate(&self) -> Result<CallToolResult, McpError> {
-        match Towerfile::from_local_file() {
+    #[tool(description = "Validate the current Towerfile configuration. Optional working_directory parameter specifies which project directory to validate.")]
+    async fn tower_file_validate(&self, Parameters(request): Parameters<EmptyRequest>) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(_) => Self::json_success(json!({"valid": true})),
             Err(e) => Self::json_success(json!({"valid": false, "error": e.to_string()})),
         }
     }
 
-    #[tool(description = "Generate Towerfile from pyproject.toml. This is typically the first step in the workflow")]
+    #[tool(description = "Generate Towerfile from pyproject.toml. This is typically the first step in the workflow. Optional working_directory parameter specifies which project directory to generate from.")]
     async fn tower_file_generate(&self, Parameters(request): Parameters<GenerateTowerfileRequest>) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        let pyproject_path = working_dir.join("pyproject.toml");
         let content = match TowerfileGenerator::from_pyproject(
-            request.pyproject_path.as_deref(),
+            Some(pyproject_path.to_str().unwrap()),
             request.script_path.as_deref()
         ) {
             Ok(content) => content,
             Err(e) => return Self::error_result("Failed to generate Towerfile", e),
         };
         
-        match std::fs::write("Towerfile", &content) {
-            Ok(_) => Self::text_success("Generated Towerfile from pyproject.toml".to_string()),
+        let towerfile_path = working_dir.join("Towerfile");
+        match std::fs::write(&towerfile_path, &content) {
+            Ok(_) => Self::text_success(format!("Generated Towerfile at {}", towerfile_path.display())),
             Err(e) => Self::error_result("Failed to write Towerfile", e),
         }
     }
@@ -411,6 +455,8 @@ impl TowerService {
     #[tool(description = "Show the recommended workflow for developing and deploying Tower applications")]
     async fn tower_workflow_help(&self) -> Result<CallToolResult, McpError> {
         let workflow = r#"Tower Application Development Workflow:
+
+All commands support an optional 'working_directory' parameter to specify which project directory to operate on.
 
 1. CREATE TOWERFILE (required for all steps):
    - tower_file_generate: Generate from existing pyproject.toml
@@ -434,7 +480,9 @@ impl TowerService {
    - tower_teams_list/switch: Manage team contexts
    - tower_secrets_create/list: Manage application secrets
 
-Quick Start: tower_file_generate → tower_run (test locally) → tower_apps_create → tower_deploy → tower_run_remote
+Quick Start: tower_file_generate → tower_run_local (test locally) → tower_apps_create → tower_deploy → tower_run_remote
+
+Example with working_directory: {"working_directory": "/path/to/project", ...}
 
 Consider taking database username/password/url and making them into secrets to be accessed in app code"#;
 
