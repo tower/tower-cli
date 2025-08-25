@@ -7,6 +7,7 @@ pub struct TowerfileGenerator;
 impl TowerfileGenerator {
     pub fn from_pyproject(pyproject_path: Option<&str>, script_path: Option<&str>) -> Result<String> {
         let pyproject_path = pyproject_path.unwrap_or("pyproject.toml");
+        let pyproject_dir = Path::new(pyproject_path).parent().unwrap_or(Path::new("."));
         
         if !Path::new(pyproject_path).exists() {
             return Err(anyhow::anyhow!("pyproject.toml not found at {}", pyproject_path));
@@ -29,7 +30,7 @@ impl TowerfileGenerator {
 
         let script = script_path
             .map(String::from)
-            .or_else(Self::find_main_script)
+            .or_else(|| Self::find_main_script(pyproject_dir))
             .unwrap_or_else(|| "./main.py".to_string());
 
         let source_files = if script.ends_with(".py") {
@@ -50,22 +51,22 @@ description = "{}"
     }
 
 
-    fn find_main_script() -> Option<String> {
-        Self::find_script_from_pyproject()
-            .or_else(Self::find_script_with_main)
-            .or_else(Self::find_common_script)
-            .or_else(Self::find_any_python_file)
+    fn find_main_script(dir: &Path) -> Option<String> {
+        Self::find_script_from_pyproject(dir)
+            .or_else(|| Self::find_script_with_main(dir))
+            .or_else(|| Self::find_common_script(dir))
+            .or_else(|| Self::find_any_python_file(dir))
     }
     
-    fn find_common_script() -> Option<String> {
+    fn find_common_script(dir: &Path) -> Option<String> {
         ["main.py", "app.py", "run.py", "task.py"]
             .into_iter()
-            .find(|&candidate| Path::new(candidate).exists())
+            .find(|&candidate| dir.join(candidate).exists())
             .map(|candidate| format!("./{}", candidate))
     }
     
-    fn find_script_from_pyproject() -> Option<String> {
-        let content = fs::read_to_string("pyproject.toml").ok()?;
+    fn find_script_from_pyproject(dir: &Path) -> Option<String> {
+        let content = fs::read_to_string(dir.join("pyproject.toml")).ok()?;
         let pyproject: serde_json::Value = toml::from_str(&content).ok()?;
         
         let script_path = pyproject
@@ -79,11 +80,11 @@ description = "{}"
         let module = script_path.split(':').next()?;
         let py_file = format!("{}.py", module.replace('.', "/"));
         
-        Path::new(&py_file).exists().then(|| format!("./{}", py_file))
+        dir.join(&py_file).exists().then(|| format!("./{}", py_file))
     }
     
-    fn get_python_files() -> Vec<String> {
-        fs::read_dir(".")
+    fn get_python_files(dir: &Path) -> Vec<String> {
+        fs::read_dir(dir)
             .ok()
             .into_iter()
             .flat_map(|entries| entries.flatten())
@@ -92,19 +93,19 @@ description = "{}"
             .collect()
     }
     
-    fn find_script_with_main() -> Option<String> {
-        Self::get_python_files()
+    fn find_script_with_main(dir: &Path) -> Option<String> {
+        Self::get_python_files(dir)
             .into_iter()
             .find(|name| {
-                fs::read_to_string(name)
+                fs::read_to_string(dir.join(name))
                     .map(|content| content.contains("if __name__ == \"__main__\":"))
                     .unwrap_or(false)
             })
             .map(|name| format!("./{}", name))
     }
     
-    fn find_any_python_file() -> Option<String> {
-        Self::get_python_files()
+    fn find_any_python_file(dir: &Path) -> Option<String> {
+        Self::get_python_files(dir)
             .into_iter()
             .next()
             .map(|name| format!("./{}", name))
@@ -193,10 +194,10 @@ requires = ["setuptools"]
     #[test]
     fn test_find_script_from_pyproject() {
         let temp_dir = create_test_env();
-        std::env::set_current_dir(&temp_dir).unwrap();
+        let _guard = std::env::set_current_dir(&temp_dir);
         
         // Create pyproject.toml with script entry
-        fs::write("pyproject.toml", r#"
+        fs::write(temp_dir.path().join("pyproject.toml"), r#"
 [project]
 name = "test-project"
 
@@ -205,39 +206,37 @@ my-script = "src.main:main"
 "#).unwrap();
         
         // Create the referenced script file
-        fs::create_dir("src").unwrap();
-        fs::write("src/main.py", "def main(): pass").unwrap();
+        fs::create_dir_all(temp_dir.path().join("src")).unwrap();
+        fs::write(temp_dir.path().join("src/main.py"), "def main(): pass").unwrap();
         
-        let result = TowerfileGenerator::find_script_from_pyproject();
+        let result = TowerfileGenerator::find_script_from_pyproject(temp_dir.path());
         assert_eq!(result, Some("./src/main.py".to_string()));
     }
 
     #[test]
     fn test_find_script_from_pyproject_no_file() {
         let temp_dir = create_test_env();
-        std::env::set_current_dir(&temp_dir).unwrap();
         
-        let result = TowerfileGenerator::find_script_from_pyproject();
+        let result = TowerfileGenerator::find_script_from_pyproject(temp_dir.path());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_find_script_with_main() {
         let temp_dir = create_test_env();
-        std::env::set_current_dir(&temp_dir).unwrap();
         
         // Create files with and without __main__
-        fs::write("script1.py", "print('hello')").unwrap();
-        fs::write("script2.py", r#"
+        fs::write(temp_dir.path().join("script1.py"), "print('hello')").unwrap();
+        fs::write(temp_dir.path().join("script2.py"), r#"
 def main():
     print("hello")
 
 if __name__ == "__main__":
     main()
 "#).unwrap();
-        fs::write("script3.py", "import sys").unwrap();
+        fs::write(temp_dir.path().join("script3.py"), "import sys").unwrap();
         
-        let result = TowerfileGenerator::find_script_with_main();
+        let result = TowerfileGenerator::find_script_with_main(temp_dir.path());
         assert_eq!(result, Some("./script2.py".to_string()));
     }
 
@@ -245,14 +244,13 @@ if __name__ == "__main__":
     #[test]
     fn test_find_main_script_priority() {
         let temp_dir = create_test_env();
-        std::env::set_current_dir(&temp_dir).unwrap();
         
         // Create pyproject.toml with script entry (highest priority)
-        fs::write("pyproject.toml", r#"
+        fs::write(temp_dir.path().join("pyproject.toml"), r#"
 [project.scripts]
 cli = "main:run"
 "#).unwrap();
-        fs::write("main.py", r#"
+        fs::write(temp_dir.path().join("main.py"), r#"
 def run():
     pass
 
@@ -261,12 +259,12 @@ if __name__ == "__main__":
 "#).unwrap();
         
         // Also create other files that should be lower priority
-        fs::write("app.py", r#"
+        fs::write(temp_dir.path().join("app.py"), r#"
 if __name__ == "__main__":
     print("app")
 "#).unwrap();
         
-        let result = TowerfileGenerator::find_main_script();
+        let result = TowerfileGenerator::find_main_script(temp_dir.path());
         assert_eq!(result, Some("./main.py".to_string()));
     }
 
