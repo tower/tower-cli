@@ -71,6 +71,7 @@ tower = { workspace = true }
 [dependency-groups]
 dev = [
   "aiohttp==3.10.11",
+  "behave==1.2.6",
   "openapi-python-client==0.24.3",
   "pytest==8.3.5",
   "pytest-httpx==0.35.0",
