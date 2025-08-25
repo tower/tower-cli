@@ -1,0 +1,61 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '**'
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install the latest version of uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: "Set up Python"
+      uses: actions/setup-python@v5
+      with:
+        python-version-file: ".python-version"
+
+    - name: Build Tower CLI
+      run: cargo build
+
+    - name: Install Python dependencies
+      run: uv sync --locked --group dev
+
+    - name: Start mock API server
+      run: |
+        cd tests/mock-api-server
+        uv run uvicorn main:app --host 127.0.0.1 --port 8000 &
+        echo $! > mock_server.pid
+        
+        # Wait for server to be ready
+        for i in {1..30}; do
+          if curl -f http://127.0.0.1:8000/health 2>/dev/null; then
+            echo "Mock server is ready"
+            break
+          fi
+          echo "Waiting for mock server to start... ($i/30)"
+          sleep 1
+        done
+
+    - name: Run BDD integration tests
+      run: |
+        cd tests/integration
+        TOWER_MOCK_API_URL=http://127.0.0.1:8000 uv run behave features/
+
+    - name: Stop mock server
+      if: always()
+      run: |
+        if [ -f tests/mock-api-server/mock_server.pid ]; then
+          kill $(cat tests/mock-api-server/mock_server.pid) || true
+        fi
