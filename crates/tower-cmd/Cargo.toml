@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+axum = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
@@ -33,7 +34,7 @@ tower-runtime = { workspace = true }
 tower-telemetry = { workspace = true }
 tower-version = { path = "../tower-version" }
 webbrowser = { workspace = true }
-rmcp = { version = "0.5.0", features = ["server", "transport-io", "schemars"] }
+rmcp = { version = "0.5.0", features = ["server", "transport-io", "schemars", "transport-sse-server"] }
 schemars = "1.0"
 toml = { workspace = true }
 toml_edit = { workspace = true }
