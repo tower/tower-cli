@@ -327,23 +327,27 @@ impl TowerService {
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
         
-        // Check if app exists/is deployed
-        match api::describe_app(&config, &towerfile.app.name).await {
-            Ok(_) => {
-                // App exists, proceed with remote run
-                match tokio::time::timeout(
-                    std::time::Duration::from_secs(300), // 5 minute timeout for remote runs
-                    run::do_run_remote(config, path, env, params, None, false)
-                ).await {
-                    Ok(Ok(_)) => Self::text_success("App scheduled for remote execution successfully".to_string()),
-                    Ok(Err(e)) => Self::error_result("Remote run failed", e),
-                    Err(_) => Self::text_success("Remote run scheduling timed out after 5 minutes".to_string()),
+        // Try remote run directly to get better error messages
+        match run::do_run_remote_capture(config, path, env, params, None).await {
+            Ok(output_lines) => {
+                let output = if output_lines.is_empty() {
+                    "Remote run completed successfully (no output)"
+                } else {
+                    &format!("Remote run completed successfully:\n\n{}", output_lines.join("\n"))
+                };
+                Self::text_success(output.to_string())
+            }
+            Err(e) => {
+                let error_msg = format!("{}", e);
+                if error_msg.contains("404") || error_msg.contains("Not found") {
+                    Self::text_success(format!(
+                        "App '{}' exists but may not be deployed. Try running tower_deploy first, or check if the app has any successful deployments.",
+                        towerfile.app.name
+                    ))
+                } else {
+                    Self::error_result("Remote run failed", e)
                 }
-            },
-            Err(_) => Self::text_success(format!(
-                "App '{}' not found on Tower cloud. Complete the workflow: 1) Create app with tower_apps_create, 2) Deploy with tower_deploy, then try tower_run_remote again",
-                towerfile.app.name
-            )),
+            }
         }
     }
 

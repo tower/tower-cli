@@ -293,7 +293,7 @@ pub async fn do_follow_run_capture(
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let sink = ChannelSink(tx);
     
-    let result = do_follow_run_impl(config, run, &sink).await;
+    let result = do_follow_run_impl(config, run, &sink, false).await;
     
     let mut output_lines = Vec::new();
     while let Ok(line) = rx.try_recv() {
@@ -308,13 +308,14 @@ async fn do_follow_run(
     run: &Run,
 ) {
     let sink = StdoutSink;
-    let _ = do_follow_run_impl(config, run, &sink).await;
+    let _ = do_follow_run_impl(config, run, &sink, true).await;
 }
 
 async fn do_follow_run_impl(
     config: Config,
     run: &Run,
     sink: &dyn OutputSink,
+    enable_ctrl_c: bool,
 ) -> Result<()> {
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
@@ -328,21 +329,27 @@ async fn do_follow_run_impl(
             // `wait_for_run_start` function above.
             let mut run_complete = monitor_run_completion(&config, run);
 
-            // Skip Ctrl+C handler for capture mode
+            // Set up Ctrl+C handler if enabled
+            let ctrl_c_future = if enable_ctrl_c {
+                Some(tokio::signal::ctrl_c())
+            } else {
+                None
+            };
 
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
                 Ok(mut output) => {
                     loop {
-                        tokio::select! {
-                            Some(event) = output.recv() => {
-                                if let api::LogStreamEvent::EventLog(log) = &event {
-                                    let ts = dates::format_str(&log.reported_at);
-                                    sink.send_line(format!("{}: {}", ts, log.content));
-                                }
-                            },
-                            res = &mut run_complete => {
+                        if enable_ctrl_c {
+                            tokio::select! {
+                                Some(event) = output.recv() => {
+                                    if let api::LogStreamEvent::EventLog(log) = &event {
+                                        let ts = dates::format_str(&log.reported_at);
+                                        sink.send_line(format!("{}: {}", ts, log.content));
+                                    }
+                                },
+                                res = &mut run_complete => {
                                 match res {
                                     Ok(completed_run) => {
                                         match completed_run.status {
@@ -370,7 +377,50 @@ async fn do_follow_run_impl(
                                 }
                                 break;
                             },
+                            _ = tokio::signal::ctrl_c() => {
+                                sink.send_line("Received Ctrl+C, stopping log streaming...".to_string());
+                                sink.send_line("Note: The run will continue in Tower cloud".to_string());
+                                break;
+                            },
                         };
+                        } else {
+                            tokio::select! {
+                                Some(event) = output.recv() => {
+                                    if let api::LogStreamEvent::EventLog(log) = &event {
+                                        let ts = dates::format_str(&log.reported_at);
+                                        sink.send_line(format!("{}: {}", ts, log.content));
+                                    }
+                                },
+                                res = &mut run_complete => {
+                                    match res {
+                                        Ok(completed_run) => {
+                                            match completed_run.status {
+                                                tower_api::models::run::Status::Errored => {
+                                                    sink.send_error(format!("Run #{} for app '{}' had an error", completed_run.number, completed_run.app_name));
+                                                    return Err(anyhow::anyhow!("Run failed with error status"));
+                                                },
+                                                tower_api::models::run::Status::Crashed => {
+                                                    sink.send_error(format!("Run #{} for app '{}' crashed", completed_run.number, completed_run.app_name));
+                                                    return Err(anyhow::anyhow!("Run crashed"));
+                                                },
+                                                tower_api::models::run::Status::Cancelled => {
+                                                    sink.send_error(format!("Run #{} for app '{}' was cancelled", completed_run.number, completed_run.app_name));
+                                                    return Err(anyhow::anyhow!("Run was cancelled"));
+                                                },
+                                                _ => {
+                                                    sink.send_line(format!("Run #{} for app '{}' completed successfully", completed_run.number, completed_run.app_name));
+                                                }
+                                            }
+                                        }
+                                        Err(err) => {
+                                            sink.send_error(format!("Failed to monitor run completion: {:?}", err));
+                                            return Err(err.into());
+                                        }
+                                    }
+                                    break;
+                                },
+                            };
+                        }
                     }
                 },
                 Err(err) => {
