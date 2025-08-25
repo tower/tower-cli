@@ -114,7 +114,7 @@ pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()
     let port = *args.get_one::<u16>("port").unwrap();
     let bind_addr = format!("127.0.0.1:{}", port);
     
-    println!("SSE server running on http://{}", bind_addr);
+    eprintln!("SSE server running on http://{}", bind_addr);
     
     let ct = SseServer::serve(bind_addr.parse()?)
         .await?

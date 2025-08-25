@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 import os
+import aiohttp
 
 
 class MCPClient:
@@ -25,6 +26,7 @@ class MCPClient:
         self.process: Optional[subprocess.Popen] = None
         self.request_id = 0
         self.temp_config_dir: Optional[str] = None
+        self.mcp_server_url = "http://127.0.0.1:34567"
 
     def _setup_mock_config(self, test_env):
         import tempfile
@@ -69,19 +71,33 @@ class MCPClient:
 
         self.process = subprocess.Popen(
             cmd,
-            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=0,
             env=test_env
         )
+        
+        # Check for immediate errors
+        import time
+        time.sleep(0.05)  # Brief pause to catch startup errors
+        if self.process.poll() is not None:
+            stderr_output = self.process.stderr.read()
+            if stderr_output:
+                print(f"DEBUG: MCP server stderr: {stderr_output}")
+            raise RuntimeError(f"MCP server exited immediately with code {self.process.returncode}")
 
-        # Wait a moment for server to start
-        await asyncio.sleep(0.1)
-
-        # Initialize the connection
-        await self._send_initialize()
+        # Wait for SSE server to start
+        await asyncio.sleep(1.0)
+        
+        # Check if process is still running after wait
+        if self.process.poll() is not None:
+            stderr_output = self.process.stderr.read()
+            if stderr_output:
+                print(f"DEBUG: MCP server stderr after wait: {stderr_output}")
+            raise RuntimeError(f"MCP server died during startup with code {self.process.returncode}")
+        
+        # Test server connectivity
+        await self._test_server_connectivity()
 
     async def stop_server(self) -> None:
         if self.process:
@@ -100,6 +116,20 @@ class MCPClient:
 
         self._cleanup_temp_config()
 
+    async def _test_server_connectivity(self) -> None:
+        """Test if the SSE server is responding"""
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Try to connect to the server
+                async with session.get(self.mcp_server_url + "/sse", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        print(f"DEBUG: SSE server is responsive at {self.mcp_server_url}")
+                        return
+        except Exception as e:
+            print(f"DEBUG: SSE server connectivity test failed: {e}")
+            raise RuntimeError(f"SSE server not responding at {self.mcp_server_url}")
+
     async def _send_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         if not self.process:
             raise RuntimeError("Server not started")
@@ -112,60 +142,45 @@ class MCPClient:
             "params": params or {}
         }
 
-        request_json = json.dumps(request) + "\n"
-        self.process.stdin.write(request_json)
-        self.process.stdin.flush()
-
-        # Client timeout should only catch bugs/hangs, not interfere with tests
         try:
-            response_line = await asyncio.wait_for(
-                self._read_line(),
-                timeout=30.0  # High timeout - only catches real hangs, not test interference
-            )
-            return json.loads(response_line)
-        except asyncio.TimeoutError:
-            raise TimeoutError(f"Request {method} timed out after 30 seconds - likely a bug")
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    self.mcp_server_url + "/message", 
+                    json=request,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result
+                    else:
+                        raise RuntimeError(f"HTTP {response.status}: {await response.text()}")
+        except Exception as e:
+            raise RuntimeError(f"Request {method} failed: {e}")
 
-    async def _read_line(self) -> str:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.process.stdout.readline)
-
-    async def _send_initialize(self) -> None:
-        params = {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "roots": {"listChanged": True},
-                "sampling": {}
-            },
-            "clientInfo": {
-                "name": "tower-test-client",
-                "version": "1.0.0"
-            }
-        }
-
-        response = await self._send_request("initialize", params)
-        if "error" in response:
-            raise RuntimeError(f"Failed to initialize: {response['error']}")
-
-        # Send initialized notification
-        await self._send_notification("notifications/initialized")
-
-    async def _send_notification(self, method: str, params: Dict[str, Any] = None) -> None:
-        if not self.process:
-            raise RuntimeError("Server not started")
-
-        notification = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params or {}
-        }
-
-        notification_json = json.dumps(notification) + "\n"
-        self.process.stdin.write(notification_json)
-        self.process.stdin.flush()
 
     def is_server_alive(self) -> bool:
-        return self.process is not None and self.process.poll() is None
+        # Check if process is running
+        if self.process is None or self.process.poll() is not None:
+            return False
+        
+        # For HTTP transport, also check if server is responsive
+        try:
+            import aiohttp
+            import asyncio
+            
+            async def check_connectivity():
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(self.mcp_server_url + "/sse", timeout=aiohttp.ClientTimeout(total=1)) as response:
+                            return response.status == 200
+                except:
+                    return False
+            
+            return asyncio.run(check_connectivity())
+        except:
+            # If HTTP check fails, fall back to just process check
+            return True
 
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any] = None) -> Dict[str, Any]:
         if not self.is_server_alive():
