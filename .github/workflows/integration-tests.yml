@@ -1,10 +1,14 @@
 name: Integration Tests
 
 on:
-  push:
-    branches: [main, 'ben/*']  # Run on main branch and personal branches
   pull_request:
-    branches: [main]
+    branches:
+      - '*'
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '**'
 
 jobs:
   integration-tests:
@@ -26,7 +30,7 @@ jobs:
     - name: Set up Python and dependencies
       run: |
         nix develop --command bash -c "
-          cd mock-api-server && 
+          cd tests/mock-api-server &&
           python -m venv .venv && 
           source .venv/bin/activate && 
           pip install -e .
@@ -34,7 +38,7 @@ jobs:
 
     - name: Start mock API server
       run: |
-        cd mock-api-server
+        cd tests/mock-api-server
         source .venv/bin/activate
         uvicorn main:app --host 127.0.0.1 --port 8000 &
         echo $! > mock_server.pid
@@ -59,6 +63,6 @@ jobs:
     - name: Stop mock server
       if: always()
       run: |
-        if [ -f mock-api-server/mock_server.pid ]; then
-          kill $(cat mock-api-server/mock_server.pid) || true
+        if [ -f tests/mock-api-server/mock_server.pid ]; then
+          kill $(cat tests/mock-api-server/mock_server.pid) || true
         fi
