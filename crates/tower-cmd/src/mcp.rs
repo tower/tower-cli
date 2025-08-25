@@ -2,12 +2,12 @@ use anyhow::Result;
 use clap::Command;
 use crate::{Config, api, deploy, run};
 use rmcp::{
-    ErrorData as McpError, ServerHandler, ServiceExt,
+    ErrorData as McpError, ServerHandler,
     handler::server::{tool::{Parameters, ToolRouter}},
     model::{CallToolResult, Content, ServerInfo, ServerCapabilities, Implementation, ProtocolVersion},
     schemars::{self, JsonSchema},
     tool, tool_handler, tool_router,
-    transport::sse_server::{SseServer, SseServerConfig},
+    transport::sse_server::SseServer,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -290,16 +290,9 @@ impl TowerService {
 
     #[tool(description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create")]
     async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
-        let config = self.config.clone();
-        Self::run_with_panic_handling(
-            move || async move {
-                let matches = clap::ArgMatches::default();
-                deploy::do_deploy(config, &matches).await;
-                Ok(())
-            },
-            "App deployed",
-            "Deploy failed - check Towerfile and login status"
-        ).await
+        let matches = clap::ArgMatches::default();
+        deploy::do_deploy(self.config.clone(), &matches).await;
+        Self::text_success("Deploy command completed - check output above for status".to_string())
     }
 
     #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update")]

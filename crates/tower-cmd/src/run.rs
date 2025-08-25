@@ -187,6 +187,30 @@ pub async fn do_run_local_capture(config: Config, path: PathBuf, env: &str, para
     do_run_local_impl(config, path, env, params, monitor_output_capture).await
 }
 
+pub async fn do_run_remote_capture(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    params: HashMap<String, String>,
+    app_name: Option<String>,
+) -> Result<Vec<String>> {
+    let app_slug = if let Some(name) = app_name {
+        name
+    } else {
+        let towerfile_path = path.join("Towerfile");
+        let towerfile = load_towerfile(&towerfile_path)?;
+        towerfile.app.name
+    };
+
+    match api::run_app(&config, &app_slug, env, params).await {
+        Err(err) => Err(err.into()),
+        Ok(res) => {
+            let run = res.run;
+            do_follow_run_capture(config, &run).await
+        }
+    }
+}
+
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
 pub async fn do_run_remote(
@@ -237,51 +261,74 @@ pub async fn do_run_remote(
     }
 }
 
+trait OutputSink: Send + Sync {
+    fn send_line(&self, line: String);
+    fn send_error(&self, error: String);
+}
+
+struct StdoutSink;
+impl OutputSink for StdoutSink {
+    fn send_line(&self, line: String) {
+        output::write(&line);
+    }
+    fn send_error(&self, error: String) {
+        output::failure(&error);
+    }
+}
+
+struct ChannelSink(tokio::sync::mpsc::UnboundedSender<String>);
+impl OutputSink for ChannelSink {
+    fn send_line(&self, line: String) {
+        let _ = self.0.send(line);
+    }
+    fn send_error(&self, error: String) {
+        let _ = self.0.send(error);
+    }
+}
+
+pub async fn do_follow_run_capture(
+    config: Config,
+    run: &Run,
+) -> Result<Vec<String>> {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let sink = ChannelSink(tx);
+    
+    let result = do_follow_run_impl(config, run, &sink).await;
+    
+    let mut output_lines = Vec::new();
+    while let Ok(line) = rx.try_recv() {
+        output_lines.push(line);
+    }
+    
+    result.map(|_| output_lines)
+}
+
 async fn do_follow_run(
     config: Config,
     run: &Run,
 ) {
-    let mut spinner = output::spinner("Waiting for run to start...");
+    let sink = StdoutSink;
+    let _ = do_follow_run_impl(config, run, &sink).await;
+}
 
+async fn do_follow_run_impl(
+    config: Config,
+    run: &Run,
+    sink: &dyn OutputSink,
+) -> Result<()> {
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
-            spinner.failure();
-            debug!("Failed to wait for run to start: {}", err);
-            let msg = format!("An error occurred while waiting for the run to start. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
-            output::failure(&msg);
+            sink.send_error(format!("Failed to wait for run to start: {}", err));
+            return Err(err.into());
         },
         Ok(()) => {
-            spinner.success();
+            sink.send_line("Run started, streaming logs...".to_string());
 
             // We do this here, explicitly, to not double-monitor our API via the
             // `wait_for_run_start` function above.
             let mut run_complete = monitor_run_completion(&config, run);
 
-            // We set a Ctrl+C handler here, if invoked it will print a message that shows where
-            // the user can follow the run.
-            let run_copy = run.clone();
-
-            ctrlc::set_handler(move || {
-                output::newline();
-
-                let msg = format!(
-                    "Run #{} for app `{}` is still running.",
-                    run_copy.number, run_copy.app_name
-                );
-                output::write(&msg);
-                output::newline();
-
-                let msg = format!(
-                    "You can follow it at {}",
-                    run_copy.dollar_link
-                );
-                output::write(&msg);
-                output::newline();
-
-                // According to
-                // https://www.agileconnection.com/article/overview-linux-exit-codes...
-                std::process::exit(130);
-            }).expect("Failed to set Ctrl+C handler");
+            // Skip Ctrl+C handler for capture mode
 
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
@@ -289,30 +336,52 @@ async fn do_follow_run(
                 Ok(mut output) => {
                     loop {
                         tokio::select! {
-                            Some(event) = output.recv() => print_log_stream_event(event),
+                            Some(event) = output.recv() => {
+                                if let api::LogStreamEvent::EventLog(log) = &event {
+                                    let ts = dates::format_str(&log.reported_at);
+                                    sink.send_line(format!("{}: {}", ts, log.content));
+                                }
+                            },
                             res = &mut run_complete => {
                                 match res {
-                                    Ok(run) => print_run_completion(&run),
+                                    Ok(completed_run) => {
+                                        match completed_run.status {
+                                            tower_api::models::run::Status::Errored => {
+                                                sink.send_error(format!("Run #{} for app '{}' had an error", completed_run.number, completed_run.app_name));
+                                                return Err(anyhow::anyhow!("Run failed with error status"));
+                                            },
+                                            tower_api::models::run::Status::Crashed => {
+                                                sink.send_error(format!("Run #{} for app '{}' crashed", completed_run.number, completed_run.app_name));
+                                                return Err(anyhow::anyhow!("Run crashed"));
+                                            },
+                                            tower_api::models::run::Status::Cancelled => {
+                                                sink.send_error(format!("Run #{} for app '{}' was cancelled", completed_run.number, completed_run.app_name));
+                                                return Err(anyhow::anyhow!("Run was cancelled"));
+                                            },
+                                            _ => {
+                                                sink.send_line(format!("Run #{} for app '{}' completed successfully", completed_run.number, completed_run.app_name));
+                                            }
+                                        }
+                                    }
                                     Err(err) => {
-                                        debug!("Failed to monitor run completion: {:?}", err);
-                                        let msg = format!("An error occurred while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
-                                        output::failure(&msg);
+                                        sink.send_error(format!("Failed to monitor run completion: {:?}", err));
+                                        return Err(err.into());
                                     }
                                 }
-
                                 break;
                             },
                         };
                     }
                 },
                 Err(err) => {
-                    debug!("Failed to stream run logs: {:?}", err);
-                    let msg = format!("An error occurred while streaming logs from Tower to your console. You can get more details at {:?} or by contacting support.", run.dollar_link);
-                    output::failure(&msg);
+                    sink.send_error(format!("Failed to stream run logs: {:?}", err));
+                    return Err(anyhow::anyhow!("Failed to stream run logs: {:?}", err));
                 }
             }
         }
     };
+    
+    Ok(())
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
