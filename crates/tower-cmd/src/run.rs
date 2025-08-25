@@ -329,98 +329,30 @@ async fn do_follow_run_impl(
             // `wait_for_run_start` function above.
             let mut run_complete = monitor_run_completion(&config, run);
 
-            // Set up Ctrl+C handler if enabled
-            let ctrl_c_future = if enable_ctrl_c {
-                Some(tokio::signal::ctrl_c())
-            } else {
-                None
-            };
-
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
                 Ok(mut output) => {
                     loop {
-                        if enable_ctrl_c {
-                            tokio::select! {
-                                Some(event) = output.recv() => {
-                                    if let api::LogStreamEvent::EventLog(log) = &event {
-                                        let ts = dates::format_str(&log.reported_at);
-                                        sink.send_line(format!("{}: {}", ts, log.content));
-                                    }
-                                },
-                                res = &mut run_complete => {
-                                match res {
-                                    Ok(completed_run) => {
-                                        match completed_run.status {
-                                            tower_api::models::run::Status::Errored => {
-                                                sink.send_error(format!("Run #{} for app '{}' had an error", completed_run.number, completed_run.app_name));
-                                                return Err(anyhow::anyhow!("Run failed with error status"));
-                                            },
-                                            tower_api::models::run::Status::Crashed => {
-                                                sink.send_error(format!("Run #{} for app '{}' crashed", completed_run.number, completed_run.app_name));
-                                                return Err(anyhow::anyhow!("Run crashed"));
-                                            },
-                                            tower_api::models::run::Status::Cancelled => {
-                                                sink.send_error(format!("Run #{} for app '{}' was cancelled", completed_run.number, completed_run.app_name));
-                                                return Err(anyhow::anyhow!("Run was cancelled"));
-                                            },
-                                            _ => {
-                                                sink.send_line(format!("Run #{} for app '{}' completed successfully", completed_run.number, completed_run.app_name));
-                                            }
-                                        }
-                                    }
-                                    Err(err) => {
-                                        sink.send_error(format!("Failed to monitor run completion: {:?}", err));
-                                        return Err(err.into());
-                                    }
+                        let should_exit = tokio::select! {
+                            Some(event) = output.recv() => {
+                                if let api::LogStreamEvent::EventLog(log) = &event {
+                                    let ts = dates::format_str(&log.reported_at);
+                                    sink.send_line(format!("{}: {}", ts, log.content));
                                 }
-                                break;
+                                false
                             },
-                            _ = tokio::signal::ctrl_c() => {
+                            res = &mut run_complete => {
+                                handle_run_completion(res, sink)?;
+                                true
+                            },
+                            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
                                 sink.send_line("Received Ctrl+C, stopping log streaming...".to_string());
                                 sink.send_line("Note: The run will continue in Tower cloud".to_string());
-                                break;
+                                true
                             },
                         };
-                        } else {
-                            tokio::select! {
-                                Some(event) = output.recv() => {
-                                    if let api::LogStreamEvent::EventLog(log) = &event {
-                                        let ts = dates::format_str(&log.reported_at);
-                                        sink.send_line(format!("{}: {}", ts, log.content));
-                                    }
-                                },
-                                res = &mut run_complete => {
-                                    match res {
-                                        Ok(completed_run) => {
-                                            match completed_run.status {
-                                                tower_api::models::run::Status::Errored => {
-                                                    sink.send_error(format!("Run #{} for app '{}' had an error", completed_run.number, completed_run.app_name));
-                                                    return Err(anyhow::anyhow!("Run failed with error status"));
-                                                },
-                                                tower_api::models::run::Status::Crashed => {
-                                                    sink.send_error(format!("Run #{} for app '{}' crashed", completed_run.number, completed_run.app_name));
-                                                    return Err(anyhow::anyhow!("Run crashed"));
-                                                },
-                                                tower_api::models::run::Status::Cancelled => {
-                                                    sink.send_error(format!("Run #{} for app '{}' was cancelled", completed_run.number, completed_run.app_name));
-                                                    return Err(anyhow::anyhow!("Run was cancelled"));
-                                                },
-                                                _ => {
-                                                    sink.send_line(format!("Run #{} for app '{}' completed successfully", completed_run.number, completed_run.app_name));
-                                                }
-                                            }
-                                        }
-                                        Err(err) => {
-                                            sink.send_error(format!("Failed to monitor run completion: {:?}", err));
-                                            return Err(err.into());
-                                        }
-                                    }
-                                    break;
-                                },
-                            };
-                        }
+                        if should_exit { break; }
                     }
                 },
                 Err(err) => {
@@ -432,6 +364,38 @@ async fn do_follow_run_impl(
     };
     
     Ok(())
+}
+
+fn handle_run_completion(
+    res: Result<Run, tokio::sync::oneshot::error::RecvError>, 
+    sink: &dyn OutputSink
+) -> Result<()> {
+    match res {
+        Ok(completed_run) => {
+            match completed_run.status {
+                tower_api::models::run::Status::Errored => {
+                    sink.send_error(format!("Run #{} for app '{}' had an error", completed_run.number, completed_run.app_name));
+                    Err(anyhow::anyhow!("Run failed with error status"))
+                },
+                tower_api::models::run::Status::Crashed => {
+                    sink.send_error(format!("Run #{} for app '{}' crashed", completed_run.number, completed_run.app_name));
+                    Err(anyhow::anyhow!("Run crashed"))
+                },
+                tower_api::models::run::Status::Cancelled => {
+                    sink.send_error(format!("Run #{} for app '{}' was cancelled", completed_run.number, completed_run.app_name));
+                    Err(anyhow::anyhow!("Run was cancelled"))
+                },
+                _ => {
+                    sink.send_line(format!("Run #{} for app '{}' completed successfully", completed_run.number, completed_run.app_name));
+                    Ok(())
+                }
+            }
+        }
+        Err(err) => {
+            sink.send_error(format!("Failed to monitor run completion: {:?}", err));
+            Err(err.into())
+        }
+    }
 }
 
 /// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
