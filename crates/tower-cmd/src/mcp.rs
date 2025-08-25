@@ -25,31 +25,23 @@ struct CommonParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct NameRequest {
-    #[serde(flatten)]
-    common: CommonParams,
     name: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct AppLogsRequest {
-    #[serde(flatten)]
-    common: CommonParams,
     name: String,
     seq: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ListSecretsRequest {
-    #[serde(flatten)]
-    common: CommonParams,
     environment: Option<String>,
     all: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CreateSecretRequest {
-    #[serde(flatten)]
-    common: CommonParams,
     name: String,
     value: String,
     environment: Option<String>,
@@ -57,8 +49,6 @@ struct CreateSecretRequest {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct DeleteSecretRequest {
-    #[serde(flatten)]
-    common: CommonParams,
     name: String,
     environment: String,
 }
