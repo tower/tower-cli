@@ -18,29 +18,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install Nix
-      uses: cachix/install-nix-action@v24
+    - name: Install the latest version of uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: "Set up Python"
+      uses: actions/setup-python@v5
       with:
-        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+        python-version-file: ".python-version"
 
     - name: Build Tower CLI
-      run: |
-        nix develop --command cargo build
+      run: cargo build
 
-    - name: Set up Python and dependencies
-      run: |
-        nix develop --command bash -c "
-          cd tests/mock-api-server &&
-          python -m venv .venv && 
-          source .venv/bin/activate && 
-          pip install -e .
-        "
+    - name: Install Python dependencies
+      run: uv sync --locked --group dev
 
     - name: Start mock API server
       run: |
         cd tests/mock-api-server
-        source .venv/bin/activate
-        uvicorn main:app --host 127.0.0.1 --port 8000 &
+        uv run uvicorn main:app --host 127.0.0.1 --port 8000 &
         echo $! > mock_server.pid
         
         # Wait for server to be ready
@@ -56,9 +51,7 @@ jobs:
     - name: Run BDD integration tests
       run: |
         cd tests/integration
-        nix develop --command bash -c "
-          TOWER_MOCK_API_URL=http://127.0.0.1:8000 behave features/
-        "
+        TOWER_MOCK_API_URL=http://127.0.0.1:8000 uv run behave features/
 
     - name: Stop mock server
       if: always()
