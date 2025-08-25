@@ -12,7 +12,6 @@ use rmcp::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::future::Future;
-use futures_util::FutureExt;
 use crypto;
 use rsa::pkcs1::DecodeRsaPublicKey;
 use config::Towerfile;
@@ -128,16 +127,6 @@ impl TowerService {
         Ok(CallToolResult::error(vec![Content::text(format!("{}: {:#?}", prefix, error))]))
     }
 
-    async fn run_with_panic_handling<F, Fut>(operation: F, success_msg: &str, error_msg: &str) -> Result<CallToolResult, McpError>
-    where
-        F: FnOnce() -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = Result<(), anyhow::Error>> + Send + 'static,
-    {
-        match std::panic::AssertUnwindSafe(operation()).catch_unwind().await {
-            Ok(_) => Ok(CallToolResult::success(vec![Content::text(success_msg.to_string())])),
-            Err(_) => Ok(CallToolResult::error(vec![Content::text(error_msg.to_string())])),
-        }
-    }
 
     #[tool(description = "List all Tower apps in your account")]
     async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
