@@ -102,10 +102,19 @@ pub async fn do_run_inner(config: Config, args: &ArgMatches, cmd: Option<(&str, 
     }
 }
 
-/// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
-/// the package, and launch the app. The relevant package is cleaned up after execution is
-/// complete.
-pub async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) -> Result<()> {
+/// Core implementation for running an app locally with configurable output handling
+async fn do_run_local_impl<F, Fut, T>(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    mut params: HashMap<String, String>,
+    output_handler: F,
+) -> Result<T>
+where
+    F: FnOnce(OutputReceiver) -> Fut,
+    Fut: std::future::Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     // Load all the secrets and catalogs from the server
@@ -143,7 +152,7 @@ pub async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: 
     let (sender, receiver) = unbounded_channel();
 
     output::success(&format!("Launching app `{}`", towerfile.app.name));
-    let output_task = tokio::spawn(monitor_output(receiver));
+    let output_task = tokio::spawn(output_handler(receiver));
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     launcher
@@ -154,14 +163,28 @@ pub async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: 
     let app = launcher.app.unwrap();
     let status_task = tokio::spawn(monitor_status(app));
 
-    let (res1, res2) = tokio::join!(output_task, status_task);
+    // Wait for the output task to complete naturally
+    let final_result = output_task.await.unwrap();
+    
+    // The status task can be aborted since we don't need to wait for it
+    status_task.abort();
+    
+    Ok(final_result)
+}
 
-    // We have to unwrap both of these as a method for propagating any panics that happened
-    // internally.
-    res1.unwrap();
-    res2.unwrap();
+/// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
+/// the package, and launch the app. The relevant package is cleaned up after execution is
+/// complete.
+pub async fn do_run_local(config: Config, path: PathBuf, env: &str, params: HashMap<String, String>) -> Result<()> {
+    do_run_local_impl(config, path, env, params, |receiver| async {
+        monitor_output(receiver).await;
+        ()
+    }).await
+}
 
-    Ok(())
+/// do_run_local_capture is like do_run_local but returns captured output lines instead of printing
+pub async fn do_run_local_capture(config: Config, path: PathBuf, env: &str, params: HashMap<String, String>) -> Result<Vec<String>> {
+    do_run_local_impl(config, path, env, params, monitor_output_capture).await
 }
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
@@ -434,16 +457,29 @@ async fn build_package(towerfile: &Towerfile) -> Result<Package> {
     }
 }
 
-/// monitor_output is a helper function that will monitor the output of a given output channel and
-/// plops it down on stdout.
-async fn monitor_output(mut output: OutputReceiver) {
+/// monitor_output_capture captures output lines and returns them as a Vec<String>
+pub async fn monitor_output_capture(mut output: OutputReceiver) -> Vec<String> {
+    let mut lines = Vec::new();
     loop {
         if let Some(line) = output.recv().await {
             let ts = dates::format(line.time);
-            let msg = &line.line;
-            output::log_line(&ts, msg, output::LogLineType::Local);
+            let formatted = format!("{}: {}", ts, line.line);
+            lines.push(formatted);
         } else {
             break;
+        }
+    }
+    lines
+}
+
+/// monitor_output is a helper function that will monitor the output of a given output channel and
+/// plops it down on stdout. Refactored to use monitor_output_capture.
+async fn monitor_output(output: OutputReceiver) {
+    let lines = monitor_output_capture(output).await;
+    for line in lines {
+        // Extract timestamp and message from the formatted line
+        if let Some((ts, msg)) = line.split_once(": ") {
+            output::log_line(ts, msg, output::LogLineType::Local);
         }
     }
 }
@@ -451,21 +487,53 @@ async fn monitor_output(mut output: OutputReceiver) {
 /// monitor_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
 async fn monitor_status(app: LocalApp) {
+    debug!("Starting status monitoring for LocalApp");
+    let mut check_count = 0;
+    let max_checks = 600; // 60 seconds with 100ms intervals
+    
     loop {
-        if let Ok(status) = app.status().await {
-            match status {
-                tower_runtime::Status::Exited => {
-                    output::success("Your app exited cleanly.");
+        debug!("Status check #{}, attempting to get app status", check_count);
+        
+        match app.status().await {
+            Ok(status) => {
+                debug!("Got app status (some status)");
+                match status {
+                    tower_runtime::Status::Exited => {
+                        debug!("App exited cleanly, stopping status monitoring");
+                        output::success("Your app exited cleanly.");
+                        break;
+                    }
+                    tower_runtime::Status::Crashed { .. } => {
+                        debug!("App crashed, stopping status monitoring");
+                        output::failure("Your app crashed!");
+                        break;
+                    }
+                    _ => {
+                        debug!("App status: other, continuing to monitor");
+                        check_count += 1;
+                        if check_count >= max_checks {
+                            debug!("Status monitoring timed out after {} checks", max_checks);
+                            output::error("App status monitoring timed out, but app may still be running");
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                debug!("Failed to get app status: {:?}", e);
+                check_count += 1;
+                if check_count >= max_checks {
+                    debug!("Failed to get app status after {} attempts, giving up", max_checks);
+                    output::error("Failed to get app status after timeout");
                     break;
                 }
-                tower_runtime::Status::Crashed { .. } => {
-                    output::failure("Your app crashed!");
-                    break;
-                }
-                _ => continue,
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
     }
+    debug!("Status monitoring completed");
 }
 
 fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &str) -> String {
