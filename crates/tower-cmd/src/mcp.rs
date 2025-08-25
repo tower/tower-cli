@@ -304,60 +304,16 @@ impl TowerService {
 
     #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update")]
     async fn tower_run_local(&self) -> Result<CallToolResult, McpError> {
-        use std::collections::HashMap;
-        use std::path::PathBuf;
-        
-        let config = self.config.clone();
-        let path = PathBuf::from(".");
-        let env = "default";
-        let params = HashMap::new();
-        
-        let timeout_secs = std::env::var("TOWER_RUN_TIMEOUT")
-            .ok()
-            .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(60); // Increased default timeout
-        
-        // Use a more robust timeout approach for MCP
-        match tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            Self::run_local_with_timeout(config, path, env.to_string(), params)
-        ).await {
-            Ok(Ok(output)) => Self::text_success(format!("App ran locally successfully.\n{}", output)),
-            Ok(Err(e)) => Self::error_result("Local run failed", e),
-            Err(_) => Self::error_result("App run timed out", format!("App run timed out after {} seconds", timeout_secs)),
-        }
-    }
-
-    async fn run_local_with_timeout(
-        config: Config,
-        path: std::path::PathBuf,
-        env: String,
-        params: std::collections::HashMap<String, String>
-    ) -> Result<String, anyhow::Error> {
-        match tokio::time::timeout(
-            std::time::Duration::from_secs(30), 
-            run::do_run_local_capture(config, path, &env, params)
-        ).await {
-            Ok(result) => match result {
-                Ok(output_lines) => {
-                    eprintln!("DEBUG: Captured {} lines", output_lines.len());
-                    if output_lines.is_empty() {
-                        Ok("App completed successfully (no output)".to_string())
-                    } else {
-                        let result = format!("App completed successfully:\n\n{}", output_lines.join("\n"));
-                        eprintln!("DEBUG: Returning result of length {}", result.len());
-                        Ok(result)
-                    }
-                },
-                Err(e) => {
-                    eprintln!("DEBUG: Error in run_local_capture: {}", e);
-                    Err(e.into())
-                },
-            },
-            Err(_) => {
-                eprintln!("DEBUG: Timeout waiting for output capture");
-                Ok("App completed successfully (output capture timed out after 30 seconds)".to_string())
+        match run::do_run_local_capture(self.config.clone(), std::path::PathBuf::from("."), "default", std::collections::HashMap::new()).await {
+            Ok(output_lines) => {
+                let output = if output_lines.is_empty() {
+                    "App completed successfully (no output)"
+                } else {
+                    &format!("App ran locally successfully:\n\n{}", output_lines.join("\n"))
+                };
+                Self::text_success(output.to_string())
             }
+            Err(e) => Self::error_result("Local run failed", e)
         }
     }
 
