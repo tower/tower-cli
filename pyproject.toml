@@ -45,8 +45,10 @@ dependencies = [
   "attrs==24.2.0",
   "httpx==0.28.1",
   "huggingface-hub>=0.34.3",
+  "mcp>=1.1.0; python_version>='3.10'",
   "ollama>=0.5.3",
-  "pydantic-core==2.27.0",
+  "pydantic>=2.11.0,<3.0.0",
+  "pydantic-core>=2.27.0,<3.0.0",
   "pyiceberg==0.9.1",
   "python-dateutil==2.9.0.post0",
 ]
@@ -72,6 +74,7 @@ tower = { workspace = true }
 dev = [
   "aiohttp==3.10.11",
   "behave==1.2.6",
+  "mcp>=1.1.0; python_version>='3.10'",
   "openapi-python-client==0.24.3",
   "pytest==8.3.5",
   "pytest-httpx==0.35.0",
