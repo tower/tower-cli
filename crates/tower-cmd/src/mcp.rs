@@ -437,7 +437,10 @@ impl TowerService {
         
         let towerfile_path = working_dir.join("Towerfile");
         match std::fs::write(&towerfile_path, &content) {
-            Ok(_) => Self::text_success(format!("Generated Towerfile at {}", towerfile_path.display())),
+            Ok(_) => {
+                let success_msg = format!("Generated Towerfile at {}\n\n{}", towerfile_path.display(), content);
+                Self::text_success(success_msg)
+            }
             Err(e) => Self::error_result("Failed to write Towerfile", e),
         }
     }

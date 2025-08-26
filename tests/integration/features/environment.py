@@ -1,9 +1,9 @@
-import asyncio
 import os
 import subprocess
 import time
-import signal
-import sys
+import tempfile
+import json
+import socket
 from pathlib import Path
 
 def before_all(context):
@@ -11,6 +11,11 @@ def before_all(context):
     print(f"TOWER_MOCK_API_URL: {context.tower_url}")
 
 def before_scenario(context, scenario):
+    # Create a temporary working directory for this scenario
+    context.temp_dir = tempfile.mkdtemp(prefix="tower_test_")
+    context.original_cwd = os.getcwd()
+    os.chdir(context.temp_dir)
+
     # Start tower mcp-server synchronously
     tower_binary = _find_tower_binary()
     if not tower_binary:
@@ -19,15 +24,22 @@ def before_scenario(context, scenario):
     # Set up environment
     test_env = os.environ.copy()
     test_env["TOWER_RUN_TIMEOUT"] = "1"
+
+    # Create mock config if tower_url is set
     if context.tower_url:
         test_env["TOWER_URL"] = context.tower_url
+        _setup_mock_config(test_env, context.tower_url)
+    
+    # Find a free port for this test scenario
+    mcp_port = _find_free_port()
     
     # Start the server process
     context.tower_process = subprocess.Popen(
-        [tower_binary, "mcp-server"],
+        [tower_binary, "mcp-server", "--port", str(mcp_port)],
         env=test_env,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.PIPE,
+        text=True
     )
     
     # Give server time to start
@@ -35,9 +47,12 @@ def before_scenario(context, scenario):
     
     # Check if process is still running
     if context.tower_process.poll() is not None:
+        stderr_output = context.tower_process.stderr.read()
+        if stderr_output:
+            print(f"DEBUG: MCP server stderr: {stderr_output}")
         raise RuntimeError(f"MCP server exited with code {context.tower_process.returncode}")
     
-    context.mcp_server_url = "http://127.0.0.1:34567"
+    context.mcp_server_url = f"http://127.0.0.1:{mcp_port}"
 
 def after_scenario(context, scenario):
     if hasattr(context, 'tower_process') and context.tower_process:
@@ -48,8 +63,41 @@ def after_scenario(context, scenario):
             context.tower_process.kill()
             context.tower_process.wait()
 
+    # Clean up temp directory
+    if hasattr(context, 'original_cwd'):
+        os.chdir(context.original_cwd)
+    if hasattr(context, 'temp_dir'):
+        import shutil
+        shutil.rmtree(context.temp_dir, ignore_errors=True)
+
 def after_all(context):
     pass
+
+def _find_free_port():
+    """Find a free port for the MCP server"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+def _setup_mock_config(test_env, tower_url):
+    """Create a temporary tower configuration with mock session data"""
+    temp_config_dir = tempfile.mkdtemp(prefix="tower_test_config_")
+    test_env["HOME"] = temp_config_dir
+    
+    config_dir = os.path.join(temp_config_dir, ".config", "tower")
+    os.makedirs(config_dir, exist_ok=True)
+
+    mock_session = {
+        "user": {"id": "mock_user_id", "email": "test@example.com"},
+        "teams": [{"name": "default", "type": "user", "token": {"jwt": "mock_jwt_token"}}],
+        "active_team": {"name": "default", "type": "user", "token": {"jwt": "mock_jwt_token"}},
+        "tower_url": tower_url
+    }
+
+    with open(os.path.join(config_dir, "session.json"), 'w') as f:
+        json.dump(mock_session, f)
 
 def _find_tower_binary():
     # Look for debug build first
