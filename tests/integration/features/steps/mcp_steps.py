@@ -58,6 +58,21 @@ def step_create_long_running_app(context):
     context.mcp_helper.create_towerfile("long_running")
 
 
+@given('I have a pyproject.toml file with project metadata')
+def step_create_pyproject_toml(context):
+    import os
+    pyproject_content = '''[project]
+name = "test-project"
+description = "A test project for Towerfile generation"
+version = "0.1.0"
+'''
+    with open("pyproject.toml", "w") as f:
+        f.write(pyproject_content)
+    # Also create a main.py file
+    with open("main.py", "w") as f:
+        f.write('print("Hello from test project")\n')
+
+
 def call_mcp_tool(context, tool_name, **tool_args):
     try:
         async def call_tool():
@@ -175,6 +190,51 @@ def step_check_app_not_deployed_error(context):
 
     found_deployment_error = any(keyword in response_text for keyword in deployment_keywords)
     assert found_deployment_error, f"Error should mention deployment, got: {context.mcp_response}"
+
+
+@then('I should receive a valid TOML Towerfile')
+def step_check_valid_toml_towerfile(context):
+    """Verify the response contains valid TOML Towerfile content."""
+    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
+    
+    response_content = context.mcp_response.get("content", [])
+    assert len(response_content) > 0, "Response should have content"
+    
+    # Find the TOML content
+    found_toml = False
+    for content_item in response_content:
+        if content_item.get("type") == "text":
+            text = content_item.get("text", "")
+            if "[app]" in text and "name =" in text and "script =" in text:
+                found_toml = True
+                # Verify it's valid TOML by parsing it
+                import toml
+                try:
+                    parsed = toml.loads(text)
+                    assert "app" in parsed, "TOML should have [app] section"
+                except Exception as e:
+                    assert False, f"Generated content is not valid TOML: {e}"
+                break
+    
+    assert found_toml, f"Response should contain valid TOML Towerfile, got: {response_content}"
+
+
+@then('the Towerfile should contain the project name and description')
+def step_check_towerfile_metadata(context):
+    """Verify the Towerfile contains expected project metadata."""
+    assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
+    
+    response_content = context.mcp_response.get("content", [])
+    
+    found_metadata = False
+    for content_item in response_content:
+        if content_item.get("type") == "text":
+            text = content_item.get("text", "")
+            if 'name = "test-project"' in text and 'description = "A test project for Towerfile generation"' in text:
+                found_metadata = True
+                break
+    
+    assert found_metadata, f"Towerfile should contain project name and description, got: {response_content}"
 
 
 @then('the MCP server should remain responsive')

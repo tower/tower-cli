@@ -50,3 +50,9 @@ Feature: MCP App Management
     When I call tower_run_local via MCP
     Then I should receive a timeout message
     And the MCP server should remain responsive
+
+  Scenario: Generate Towerfile from pyproject.toml
+    Given I have a pyproject.toml file with project metadata
+    When I call tower_file_generate via MCP
+    Then I should receive a valid TOML Towerfile
+    And the Towerfile should contain the project name and description

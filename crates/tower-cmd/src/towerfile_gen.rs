@@ -39,15 +39,15 @@ impl TowerfileGenerator {
             vec![script.clone()]
         };
 
-        Ok(format!(
-            r#"[app]
-name = "{}"
-script = "{}"
-source = {:?}
-description = "{}"
-"#,
-            app_name, script, source_files, description
-        ))
+        let towerfile = toml::toml! {
+            [app]
+            name = app_name
+            script = script
+            source = source_files
+            description = description
+        };
+        
+        Ok(toml::to_string(&towerfile)?)
     }
 
 
