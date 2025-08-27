@@ -190,6 +190,54 @@ QIDAQAB
 -----END RSA PUBLIC KEY-----"""
     return {"public_key": mock_public_key}
 
+def empty_paginated_response(key: str):
+    """Create empty paginated response for any resource type."""
+    return {
+        key: [],
+        "pages": {"page": 1, "total": 0, "num_pages": 1, "page_size": 20}
+    }
+
+@app.post("/v1/secrets/export")
+async def export_secrets(export_params: Dict[str, Any]):
+    """Mock endpoint for exporting secrets with encryption."""
+    return empty_paginated_response("secrets")
+
+@app.post("/v1/catalogs/export")
+async def export_catalogs(export_params: Dict[str, Any]):
+    """Mock endpoint for exporting catalogs with encryption."""
+    return empty_paginated_response("catalogs")
+
+@app.get("/v1/session")
+async def get_session():
+    """Mock endpoint for getting current session."""
+    return {
+        "session": {
+            "featurebase_identity": {
+                "company_hash": "mock_company_hash",
+                "user_hash": "mock_user_hash"
+            },
+            "user": {
+                "company": "Mock Company",
+                "country": "US",
+                "created_at": "2023-01-01T00:00:00Z",
+                "email": "test@example.com",
+                "first_name": "Test",
+                "is_alerts_enabled": True,
+                "is_invitation_claimed": True,
+                "last_name": "User",
+                "profile_photo_url": "https://example.com/photo.jpg"
+            },
+            "teams": [
+                {
+                    "name": "default",
+                    "type": "user",
+                    "token": {"jwt": "mock_jwt_token"}
+                }
+            ],
+            "token": {"jwt": "mock_jwt_token"}
+        }
+    }
+
 @app.post("/v1/session/refresh")
 async def refresh_session(refresh_params: Dict[str, Any] = None):
     """Mock endpoint for refreshing session."""

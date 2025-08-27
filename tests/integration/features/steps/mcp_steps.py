@@ -199,7 +199,7 @@ def step_check_timeout_message(context):
     assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
 
     response_text = str(context.mcp_response).lower()
-    timeout_keywords = ["timeout", "timed out", "1 seconds"]
+    timeout_keywords = ["timeout", "timed out", "3 seconds"]
 
     found_timeout = any(keyword in response_text for keyword in timeout_keywords)
     assert found_timeout, f"Response should indicate timeout, got: {context.mcp_response}"

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Command;
 use crate::{Config, api, deploy, run};
+use config::Session;
 use rmcp::{
     ErrorData as McpError, ServerHandler,
     handler::server::{tool::{Parameters, ToolRouter}},
@@ -125,7 +126,11 @@ pub struct TowerService {
 impl TowerService {
     pub fn new(config: Config) -> Self {
         Self {
-            config,
+            config: std::env::var("TOWER_JWT")
+                .ok()
+                .and_then(|token| Session::from_jwt(&token).ok())
+                .map(|session| config.clone().with_session(session))
+                .unwrap_or(config),
             tool_router: Self::tool_router(),
         }
     }

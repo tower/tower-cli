@@ -2,7 +2,6 @@ import os
 import subprocess
 import time
 import tempfile
-import json
 import socket
 from pathlib import Path
 
@@ -23,12 +22,11 @@ def before_scenario(context, scenario):
     
     # Set up environment
     test_env = os.environ.copy()
-    test_env["TOWER_RUN_TIMEOUT"] = "1"
+    test_env["TOWER_RUN_TIMEOUT"] = "3"
 
-    # Create mock config if tower_url is set
     if context.tower_url:
         test_env["TOWER_URL"] = context.tower_url
-        _setup_mock_config(test_env, context.tower_url)
+        test_env["TOWER_JWT"] = "mock_jwt_token"
     
     # Find a free port for this test scenario
     mcp_port = _find_free_port()
@@ -38,7 +36,7 @@ def before_scenario(context, scenario):
         [tower_binary, "mcp-server", "--port", str(mcp_port)],
         env=test_env,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         text=True
     )
     
@@ -81,23 +79,6 @@ def _find_free_port():
         port = s.getsockname()[1]
     return port
 
-def _setup_mock_config(test_env, tower_url):
-    """Create a temporary tower configuration with mock session data"""
-    temp_config_dir = tempfile.mkdtemp(prefix="tower_test_config_")
-    test_env["HOME"] = temp_config_dir
-    
-    config_dir = os.path.join(temp_config_dir, ".config", "tower")
-    os.makedirs(config_dir, exist_ok=True)
-
-    mock_session = {
-        "user": {"id": "mock_user_id", "email": "test@example.com"},
-        "teams": [{"name": "default", "type": "user", "token": {"jwt": "mock_jwt_token"}}],
-        "active_team": {"name": "default", "type": "user", "token": {"jwt": "mock_jwt_token"}},
-        "tower_url": tower_url
-    }
-
-    with open(os.path.join(config_dir, "session.json"), 'w') as f:
-        json.dump(mock_session, f)
 
 def _find_tower_binary():
     # Look for debug build first
