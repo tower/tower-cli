@@ -147,6 +147,144 @@ pprint.pprint(tower.get_available_features())
 print(tower.is_feature_enabled("ai"))
 ```
 
+### MCP Server Integration
+
+Tower CLI includes an MCP (Model Context Protocol) server that allows AI assistants and editors to interact with your Tower account directly. The MCP server provides tools for managing apps, secrets, teams, and deployments.
+
+#### Available Tools
+
+The MCP server exposes the following tools:
+- `tower_apps_list` - List all Tower apps in your account
+- `tower_apps_create` - Create a new Tower app
+- `tower_apps_show` - Show details for a Tower app and its recent runs
+- `tower_apps_logs` - Get logs for a specific Tower app run
+- `tower_apps_delete` - Delete a Tower app
+- `tower_secrets_list` - List secrets in your Tower account
+- `tower_secrets_create` - Create a new secret in Tower
+- `tower_secrets_delete` - Delete a secret from Tower
+- `tower_teams_list` - List teams you belong to
+- `tower_teams_switch` - Switch context to a different team
+- `tower_deploy` - Deploy your app to Tower cloud
+- `tower_run` - Run your app locally
+
+#### Starting the MCP Server
+
+The Tower MCP server uses Server-Sent Events (SSE) for communication and runs on port 34567 by default. Start the server:
+
+```bash
+tower mcp-server
+```
+
+Or specify a custom port:
+
+```bash
+tower mcp-server --port 8080
+```
+
+The server will display a message showing the URL it's running on:
+```
+SSE server running on http://127.0.0.1:34567
+```
+
+#### Editor Configuration
+
+##### Claude Code
+
+Add the Tower MCP server to Claude Code using SSE transport:
+
+```bash
+claude mcp add tower http://127.0.0.1:34567/sse --transport sse
+```
+
+Or using JSON configuration with SSE:
+
+```json
+{
+  "mcpServers": {
+    "tower": {
+      "url": "http://127.0.0.1:34567/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+For custom ports, adjust the URL accordingly (e.g., `http://127.0.0.1:8080/sse`).
+
+##### Cursor
+
+Add this to your Cursor settings (`settings.json`):
+
+```json
+{
+  "mcp.servers": {
+    "tower": {
+      "url": "http://127.0.0.1:34567/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+##### Windsurf
+
+Configure in Windsurf settings:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "tower": {
+        "url": "http://127.0.0.1:34567/sse",
+        "transport": "sse"
+      }
+    }
+  }
+}
+```
+
+##### Zed
+
+Add to your Zed `settings.json`:
+
+```json
+{
+  "assistant": {
+    "mcp_servers": {
+      "tower": {
+        "url": "http://127.0.0.1:34567/sse",
+        "transport": "sse"
+      }
+    }
+  }
+}
+```
+
+##### VS Code
+
+For VS Code with MCP extensions, add to your `settings.json`:
+
+```json
+{
+  "mcp.servers": {
+    "tower": {
+      "url": "http://127.0.0.1:34567/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+#### Prerequisites
+
+Before using the MCP server, ensure you're logged into Tower:
+
+```bash
+tower login
+```
+
+The MCP server will use your existing Tower CLI authentication and configuration.
+
 ### About the runtime environment
 
 The [tower-runtime](crates/tower-runtime) crate has the Rust library that makes
