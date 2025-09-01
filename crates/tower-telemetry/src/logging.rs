@@ -198,6 +198,5 @@ pub fn enable_logging(level: LogLevel, format: LogFormat, destination: LogDestin
         .with(create_fmt_layer(format, destination))
         .with(filter);
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("Failed to set global default subscriber");
+    let _ = tracing::subscriber::set_global_default(subscriber);
 }
