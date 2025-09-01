@@ -456,6 +456,11 @@ impl TowerService {
 
 All commands support an optional 'working_directory' parameter to specify which project directory to operate on.
 
+0. HAVE AN EXISTING PYTHON PROJECT:
+   There are no commands for this provided with this MCP server. However, if you do not have a python project yet
+   then a good start would be to make a new directory with the project name, and then call `uv init` to generate
+   a pyproject.toml, main.py and README.md
+
 1. CREATE TOWERFILE (required for all steps):
    - tower_file_generate: Generate from existing pyproject.toml
    - tower_file_update: Manually create or update configuration
