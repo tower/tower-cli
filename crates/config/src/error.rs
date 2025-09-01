@@ -48,3 +48,10 @@ impl From<toml::de::Error> for Error {
         Error::InvalidTowerfile
     }
 }
+
+impl From<toml::ser::Error> for Error {
+    fn from(err: toml::ser::Error) -> Self {
+        debug!("error serializing Towerfile TOML: {}", err);
+        Error::InvalidTowerfile
+    }
+}
