@@ -68,14 +68,13 @@ async fn test_running_hello_world() {
     let status = app.status().await.expect("Failed to get app status");
     assert!(status == Status::Running, "App should be running");
 
+    let mut outputs = Vec::new();
     while let Some(output) = receiver.recv().await {
-        let valid_line = output.line.contains("Hello, world!") || 
-                         output.line.contains("Using CPython") ||
-                         output.line.contains("Creating virtual environment") ||
-                         output.line.contains("Activate with");
-
-        assert!(valid_line, "Log should contain 'Hello, world!' or a setup line");
+        outputs.push(output.line);
     }
+
+    let found_hello = outputs.iter().any(|line| line.contains("Hello, world!"));
+    assert!(found_hello, "Should have received 'Hello, world!' output from the application");
 
     // check the status once more, should be done.
     let status = app.status().await.expect("Failed to get app status");
