@@ -12,8 +12,8 @@ T = TypeVar("T", bound="UpdateTeamParams")
 class UpdateTeamParams:
     """
     Attributes:
-        name (Union[None, str]): The name of the team to update. This is optional, if you supply null it will not
-            update the team name.
+        name (Union[None, str]): The name of the team to update. This is optional, if you supply null it will not update
+            the team name.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateTeamParams.json.
     """

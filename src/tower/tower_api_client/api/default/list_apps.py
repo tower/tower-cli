@@ -19,6 +19,7 @@ def _get_kwargs(
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -41,6 +42,8 @@ def _get_kwargs(
         json_filter_ = filter_.value
 
     params["filter"] = json_filter_
+
+    params["environment"] = environment
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -86,6 +89,7 @@ def sync_detailed(
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListAppsResponse]:
     """List apps
 
@@ -100,6 +104,8 @@ def sync_detailed(
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
             ListAppsSort.CREATED_AT.
         filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
+        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
+            apps for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -116,6 +122,7 @@ def sync_detailed(
         num_runs=num_runs,
         sort=sort,
         filter_=filter_,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -134,6 +141,7 @@ def sync(
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListAppsResponse]:
     """List apps
 
@@ -148,6 +156,8 @@ def sync(
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
             ListAppsSort.CREATED_AT.
         filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
+        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
+            apps for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -165,6 +175,7 @@ def sync(
         num_runs=num_runs,
         sort=sort,
         filter_=filter_,
+        environment=environment,
     ).parsed
 
 
@@ -177,6 +188,7 @@ async def asyncio_detailed(
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListAppsResponse]:
     """List apps
 
@@ -191,6 +203,8 @@ async def asyncio_detailed(
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
             ListAppsSort.CREATED_AT.
         filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
+        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
+            apps for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -207,6 +221,7 @@ async def asyncio_detailed(
         num_runs=num_runs,
         sort=sort,
         filter_=filter_,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -223,6 +238,7 @@ async def asyncio(
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListAppsResponse]:
     """List apps
 
@@ -237,6 +253,8 @@ async def asyncio(
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
             ListAppsSort.CREATED_AT.
         filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
+        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
+            apps for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -255,5 +273,6 @@ async def asyncio(
             num_runs=num_runs,
             sort=sort,
             filter_=filter_,
+            environment=environment,
         )
     ).parsed

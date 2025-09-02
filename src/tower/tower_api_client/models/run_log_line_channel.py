@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class LogLineChannel(str, Enum):
+class RunLogLineChannel(str, Enum):
     PROGRAM = "program"
     SETUP = "setup"
 

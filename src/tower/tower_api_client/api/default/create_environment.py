@@ -5,20 +5,20 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.accept_invitation_params import AcceptInvitationParams
-from ...models.accept_invitation_response import AcceptInvitationResponse
+from ...models.create_environment_params import CreateEnvironmentParams
+from ...models.create_environment_response import CreateEnvironmentResponse
 from ...types import Response
 
 
 def _get_kwargs(
     *,
-    body: AcceptInvitationParams,
+    body: CreateEnvironmentParams,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/accounts/invite",
+        "url": "/environments",
     }
 
     _body = body.to_dict()
@@ -32,9 +32,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[AcceptInvitationResponse]:
+) -> Optional[CreateEnvironmentResponse]:
     if response.status_code == 200:
-        response_200 = AcceptInvitationResponse.from_dict(response.json())
+        response_200 = CreateEnvironmentResponse.from_dict(response.json())
 
         return response_200
     if client.raise_on_unexpected_status:
@@ -45,7 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[AcceptInvitationResponse]:
+) -> Response[CreateEnvironmentResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -57,21 +57,21 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: AcceptInvitationParams,
-) -> Response[AcceptInvitationResponse]:
-    """Accept an invitation code
+    body: CreateEnvironmentParams,
+) -> Response[CreateEnvironmentResponse]:
+    """Create environment
 
-     Accept an invitation code to join an account
+     Create a new environment for an app.
 
     Args:
-        body (AcceptInvitationParams):
+        body (CreateEnvironmentParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AcceptInvitationResponse]
+        Response[CreateEnvironmentResponse]
     """
 
     kwargs = _get_kwargs(
@@ -88,21 +88,21 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: AcceptInvitationParams,
-) -> Optional[AcceptInvitationResponse]:
-    """Accept an invitation code
+    body: CreateEnvironmentParams,
+) -> Optional[CreateEnvironmentResponse]:
+    """Create environment
 
-     Accept an invitation code to join an account
+     Create a new environment for an app.
 
     Args:
-        body (AcceptInvitationParams):
+        body (CreateEnvironmentParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AcceptInvitationResponse
+        CreateEnvironmentResponse
     """
 
     return sync_detailed(
@@ -114,21 +114,21 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: AcceptInvitationParams,
-) -> Response[AcceptInvitationResponse]:
-    """Accept an invitation code
+    body: CreateEnvironmentParams,
+) -> Response[CreateEnvironmentResponse]:
+    """Create environment
 
-     Accept an invitation code to join an account
+     Create a new environment for an app.
 
     Args:
-        body (AcceptInvitationParams):
+        body (CreateEnvironmentParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AcceptInvitationResponse]
+        Response[CreateEnvironmentResponse]
     """
 
     kwargs = _get_kwargs(
@@ -143,21 +143,21 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: AcceptInvitationParams,
-) -> Optional[AcceptInvitationResponse]:
-    """Accept an invitation code
+    body: CreateEnvironmentParams,
+) -> Optional[CreateEnvironmentResponse]:
+    """Create environment
 
-     Accept an invitation code to join an account
+     Create a new environment for an app.
 
     Args:
-        body (AcceptInvitationParams):
+        body (CreateEnvironmentParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AcceptInvitationResponse
+        CreateEnvironmentResponse
     """
 
     return (

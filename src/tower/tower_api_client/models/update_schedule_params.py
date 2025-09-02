@@ -18,7 +18,6 @@ class UpdateScheduleParams:
     Attributes:
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateScheduleParams.json.
-        app_name (Union[None, Unset, str]): The name of the app that this schedule runs
         app_version (Union[None, Unset, str]): The specific app version to run (if omitted, will use the app's default
             version)
         cron (Union[Unset, str]): The cron expression defining when the app should run
@@ -27,7 +26,6 @@ class UpdateScheduleParams:
     """
 
     schema: Union[Unset, str] = UNSET
-    app_name: Union[None, Unset, str] = UNSET
     app_version: Union[None, Unset, str] = UNSET
     cron: Union[Unset, str] = UNSET
     environment: Union[Unset, str] = UNSET
@@ -35,12 +33,6 @@ class UpdateScheduleParams:
 
     def to_dict(self) -> dict[str, Any]:
         schema = self.schema
-
-        app_name: Union[None, Unset, str]
-        if isinstance(self.app_name, Unset):
-            app_name = UNSET
-        else:
-            app_name = self.app_name
 
         app_version: Union[None, Unset, str]
         if isinstance(self.app_version, Unset):
@@ -63,8 +55,6 @@ class UpdateScheduleParams:
         field_dict.update({})
         if schema is not UNSET:
             field_dict["$schema"] = schema
-        if app_name is not UNSET:
-            field_dict["app_name"] = app_name
         if app_version is not UNSET:
             field_dict["app_version"] = app_version
         if cron is not UNSET:
@@ -82,15 +72,6 @@ class UpdateScheduleParams:
 
         d = dict(src_dict)
         schema = d.pop("$schema", UNSET)
-
-        def _parse_app_name(data: object) -> Union[None, Unset, str]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(Union[None, Unset, str], data)
-
-        app_name = _parse_app_name(d.pop("app_name", UNSET))
 
         def _parse_app_version(data: object) -> Union[None, Unset, str]:
             if data is None:
@@ -114,7 +95,6 @@ class UpdateScheduleParams:
 
         update_schedule_params = cls(
             schema=schema,
-            app_name=app_name,
             app_version=app_version,
             cron=cron,
             environment=environment,

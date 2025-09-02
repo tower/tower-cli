@@ -20,6 +20,7 @@ T = TypeVar("T", bound="Run")
 class Run:
     """
     Attributes:
+        link (str): Link to the run in the Tower UI
         app_name (str):
         app_version (str):
         cancelled_at (Union[None, datetime.datetime]):
@@ -37,6 +38,7 @@ class Run:
         app_slug (Union[Unset, str]): This property is deprecated. Please use app_name instead.
     """
 
+    link: str
     app_name: str
     app_version: str
     cancelled_at: Union[None, datetime.datetime]
@@ -54,6 +56,8 @@ class Run:
     app_slug: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        link = self.link
+
         app_name = self.app_name
 
         app_version = self.app_version
@@ -103,6 +107,7 @@ class Run:
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
+                "$link": link,
                 "app_name": app_name,
                 "app_version": app_version,
                 "cancelled_at": cancelled_at,
@@ -129,6 +134,8 @@ class Run:
         from ..models.run_parameter import RunParameter
 
         d = dict(src_dict)
+        link = d.pop("$link")
+
         app_name = d.pop("app_name")
 
         app_version = d.pop("app_version")
@@ -209,6 +216,7 @@ class Run:
         app_slug = d.pop("app_slug", UNSET)
 
         run = cls(
+            link=link,
             app_name=app_name,
             app_version=app_version,
             cancelled_at=cancelled_at,

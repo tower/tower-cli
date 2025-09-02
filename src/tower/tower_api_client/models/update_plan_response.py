@@ -1,34 +1,38 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="AcceptInvitationParams")
+if TYPE_CHECKING:
+    from ..models.plan import Plan
+
+
+T = TypeVar("T", bound="UpdatePlanResponse")
 
 
 @_attrs_define
-class AcceptInvitationParams:
+class UpdatePlanResponse:
     """
     Attributes:
-        code (str): The invitation code to accept
+        plan (Plan):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/AcceptInvitationParams.json.
+            https://api.tower.dev/v1/schemas/UpdatePlanResponse.json.
     """
 
-    code: str
+    plan: "Plan"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        code = self.code
+        plan = self.plan.to_dict()
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "code": code,
+                "plan": plan,
             }
         )
         if schema is not UNSET:
@@ -38,14 +42,16 @@ class AcceptInvitationParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.plan import Plan
+
         d = dict(src_dict)
-        code = d.pop("code")
+        plan = Plan.from_dict(d.pop("plan"))
 
         schema = d.pop("$schema", UNSET)
 
-        accept_invitation_params = cls(
-            code=code,
+        update_plan_response = cls(
+            plan=plan,
             schema=schema,
         )
 
-        return accept_invitation_params
+        return update_plan_response

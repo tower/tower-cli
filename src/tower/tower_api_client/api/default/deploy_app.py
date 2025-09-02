@@ -14,10 +14,14 @@ def _get_kwargs(
     name: str,
     *,
     content_encoding: Union[Unset, str] = UNSET,
+    x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
     if not isinstance(content_encoding, Unset):
         headers["Content-Encoding"] = content_encoding
+
+    if not isinstance(x_tower_checksum_sha256, Unset):
+        headers["X-Tower-Checksum-SHA256"] = x_tower_checksum_sha256
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -71,6 +75,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
+    x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Response[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
@@ -80,6 +85,8 @@ def sync_detailed(
     Args:
         name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
+        x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
+            verify integrity.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -92,6 +99,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         name=name,
         content_encoding=content_encoding,
+        x_tower_checksum_sha256=x_tower_checksum_sha256,
     )
 
     response = client.get_httpx_client().request(
@@ -106,6 +114,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
+    x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Optional[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
@@ -115,6 +124,8 @@ def sync(
     Args:
         name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
+        x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
+            verify integrity.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -128,6 +139,7 @@ def sync(
         name=name,
         client=client,
         content_encoding=content_encoding,
+        x_tower_checksum_sha256=x_tower_checksum_sha256,
     ).parsed
 
 
@@ -136,6 +148,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
+    x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Response[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
@@ -145,6 +158,8 @@ async def asyncio_detailed(
     Args:
         name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
+        x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
+            verify integrity.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -157,6 +172,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         name=name,
         content_encoding=content_encoding,
+        x_tower_checksum_sha256=x_tower_checksum_sha256,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -169,6 +185,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     content_encoding: Union[Unset, str] = UNSET,
+    x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Optional[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
@@ -178,6 +195,8 @@ async def asyncio(
     Args:
         name (str): The name of the app to deploy.
         content_encoding (Union[Unset, str]): The encoding of the content.
+        x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
+            verify integrity.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -192,5 +211,6 @@ async def asyncio(
             name=name,
             client=client,
             content_encoding=content_encoding,
+            x_tower_checksum_sha256=x_tower_checksum_sha256,
         )
     ).parsed
