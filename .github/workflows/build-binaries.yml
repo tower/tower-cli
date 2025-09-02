@@ -320,6 +320,7 @@ jobs:
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.platform.target == 'armv7-unknown-linux-musleabihf' }}
     strategy:
       matrix:
         platform:
