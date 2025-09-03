@@ -1,38 +1,34 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-if TYPE_CHECKING:
-    from ..models.user import User
-
-
-T = TypeVar("T", bound="AcceptInvitationResponse")
+T = TypeVar("T", bound="DeleteScheduleParams")
 
 
 @_attrs_define
-class AcceptInvitationResponse:
+class DeleteScheduleParams:
     """
     Attributes:
-        user (User):
+        ids (list[str]): The IDs of the schedules to delete.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/AcceptInvitationResponse.json.
+            https://api.tower.dev/v1/schemas/DeleteScheduleParams.json.
     """
 
-    user: "User"
+    ids: list[str]
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        user = self.user.to_dict()
+        ids = self.ids
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "user": user,
+                "ids": ids,
             }
         )
         if schema is not UNSET:
@@ -42,16 +38,14 @@ class AcceptInvitationResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.user import User
-
         d = dict(src_dict)
-        user = User.from_dict(d.pop("user"))
+        ids = cast(list[str], d.pop("ids"))
 
         schema = d.pop("$schema", UNSET)
 
-        accept_invitation_response = cls(
-            user=user,
+        delete_schedule_params = cls(
+            ids=ids,
             schema=schema,
         )
 
-        return accept_invitation_response
+        return delete_schedule_params

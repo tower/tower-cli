@@ -6,13 +6,23 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.generate_app_statistics_response import GenerateAppStatisticsResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    environment: Union[Unset, str] = UNSET,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+
+    params["environment"] = environment
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/stats/apps",
+        "params": params,
     }
 
     return _kwargs
@@ -45,10 +55,15 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[GenerateAppStatisticsResponse]:
     """Generate app statistics
 
      Generates current statistics about apps
+
+    Args:
+        environment (Union[Unset, str]): The environment to filter the statistics by. If not
+            provided, statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -58,7 +73,9 @@ def sync_detailed(
         Response[GenerateAppStatisticsResponse]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        environment=environment,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -70,10 +87,15 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[GenerateAppStatisticsResponse]:
     """Generate app statistics
 
      Generates current statistics about apps
+
+    Args:
+        environment (Union[Unset, str]): The environment to filter the statistics by. If not
+            provided, statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -85,16 +107,22 @@ def sync(
 
     return sync_detailed(
         client=client,
+        environment=environment,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[GenerateAppStatisticsResponse]:
     """Generate app statistics
 
      Generates current statistics about apps
+
+    Args:
+        environment (Union[Unset, str]): The environment to filter the statistics by. If not
+            provided, statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -104,7 +132,9 @@ async def asyncio_detailed(
         Response[GenerateAppStatisticsResponse]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        environment=environment,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -114,10 +144,15 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[GenerateAppStatisticsResponse]:
     """Generate app statistics
 
      Generates current statistics about apps
+
+    Args:
+        environment (Union[Unset, str]): The environment to filter the statistics by. If not
+            provided, statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -130,5 +165,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            environment=environment,
         )
     ).parsed

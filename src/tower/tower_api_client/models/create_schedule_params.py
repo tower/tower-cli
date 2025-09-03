@@ -17,7 +17,7 @@ class CreateScheduleParams:
     """
     Attributes:
         app_name (str): The name of the app to create a schedule for
-        cron_string (str): The cron expression defining when the app should run
+        cron (str): The cron expression defining when the app should run
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateScheduleParams.json.
         app_version (Union[None, Unset, str]): The specific app version to run (if omitted, will use the app's default
@@ -27,7 +27,7 @@ class CreateScheduleParams:
     """
 
     app_name: str
-    cron_string: str
+    cron: str
     schema: Union[Unset, str] = UNSET
     app_version: Union[None, Unset, str] = UNSET
     environment: Union[Unset, str] = "default"
@@ -36,7 +36,7 @@ class CreateScheduleParams:
     def to_dict(self) -> dict[str, Any]:
         app_name = self.app_name
 
-        cron_string = self.cron_string
+        cron = self.cron
 
         schema = self.schema
 
@@ -59,7 +59,7 @@ class CreateScheduleParams:
         field_dict.update(
             {
                 "app_name": app_name,
-                "cron_string": cron_string,
+                "cron": cron,
             }
         )
         if schema is not UNSET:
@@ -80,7 +80,7 @@ class CreateScheduleParams:
         d = dict(src_dict)
         app_name = d.pop("app_name")
 
-        cron_string = d.pop("cron_string")
+        cron = d.pop("cron")
 
         schema = d.pop("$schema", UNSET)
 
@@ -104,7 +104,7 @@ class CreateScheduleParams:
 
         create_schedule_params = cls(
             app_name=app_name,
-            cron_string=cron_string,
+            cron=cron,
             schema=schema,
             app_version=app_version,
             environment=environment,

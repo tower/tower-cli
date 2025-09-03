@@ -19,6 +19,7 @@ def _get_kwargs(
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -44,6 +45,8 @@ def _get_kwargs(
     if not isinstance(end_at, Unset):
         json_end_at = end_at.isoformat()
     params["end_at"] = json_end_at
+
+    params["environment"] = environment
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -91,6 +94,7 @@ def sync_detailed(
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListRunsResponse]:
     """List runs
 
@@ -107,6 +111,8 @@ def sync_detailed(
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
             (inclusive)
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,6 +129,7 @@ def sync_detailed(
         status=status,
         start_at=start_at,
         end_at=end_at,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -141,6 +148,7 @@ def sync(
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListRunsResponse]:
     """List runs
 
@@ -157,6 +165,8 @@ def sync(
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
             (inclusive)
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -174,6 +184,7 @@ def sync(
         status=status,
         start_at=start_at,
         end_at=end_at,
+        environment=environment,
     ).parsed
 
 
@@ -186,6 +197,7 @@ async def asyncio_detailed(
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListRunsResponse]:
     """List runs
 
@@ -202,6 +214,8 @@ async def asyncio_detailed(
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
             (inclusive)
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,6 +232,7 @@ async def asyncio_detailed(
         status=status,
         start_at=start_at,
         end_at=end_at,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -234,6 +249,7 @@ async def asyncio(
     status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListRunsResponse]:
     """List runs
 
@@ -250,6 +266,8 @@ async def asyncio(
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
             (inclusive)
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -268,5 +286,6 @@ async def asyncio(
             status=status,
             start_at=start_at,
             end_at=end_at,
+            environment=environment,
         )
     ).parsed

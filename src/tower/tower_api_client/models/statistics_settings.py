@@ -15,18 +15,22 @@ class StatisticsSettings:
     """
     Attributes:
         end_at (datetime.datetime): The end time for the statistics period.
+        environment (str): The environment to get statistics for.
         interval (StatisticsSettingsInterval): The interval for the statistics period.
         start_at (datetime.datetime): The start time for the statistics period.
         timezone (str): The time zone for the statistics period.
     """
 
     end_at: datetime.datetime
+    environment: str
     interval: StatisticsSettingsInterval
     start_at: datetime.datetime
     timezone: str
 
     def to_dict(self) -> dict[str, Any]:
         end_at = self.end_at.isoformat()
+
+        environment = self.environment
 
         interval = self.interval.value
 
@@ -38,6 +42,7 @@ class StatisticsSettings:
         field_dict.update(
             {
                 "end_at": end_at,
+                "environment": environment,
                 "interval": interval,
                 "start_at": start_at,
                 "timezone": timezone,
@@ -51,6 +56,8 @@ class StatisticsSettings:
         d = dict(src_dict)
         end_at = isoparse(d.pop("end_at"))
 
+        environment = d.pop("environment")
+
         interval = StatisticsSettingsInterval(d.pop("interval"))
 
         start_at = isoparse(d.pop("start_at"))
@@ -59,6 +66,7 @@ class StatisticsSettings:
 
         statistics_settings = cls(
             end_at=end_at,
+            environment=environment,
             interval=interval,
             start_at=start_at,
             timezone=timezone,
