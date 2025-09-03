@@ -415,7 +415,7 @@ impl ResponseEntity for tower_api::apis::default_api::CreateSecretSuccess {
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status200(data) => Some(data),
+            Self::Status201(data) => Some(data),
             Self::UnknownValue(_) => None,
         }
     }
@@ -467,7 +467,6 @@ impl ResponseEntity for tower_api::apis::default_api::RunAppSuccess {
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status200(data) => Some(data),
             Self::Status201(data) => Some(data),
             Self::UnknownValue(_) => None,
         }
@@ -512,7 +511,7 @@ impl ResponseEntity for tower_api::apis::default_api::CreateAppSuccess {
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status200(resp) => Some(resp),
+            Self::Status201(resp) => Some(resp),
             Self::UnknownValue(_) => None,
         }
     }
