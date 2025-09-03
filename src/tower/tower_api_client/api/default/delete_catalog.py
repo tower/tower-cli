@@ -34,10 +34,10 @@ def _get_kwargs(
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Optional[DeleteCatalogResponse]:
-    if response.status_code == 200:
-        response_200 = DeleteCatalogResponse.from_dict(response.json())
+    if response.status_code == 204:
+        response_204 = DeleteCatalogResponse.from_dict(response.json())
 
-        return response_200
+        return response_204
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:

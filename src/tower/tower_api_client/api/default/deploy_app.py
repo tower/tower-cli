@@ -37,10 +37,10 @@ def _get_kwargs(
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Optional[Union[DeployAppResponse, ErrorModel]]:
-    if response.status_code == 200:
-        response_200 = DeployAppResponse.from_dict(response.json())
+    if response.status_code == 201:
+        response_201 = DeployAppResponse.from_dict(response.json())
 
-        return response_200
+        return response_201
     if response.status_code == 400:
         response_400 = ErrorModel.from_dict(response.json())
 
