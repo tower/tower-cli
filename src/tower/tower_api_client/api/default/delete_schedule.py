@@ -5,20 +5,28 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.delete_schedule_params import DeleteScheduleParams
 from ...models.delete_schedule_response import DeleteScheduleResponse
 from ...types import Response
 
 
 def _get_kwargs(
-    id: str,
+    *,
+    body: DeleteScheduleParams,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/schedules/{id}".format(
-            id=id,
-        ),
+        "url": "/schedules",
     }
 
+    _body = body.to_dict()
+
+    _kwargs["json"] = _body
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -47,16 +55,16 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
     *,
     client: AuthenticatedClient,
+    body: DeleteScheduleParams,
 ) -> Response[DeleteScheduleResponse]:
     """Delete schedule
 
      Delete an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to delete.
+        body (DeleteScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -67,7 +75,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -78,16 +86,16 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
     *,
     client: AuthenticatedClient,
+    body: DeleteScheduleParams,
 ) -> Optional[DeleteScheduleResponse]:
     """Delete schedule
 
      Delete an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to delete.
+        body (DeleteScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,22 +106,22 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
     *,
     client: AuthenticatedClient,
+    body: DeleteScheduleParams,
 ) -> Response[DeleteScheduleResponse]:
     """Delete schedule
 
      Delete an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to delete.
+        body (DeleteScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,7 +132,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -133,16 +141,16 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
     *,
     client: AuthenticatedClient,
+    body: DeleteScheduleParams,
 ) -> Optional[DeleteScheduleResponse]:
     """Delete schedule
 
      Delete an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to delete.
+        body (DeleteScheduleParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,7 +162,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
             client=client,
+            body=body,
         )
     ).parsed

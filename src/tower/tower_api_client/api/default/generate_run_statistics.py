@@ -19,6 +19,7 @@ def _get_kwargs(
     start_at: datetime.datetime,
     end_at: datetime.datetime,
     timezone: Union[Unset, str] = "UTC",
+    environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -38,6 +39,8 @@ def _get_kwargs(
     params["end_at"] = json_end_at
 
     params["timezone"] = timezone
+
+    params["environment"] = environment
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -81,6 +84,7 @@ def sync_detailed(
     start_at: datetime.datetime,
     end_at: datetime.datetime,
     timezone: Union[Unset, str] = "UTC",
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
@@ -93,6 +97,8 @@ def sync_detailed(
         end_at (datetime.datetime): End date and time for statistics (inclusive)
         timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
             Defaults to UTC. Default: 'UTC'.
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -107,6 +113,7 @@ def sync_detailed(
         start_at=start_at,
         end_at=end_at,
         timezone=timezone,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -123,6 +130,7 @@ def sync(
     start_at: datetime.datetime,
     end_at: datetime.datetime,
     timezone: Union[Unset, str] = "UTC",
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
@@ -135,6 +143,8 @@ def sync(
         end_at (datetime.datetime): End date and time for statistics (inclusive)
         timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
             Defaults to UTC. Default: 'UTC'.
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -150,6 +160,7 @@ def sync(
         start_at=start_at,
         end_at=end_at,
         timezone=timezone,
+        environment=environment,
     ).parsed
 
 
@@ -160,6 +171,7 @@ async def asyncio_detailed(
     start_at: datetime.datetime,
     end_at: datetime.datetime,
     timezone: Union[Unset, str] = "UTC",
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
@@ -172,6 +184,8 @@ async def asyncio_detailed(
         end_at (datetime.datetime): End date and time for statistics (inclusive)
         timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
             Defaults to UTC. Default: 'UTC'.
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -186,6 +200,7 @@ async def asyncio_detailed(
         start_at=start_at,
         end_at=end_at,
         timezone=timezone,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -200,6 +215,7 @@ async def asyncio(
     start_at: datetime.datetime,
     end_at: datetime.datetime,
     timezone: Union[Unset, str] = "UTC",
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[GenerateRunStatisticsResponse]:
     """Generate run statistics
 
@@ -212,6 +228,8 @@ async def asyncio(
         end_at (datetime.datetime): End date and time for statistics (inclusive)
         timezone (Union[Unset, str]): Timezone for the statistics (e.g., 'Europe/Berlin').
             Defaults to UTC. Default: 'UTC'.
+        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -228,5 +246,6 @@ async def asyncio(
             start_at=start_at,
             end_at=end_at,
             timezone=timezone,
+            environment=environment,
         )
     ).parsed

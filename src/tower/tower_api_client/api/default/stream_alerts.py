@@ -5,8 +5,10 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.run_failure_alert import RunFailureAlert
-from ...models.sse_warning import SSEWarning
+from ...models.stream_alerts_event_error import StreamAlertsEventError
+from ...models.stream_alerts_event_run_failure_alert import (
+    StreamAlertsEventRunFailureAlert,
+)
 from ...types import Response
 
 
@@ -21,7 +23,9 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[list[Union["RunFailureAlert", "SSEWarning"]]]:
+) -> Optional[
+    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
+]:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.text
@@ -29,18 +33,20 @@ def _parse_response(
 
             def _parse_response_200_item(
                 data: object,
-            ) -> Union["RunFailureAlert", "SSEWarning"]:
+            ) -> Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    response_200_item_type_0 = SSEWarning.from_dict(data)
+                    response_200_item_type_0 = StreamAlertsEventError.from_dict(data)
 
                     return response_200_item_type_0
                 except:  # noqa: E722
                     pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                response_200_item_type_1 = RunFailureAlert.from_dict(data)
+                response_200_item_type_1 = StreamAlertsEventRunFailureAlert.from_dict(
+                    data
+                )
 
                 return response_200_item_type_1
 
@@ -57,7 +63,9 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[list[Union["RunFailureAlert", "SSEWarning"]]]:
+) -> Response[
+    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
+]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -69,7 +77,9 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[list[Union["RunFailureAlert", "SSEWarning"]]]:
+) -> Response[
+    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
+]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -79,7 +89,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['RunFailureAlert', 'SSEWarning']]]
+        Response[list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]]
     """
 
     kwargs = _get_kwargs()
@@ -94,7 +104,9 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> Optional[list[Union["RunFailureAlert", "SSEWarning"]]]:
+) -> Optional[
+    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
+]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -104,7 +116,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['RunFailureAlert', 'SSEWarning']]
+        list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]
     """
 
     return sync_detailed(
@@ -115,7 +127,9 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[list[Union["RunFailureAlert", "SSEWarning"]]]:
+) -> Response[
+    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
+]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -125,7 +139,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['RunFailureAlert', 'SSEWarning']]]
+        Response[list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]]
     """
 
     kwargs = _get_kwargs()
@@ -138,7 +152,9 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> Optional[list[Union["RunFailureAlert", "SSEWarning"]]]:
+) -> Optional[
+    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
+]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -148,7 +164,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['RunFailureAlert', 'SSEWarning']]
+        list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]
     """
 
     return (

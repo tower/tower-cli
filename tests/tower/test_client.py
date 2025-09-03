@@ -38,6 +38,7 @@ def mock_run_response_factory():
             
         return {
             "run": {
+                "$link": f"https://api.example.com/v1/apps/my-app/runs/{number}",
                 "app_name": "my-app",
                 "app_version": app_version,
                 "cancelled_at": None,
@@ -74,6 +75,7 @@ def create_run_object():
             parameters = []
             
         return Run(
+            link="https://api.example.com/v1/apps/my-app/runs/0",
             app_name="my-app",
             exit_code=None,
             app_version=app_version,
@@ -99,7 +101,7 @@ def test_running_apps(httpx_mock, mock_api_config, mock_run_response_factory):
         method="POST",
         url="https://api.example.com/v1/apps/my-app/runs",
         json=mock_run_response_factory(),
-        status_code=200,
+        status_code=201,
     )
 
     # Call the function that makes the API request

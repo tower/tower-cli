@@ -1,9 +1,11 @@
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="User")
 
@@ -18,9 +20,10 @@ class User:
         email (str):
         first_name (str):
         is_alerts_enabled (bool):
-        is_invitation_claimed (bool):
+        is_confirmed (bool):
         last_name (str):
         profile_photo_url (str):
+        is_invitation_claimed (Union[Unset, bool]): This property is deprecated. It will be removed in a future version.
     """
 
     company: str
@@ -29,9 +32,10 @@ class User:
     email: str
     first_name: str
     is_alerts_enabled: bool
-    is_invitation_claimed: bool
+    is_confirmed: bool
     last_name: str
     profile_photo_url: str
+    is_invitation_claimed: Union[Unset, bool] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         company = self.company
@@ -46,11 +50,13 @@ class User:
 
         is_alerts_enabled = self.is_alerts_enabled
 
-        is_invitation_claimed = self.is_invitation_claimed
+        is_confirmed = self.is_confirmed
 
         last_name = self.last_name
 
         profile_photo_url = self.profile_photo_url
+
+        is_invitation_claimed = self.is_invitation_claimed
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
@@ -61,11 +67,13 @@ class User:
                 "email": email,
                 "first_name": first_name,
                 "is_alerts_enabled": is_alerts_enabled,
-                "is_invitation_claimed": is_invitation_claimed,
+                "is_confirmed": is_confirmed,
                 "last_name": last_name,
                 "profile_photo_url": profile_photo_url,
             }
         )
+        if is_invitation_claimed is not UNSET:
+            field_dict["is_invitation_claimed"] = is_invitation_claimed
 
         return field_dict
 
@@ -84,11 +92,13 @@ class User:
 
         is_alerts_enabled = d.pop("is_alerts_enabled")
 
-        is_invitation_claimed = d.pop("is_invitation_claimed")
+        is_confirmed = d.pop("is_confirmed")
 
         last_name = d.pop("last_name")
 
         profile_photo_url = d.pop("profile_photo_url")
+
+        is_invitation_claimed = d.pop("is_invitation_claimed", UNSET)
 
         user = cls(
             company=company,
@@ -97,9 +107,10 @@ class User:
             email=email,
             first_name=first_name,
             is_alerts_enabled=is_alerts_enabled,
-            is_invitation_claimed=is_invitation_claimed,
+            is_confirmed=is_confirmed,
             last_name=last_name,
             profile_photo_url=profile_photo_url,
+            is_invitation_claimed=is_invitation_claimed,
         )
 
         return user

@@ -18,6 +18,7 @@ def _get_kwargs(
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -38,6 +39,8 @@ def _get_kwargs(
     params["page_size"] = page_size
 
     params["acked"] = acked
+
+    params["environment"] = environment
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -83,6 +86,7 @@ def sync_detailed(
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListAlertsResponse]:
     """List alerts
 
@@ -97,6 +101,7 @@ def sync_detailed(
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
+        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -113,6 +118,7 @@ def sync_detailed(
         page=page,
         page_size=page_size,
         acked=acked,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -131,6 +137,7 @@ def sync(
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListAlertsResponse]:
     """List alerts
 
@@ -145,6 +152,7 @@ def sync(
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
+        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,6 +170,7 @@ def sync(
         page=page,
         page_size=page_size,
         acked=acked,
+        environment=environment,
     ).parsed
 
 
@@ -174,6 +183,7 @@ async def asyncio_detailed(
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListAlertsResponse]:
     """List alerts
 
@@ -188,6 +198,7 @@ async def asyncio_detailed(
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
+        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -204,6 +215,7 @@ async def asyncio_detailed(
         page=page,
         page_size=page_size,
         acked=acked,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -220,6 +232,7 @@ async def asyncio(
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListAlertsResponse]:
     """List alerts
 
@@ -234,6 +247,7 @@ async def asyncio(
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
+        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -252,5 +266,6 @@ async def asyncio(
             page=page,
             page_size=page_size,
             acked=acked,
+            environment=environment,
         )
     ).parsed

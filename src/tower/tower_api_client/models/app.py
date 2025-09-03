@@ -22,7 +22,6 @@ class App:
     """
     Attributes:
         created_at (datetime.datetime): The date and time this app was created.
-        health_status (AppHealthStatus): The health status of this app
         name (str): The name of the app.
         next_run_at (Union[None, datetime.datetime]): The next time this app will run as part of it's schedule, null if
             none.
@@ -30,6 +29,7 @@ class App:
         schedule (Union[None, str]): The schedule associated with this app, null if none.
         short_description (str): A short description of the app. Can be empty.
         version (Union[None, str]): The current version of this app, null if none.
+        health_status (Union[Unset, AppHealthStatus]): The health status of this app
         last_run (Union[Unset, Run]):
         run_results (Union[Unset, RunResults]):
         slug (Union[Unset, str]): This property is deprecated. Please use name instead.
@@ -37,13 +37,13 @@ class App:
     """
 
     created_at: datetime.datetime
-    health_status: AppHealthStatus
     name: str
     next_run_at: Union[None, datetime.datetime]
     owner: str
     schedule: Union[None, str]
     short_description: str
     version: Union[None, str]
+    health_status: Union[Unset, AppHealthStatus] = UNSET
     last_run: Union[Unset, "Run"] = UNSET
     run_results: Union[Unset, "RunResults"] = UNSET
     slug: Union[Unset, str] = UNSET
@@ -51,8 +51,6 @@ class App:
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
-
-        health_status = self.health_status.value
 
         name = self.name
 
@@ -72,6 +70,10 @@ class App:
         version: Union[None, str]
         version = self.version
 
+        health_status: Union[Unset, str] = UNSET
+        if not isinstance(self.health_status, Unset):
+            health_status = self.health_status.value
+
         last_run: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.last_run, Unset):
             last_run = self.last_run.to_dict()
@@ -90,7 +92,6 @@ class App:
         field_dict.update(
             {
                 "created_at": created_at,
-                "health_status": health_status,
                 "name": name,
                 "next_run_at": next_run_at,
                 "owner": owner,
@@ -99,6 +100,8 @@ class App:
                 "version": version,
             }
         )
+        if health_status is not UNSET:
+            field_dict["health_status"] = health_status
         if last_run is not UNSET:
             field_dict["last_run"] = last_run
         if run_results is not UNSET:
@@ -117,8 +120,6 @@ class App:
 
         d = dict(src_dict)
         created_at = isoparse(d.pop("created_at"))
-
-        health_status = AppHealthStatus(d.pop("health_status"))
 
         name = d.pop("name")
 
@@ -155,6 +156,13 @@ class App:
 
         version = _parse_version(d.pop("version"))
 
+        _health_status = d.pop("health_status", UNSET)
+        health_status: Union[Unset, AppHealthStatus]
+        if isinstance(_health_status, Unset):
+            health_status = UNSET
+        else:
+            health_status = AppHealthStatus(_health_status)
+
         _last_run = d.pop("last_run", UNSET)
         last_run: Union[Unset, Run]
         if isinstance(_last_run, Unset):
@@ -180,13 +188,13 @@ class App:
 
         app = cls(
             created_at=created_at,
-            health_status=health_status,
             name=name,
             next_run_at=next_run_at,
             owner=owner,
             schedule=schedule,
             short_description=short_description,
             version=version,
+            health_status=health_status,
             last_run=last_run,
             run_results=run_results,
             slug=slug,

@@ -42,6 +42,7 @@ pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsRes
         num_runs: Some(0),
         sort: None,
         filter: None,
+        environment: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
@@ -52,10 +53,11 @@ pub async fn create_app(config: &Config, name: &str, description: &str) -> Resul
 
     let params = tower_api::apis::default_api::CreateAppParams {
         create_app_params: tower_api::models::CreateAppParams{
+            schema: None,
             name: name.to_string(),
             short_description: Some(description.to_string()),
-            schema: None,
             slug: None,
+            is_externally_accessible: None,
         },
     };
 
@@ -221,7 +223,7 @@ pub async fn refresh_session(config: &Config) -> Result<tower_api::models::Refre
 }
 
 pub enum LogStreamEvent {
-    EventLog(tower_api::models::LogLine),
+    EventLog(tower_api::models::RunLogLine),
     EventWarning(tower_api::models::EventWarning),
 }
 
@@ -413,7 +415,7 @@ impl ResponseEntity for tower_api::apis::default_api::CreateSecretSuccess {
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status200(data) => Some(data),
+            Self::Status201(data) => Some(data),
             Self::UnknownValue(_) => None,
         }
     }
@@ -465,7 +467,6 @@ impl ResponseEntity for tower_api::apis::default_api::RunAppSuccess {
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status200(data) => Some(data),
             Self::Status201(data) => Some(data),
             Self::UnknownValue(_) => None,
         }
@@ -510,7 +511,7 @@ impl ResponseEntity for tower_api::apis::default_api::CreateAppSuccess {
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
-            Self::Status200(resp) => Some(resp),
+            Self::Status201(resp) => Some(resp),
             Self::UnknownValue(_) => None,
         }
     }
