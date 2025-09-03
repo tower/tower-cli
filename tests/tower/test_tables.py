@@ -8,7 +8,7 @@ from urllib.request import pathname2url
 
 # We import all the things we need from Tower.
 import tower.polars as pl
-import tower.pyarrow as pa
+import pyarrow as pa
 from pyiceberg.catalog.memory import InMemoryCatalog
 
 # Imports the library under test
