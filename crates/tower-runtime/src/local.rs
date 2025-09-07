@@ -17,6 +17,7 @@ use tokio::{
     fs,
     io::{AsyncRead, BufReader, AsyncBufReadExt},
     process::{Child, Command}, 
+    runtime::Handle,
     sync::{
         Mutex,
         oneshot::{
@@ -49,7 +50,7 @@ pub struct LocalApp {
     waiter: Mutex<oneshot::Receiver<i32>>,
 
     // terminator is what we use to flag that we want to terminate the child process.
-    terminator: Mutex<CancellationToken>,
+    terminator: CancellationToken,
 
     // execute_handle keeps track of the current state of the execution lifecycle.
     execute_handle: Option<JoinHandle<Result<(), Error>>>,
@@ -271,20 +272,28 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
 
 impl Drop for LocalApp {
     fn drop(&mut self) {
-        // We want to ensure that we cancel the process if it is still running.
-        let _ = self.terminate();
+        // CancellationToken::cancel() is not async
+        self.terminator.cancel();
+        
+        // Optionally spawn a task to wait for the handle
+        if let Some(execute_handle) = self.execute_handle.take() {
+            if let Ok(handle) = Handle::try_current() {
+                handle.spawn(async move {
+                    let _ = execute_handle.await;
+                });
+            }
+        }
     }
 }
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        let cancel_token = CancellationToken::new();
-        let terminator = Mutex::new(cancel_token.clone());
+        let terminator = CancellationToken::new();
 
         let (sx, rx) = oneshot::channel::<i32>();
         let waiter = Mutex::new(rx);
 
-        let handle = tokio::spawn(execute_local_app(opts, sx, cancel_token));
+        let handle = tokio::spawn(execute_local_app(opts, sx, terminator.clone()));
         let execute_handle = Some(handle);
 
         Ok(Self {
@@ -323,8 +332,7 @@ impl App for LocalApp {
     }
 
     async fn terminate(&mut self) -> Result<(), Error> {
-        let terminator = self.terminator.lock().await;
-        terminator.cancel();
+        self.terminator.cancel();
 
         // Now we should wait for the join handle to finish.
         if let Some(execute_handle) = self.execute_handle.take() {
