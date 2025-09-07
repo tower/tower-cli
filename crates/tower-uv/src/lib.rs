@@ -106,6 +106,7 @@ impl Uv {
                 .arg("--no-progress")
                 .arg("sync")
                 .envs(env_vars)
+                .process_group(0)
                 .spawn()?;
 
             Ok(child)
@@ -126,6 +127,7 @@ impl Uv {
                 .arg("-r")
                 .arg(cwd.join("requirements.txt"))
                 .envs(env_vars)
+                .process_group(0)
                 .spawn()?;
 
             Ok(child)
@@ -152,6 +154,7 @@ impl Uv {
             .arg("run")
             .arg(program)
             .envs(env_vars)
+            .process_group(0)
             .spawn()?;
 
         Ok(child)

@@ -429,11 +429,46 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs:
     res
 }
 
+#[cfg(unix)]
+async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
+    let pid = child.id().unwrap();
+
+    // We first send a SIGTERM to ensure that the child processes are terminated. Using SIGKILL
+    // (default behavior in Child::kill) can leave orphaned processes behind.
+    nix::sys::signal::killpg(
+        nix::unistd::Pid::from_raw(pid as i32), 
+        nix::sys::signal::Signal::SIGTERM
+    ).ok();
+    
+    // If it doesn't die after 5 seconds then we'll forcefullt kill it.
+    let timeout = tokio::time::timeout(
+        Duration::from_secs(5), 
+
+        // Wait for the child process to finish.
+        child.wait()
+    ).await;
+    
+    if timeout.is_err() {
+        nix::sys::signal::killpg(
+            nix::unistd::Pid::from_raw(pid as i32), 
+            nix::sys::signal::Signal::SIGKILL
+        ).ok();
+    }
+}
+
+#[cfg(not(unix))]
+async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
+    match child.kill().await {
+        Ok(_) => debug!(ctx: &ctx, "child process killed successfully"),
+        Err(e) => debug!(ctx: &ctx, "failed to kill child process: {}", e),
+    };
+}
+
 async fn wait_for_process(ctx: tower_telemetry::Context, cancel_token: &CancellationToken, mut child: Child) -> i32 {
     let code = loop {
         if cancel_token.is_cancelled() {
             debug!(ctx: &ctx, "process cancelled, terminating child process");
-            let _ = child.kill().await;
+            kill_child_process(&ctx, child).await;
             break -1; // return -1 to indicate that the process was cancelled.
         }
 

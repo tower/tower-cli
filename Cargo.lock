@@ -2993,6 +2993,7 @@ version = "0.3.27"
 dependencies = [
  "chrono",
  "config",
+ "nix 0.30.1",
  "snafu",
  "tokio",
  "tokio-util",
