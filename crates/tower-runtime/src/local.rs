@@ -29,6 +29,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 
+#[cfg(unix)]
 use nix::{
     unistd::Pid,
     sys::signal::{
