@@ -443,7 +443,7 @@ async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
     let pid = match child.id() {
         Some(pid) => pid,
         None => {
-            // We didn't get anything, so we can't do anything. Let's just exist with a debug
+            // We didn't get anything, so we can't do anything. Let's just exit with a debug
             // message.
             error!(ctx: &ctx, "child process has no pid, cannot kill");
             return;
