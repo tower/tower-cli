@@ -219,7 +219,7 @@ impl TowerService {
         match api::describe_run_logs(&self.config, &request.name, seq).await {
             Ok(response) => {
                 let logs = response.log_lines.into_iter()
-                    .map(|log| format!("{}: {}", log.timestamp, log.message))
+                    .map(|log| format!("{}: {}", log.reported_at, log.content))
                     .collect::<Vec<_>>()
                     .join("\n");
                 
