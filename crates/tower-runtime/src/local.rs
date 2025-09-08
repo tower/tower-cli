@@ -41,7 +41,7 @@ use nix::{
 use tokio_util::sync::CancellationToken;
 
 use tower_package::{Manifest, Package};
-use tower_telemetry::{debug, error};
+use tower_telemetry::debug;
 use tower_uv::Uv;
 
 use crate::{
@@ -445,7 +445,7 @@ async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
         None => {
             // We didn't get anything, so we can't do anything. Let's just exit with a debug
             // message.
-            error!(ctx: &ctx, "child process has no pid, cannot kill");
+            tower_telemetry::error!(ctx: &ctx, "child process has no pid, cannot kill");
             return;
         }
     };
