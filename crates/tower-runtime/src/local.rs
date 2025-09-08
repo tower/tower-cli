@@ -29,10 +29,18 @@ use tokio::{
     time::{timeout, Duration},
 };
 
+use nix::{
+    unistd::Pid,
+    sys::signal::{
+        Signal,
+        killpg,
+    },  
+};
+
 use tokio_util::sync::CancellationToken;
 
 use tower_package::{Manifest, Package};
-use tower_telemetry::debug;
+use tower_telemetry::{debug, error};
 use tower_uv::Uv;
 
 use crate::{
@@ -431,27 +439,38 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs:
 
 #[cfg(unix)]
 async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
-    let pid = child.id().unwrap();
+    let pid = match child.id() {
+        Some(pid) => pid,
+        None => {
+            // We didn't get anything, so we can't do anything. Let's just exist with a debug
+            // message.
+            error!(ctx: &ctx, "child process has no pid, cannot kill");
+            return;
+        }
+    };
+
+    // This is the actual converted pid.
+    let pid = Pid::from_raw(pid as i32);
 
     // We first send a SIGTERM to ensure that the child processes are terminated. Using SIGKILL
     // (default behavior in Child::kill) can leave orphaned processes behind.
-    nix::sys::signal::killpg(
-        nix::unistd::Pid::from_raw(pid as i32), 
-        nix::sys::signal::Signal::SIGTERM
+    killpg(
+        pid, 
+        Signal::SIGTERM
     ).ok();
     
-    // If it doesn't die after 5 seconds then we'll forcefullt kill it.
-    let timeout = tokio::time::timeout(
-        Duration::from_secs(5), 
-
-        // Wait for the child process to finish.
+    // If it doesn't die after 2 seconds then we'll forcefully kill it. This timeout should be less
+    // than the overall timeout for the process (which should likely live on the context as a
+    // deadline).
+    let timeout = timeout(
+        Duration::from_secs(2), 
         child.wait()
     ).await;
     
     if timeout.is_err() {
-        nix::sys::signal::killpg(
-            nix::unistd::Pid::from_raw(pid as i32), 
-            nix::sys::signal::Signal::SIGKILL
+        killpg(
+            pid,
+            Signal::SIGKILL
         ).ok();
     }
 }
