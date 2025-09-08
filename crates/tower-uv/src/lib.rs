@@ -95,8 +95,8 @@ impl Uv {
         // that's easy.
         if cwd.join("pyproject.toml").exists() {
             debug!("Executing UV ({:?}) sync in {:?}", &self.uv_path, cwd);
-            let child = Command::new(&self.uv_path)
-                .kill_on_drop(true)
+            let mut cmd = Command::new(&self.uv_path);
+            cmd.kill_on_drop(true)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -105,17 +105,22 @@ impl Uv {
                 .arg("never")
                 .arg("--no-progress")
                 .arg("sync")
-                .envs(env_vars)
-                .process_group(0)
-                .spawn()?;
+                .envs(env_vars);
+
+            #[cfg(unix)]
+            {
+                cmd.process_group(0);
+            }
+
+            let child = cmd.spawn()?;
 
             Ok(child)
         } else if cwd.join("requirements.txt").exists() {
             debug!("Executing UV ({:?}) sync with requirements in {:?}", &self.uv_path, cwd);
 
             // If there is a requirements.txt, then we can use that to sync.
-            let child = Command::new(&self.uv_path)
-                .kill_on_drop(true)
+            let mut cmd = Command::new(&self.uv_path);
+            cmd.kill_on_drop(true)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -126,9 +131,14 @@ impl Uv {
                 .arg("install")
                 .arg("-r")
                 .arg(cwd.join("requirements.txt"))
-                .envs(env_vars)
-                .process_group(0)
-                .spawn()?;
+                .envs(env_vars);
+
+            #[cfg(unix)]
+            {
+                cmd.process_group(0);
+            }
+
+            let child = cmd.spawn()?;
 
             Ok(child)
         } else {
@@ -142,8 +152,8 @@ impl Uv {
     pub async fn run(&self, cwd: &PathBuf, program: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
         debug!("Executing UV ({:?}) run {:?} in {:?}", &self.uv_path, program, cwd);
 
-        let child = Command::new(&self.uv_path)
-            .kill_on_drop(true)
+        let mut cmd = Command::new(&self.uv_path);
+        cmd.kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -153,10 +163,14 @@ impl Uv {
             .arg("--no-progress")
             .arg("run")
             .arg(program)
-            .envs(env_vars)
-            .process_group(0)
-            .spawn()?;
+            .envs(env_vars);
 
+        #[cfg(unix)]
+        {
+            cmd.process_group(0);
+        }
+
+        let child = cmd.spawn()?;
         Ok(child)
     }
 
