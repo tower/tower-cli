@@ -4,7 +4,8 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.27"
+version = "0.3.28"
+
 
 
 
@@ -38,6 +39,7 @@ futures-lite = "2.6"
 glob = "0.3"
 http = "1.1"
 indicatif = "0.17"
+nix = { version = "0.30", features = ["signal"] }
 pem = "3"
 promptly = "0.3"
 rand = "0.8"

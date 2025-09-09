@@ -17,6 +17,7 @@ use tokio::{
     fs,
     io::{AsyncRead, BufReader, AsyncBufReadExt},
     process::{Child, Command}, 
+    runtime::Handle,
     sync::{
         Mutex,
         oneshot::{
@@ -26,6 +27,15 @@ use tokio::{
     },
     task::JoinHandle,
     time::{timeout, Duration},
+};
+
+#[cfg(unix)]
+use nix::{
+    unistd::Pid,
+    sys::signal::{
+        Signal,
+        killpg,
+    },  
 };
 
 use tokio_util::sync::CancellationToken;
@@ -49,7 +59,7 @@ pub struct LocalApp {
     waiter: Mutex<oneshot::Receiver<i32>>,
 
     // terminator is what we use to flag that we want to terminate the child process.
-    terminator: Mutex<CancellationToken>,
+    terminator: CancellationToken,
 
     // execute_handle keeps track of the current state of the execution lifecycle.
     execute_handle: Option<JoinHandle<Result<(), Error>>>,
@@ -271,20 +281,28 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
 
 impl Drop for LocalApp {
     fn drop(&mut self) {
-        // We want to ensure that we cancel the process if it is still running.
-        let _ = self.terminate();
+        // CancellationToken::cancel() is not async
+        self.terminator.cancel();
+        
+        // Optionally spawn a task to wait for the handle
+        if let Some(execute_handle) = self.execute_handle.take() {
+            if let Ok(handle) = Handle::try_current() {
+                handle.spawn(async move {
+                    let _ = execute_handle.await;
+                });
+            }
+        }
     }
 }
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
-        let cancel_token = CancellationToken::new();
-        let terminator = Mutex::new(cancel_token.clone());
+        let terminator = CancellationToken::new();
 
         let (sx, rx) = oneshot::channel::<i32>();
         let waiter = Mutex::new(rx);
 
-        let handle = tokio::spawn(execute_local_app(opts, sx, cancel_token));
+        let handle = tokio::spawn(execute_local_app(opts, sx, terminator.clone()));
         let execute_handle = Some(handle);
 
         Ok(Self {
@@ -323,8 +341,7 @@ impl App for LocalApp {
     }
 
     async fn terminate(&mut self) -> Result<(), Error> {
-        let terminator = self.terminator.lock().await;
-        terminator.cancel();
+        self.terminator.cancel();
 
         // Now we should wait for the join handle to finish.
         if let Some(execute_handle) = self.execute_handle.take() {
@@ -421,11 +438,57 @@ fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs:
     res
 }
 
+#[cfg(unix)]
+async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
+    let pid = match child.id() {
+        Some(pid) => pid,
+        None => {
+            // We didn't get anything, so we can't do anything. Let's just exit with a debug
+            // message.
+            tower_telemetry::error!(ctx: &ctx, "child process has no pid, cannot kill");
+            return;
+        }
+    };
+
+    // This is the actual converted pid.
+    let pid = Pid::from_raw(pid as i32);
+
+    // We first send a SIGTERM to ensure that the child processes are terminated. Using SIGKILL
+    // (default behavior in Child::kill) can leave orphaned processes behind.
+    killpg(
+        pid, 
+        Signal::SIGTERM
+    ).ok();
+    
+    // If it doesn't die after 2 seconds then we'll forcefully kill it. This timeout should be less
+    // than the overall timeout for the process (which should likely live on the context as a
+    // deadline).
+    let timeout = timeout(
+        Duration::from_secs(2), 
+        child.wait()
+    ).await;
+    
+    if timeout.is_err() {
+        killpg(
+            pid,
+            Signal::SIGKILL
+        ).ok();
+    }
+}
+
+#[cfg(not(unix))]
+async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
+    match child.kill().await {
+        Ok(_) => debug!(ctx: &ctx, "child process killed successfully"),
+        Err(e) => debug!(ctx: &ctx, "failed to kill child process: {}", e),
+    };
+}
+
 async fn wait_for_process(ctx: tower_telemetry::Context, cancel_token: &CancellationToken, mut child: Child) -> i32 {
     let code = loop {
         if cancel_token.is_cancelled() {
             debug!(ctx: &ctx, "process cancelled, terminating child process");
-            let _ = child.kill().await;
+            kill_child_process(&ctx, child).await;
             break -1; // return -1 to indicate that the process was cancelled.
         }
 
