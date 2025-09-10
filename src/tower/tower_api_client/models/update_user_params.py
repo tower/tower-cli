@@ -18,6 +18,8 @@ class UpdateUserParams:
         country (Union[None, Unset, str]):
         first_name (Union[None, Unset, str]):
         is_alerts_enabled (Union[None, Unset, bool]):
+        is_subscribed_to_changelog (Union[None, Unset, bool]): If true, the user will receive changelog updates via
+            email.
         last_name (Union[None, Unset, str]):
         password (Union[None, Unset, str]):
     """
@@ -27,6 +29,7 @@ class UpdateUserParams:
     country: Union[None, Unset, str] = UNSET
     first_name: Union[None, Unset, str] = UNSET
     is_alerts_enabled: Union[None, Unset, bool] = UNSET
+    is_subscribed_to_changelog: Union[None, Unset, bool] = UNSET
     last_name: Union[None, Unset, str] = UNSET
     password: Union[None, Unset, str] = UNSET
 
@@ -57,6 +60,12 @@ class UpdateUserParams:
         else:
             is_alerts_enabled = self.is_alerts_enabled
 
+        is_subscribed_to_changelog: Union[None, Unset, bool]
+        if isinstance(self.is_subscribed_to_changelog, Unset):
+            is_subscribed_to_changelog = UNSET
+        else:
+            is_subscribed_to_changelog = self.is_subscribed_to_changelog
+
         last_name: Union[None, Unset, str]
         if isinstance(self.last_name, Unset):
             last_name = UNSET
@@ -81,6 +90,8 @@ class UpdateUserParams:
             field_dict["first_name"] = first_name
         if is_alerts_enabled is not UNSET:
             field_dict["is_alerts_enabled"] = is_alerts_enabled
+        if is_subscribed_to_changelog is not UNSET:
+            field_dict["is_subscribed_to_changelog"] = is_subscribed_to_changelog
         if last_name is not UNSET:
             field_dict["last_name"] = last_name
         if password is not UNSET:
@@ -129,6 +140,17 @@ class UpdateUserParams:
 
         is_alerts_enabled = _parse_is_alerts_enabled(d.pop("is_alerts_enabled", UNSET))
 
+        def _parse_is_subscribed_to_changelog(data: object) -> Union[None, Unset, bool]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, bool], data)
+
+        is_subscribed_to_changelog = _parse_is_subscribed_to_changelog(
+            d.pop("is_subscribed_to_changelog", UNSET)
+        )
+
         def _parse_last_name(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
@@ -153,6 +175,7 @@ class UpdateUserParams:
             country=country,
             first_name=first_name,
             is_alerts_enabled=is_alerts_enabled,
+            is_subscribed_to_changelog=is_subscribed_to_changelog,
             last_name=last_name,
             password=password,
         )
