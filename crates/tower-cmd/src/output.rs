@@ -169,6 +169,9 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
         StatusCode::INTERNAL_SERVER_ERROR => {
             error("The Tower API encountered an internal error. Maybe try again later on.");
         },
+        StatusCode::NOT_FOUND => {
+            output_full_error_details(&error_model);
+        },
         StatusCode::UNAUTHORIZED => {
             error("You aren't authorized to do that! Are you logged in? Run `tower login` to login.");
         },
