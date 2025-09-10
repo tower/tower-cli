@@ -21,6 +21,7 @@ class User:
         first_name (str):
         is_alerts_enabled (bool):
         is_confirmed (bool):
+        is_subscribed_to_changelog (bool):
         last_name (str):
         profile_photo_url (str):
         is_invitation_claimed (Union[Unset, bool]): This property is deprecated. It will be removed in a future version.
@@ -33,6 +34,7 @@ class User:
     first_name: str
     is_alerts_enabled: bool
     is_confirmed: bool
+    is_subscribed_to_changelog: bool
     last_name: str
     profile_photo_url: str
     is_invitation_claimed: Union[Unset, bool] = UNSET
@@ -52,6 +54,8 @@ class User:
 
         is_confirmed = self.is_confirmed
 
+        is_subscribed_to_changelog = self.is_subscribed_to_changelog
+
         last_name = self.last_name
 
         profile_photo_url = self.profile_photo_url
@@ -68,6 +72,7 @@ class User:
                 "first_name": first_name,
                 "is_alerts_enabled": is_alerts_enabled,
                 "is_confirmed": is_confirmed,
+                "is_subscribed_to_changelog": is_subscribed_to_changelog,
                 "last_name": last_name,
                 "profile_photo_url": profile_photo_url,
             }
@@ -94,6 +99,8 @@ class User:
 
         is_confirmed = d.pop("is_confirmed")
 
+        is_subscribed_to_changelog = d.pop("is_subscribed_to_changelog")
+
         last_name = d.pop("last_name")
 
         profile_photo_url = d.pop("profile_photo_url")
@@ -108,6 +115,7 @@ class User:
             first_name=first_name,
             is_alerts_enabled=is_alerts_enabled,
             is_confirmed=is_confirmed,
+            is_subscribed_to_changelog=is_subscribed_to_changelog,
             last_name=last_name,
             profile_photo_url=profile_photo_url,
             is_invitation_claimed=is_invitation_claimed,
