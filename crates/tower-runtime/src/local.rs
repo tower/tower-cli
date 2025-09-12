@@ -35,7 +35,7 @@ use nix::{
     sys::signal::{
         Signal,
         killpg,
-    },  
+    },
 };
 
 use tokio_util::sync::CancellationToken;
