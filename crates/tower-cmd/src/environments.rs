@@ -28,12 +28,24 @@ pub async fn do_list(config: Config) {
 
     match resp {
         Ok(resp) => {
-            let items = resp
-                .environments
+            let headers = vec!["Name"]
                 .into_iter()
-                .map(|env| env.name.bold().green().to_string())
+                .map(|h| h.yellow().to_string())
                 .collect();
-            output::list(items);
+
+            // Format the environments data for the table
+            let envs = resp
+                .environments
+                .into_iter();
+
+            let envs_data: Vec<Vec<String>> = envs
+                .map(|env| {
+                    vec![env.name.clone()]
+                })
+                .collect();
+
+            // Display the table using the existing table function
+            output::table(headers, envs_data);
         }
         Err(err) => {
             output::tower_error(err);
