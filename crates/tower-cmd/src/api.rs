@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 use reqwest_eventsource::{Event, EventSource};
 use tower_api::apis::configuration;
 use futures_util::StreamExt;
+use tower_api::models::RunParameter;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -567,6 +568,133 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeRunSuccess {
     fn extract_data(self) -> Option<Self::Data> {
         match self {
             Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+pub async fn list_schedules(config: &Config, _app_name: Option<&str>, _environment: Option<&str>) -> Result<tower_api::models::ListSchedulesResponse, Error<tower_api::apis::default_api::ListSchedulesError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListSchedulesParams {
+        page: None,
+        page_size: None,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_schedules(api_config, params)).await
+}
+
+pub async fn create_schedule(
+    config: &Config,
+    app_name: &str,
+    environment: &str,
+    cron: &str,
+    parameters: Option<HashMap<String, String>>,
+) -> Result<tower_api::models::CreateScheduleResponse, Error<tower_api::apis::default_api::CreateScheduleError>> {
+    let api_config = &config.into();
+
+    let run_parameters = parameters.map(|params| {
+        params
+            .into_iter()
+            .map(|(key, value)| RunParameter { name: key, value })
+            .collect()
+    });
+
+    let params = tower_api::apis::default_api::CreateScheduleParams {
+        create_schedule_params: tower_api::models::CreateScheduleParams {
+            schema: None,
+            app_name: app_name.to_string(),
+            cron: cron.to_string(),
+            environment: Some(environment.to_string()),
+            app_version: None,
+            parameters: run_parameters,
+        },
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::create_schedule(api_config, params)).await
+}
+
+pub async fn update_schedule(
+    config: &Config,
+    schedule_id: &str,
+    cron: Option<&String>,
+    parameters: Option<HashMap<String, String>>,
+) -> Result<tower_api::models::UpdateScheduleResponse, Error<tower_api::apis::default_api::UpdateScheduleError>> {
+    let api_config = &config.into();
+
+    let run_parameters = parameters.map(|params| {
+        params
+            .into_iter()
+            .map(|(key, value)| RunParameter { name: key, value })
+            .collect()
+    });
+
+    let params = tower_api::apis::default_api::UpdateScheduleParams {
+        id: schedule_id.to_string(),
+        update_schedule_params: tower_api::models::UpdateScheduleParams {
+            schema: None,
+            cron: cron.map(|s| s.clone()),
+            environment: None,
+            app_version: None,
+            parameters: run_parameters,
+        },
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::update_schedule(api_config, params)).await
+}
+
+pub async fn delete_schedule(config: &Config, schedule_id: &str) -> Result<tower_api::models::DeleteScheduleResponse, Error<tower_api::apis::default_api::DeleteScheduleError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DeleteScheduleParams {
+        delete_schedule_params: tower_api::models::DeleteScheduleParams {
+            schema: None,
+            ids: vec![schedule_id.to_string()],
+        },
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::delete_schedule(api_config, params)).await
+}
+
+impl ResponseEntity for tower_api::apis::default_api::ListSchedulesSuccess {
+    type Data = tower_api::models::ListSchedulesResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::CreateScheduleSuccess {
+    type Data = tower_api::models::CreateScheduleResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status201(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::UpdateScheduleSuccess {
+    type Data = tower_api::models::UpdateScheduleResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DeleteScheduleSuccess {
+    type Data = tower_api::models::DeleteScheduleResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
             Self::UnknownValue(_) => None,
         }
     }
