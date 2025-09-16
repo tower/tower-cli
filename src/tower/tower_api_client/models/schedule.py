@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
+from ..models.schedule_status import ScheduleStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ class Schedule:
         cron (str): The cron expression defining when the app should run
         environment (str): The environment to run the app in
         id (str): The unique identifier for the schedule
+        status (ScheduleStatus): The status of the schedule
         updated_at (datetime.datetime): The timestamp when the schedule was last updated
         app_version (Union[Unset, str]): The specific app version to run, or null for the default version
         parameters (Union[Unset, list['RunParameter']]): The parameters to pass when running the app
@@ -33,6 +35,7 @@ class Schedule:
     cron: str
     environment: str
     id: str
+    status: ScheduleStatus
     updated_at: datetime.datetime
     app_version: Union[Unset, str] = UNSET
     parameters: Union[Unset, list["RunParameter"]] = UNSET
@@ -47,6 +50,8 @@ class Schedule:
         environment = self.environment
 
         id = self.id
+
+        status = self.status.value
 
         updated_at = self.updated_at.isoformat()
 
@@ -67,6 +72,7 @@ class Schedule:
                 "cron": cron,
                 "environment": environment,
                 "id": id,
+                "status": status,
                 "updated_at": updated_at,
             }
         )
@@ -92,6 +98,8 @@ class Schedule:
 
         id = d.pop("id")
 
+        status = ScheduleStatus(d.pop("status"))
+
         updated_at = isoparse(d.pop("updated_at"))
 
         app_version = d.pop("app_version", UNSET)
@@ -109,6 +117,7 @@ class Schedule:
             cron=cron,
             environment=environment,
             id=id,
+            status=status,
             updated_at=updated_at,
             app_version=app_version,
             parameters=parameters,
