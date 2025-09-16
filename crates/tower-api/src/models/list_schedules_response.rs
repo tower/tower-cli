@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ListSchedulesResponse {
@@ -23,7 +23,10 @@ pub struct ListSchedulesResponse {
 }
 
 impl ListSchedulesResponse {
-    pub fn new(pages: models::Pagination, schedules: Vec<models::Schedule>) -> ListSchedulesResponse {
+    pub fn new(
+        pages: models::Pagination,
+        schedules: Vec<models::Schedule>,
+    ) -> ListSchedulesResponse {
         ListSchedulesResponse {
             schema: None,
             pages,
@@ -31,4 +34,3 @@ impl ListSchedulesResponse {
         }
     }
 }
-

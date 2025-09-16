@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CancelRunResponse {
@@ -22,10 +22,6 @@ pub struct CancelRunResponse {
 
 impl CancelRunResponse {
     pub fn new(run: models::Run) -> CancelRunResponse {
-        CancelRunResponse {
-            schema: None,
-            run,
-        }
+        CancelRunResponse { schema: None, run }
     }
 }
-

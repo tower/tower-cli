@@ -1,14 +1,10 @@
-use sha2::Sha256;
+use aes_gcm::aead::Aead;
+use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce}; // Or Aes256GcmSiv, Aes256GcmHs
 use base64::prelude::*;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce}; // Or Aes256GcmSiv, Aes256GcmHs
-use aes_gcm::aead::Aead;
-use rsa::{
-    Oaep, RsaPrivateKey, RsaPublicKey,
-    traits::PublicKeyParts,
-    pkcs8::EncodePublicKey,
-};
+use rsa::{pkcs8::EncodePublicKey, traits::PublicKeyParts, Oaep, RsaPrivateKey, RsaPublicKey};
+use sha2::Sha256;
 
 mod errors;
 pub use errors::Error;
@@ -16,10 +12,7 @@ pub use errors::Error;
 /// encrypt encryptes plaintext with a randomly-generated AES-256 key and IV, then encrypts the AES
 /// key with RSA-OAEP using the provided public key. The result is a non-URL-safe base64-encoded
 /// string.
-pub fn encrypt(
-    key: RsaPublicKey,
-    plaintext: String
-) -> Result<String, Error> {
+pub fn encrypt(key: RsaPublicKey, plaintext: String) -> Result<String, Error> {
     // Generate a random 32-byte AES key
     let mut aes_key = [0u8; 32];
     OsRng.fill_bytes(&mut aes_key);
@@ -58,12 +51,9 @@ pub fn decrypt(key: RsaPrivateKey, ciphertext: String) -> Result<String, Error> 
     let n = key.size();
     let (ciphered_key, suffix) = decoded.split_at(n);
 
-    let key = key.decrypt(
-        Oaep::new::<Sha256>(),
-        ciphered_key,
-    )?;
+    let key = key.decrypt(Oaep::new::<Sha256>(), ciphered_key)?;
 
-    let aes_key =Key::<Aes256Gcm>::from_slice(&key);
+    let aes_key = Key::<Aes256Gcm>::from_slice(&key);
     let cipher = Aes256Gcm::new(aes_key);
 
     // Check if the suffix is at least 12 bytes (96 bits) for the IV
@@ -100,7 +90,7 @@ mod test {
 
     #[test]
     fn test_encrypt_decrypt() {
-        let  (private_key, public_key) = testutils::crypto::get_test_keys();
+        let (private_key, public_key) = testutils::crypto::get_test_keys();
 
         let plaintext = "Hello, World!".to_string();
         let ciphertext = encrypt(public_key, plaintext.clone()).unwrap();
@@ -111,7 +101,7 @@ mod test {
 
     #[test]
     fn test_encrypt_decrypt_long_messages() {
-        let  (private_key, public_key) = testutils::crypto::get_test_keys();
+        let (private_key, public_key) = testutils::crypto::get_test_keys();
 
         let plaintext: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -127,7 +117,7 @@ mod test {
 
     #[test]
     fn test_serialize_public_key() {
-        let  (_private_key, public_key) = testutils::crypto::get_test_keys();
+        let (_private_key, public_key) = testutils::crypto::get_test_keys();
         let serialized = serialize_public_key(public_key.clone());
         let deserialized = RsaPublicKey::from_public_key_pem(&serialized).unwrap();
 

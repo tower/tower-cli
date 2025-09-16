@@ -1,7 +1,7 @@
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process::Stdio;
-use tokio::process::{Command, Child};
+use tokio::process::{Child, Command};
 use tower_telemetry::debug;
 
 pub mod install;
@@ -66,7 +66,7 @@ impl Uv {
             Ok(uv_path) => {
                 test_uv_path(&uv_path).await?;
                 Ok(Uv { uv_path })
-            },
+            }
             Err(e) => {
                 debug!("Error setting up UV: {:?}", e);
                 Err(e.into())
@@ -74,7 +74,11 @@ impl Uv {
         }
     }
 
-    pub async fn venv(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
+    pub async fn venv(
+        &self,
+        cwd: &PathBuf,
+        env_vars: &HashMap<String, String>,
+    ) -> Result<Child, Error> {
         debug!("Executing UV ({:?}) venv in {:?}", &self.uv_path, cwd);
 
         let child = Command::new(&self.uv_path)
@@ -90,7 +94,11 @@ impl Uv {
         Ok(child)
     }
 
-    pub async fn sync(&self, cwd: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
+    pub async fn sync(
+        &self,
+        cwd: &PathBuf,
+        env_vars: &HashMap<String, String>,
+    ) -> Result<Child, Error> {
         // We need to figure out which sync strategy to apply. If there is a pyproject.toml, then
         // that's easy.
         if cwd.join("pyproject.toml").exists() {
@@ -116,7 +124,10 @@ impl Uv {
 
             Ok(child)
         } else if cwd.join("requirements.txt").exists() {
-            debug!("Executing UV ({:?}) sync with requirements in {:?}", &self.uv_path, cwd);
+            debug!(
+                "Executing UV ({:?}) sync with requirements in {:?}",
+                &self.uv_path, cwd
+            );
 
             // If there is a requirements.txt, then we can use that to sync.
             let mut cmd = Command::new(&self.uv_path);
@@ -145,12 +156,18 @@ impl Uv {
             // If there is no pyproject.toml or requirements.txt, then we can't sync.
             Err(Error::MissingPyprojectToml)
         }
-
-
     }
 
-    pub async fn run(&self, cwd: &PathBuf, program: &PathBuf, env_vars: &HashMap<String, String>) -> Result<Child, Error> {
-        debug!("Executing UV ({:?}) run {:?} in {:?}", &self.uv_path, program, cwd);
+    pub async fn run(
+        &self,
+        cwd: &PathBuf,
+        program: &PathBuf,
+        env_vars: &HashMap<String, String>,
+    ) -> Result<Child, Error> {
+        debug!(
+            "Executing UV ({:?}) run {:?} in {:?}",
+            &self.uv_path, program, cwd
+        );
 
         let mut cmd = Command::new(&self.uv_path);
         cmd.kill_on_drop(true)

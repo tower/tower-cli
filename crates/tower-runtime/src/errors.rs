@@ -81,13 +81,13 @@ impl From<std::env::JoinPathsError> for Error {
 impl From<tower_uv::Error> for Error {
     fn from(err: tower_uv::Error) -> Self {
         match err {
-           tower_uv::Error::IoError(_) => Error::SpawnFailed, 
-           tower_uv::Error::NotFound(_) => Error::SpawnFailed, 
-           tower_uv::Error::PermissionDenied(_) => Error::SpawnFailed, 
-           tower_uv::Error::Other(_) => Error::SpawnFailed, 
-           tower_uv::Error::MissingPyprojectToml => Error::SpawnFailed, 
-           tower_uv::Error::InvalidUv => Error::SpawnFailed, 
-           tower_uv::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
+            tower_uv::Error::IoError(_) => Error::SpawnFailed,
+            tower_uv::Error::NotFound(_) => Error::SpawnFailed,
+            tower_uv::Error::PermissionDenied(_) => Error::SpawnFailed,
+            tower_uv::Error::Other(_) => Error::SpawnFailed,
+            tower_uv::Error::MissingPyprojectToml => Error::SpawnFailed,
+            tower_uv::Error::InvalidUv => Error::SpawnFailed,
+            tower_uv::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
         }
     }
 }

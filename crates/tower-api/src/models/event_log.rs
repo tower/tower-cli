@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EventLog {
@@ -57,11 +57,7 @@ impl<'de> Deserialize<'de> for Event {
         let s = String::deserialize(deserializer)?;
         match s.to_lowercase().as_str() {
             "log" => Ok(Self::Log),
-            _ => Err(serde::de::Error::unknown_variant(
-                &s,
-                &["log"],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&s, &["log"])),
         }
     }
 }
-

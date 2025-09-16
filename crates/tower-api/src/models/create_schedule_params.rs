@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateScheduleParams {
@@ -20,7 +20,12 @@ pub struct CreateScheduleParams {
     #[serde(rename = "app_name")]
     pub app_name: String,
     /// The specific app version to run (if omitted, will use the app's default version)
-    #[serde(rename = "app_version", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "app_version",
+        default,
+        with = "::serde_with::rust::double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub app_version: Option<Option<String>>,
     /// The cron expression defining when the app should run
     #[serde(rename = "cron")]
@@ -45,4 +50,3 @@ impl CreateScheduleParams {
         }
     }
 }
-

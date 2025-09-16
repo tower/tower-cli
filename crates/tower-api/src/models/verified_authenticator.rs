@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VerifiedAuthenticator {
@@ -28,7 +28,12 @@ pub struct VerifiedAuthenticator {
 }
 
 impl VerifiedAuthenticator {
-    pub fn new(created_at: String, id: String, issuer: String, label: String) -> VerifiedAuthenticator {
+    pub fn new(
+        created_at: String,
+        id: String,
+        issuer: String,
+        label: String,
+    ) -> VerifiedAuthenticator {
         VerifiedAuthenticator {
             created_at,
             id,
@@ -37,4 +42,3 @@ impl VerifiedAuthenticator {
         }
     }
 }
-

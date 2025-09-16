@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LeaveTeamResponse {
@@ -23,10 +23,6 @@ pub struct LeaveTeamResponse {
 
 impl LeaveTeamResponse {
     pub fn new(team: models::Team) -> LeaveTeamResponse {
-        LeaveTeamResponse {
-            schema: None,
-            team,
-        }
+        LeaveTeamResponse { schema: None, team }
     }
 }
-

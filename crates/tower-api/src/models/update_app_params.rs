@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateAppParams {
@@ -20,7 +20,12 @@ pub struct UpdateAppParams {
     #[serde(rename = "description")]
     pub description: String,
     /// Indicates that web traffic should be routed to this app and that its runs should get a hostname assigned to it.
-    #[serde(rename = "is_externally_accessible", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "is_externally_accessible",
+        default,
+        with = "::serde_with::rust::double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub is_externally_accessible: Option<Option<bool>>,
     /// New status for the App
     #[serde(rename = "status")]
@@ -37,4 +42,3 @@ impl UpdateAppParams {
         }
     }
 }
-

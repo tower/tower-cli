@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc}; 
+use chrono::{DateTime, Utc};
 
 pub fn format_str(ts: &str) -> String {
     let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(ts)

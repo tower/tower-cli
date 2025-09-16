@@ -1,12 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use tower_runtime::{
-    App,
-    StartOptions,
-    Status,
-    local::LocalApp,
-};
+use tower_runtime::{local::LocalApp, App, StartOptions, Status};
 
 use config::Towerfile;
 use tower_package::{Package, PackageSpec};
@@ -29,9 +24,11 @@ fn get_example_app_dir(name: &str) -> PathBuf {
 }
 
 async fn build_package_from_dir(dir: &PathBuf) -> Package {
-    let towerfile = Towerfile::from_path(dir.join("Towerfile")).expect("Failed to load Towerfile"); 
+    let towerfile = Towerfile::from_path(dir.join("Towerfile")).expect("Failed to load Towerfile");
     let spec = PackageSpec::from_towerfile(&towerfile);
-    let mut package = Package::build(spec).await.expect("Failed to build package from directory");
+    let mut package = Package::build(spec)
+        .await
+        .expect("Failed to build package from directory");
     package.unpack().await.expect("Failed to unpack package");
     package
 }
@@ -50,7 +47,7 @@ async fn test_running_hello_world() {
     let (sender, mut receiver) = unbounded_channel();
 
     // We need to create the package, which will load the app
-    let opts = StartOptions{
+    let opts = StartOptions {
         ctx: tower_telemetry::Context::new(),
         package,
         output_sender: sender,
@@ -69,12 +66,15 @@ async fn test_running_hello_world() {
     assert!(status == Status::Running, "App should be running");
 
     while let Some(output) = receiver.recv().await {
-        let valid_line = output.line.contains("Hello, world!") || 
-                         output.line.contains("Using CPython") ||
-                         output.line.contains("Creating virtual environment") ||
-                         output.line.contains("Activate with");
+        let valid_line = output.line.contains("Hello, world!")
+            || output.line.contains("Using CPython")
+            || output.line.contains("Creating virtual environment")
+            || output.line.contains("Activate with");
 
-        assert!(valid_line, "Log should contain 'Hello, world!' or a setup line");
+        assert!(
+            valid_line,
+            "Log should contain 'Hello, world!' or a setup line"
+        );
     }
 
     // check the status once more, should be done.
@@ -92,7 +92,7 @@ async fn test_running_use_faker() {
     let (sender, mut receiver) = unbounded_channel();
 
     // We need to create the package, which will load the app
-    let opts = StartOptions{
+    let opts = StartOptions {
         ctx: tower_telemetry::Context::new(),
         package,
         output_sender: sender,
@@ -118,7 +118,7 @@ async fn test_running_use_faker() {
         match output.channel {
             tower_runtime::Channel::Setup => {
                 count_setup += 1;
-            },
+            }
             tower_runtime::Channel::Program => {
                 count_stdout += 1;
             }
@@ -143,7 +143,7 @@ async fn test_running_legacy_app() {
     let (sender, mut receiver) = unbounded_channel();
 
     // We need to create the package, which will load the app
-    let opts = StartOptions{
+    let opts = StartOptions {
         ctx: tower_telemetry::Context::new(),
         package,
         output_sender: sender,
@@ -169,7 +169,7 @@ async fn test_running_legacy_app() {
         match output.channel {
             tower_runtime::Channel::Setup => {
                 count_setup += 1;
-            },
+            }
             tower_runtime::Channel::Program => {
                 count_stdout += 1;
             }

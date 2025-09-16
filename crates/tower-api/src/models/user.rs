@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct User {
@@ -28,7 +28,10 @@ pub struct User {
     #[serde(rename = "is_confirmed")]
     pub is_confirmed: bool,
     /// This property is deprecated. It will be removed in a future version.
-    #[serde(rename = "is_invitation_claimed", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "is_invitation_claimed",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub is_invitation_claimed: Option<bool>,
     #[serde(rename = "is_subscribed_to_changelog")]
     pub is_subscribed_to_changelog: bool,
@@ -39,7 +42,18 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(company: String, country: String, created_at: String, email: String, first_name: String, is_alerts_enabled: bool, is_confirmed: bool, is_subscribed_to_changelog: bool, last_name: String, profile_photo_url: String) -> User {
+    pub fn new(
+        company: String,
+        country: String,
+        created_at: String,
+        email: String,
+        first_name: String,
+        is_alerts_enabled: bool,
+        is_confirmed: bool,
+        is_subscribed_to_changelog: bool,
+        last_name: String,
+        profile_photo_url: String,
+    ) -> User {
         User {
             company,
             country,
@@ -55,4 +69,3 @@ impl User {
         }
     }
 }
-

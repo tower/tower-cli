@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DeleteAppResponse {
@@ -22,10 +22,6 @@ pub struct DeleteAppResponse {
 
 impl DeleteAppResponse {
     pub fn new(app: models::App) -> DeleteAppResponse {
-        DeleteAppResponse {
-            schema: None,
-            app,
-        }
+        DeleteAppResponse { schema: None, app }
     }
 }
-

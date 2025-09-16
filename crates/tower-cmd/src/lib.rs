@@ -1,11 +1,12 @@
 use clap::{value_parser, Arg, Command};
 use config::{Config, Session};
 
+pub mod api;
 mod apps;
 mod deploy;
-pub mod output;
-pub mod api;
+mod environments;
 pub mod error;
+pub mod output;
 mod run;
 mod secrets;
 mod session;
@@ -31,7 +32,7 @@ impl App {
             Session::from_jwt(&token).ok()
         } else {
             Session::from_config_dir().ok()
-        }; 
+        };
 
         Self { cmd, session }
     }
@@ -118,6 +119,20 @@ impl App {
                     }
                 }
             }
+            Some(("environments", sub_matches)) => {
+                let environments_command = sub_matches.subcommand();
+
+                match environments_command {
+                    Some(("list", _)) => environments::do_list(sessionized_config).await,
+                    Some(("create", args)) => {
+                        environments::do_create(sessionized_config, args).await
+                    }
+                    _ => {
+                        environments::environments_cmd().print_help().unwrap();
+                        std::process::exit(2);
+                    }
+                }
+            }
             Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
             Some(("run", args)) => run::do_run(sessionized_config, args, args.subcommand()).await,
             Some(("teams", sub_matches)) => {
@@ -163,6 +178,7 @@ fn root_cmd() -> Command {
         .subcommand(session::login_cmd())
         .subcommand(apps::apps_cmd())
         .subcommand(secrets::secrets_cmd())
+        .subcommand(environments::environments_cmd())
         .subcommand(deploy::deploy_cmd())
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())

@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppVersion {
@@ -25,7 +25,12 @@ pub struct AppVersion {
 }
 
 impl AppVersion {
-    pub fn new(created_at: String, parameters: Vec<models::Parameter>, towerfile: String, version: String) -> AppVersion {
+    pub fn new(
+        created_at: String,
+        parameters: Vec<models::Parameter>,
+        towerfile: String,
+        version: String,
+    ) -> AppVersion {
         AppVersion {
             created_at,
             parameters,
@@ -34,4 +39,3 @@ impl AppVersion {
         }
     }
 }
-

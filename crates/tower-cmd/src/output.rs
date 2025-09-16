@@ -3,14 +3,11 @@ use cli_table::{
     format::{Border, HorizontalLine, Separator},
     print_stdout, Table,
 };
-use http::StatusCode;
 use colored::Colorize;
+use http::StatusCode;
 use std::io::{self, Write};
 use tower_api::{
-    apis::{
-        Error as ApiError,
-        ResponseContent,
-    },
+    apis::{Error as ApiError, ResponseContent},
     models::ErrorModel,
 };
 use tower_telemetry::debug;
@@ -55,7 +52,8 @@ pub fn package_error(err: tower_package::Error) {
             "Invalid manifest was found or created".to_string()
         }
         tower_package::Error::InvalidPath => {
-            "There was a problem determining exactly where your Towerfile was stored on disk".to_string()
+            "There was a problem determining exactly where your Towerfile was stored on disk"
+                .to_string()
         }
     };
 
@@ -123,7 +121,7 @@ pub fn output_full_error_details(model: &ErrorModel) {
         writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
         writeln!(io::stdout(), "{}", detail.red()).unwrap();
     }
-    
+
     // Show any additional error details from the errors field
     if let Some(errors) = &model.errors {
         if !errors.is_empty() {
@@ -147,7 +145,7 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
         Ok(model) => {
             debug!("Error model (status: {}): {:?}", err.status, model);
             model
-        },
+        }
         Err(e) => {
             debug!("Failed to parse error content as JSON: {}", e);
             debug!("Raw error content: {}", err.content);
@@ -162,25 +160,26 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
         StatusCode::CONFLICT => {
             error("There was a conflict while trying to do that!");
             output_full_error_details(&error_model);
-        },
+        }
         StatusCode::UNPROCESSABLE_ENTITY => {
             output_full_error_details(&error_model);
-        },
+        }
         StatusCode::INTERNAL_SERVER_ERROR => {
             error("The Tower API encountered an internal error. Maybe try again later on.");
-        },
+        }
         StatusCode::NOT_FOUND => {
             output_full_error_details(&error_model);
-        },
+        }
         StatusCode::UNAUTHORIZED => {
-            error("You aren't authorized to do that! Are you logged in? Run `tower login` to login.");
-        },
+            error(
+                "You aren't authorized to do that! Are you logged in? Run `tower login` to login.",
+            );
+        }
         _ => {
             error("The Tower API returned an error that the Tower CLI doesn't know what to do with! Maybe try again in a bit.");
         }
     }
 }
-
 
 pub fn tower_error<T>(err: ApiError<T>) {
     match err {

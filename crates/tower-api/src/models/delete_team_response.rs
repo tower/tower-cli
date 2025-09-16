@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DeleteTeamResponse {
@@ -23,10 +23,6 @@ pub struct DeleteTeamResponse {
 
 impl DeleteTeamResponse {
     pub fn new(team: models::Team) -> DeleteTeamResponse {
-        DeleteTeamResponse {
-            schema: None,
-            team,
-        }
+        DeleteTeamResponse { schema: None, team }
     }
 }
-

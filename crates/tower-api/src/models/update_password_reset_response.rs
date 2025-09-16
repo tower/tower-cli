@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdatePasswordResetResponse {
@@ -23,10 +23,6 @@ pub struct UpdatePasswordResetResponse {
 
 impl UpdatePasswordResetResponse {
     pub fn new(ok: bool) -> UpdatePasswordResetResponse {
-        UpdatePasswordResetResponse {
-            schema: None,
-            ok,
-        }
+        UpdatePasswordResetResponse { schema: None, ok }
     }
 }
-

@@ -1,6 +1,6 @@
 use snafu::prelude::*;
-use tower_telemetry::debug;
 use tower_api::apis::default_api::DescribeRunError;
+use tower_telemetry::debug;
 
 #[derive(Debug, Snafu)]
 pub enum Error {

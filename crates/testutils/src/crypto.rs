@@ -1,9 +1,4 @@
-use rsa::{
-    RsaPublicKey,
-    RsaPrivateKey,
-    pkcs1::DecodeRsaPublicKey,
-    pkcs1::DecodeRsaPrivateKey,
-};
+use rsa::{pkcs1::DecodeRsaPrivateKey, pkcs1::DecodeRsaPublicKey, RsaPrivateKey, RsaPublicKey};
 
 const PUBLIC_KEY_PEM: &str = "-----BEGIN RSA PUBLIC KEY-----
 MIIBCgKCAQEAxModqC5QNOKPZRDkaEnY8AL6gFsasyFXveqJAEnCK75Adodj4MD0

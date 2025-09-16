@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UnverifiedAuthenticator {
@@ -37,4 +37,3 @@ impl UnverifiedAuthenticator {
         }
     }
 }
-

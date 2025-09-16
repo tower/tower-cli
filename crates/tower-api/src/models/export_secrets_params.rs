@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExportSecretsParams {
@@ -34,7 +34,13 @@ pub struct ExportSecretsParams {
 }
 
 impl ExportSecretsParams {
-    pub fn new(all: bool, environment: String, page: i64, page_size: i64, public_key: String) -> ExportSecretsParams {
+    pub fn new(
+        all: bool,
+        environment: String,
+        page: i64,
+        page_size: i64,
+        public_key: String,
+    ) -> ExportSecretsParams {
         ExportSecretsParams {
             schema: None,
             all,
@@ -45,4 +51,3 @@ impl ExportSecretsParams {
         }
     }
 }
-

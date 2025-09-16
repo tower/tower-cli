@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateApiKeyParams {
@@ -22,10 +22,6 @@ pub struct CreateApiKeyParams {
 
 impl CreateApiKeyParams {
     pub fn new(name: String) -> CreateApiKeyParams {
-        CreateApiKeyParams {
-            schema: None,
-            name,
-        }
+        CreateApiKeyParams { schema: None, name }
     }
 }
-

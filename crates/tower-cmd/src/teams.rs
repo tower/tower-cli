@@ -3,10 +3,7 @@ use colored::*;
 use config::Config;
 use tower_telemetry::debug;
 
-use crate::{
-    output,
-    api,
-};
+use crate::{api, output};
 
 pub fn teams_cmd() -> Command {
     Command::new("teams")
@@ -16,7 +13,7 @@ pub fn teams_cmd() -> Command {
         .subcommand(
             Command::new("switch")
                 .allow_external_subcommands(true)
-                .about("Switch context to a different team")
+                .about("Switch context to a different team"),
         )
 }
 
@@ -47,7 +44,7 @@ async fn refresh_session(config: &Config) -> config::Session {
             }
 
             session
-        },
+        }
         Err(err) => {
             debug!("Failed to refresh session: {}", err);
 
@@ -135,6 +132,9 @@ fn extract_team_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
         return name.to_string();
     }
 
-    let line = format!("Team name is required. Example: tower teams {} <team name>", subcmd);
+    let line = format!(
+        "Team name is required. Example: tower teams {} <team name>",
+        subcmd
+    );
     output::die(&line);
 }

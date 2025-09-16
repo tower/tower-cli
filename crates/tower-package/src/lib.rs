@@ -1,19 +1,19 @@
+use config::Towerfile;
+use glob::glob;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::collections::{VecDeque, HashMap};
+use tmpdir::TmpDir;
 use tokio::{
     fs::File,
-    io::{AsyncRead, BufReader, AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader},
 };
-use config::Towerfile;
 use tokio_tar::{Archive, Builder};
-use glob::glob;
-use tmpdir::TmpDir;
-use sha2::{Sha256, Digest};
 
-use async_compression::tokio::write::GzipEncoder;
 use async_compression::tokio::bufread::GzipDecoder;
+use async_compression::tokio::write::GzipEncoder;
 
 use tower_telemetry::debug;
 
@@ -23,7 +23,7 @@ pub use error::Error;
 const CURRENT_PACKAGE_VERSION: i32 = 2;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Parameter{
+pub struct Parameter {
     pub name: String,
     pub description: String,
     pub default: String,
@@ -71,7 +71,7 @@ impl Manifest {
 
     pub async fn from_json(data: &str) -> Result<Self, Error> {
         let manifest: Self = serde_json::from_str(data)?;
-        Ok(manifest) 
+        Ok(manifest)
     }
 }
 
@@ -115,9 +115,10 @@ impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
         debug!("creating package spec from towerfile: {:?}", towerfile);
         let towerfile_path = towerfile.file_path.clone();
-        let base_dir = towerfile_path.parent().
-            unwrap_or_else(|| Path::new(".")).
-            to_path_buf();
+        let base_dir = towerfile_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
 
         let schedule = if towerfile.app.schedule.is_empty() {
             None
@@ -126,7 +127,10 @@ impl PackageSpec {
         };
 
         // We need to turn these (validated) paths into something taht we can use at runtime.
-        let import_paths = towerfile.app.import_paths.iter()
+        let import_paths = towerfile
+            .app
+            .import_paths
+            .iter()
             .map(|p| p.to_string_lossy().to_string())
             .collect();
 
@@ -138,12 +142,12 @@ impl PackageSpec {
             invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
             parameters: get_parameters(towerfile),
-        }  
+        }
     }
 }
 
 pub struct Package {
-    pub manifest: Manifest, 
+    pub manifest: Manifest,
 
     // tmp_dir is used to keep the package directory around occasionally so the directory doesn't
     // get deleted out from under the application.
@@ -157,186 +161,191 @@ pub struct Package {
 }
 
 impl Package {
-   pub fn default() -> Self {
-       Self {
-           tmp_dir: None,
-           package_file_path: None,
-           unpacked_path: None,
-           manifest: Manifest {
-               version: Some(CURRENT_PACKAGE_VERSION),
-               invoke: "".to_string(),
-               parameters: vec![],
-               schedule: None,
-               import_paths: vec![],
-               app_dir_name: "app".to_string(),
-               modules_dir_name: "modules".to_string(),
-               checksum: "".to_string(),
-           },
-       }
-   }
+    pub fn default() -> Self {
+        Self {
+            tmp_dir: None,
+            package_file_path: None,
+            unpacked_path: None,
+            manifest: Manifest {
+                version: Some(CURRENT_PACKAGE_VERSION),
+                invoke: "".to_string(),
+                parameters: vec![],
+                schedule: None,
+                import_paths: vec![],
+                app_dir_name: "app".to_string(),
+                modules_dir_name: "modules".to_string(),
+                checksum: "".to_string(),
+            },
+        }
+    }
 
-   pub async fn from_unpacked_path(path: PathBuf) -> Self {
-       let manifest_path = path.join("MANIFEST");
-       let manifest = Manifest::from_path(&manifest_path).await.unwrap();
+    pub async fn from_unpacked_path(path: PathBuf) -> Self {
+        let manifest_path = path.join("MANIFEST");
+        let manifest = Manifest::from_path(&manifest_path).await.unwrap();
 
-       Self {
-           tmp_dir: None,
-           package_file_path: None,
-           unpacked_path: Some(path),
-           manifest,
-       }
-   }
+        Self {
+            tmp_dir: None,
+            package_file_path: None,
+            unpacked_path: Some(path),
+            manifest,
+        }
+    }
 
-   // build creates a new package from a PackageSpec. PackageSpec is typically composed of fields
-   // copied from the Towerfile. The most important thing to know is that the collection of file
-   // globs to include in the package.
-   //
-   // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
-   // GZip'd.
-   pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
-       debug!("building package from spec: {:?}", spec);
+    // build creates a new package from a PackageSpec. PackageSpec is typically composed of fields
+    // copied from the Towerfile. The most important thing to know is that the collection of file
+    // globs to include in the package.
+    //
+    // The underlying package is just a TAR file with a special `MANIFEST` file that has also been
+    // GZip'd.
+    pub async fn build(spec: PackageSpec) -> Result<Self, Error> {
+        debug!("building package from spec: {:?}", spec);
 
-       // we canonicalize this because we want to treat all paths in the same keyspace more or
-       // less.
-       let base_dir = spec.base_dir.canonicalize()?;
+        // we canonicalize this because we want to treat all paths in the same keyspace more or
+        // less.
+        let base_dir = spec.base_dir.canonicalize()?;
 
-       let tmp_dir = TmpDir::new("tower-package").await?;
-       let package_path = tmp_dir.to_path_buf().join("package.tar");
-       debug!("building package at: {:?}", package_path);
+        let tmp_dir = TmpDir::new("tower-package").await?;
+        let package_path = tmp_dir.to_path_buf().join("package.tar");
+        debug!("building package at: {:?}", package_path);
 
-       let file = File::create(package_path.clone()).await?;
-       let gzip = GzipEncoder::new(file);
-       let mut builder = Builder::new(gzip);
+        let file = File::create(package_path.clone()).await?;
+        let gzip = GzipEncoder::new(file);
+        let mut builder = Builder::new(gzip);
 
-       // These help us compute the integrity of the package contents overall. For each path, we'll
-       // store a hash of the contents written to the file. Then we'll hash the final content to
-       // create a fingerprint of the data.
-       let mut path_hashes = HashMap::new();
+        // These help us compute the integrity of the package contents overall. For each path, we'll
+        // store a hash of the contents written to the file. Then we'll hash the final content to
+        // create a fingerprint of the data.
+        let mut path_hashes = HashMap::new();
 
-       // If the user didn't specify anything here we'll package everything under this directory
-       // and ship it to Tower.
-       let mut file_globs = spec.file_globs.clone();
+        // If the user didn't specify anything here we'll package everything under this directory
+        // and ship it to Tower.
+        let mut file_globs = spec.file_globs.clone();
 
-       // If there was no source specified, we'll pull in all the source code in the current
-       // directory.
-       if file_globs.is_empty() {
-           debug!("no source files specified. using default paths.");
-           file_globs.push("./**/*".to_string()); 
-       } 
+        // If there was no source specified, we'll pull in all the source code in the current
+        // directory.
+        if file_globs.is_empty() {
+            debug!("no source files specified. using default paths.");
+            file_globs.push("./**/*".to_string());
+        }
 
-       // We'll collect all the file paths in a collection here.
-       let mut file_paths = HashMap::new();
+        // We'll collect all the file paths in a collection here.
+        let mut file_paths = HashMap::new();
 
-       for file_glob in file_globs {
-           let path = base_dir.join(file_glob);
-           resolve_glob_path(path, &base_dir, &mut file_paths).await;
-       }
+        for file_glob in file_globs {
+            let path = base_dir.join(file_glob);
+            resolve_glob_path(path, &base_dir, &mut file_paths).await;
+        }
 
-       // App code lives in the app dir
-       let app_dir = PathBuf::from("app");
+        // App code lives in the app dir
+        let app_dir = PathBuf::from("app");
 
-       // Now that we have all the paths, we'll append them to the builder.
-       for (physical_path, logical_path) in file_paths {
-           // All of the app code goes into the "app" directory.
-           let logical_path = app_dir.join(logical_path);
+        // Now that we have all the paths, we'll append them to the builder.
+        for (physical_path, logical_path) in file_paths {
+            // All of the app code goes into the "app" directory.
+            let logical_path = app_dir.join(logical_path);
 
-           let hash = compute_sha256_file(&physical_path).await?;
-           path_hashes.insert(logical_path.clone(), hash);
+            let hash = compute_sha256_file(&physical_path).await?;
+            path_hashes.insert(logical_path.clone(), hash);
 
-           builder.append_path_with_name(physical_path, logical_path).await?;
-       }
+            builder
+                .append_path_with_name(physical_path, logical_path)
+                .await?;
+        }
 
-       // Module code lives in the modules dir.
-       let module_dir = PathBuf::from("modules");
-       let mut import_paths = vec![];
+        // Module code lives in the modules dir.
+        let module_dir = PathBuf::from("modules");
+        let mut import_paths = vec![];
 
-       // Now we need to package up all the modules to include in the code base too.
-       for import_path in &spec.import_paths {
-           // The import_path should always be relative to the base_path.
-           let import_path = base_dir.join(import_path).canonicalize()?;
-           let parent = import_path.parent().unwrap();
+        // Now we need to package up all the modules to include in the code base too.
+        for import_path in &spec.import_paths {
+            // The import_path should always be relative to the base_path.
+            let import_path = base_dir.join(import_path).canonicalize()?;
+            let parent = import_path.parent().unwrap();
 
-           let mut file_paths = HashMap::new();
-           resolve_path(&import_path, parent, &mut file_paths).await;
+            let mut file_paths = HashMap::new();
+            resolve_path(&import_path, parent, &mut file_paths).await;
 
-           // The file_name should constitute the logical path
-           let import_path = import_path.file_name().unwrap();
-           let import_path = module_dir.join(import_path);
-           let import_path_str = import_path.into_os_string().into_string().unwrap();
-           import_paths.push(import_path_str);
+            // The file_name should constitute the logical path
+            let import_path = import_path.file_name().unwrap();
+            let import_path = module_dir.join(import_path);
+            let import_path_str = import_path.into_os_string().into_string().unwrap();
+            import_paths.push(import_path_str);
 
-           // Now we write all of these paths to the modules directory.
-           for (physical_path, logical_path) in file_paths {
-               let logical_path = module_dir.join(logical_path);
+            // Now we write all of these paths to the modules directory.
+            for (physical_path, logical_path) in file_paths {
+                let logical_path = module_dir.join(logical_path);
 
-               let hash = compute_sha256_file(&physical_path).await?;
-               path_hashes.insert(logical_path.clone(), hash);
+                let hash = compute_sha256_file(&physical_path).await?;
+                path_hashes.insert(logical_path.clone(), hash);
 
-               debug!("adding file {}", logical_path.display());
-               builder.append_path_with_name(physical_path, logical_path).await?;
-           }
-       }
+                debug!("adding file {}", logical_path.display());
+                builder
+                    .append_path_with_name(physical_path, logical_path)
+                    .await?;
+            }
+        }
 
-       let manifest = Manifest {
-           import_paths,
-           version: Some(CURRENT_PACKAGE_VERSION),
-           invoke: String::from(spec.invoke),
-           parameters: spec.parameters,
-           schedule: spec.schedule,
-           app_dir_name: app_dir.to_string_lossy().to_string(),
-           modules_dir_name: module_dir.to_string_lossy().to_string(),
-           checksum: compute_sha256_package(&path_hashes)?,
-       };
+        let manifest = Manifest {
+            import_paths,
+            version: Some(CURRENT_PACKAGE_VERSION),
+            invoke: String::from(spec.invoke),
+            parameters: spec.parameters,
+            schedule: spec.schedule,
+            app_dir_name: app_dir.to_string_lossy().to_string(),
+            modules_dir_name: module_dir.to_string_lossy().to_string(),
+            checksum: compute_sha256_package(&path_hashes)?,
+        };
 
-       // the whole manifest needs to be written to a file as a convenient way to avoid having to
-       // manually populate the TAR file headers for this data. maybe in the future, someone will
-       // have the humption to do so here, thus avoiding an unnecessary file write (and the
-       // associated failure modes).
-       let manifest_path = tmp_dir.to_path_buf().join("MANIFEST");
-       write_manifest_to_file(&manifest_path, &manifest).await?;
-       builder.append_path_with_name(manifest_path, "MANIFEST").await?;
+        // the whole manifest needs to be written to a file as a convenient way to avoid having to
+        // manually populate the TAR file headers for this data. maybe in the future, someone will
+        // have the humption to do so here, thus avoiding an unnecessary file write (and the
+        // associated failure modes).
+        let manifest_path = tmp_dir.to_path_buf().join("MANIFEST");
+        write_manifest_to_file(&manifest_path, &manifest).await?;
+        builder
+            .append_path_with_name(manifest_path, "MANIFEST")
+            .await?;
 
-       // Let's also package the Towerfile along with it.
-       builder.append_path_with_name(
-           spec.towerfile_path,
-           "Towerfile",
-       ).await?;
+        // Let's also package the Towerfile along with it.
+        builder
+            .append_path_with_name(spec.towerfile_path, "Towerfile")
+            .await?;
 
-       let mut gzip = builder.into_inner().await?;
-       gzip.shutdown().await?;
+        let mut gzip = builder.into_inner().await?;
+        gzip.shutdown().await?;
 
-       // probably not explicitly required; however, makes the test suite pass so...
-       let mut file = gzip.into_inner();
-       file.shutdown().await?;
+        // probably not explicitly required; however, makes the test suite pass so...
+        let mut file = gzip.into_inner();
+        file.shutdown().await?;
 
-       Ok(Self {
-           manifest,
-           unpacked_path: None,
-           tmp_dir: Some(tmp_dir),
-           package_file_path: Some(package_path),
-       })
-   }
+        Ok(Self {
+            manifest,
+            unpacked_path: None,
+            tmp_dir: Some(tmp_dir),
+            package_file_path: Some(package_path),
+        })
+    }
 
-   /// unpack is the primary interface in to unpacking a package. It will allocate a temporary
-   /// directory if one isn't already allocated and unpack the package contents into that location.
-   pub async fn unpack(&mut self) -> Result<(), Error> {
-       // If there's already a tmp_dir allocated to this package, then we'll use that. Otherwise,
-       // we allocate one and store it on this package for later use.
-       let path = if let Some(tmp_dir) = self.tmp_dir.as_ref() {
-           tmp_dir.to_path_buf()
-       } else {
-           let tmp_dir = TmpDir::new("tower-package").await?;
-           let path = tmp_dir.to_path_buf();
-           self.tmp_dir = Some(tmp_dir);
-           path
-       };
+    /// unpack is the primary interface in to unpacking a package. It will allocate a temporary
+    /// directory if one isn't already allocated and unpack the package contents into that location.
+    pub async fn unpack(&mut self) -> Result<(), Error> {
+        // If there's already a tmp_dir allocated to this package, then we'll use that. Otherwise,
+        // we allocate one and store it on this package for later use.
+        let path = if let Some(tmp_dir) = self.tmp_dir.as_ref() {
+            tmp_dir.to_path_buf()
+        } else {
+            let tmp_dir = TmpDir::new("tower-package").await?;
+            let path = tmp_dir.to_path_buf();
+            self.tmp_dir = Some(tmp_dir);
+            path
+        };
 
-       // self.package_file_path should be set otherwise this is a bug.
-       let package_path = self.package_file_path.clone().unwrap();
-       unpack_archive(&package_path, &path).await?;
-       self.unpacked_path = Some(path);
-       Ok(())
-   }
+        // self.package_file_path should be set otherwise this is a bug.
+        let package_path = self.package_file_path.clone().unwrap();
+        unpack_archive(&package_path, &path).await?;
+        self.unpacked_path = Some(path);
+        Ok(())
+    }
 }
 
 async fn write_manifest_to_file(path: &PathBuf, manifest: &Manifest) -> Result<(), Error> {
@@ -375,10 +384,10 @@ async fn is_valid_gzip<P: AsRef<Path>>(path: P) -> bool {
         Ok(file) => file,
         Err(_) => return false,
     };
-    
+
     let reader = BufReader::new(file);
     let mut decoder = GzipDecoder::new(reader);
-    
+
     // Try to read a small amount of data. If we can, then we assume that it's a valid gzip file.
     // Othwewise, it's not gzipped I suppose?
     let mut buffer = [0u8; 1024];
@@ -388,7 +397,10 @@ async fn is_valid_gzip<P: AsRef<Path>>(path: P) -> bool {
     }
 }
 
-async fn unpack_archive<P: AsRef<Path>>(package_path: P, output_path: P) -> Result<(), std::io::Error> {
+async fn unpack_archive<P: AsRef<Path>>(
+    package_path: P,
+    output_path: P,
+) -> Result<(), std::io::Error> {
     let reader: Pin<Box<dyn AsyncRead + Send + Unpin>> = if is_valid_gzip(&package_path).await {
         // gor gzipped files
         let file = File::open(&package_path).await?;
@@ -400,21 +412,25 @@ async fn unpack_archive<P: AsRef<Path>>(package_path: P, output_path: P) -> Resu
         let file = File::open(&package_path).await?;
         Box::pin(file)
     };
-    
+
     // Create and unpack the archive
     let mut archive = Archive::new(reader);
     archive.unpack(output_path).await?;
-    
+
     Ok(())
 }
 
-async fn resolve_glob_path(path: PathBuf, base_dir: &PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
-   let path_str = extract_glob_path(path);
-   debug!("resolving glob pattern: {}", path_str);
+async fn resolve_glob_path(
+    path: PathBuf,
+    base_dir: &PathBuf,
+    file_paths: &mut HashMap<PathBuf, PathBuf>,
+) {
+    let path_str = extract_glob_path(path);
+    debug!("resolving glob pattern: {}", path_str);
 
-   for entry in glob(&path_str).unwrap() {
-       resolve_path(&entry.unwrap(), base_dir, file_paths).await;
-   }
+    for entry in glob(&path_str).unwrap() {
+        resolve_path(&entry.unwrap(), base_dir, file_paths).await;
+    }
 }
 
 async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<PathBuf, PathBuf>) {
@@ -425,8 +441,12 @@ async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<
         let canonical_path = current_path.canonicalize();
 
         if canonical_path.is_err() {
-            debug!(" - skipping path {}: {}", current_path.display(), canonical_path.unwrap_err());
-            continue;         
+            debug!(
+                " - skipping path {}: {}",
+                current_path.display(),
+                canonical_path.unwrap_err()
+            );
+            continue;
         }
 
         // We can safely unwrap this because we understand that it's not going to fail at this
@@ -445,11 +465,20 @@ async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<
 
                 match cp.strip_prefix(base_dir) {
                     Err(err) => {
-                        debug!(" - skipping file {}: not in base directory {}: {:?}", physical_path.display(), base_dir.display(), err);
+                        debug!(
+                            " - skipping file {}: not in base directory {}: {:?}",
+                            physical_path.display(),
+                            base_dir.display(),
+                            err
+                        );
                         continue;
                     }
                     Ok(logical_path) => {
-                        debug!(" - resolved path {} to logical path {}", physical_path.display(), logical_path.display());
+                        debug!(
+                            " - resolved path {} to logical path {}",
+                            physical_path.display(),
+                            logical_path.display()
+                        );
                         file_paths.insert(physical_path, logical_path.to_path_buf());
                     }
                 }
@@ -494,17 +523,17 @@ fn should_ignore_file(p: &PathBuf) -> bool {
 
     // Remove anything thats __pycache__
     if is_in_dir(p, "__pycache__") {
-        return true
+        return true;
     }
 
     // Ignore anything that lives within a .git directory
     if is_in_dir(p, ".git") {
-        return true
+        return true;
     }
 
     // Ignore anything that's in a virtualenv, too
     if is_in_dir(p, ".venv") {
-        return true
+        return true;
     }
 
     return false;
@@ -524,10 +553,10 @@ fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<Stri
         let combined = format!("{}:{}", key.display(), value);
         hasher.update(combined.as_bytes());
     }
-    
+
     // Finalize and get the hash result
     let result = hasher.finalize();
-    
+
     // Convert to hex string
     Ok(format!("{:x}", result))
 }
@@ -536,10 +565,10 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
     // Open the file
     let file = File::open(file_path).await?;
     let mut reader = BufReader::new(file);
-    
+
     // Create a SHA256 hasher
     let mut hasher = Sha256::new();
-    
+
     // Read file in chunks to handle large files efficiently
     let mut buffer = [0; 8192]; // 8KB buffer
     loop {
@@ -549,10 +578,10 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
         }
         hasher.update(&buffer[..bytes_read]);
     }
-    
+
     // Finalize and get the hash result
     let result = hasher.finalize();
-    
+
     // Convert to hex string
     Ok(format!("{:x}", result))
 }

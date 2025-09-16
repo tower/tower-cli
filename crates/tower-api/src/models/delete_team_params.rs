@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DeleteTeamParams {
@@ -23,10 +23,6 @@ pub struct DeleteTeamParams {
 
 impl DeleteTeamParams {
     pub fn new(name: String) -> DeleteTeamParams {
-        DeleteTeamParams {
-            schema: None,
-            name,
-        }
+        DeleteTeamParams { schema: None, name }
     }
 }
-

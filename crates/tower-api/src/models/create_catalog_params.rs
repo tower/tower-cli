@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateCatalogParams {
@@ -27,7 +27,12 @@ pub struct CreateCatalogParams {
 }
 
 impl CreateCatalogParams {
-    pub fn new(environment: String, name: String, properties: Vec<models::EncryptedCatalogProperty>, r#type: Type) -> CreateCatalogParams {
+    pub fn new(
+        environment: String,
+        name: String,
+        properties: Vec<models::EncryptedCatalogProperty>,
+        r#type: Type,
+    ) -> CreateCatalogParams {
         CreateCatalogParams {
             schema: None,
             environment,
@@ -37,7 +42,7 @@ impl CreateCatalogParams {
         }
     }
 }
-/// 
+///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Type {
     #[serde(rename = "snowflake-open-catalog")]
@@ -69,9 +74,13 @@ impl<'de> Deserialize<'de> for Type {
             "lakekeeper" => Ok(Self::Lakekeeper),
             _ => Err(serde::de::Error::unknown_variant(
                 &s,
-                &["snowflake-open-catalog", "apache-polaris", "cloudflare-r2-catalog", "lakekeeper"],
+                &[
+                    "snowflake-open-catalog",
+                    "apache-polaris",
+                    "cloudflare-r2-catalog",
+                    "lakekeeper",
+                ],
             )),
         }
     }
 }
-

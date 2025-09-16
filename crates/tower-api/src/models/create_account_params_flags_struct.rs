@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateAccountParamsFlagsStruct {
@@ -19,9 +19,6 @@ pub struct CreateAccountParamsFlagsStruct {
 
 impl CreateAccountParamsFlagsStruct {
     pub fn new(is_test_account: bool) -> CreateAccountParamsFlagsStruct {
-        CreateAccountParamsFlagsStruct {
-            is_test_account,
-        }
+        CreateAccountParamsFlagsStruct { is_test_account }
     }
 }
-

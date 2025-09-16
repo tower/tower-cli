@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunParameter {
@@ -21,10 +21,6 @@ pub struct RunParameter {
 
 impl RunParameter {
     pub fn new(name: String, value: String) -> RunParameter {
-        RunParameter {
-            name,
-            value,
-        }
+        RunParameter { name, value }
     }
 }
-

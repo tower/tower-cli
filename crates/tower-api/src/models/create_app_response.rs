@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateAppResponse {
@@ -22,10 +22,6 @@ pub struct CreateAppResponse {
 
 impl CreateAppResponse {
     pub fn new(app: models::App) -> CreateAppResponse {
-        CreateAppResponse {
-            schema: None,
-            app,
-        }
+        CreateAppResponse { schema: None, app }
     }
 }
-

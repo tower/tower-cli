@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VerifyEmailResponse {
@@ -23,10 +23,6 @@ pub struct VerifyEmailResponse {
 
 impl VerifyEmailResponse {
     pub fn new(user: models::User) -> VerifyEmailResponse {
-        VerifyEmailResponse {
-            schema: None,
-            user,
-        }
+        VerifyEmailResponse { schema: None, user }
     }
 }
-

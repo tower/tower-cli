@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunnerCredentials {
@@ -28,7 +28,12 @@ pub struct RunnerCredentials {
 }
 
 impl RunnerCredentials {
-    pub fn new(certificate: String, private_key: String, root_ca: Option<String>, runner_service_url: String) -> RunnerCredentials {
+    pub fn new(
+        certificate: String,
+        private_key: String,
+        root_ca: Option<String>,
+        runner_service_url: String,
+    ) -> RunnerCredentials {
         RunnerCredentials {
             certificate,
             private_key,
@@ -37,4 +42,3 @@ impl RunnerCredentials {
         }
     }
 }
-

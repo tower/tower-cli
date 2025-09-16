@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EventError {
@@ -57,11 +57,7 @@ impl<'de> Deserialize<'de> for Event {
         let s = String::deserialize(deserializer)?;
         match s.to_lowercase().as_str() {
             "error" => Ok(Self::Error),
-            _ => Err(serde::de::Error::unknown_variant(
-                &s,
-                &["error"],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&s, &["error"])),
         }
     }
 }
-

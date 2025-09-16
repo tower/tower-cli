@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Plan {
@@ -34,7 +34,15 @@ pub struct Plan {
 }
 
 impl Plan {
-    pub fn new(account_id: String, base_plan_name: String, created_at: String, features: models::Features, id: String, start_at: String, status: String) -> Plan {
+    pub fn new(
+        account_id: String,
+        base_plan_name: String,
+        created_at: String,
+        features: models::Features,
+        id: String,
+        start_at: String,
+        status: String,
+    ) -> Plan {
         Plan {
             account_id,
             base_plan_name,
@@ -48,4 +56,3 @@ impl Plan {
         }
     }
 }
-

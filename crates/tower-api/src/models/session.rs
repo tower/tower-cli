@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Session {
@@ -24,7 +24,12 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(featurebase_identity: models::FeaturebaseIdentity, teams: Vec<models::Team>, token: models::Token, user: models::User) -> Session {
+    pub fn new(
+        featurebase_identity: models::FeaturebaseIdentity,
+        teams: Vec<models::Team>,
+        token: models::Token,
+        user: models::User,
+    ) -> Session {
         Session {
             featurebase_identity,
             teams,
@@ -33,4 +38,3 @@ impl Session {
         }
     }
 }
-

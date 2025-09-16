@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunAppResponse {
@@ -22,10 +22,6 @@ pub struct RunAppResponse {
 
 impl RunAppResponse {
     pub fn new(run: models::Run) -> RunAppResponse {
-        RunAppResponse {
-            schema: None,
-            run,
-        }
+        RunAppResponse { schema: None, run }
     }
 }
-

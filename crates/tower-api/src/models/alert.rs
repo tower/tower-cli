@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Alert {
@@ -30,7 +30,15 @@ pub struct Alert {
 }
 
 impl Alert {
-    pub fn new(acked: bool, alert_type: String, created_at: String, detail: models::RunFailureAlert, environment: String, seq: i64, status: String) -> Alert {
+    pub fn new(
+        acked: bool,
+        alert_type: String,
+        created_at: String,
+        detail: models::RunFailureAlert,
+        environment: String,
+        seq: i64,
+        status: String,
+    ) -> Alert {
         Alert {
             acked,
             alert_type,
@@ -42,4 +50,3 @@ impl Alert {
         }
     }
 }
-

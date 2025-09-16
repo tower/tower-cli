@@ -20,7 +20,7 @@ pub async fn do_login(config: Config) {
         Ok(resp) => {
             spinner.success();
             handle_device_login(config, resp).await;
-        },
+        }
         Err(err) => {
             spinner.failure();
             output::failure(&format!("Failed to create device login ticket: {}", err));
@@ -28,10 +28,7 @@ pub async fn do_login(config: Config) {
     }
 }
 
-async fn handle_device_login(
-    config: Config,
-    claim: CreateDeviceLoginTicketResponse,
-) {
+async fn handle_device_login(config: Config, claim: CreateDeviceLoginTicketResponse) {
     // Try to open the login URL in browser
     if let Err(err) = webbrowser::open(&claim.login_url) {
         debug!("failed to open web browser: {}", err);
@@ -69,7 +66,7 @@ async fn poll_for_login(
             Ok(resp) => {
                 finalize_session(config, &resp, spinner);
                 return true;
-            },
+            }
             Err(err) => {
                 if let Some(api_err) = extract_api_error(&err) {
                     if api_err.status != 404 && !api_err.is_incomplete_device_login {

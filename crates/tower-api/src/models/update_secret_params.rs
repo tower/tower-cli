@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateSecretParams {
@@ -25,7 +25,11 @@ pub struct UpdateSecretParams {
 }
 
 impl UpdateSecretParams {
-    pub fn new(encrypted_value: String, environment: String, preview: String) -> UpdateSecretParams {
+    pub fn new(
+        encrypted_value: String,
+        environment: String,
+        preview: String,
+    ) -> UpdateSecretParams {
         UpdateSecretParams {
             schema: None,
             encrypted_value,
@@ -34,4 +38,3 @@ impl UpdateSecretParams {
         }
     }
 }
-

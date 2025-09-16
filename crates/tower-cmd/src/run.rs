@@ -2,22 +2,14 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
-use tower_telemetry::{Context, debug};
-use tower_api::models::Run;
+use tower_telemetry::{debug, Context};
 
-use tokio::sync::{
-    oneshot::self,
-    mpsc::unbounded_channel,
-};
+use tokio::sync::{mpsc::unbounded_channel, oneshot};
 
-use crate::{
-    util::dates,
-    output,
-    api,
-    Error,
-};
+use crate::{api, output, util::dates, Error};
 
 pub fn run_cmd() -> Command {
     Command::new("run")
@@ -97,7 +89,12 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: HashMap<String, String>) {
+async fn do_run_local(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    mut params: HashMap<String, String>,
+) {
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     // Load all the secrets and catalogs from the server
@@ -154,7 +151,15 @@ async fn do_run_local(config: Config, path: PathBuf, env: &str, mut params: Hash
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     if let Err(err) = launcher
-        .launch(Context::new(), sender, package, env.to_string(), secrets, params, env_vars)
+        .launch(
+            Context::new(),
+            sender,
+            package,
+            env.to_string(),
+            secrets,
+            params,
+            env_vars,
+        )
         .await
     {
         output::runtime_error(err);
@@ -197,7 +202,7 @@ async fn do_run_remote(
             spinner.failure();
             debug!("Failed to schedule run: {}", err);
             output::tower_error(err);
-        }, 
+        }
         Ok(res) => {
             spinner.success();
 
@@ -220,10 +225,7 @@ async fn do_run_remote(
     }
 }
 
-async fn do_follow_run(
-    config: Config,
-    run: &Run,
-) {
+async fn do_follow_run(config: Config, run: &Run) {
     let mut spinner = output::spinner("Waiting for run to start...");
 
     match wait_for_run_start(&config, &run).await {
@@ -232,7 +234,7 @@ async fn do_follow_run(
             debug!("Failed to wait for run to start: {}", err);
             let msg = format!("An error occurred while waiting for the run to start. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
             output::failure(&msg);
-        },
+        }
         Ok(()) => {
             spinner.success();
 
@@ -254,39 +256,35 @@ async fn do_follow_run(
                 output::write(&msg);
                 output::newline();
 
-                let msg = format!(
-                    "You can follow it at {}",
-                    run_copy.dollar_link
-                );
+                let msg = format!("You can follow it at {}", run_copy.dollar_link);
                 output::write(&msg);
                 output::newline();
 
                 // According to
                 // https://www.agileconnection.com/article/overview-linux-exit-codes...
                 std::process::exit(130);
-            }).expect("Failed to set Ctrl+C handler");
+            })
+            .expect("Failed to set Ctrl+C handler");
 
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
-                Ok(mut output) => {
-                    loop {
-                        tokio::select! {
-                            Some(event) = output.recv() => print_log_stream_event(event),
-                            res = &mut run_complete => {
-                                match res {
-                                    Ok(run) => print_run_completion(&run),
-                                    Err(err) => {
-                                        debug!("Failed to monitor run completion: {:?}", err);
-                                        let msg = format!("An error occurred while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
-                                        output::failure(&msg);
-                                    }
+                Ok(mut output) => loop {
+                    tokio::select! {
+                        Some(event) = output.recv() => print_log_stream_event(event),
+                        res = &mut run_complete => {
+                            match res {
+                                Ok(run) => print_run_completion(&run),
+                                Err(err) => {
+                                    debug!("Failed to monitor run completion: {:?}", err);
+                                    let msg = format!("An error occurred while waiting for the run to complete. This shouldn't happen! You can get more details at {:?} or by contacting support.", run.dollar_link);
+                                    output::failure(&msg);
                                 }
+                            }
 
-                                break;
-                            },
-                        };
-                    }
+                            break;
+                        },
+                    };
                 },
                 Err(err) => {
                     debug!("Failed to stream run logs: {:?}", err);
@@ -314,9 +312,7 @@ fn get_run_parameters(
     Ok((local, path, params, app_name))
 }
 
-fn should_follow_run(
-    args: &ArgMatches,
-) -> bool {
+fn should_follow_run(args: &ArgMatches) -> bool {
     let local = *args.get_one::<bool>("detached").unwrap();
     !local
 }
@@ -380,12 +376,13 @@ async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, Strin
 
             for secret in res.secrets {
                 // we will decrypt each property and inject it into the vals map.
-                let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
+                let decrypted_value =
+                    crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
                 secrets.insert(secret.name, decrypted_value);
             }
 
             Ok(secrets)
-        },
+        }
         Err(err) => {
             output::tower_error(err);
             Err(Error::FetchingSecretsFailed)
@@ -405,14 +402,16 @@ async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, Stri
             for catalog in res.catalogs {
                 // we will decrypt each property and inject it into the vals map.
                 for property in catalog.properties {
-                    let decrypted_value = crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
-                    let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
+                    let decrypted_value =
+                        crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
+                    let name =
+                        create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
                     vals.insert(name, decrypted_value);
                 }
             }
 
             Ok(vals)
-        },
+        }
         Err(err) => {
             output::tower_error(err);
             Err(Error::FetchingCatalogsFailed)
@@ -485,8 +484,14 @@ async fn monitor_status(app: LocalApp) {
 }
 
 fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &str) -> String {
-    let catalog_name = catalog_name.replace('.', "_").replace(':', "_").to_uppercase();
-    let property_name = property_name.replace('.', "_").replace(':', "_").to_uppercase();
+    let catalog_name = catalog_name
+        .replace('.', "_")
+        .replace(':', "_")
+        .to_uppercase();
+    let property_name = property_name
+        .replace('.', "_")
+        .replace(':', "_")
+        .to_uppercase();
 
     format!("PYICEBERG_CATALOG__{}__{}", catalog_name, property_name)
 }
@@ -498,12 +503,12 @@ async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
         let res = api::describe_run(config, &run.app_name, run.number).await?;
 
         if is_run_started(&res.run)? {
-            break
+            break;
         } else {
             // Wait half a second to to try again.
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
-    }  
+    }
 
     Ok(())
 }
@@ -515,15 +520,15 @@ async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<Run, Erro
         let res = api::describe_run(config, &run.app_name, run.number).await?;
 
         if is_run_finished(&res.run) {
-            return Ok(res.run)
+            return Ok(res.run);
         } else {
             // Wait half a second to to try again.
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
-    }  
+    }
 }
 
-/// is_run_started checks if the run has started by looking at its status. 
+/// is_run_started checks if the run has started by looking at its status.
 fn is_run_started(run: &Run) -> Result<bool, Error> {
     match run.status {
         tower_api::models::run::Status::Scheduled => Ok(false),
@@ -553,11 +558,11 @@ fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> 
     let run_clone = run.clone();
 
     tokio::spawn(async move {
-       let run = wait_for_run_completion(&config_clone, &run_clone).
-           await.
-           unwrap();
+        let run = wait_for_run_completion(&config_clone, &run_clone)
+            .await
+            .unwrap();
 
-       let _ = tx.send(run);
+        let _ = tx.send(run);
     });
 
     rx
@@ -568,11 +573,7 @@ fn print_log_stream_event(event: api::LogStreamEvent) {
         api::LogStreamEvent::EventLog(log) => {
             let ts = dates::format_str(&log.reported_at);
 
-            output::log_line(
-                &ts,
-                &log.content,
-                output::LogLineType::Remote,
-            );
+            output::log_line(&ts, &log.content, output::LogLineType::Remote);
         }
         api::LogStreamEvent::EventWarning(warning) => {
             debug!("warning: {:?}", warning);
@@ -590,21 +591,18 @@ fn print_run_completion(run: &Run) {
                 run.number, run.app_name
             );
             output::failure(&line);
-        },
+        }
         tower_api::models::run::Status::Crashed => {
-            let line = format!(
-                "Run #{} for app `{}` crashed",
-                run.number, run.app_name
-            );
+            let line = format!("Run #{} for app `{}` crashed", run.number, run.app_name);
             output::failure(&line);
-        },
+        }
         tower_api::models::run::Status::Cancelled => {
             let line = format!(
                 "Run #{} for app `{}` was cancelled",
                 run.number, run.app_name
             );
             output::failure(&line);
-        },
+        }
         _ => {
             let line = format!(
                 "Run #{} for app `{}` has exited successfully",

@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateAppParams {
@@ -17,7 +17,10 @@ pub struct CreateAppParams {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     /// Indicates that web traffic should be routed to this app and that its runs should get a hostname assigned to it.
-    #[serde(rename = "is_externally_accessible", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "is_externally_accessible",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub is_externally_accessible: Option<bool>,
     /// The name of the app.
     #[serde(rename = "name")]
@@ -41,4 +44,3 @@ impl CreateAppParams {
         }
     }
 }
-
