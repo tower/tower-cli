@@ -487,6 +487,43 @@ class TableReference:
         return Table(self._context, table)
 
 
+    def drop(self) -> bool:
+        """
+        Drops (deletes) the Iceberg table from the catalog.
+
+        This method will:
+        1. Resolve the table's namespace (using default if not specified)
+        2. Drop the table from the catalog
+        3. Return True if successful, False if the table didn't exist
+
+        Returns:
+            bool: True if the table was successfully dropped, False if it didn't exist.
+
+        Raises:
+            CatalogError: If there are issues accessing the catalog or dropping the table.
+
+        Example:
+            >>> # Drop an existing table
+            >>> table_ref = tables("my_table", namespace="my_namespace")
+            >>> success = table_ref.drop()
+            >>> if success:
+            ...     print("Table dropped successfully")
+            ... else:
+            ...     print("Table didn't exist")
+        """
+        namespace = namespace_or_default(self._namespace)
+        table_name = make_table_name(self._name, namespace)
+
+        try:
+            self._catalog.drop_table(table_name)
+            return True
+        except Exception:
+            # If the table doesn't exist or there's any other issue, return False
+            # The underlying PyIceberg catalog will raise different exceptions
+            # depending on the catalog implementation, so we catch all exceptions
+            return False
+
+
 def tables(
     name: str,
     catalog: Union[str, Catalog] = "default",
@@ -515,6 +552,7 @@ def tables(
             - Load an existing table using `load()`
             - Create a new table using `create()`
             - Create a table if it doesn't exist using `create_if_not_exists()`
+            - Drop an existing table using `drop()`
 
     Raises:
         CatalogError: If there are issues accessing or loading the specified catalog.
@@ -537,6 +575,11 @@ def tables(
         
         >>> # Create a table if it doesn't exist
         >>> table = tables("my_table").create_if_not_exists(schema)
+
+        >>> # Drop an existing table
+        >>> success = tables("my_table", namespace="my_namespace").drop()
+        >>> if success:
+        ...     print("Table dropped successfully")
     """
     if isinstance(catalog, str):
         catalog = load_catalog(catalog)

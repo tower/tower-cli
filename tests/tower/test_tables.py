@@ -560,3 +560,149 @@ def test_map_type_simple(in_memory_catalog):
     # Row 4 (null map)
     props4_series = df_read.filter(pl.col("id") == 4).select("properties").to_series()
     assert props4_series[0] is None
+
+
+def test_drop_existing_table(in_memory_catalog):
+    """Test dropping an existing table returns True."""
+    schema = pa.schema([
+        pa.field("id", pa.int64()),
+        pa.field("name", pa.string()),
+    ])
+
+    # Create a table first
+    ref = tower.tables("users_to_drop", catalog=in_memory_catalog)
+    table = ref.create(schema)
+    assert table is not None
+
+    # Insert some data to make sure the table exists and has content
+    data = pa.Table.from_pylist([{"id": 1, "name": "Alice"}], schema=schema)
+    table.insert(data)
+
+    # Verify the table exists by reading from it
+    df = table.read()
+    assert len(df) == 1
+
+    # Now drop the table - should return True
+    success = ref.drop()
+    assert success is True
+
+
+def test_drop_nonexistent_table(in_memory_catalog):
+    """Test dropping a non-existent table returns False."""
+    ref = tower.tables("nonexistent_table", catalog=in_memory_catalog)
+
+    # Try to drop a table that doesn't exist - should return False
+    success = ref.drop()
+    assert success is False
+
+
+def test_drop_table_with_namespace(in_memory_catalog):
+    """Test dropping a table with a specific namespace."""
+    schema = pa.schema([
+        pa.field("id", pa.int64()),
+        pa.field("data", pa.string()),
+    ])
+
+    # Create a table in a specific namespace
+    ref = tower.tables("test_table", catalog=in_memory_catalog, namespace="test_namespace")
+    table = ref.create(schema)
+    assert table is not None
+
+    # Insert some data to confirm the table exists
+    data = pa.Table.from_pylist([{"id": 1, "data": "test"}], schema=schema)
+    table.insert(data)
+
+    # Verify we can read from it
+    df = table.read()
+    assert len(df) == 1
+
+    # Drop the table - should succeed
+    success = ref.drop()
+    assert success is True
+
+    # Try to drop the same table again - should return False
+    success_again = ref.drop()
+    assert success_again is False
+
+
+def test_drop_and_recreate_table(in_memory_catalog):
+    """Test that we can drop a table and then recreate it."""
+    schema = pa.schema([
+        pa.field("id", pa.int64()),
+        pa.field("value", pa.string()),
+    ])
+
+    table_name = "drop_recreate_test"
+    ref = tower.tables(table_name, catalog=in_memory_catalog)
+
+    # Create and populate the table
+    table = ref.create(schema)
+    data = pa.Table.from_pylist([
+        {"id": 1, "value": "first"},
+        {"id": 2, "value": "second"}
+    ], schema=schema)
+    table.insert(data)
+
+    # Verify original data
+    df = table.read()
+    assert len(df) == 2
+
+    # Drop the table
+    success = ref.drop()
+    assert success is True
+
+    # Recreate the table with different data
+    new_table = ref.create(schema)
+    new_data = pa.Table.from_pylist([
+        {"id": 10, "value": "new_first"},
+        {"id": 20, "value": "new_second"},
+        {"id": 30, "value": "new_third"}
+    ], schema=schema)
+    new_table.insert(new_data)
+
+    # Verify new data
+    new_df = new_table.read()
+    assert len(new_df) == 3
+
+    # Make sure the old data is gone
+    ids = new_df.select("id").to_series().to_list()
+    assert 1 not in ids
+    assert 2 not in ids
+    assert 10 in ids
+    assert 20 in ids
+    assert 30 in ids
+
+
+def test_drop_multiple_tables(in_memory_catalog):
+    """Test dropping multiple tables."""
+    schema = pa.schema([
+        pa.field("id", pa.int64()),
+        pa.field("name", pa.string()),
+    ])
+
+    # Create multiple tables
+    table_names = ["table1", "table2", "table3"]
+    tables = {}
+
+    for name in table_names:
+        ref = tower.tables(name, catalog=in_memory_catalog)
+        table = ref.create(schema)
+        data = pa.Table.from_pylist([{"id": 1, "name": f"data_{name}"}], schema=schema)
+        table.insert(data)
+        tables[name] = ref
+
+    # Verify all tables exist by reading from them
+    for name, ref in tables.items():
+        table = ref.load()
+        df = table.read()
+        assert len(df) == 1
+
+    # Drop all tables
+    for name, ref in tables.items():
+        success = ref.drop()
+        assert success is True, f"Failed to drop table {name}"
+
+    # Verify all tables are gone
+    for name, ref in tables.items():
+        success = ref.drop()
+        assert success is False, f"Table {name} still exists after dropping"
