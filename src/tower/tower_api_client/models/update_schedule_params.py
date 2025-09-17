@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 
+from ..models.update_schedule_params_status import UpdateScheduleParamsStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ class UpdateScheduleParams:
         cron (Union[Unset, str]): The cron expression defining when the app should run
         environment (Union[Unset, str]): The environment to run the app in
         parameters (Union[Unset, list['RunParameter']]): Parameters to pass when running the app
+        status (Union[Unset, UpdateScheduleParamsStatus]): The status of the schedule
     """
 
     schema: Union[Unset, str] = UNSET
@@ -30,6 +32,7 @@ class UpdateScheduleParams:
     cron: Union[Unset, str] = UNSET
     environment: Union[Unset, str] = UNSET
     parameters: Union[Unset, list["RunParameter"]] = UNSET
+    status: Union[Unset, UpdateScheduleParamsStatus] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         schema = self.schema
@@ -51,6 +54,10 @@ class UpdateScheduleParams:
                 parameters_item = parameters_item_data.to_dict()
                 parameters.append(parameters_item)
 
+        status: Union[Unset, str] = UNSET
+        if not isinstance(self.status, Unset):
+            status = self.status.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update({})
         if schema is not UNSET:
@@ -63,6 +70,8 @@ class UpdateScheduleParams:
             field_dict["environment"] = environment
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
+        if status is not UNSET:
+            field_dict["status"] = status
 
         return field_dict
 
@@ -93,12 +102,20 @@ class UpdateScheduleParams:
 
             parameters.append(parameters_item)
 
+        _status = d.pop("status", UNSET)
+        status: Union[Unset, UpdateScheduleParamsStatus]
+        if isinstance(_status, Unset):
+            status = UNSET
+        else:
+            status = UpdateScheduleParamsStatus(_status)
+
         update_schedule_params = cls(
             schema=schema,
             app_version=app_version,
             cron=cron,
             environment=environment,
             parameters=parameters,
+            status=status,
         )
 
         return update_schedule_params

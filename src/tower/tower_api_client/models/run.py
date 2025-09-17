@@ -36,6 +36,7 @@ class Run:
         status (RunStatus):
         status_group (RunStatusGroup):
         app_slug (Union[Unset, str]): This property is deprecated. Please use app_name instead.
+        hostname (Union[Unset, str]): If app is externally accessible, then you can access this run with this hostname
     """
 
     link: str
@@ -54,6 +55,7 @@ class Run:
     status: RunStatus
     status_group: RunStatusGroup
     app_slug: Union[Unset, str] = UNSET
+    hostname: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         link = self.link
@@ -104,6 +106,8 @@ class Run:
 
         app_slug = self.app_slug
 
+        hostname = self.hostname
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
@@ -126,6 +130,8 @@ class Run:
         )
         if app_slug is not UNSET:
             field_dict["app_slug"] = app_slug
+        if hostname is not UNSET:
+            field_dict["hostname"] = hostname
 
         return field_dict
 
@@ -215,6 +221,8 @@ class Run:
 
         app_slug = d.pop("app_slug", UNSET)
 
+        hostname = d.pop("hostname", UNSET)
+
         run = cls(
             link=link,
             app_name=app_name,
@@ -232,6 +240,7 @@ class Run:
             status=status,
             status_group=status_group,
             app_slug=app_slug,
+            hostname=hostname,
         )
 
         return run
