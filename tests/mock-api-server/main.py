@@ -29,9 +29,25 @@ mock_apps_db = {}
 mock_secrets_db = {}
 mock_teams_db = {}
 mock_runs_db = {}
+mock_schedules_db = {}
 
 def generate_id():
     return str(uuid.uuid4())
+
+def now_iso():
+    return datetime.datetime.now().isoformat()
+
+def create_schedule_object(schedule_id, app_name, cron, environment="default", parameters=None):
+    return {
+        "id": schedule_id,
+        "app_name": app_name,
+        "cron": cron,
+        "environment": environment,
+        "status": "active",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "parameters": parameters or []
+    }
 
 @app.get("/")
 async def read_root():
@@ -305,6 +321,56 @@ async def describe_run_logs(name: str, seq: int):
             {"timestamp": "2025-08-22T12:00:02Z", "message": "Application completed successfully"}
         ]
     }
+
+# Schedule endpoints
+@app.get("/v1/schedules")
+async def list_schedules():
+    """Mock endpoint for listing schedules."""
+    return {"schedules": list(mock_schedules_db.values()), "pages": {"page": 1, "total": len(mock_schedules_db), "num_pages": 1, "page_size": 20}}
+
+@app.post("/v1/schedules")
+async def create_schedule(schedule_data: Dict[str, Any]):
+    """Mock endpoint for creating a schedule."""
+    app_name = schedule_data.get("app_name")
+    cron = schedule_data.get("cron")
+    if not app_name or not cron:
+        raise HTTPException(status_code=400, detail="app_name and cron are required")
+    
+    schedule_id = generate_id()
+    new_schedule = create_schedule_object(
+        schedule_id,
+        app_name, 
+        cron,
+        schedule_data.get("environment", "default"),
+        schedule_data.get("parameters", [])
+    )
+    mock_schedules_db[schedule_id] = new_schedule
+    return {"schedule": new_schedule}
+
+@app.put("/v1/schedules/{schedule_id}")
+async def update_schedule(schedule_id: str, schedule_data: Dict[str, Any]):
+    """Mock endpoint for updating a schedule."""
+    if schedule_id not in mock_schedules_db:
+        raise HTTPException(status_code=404, detail=f"Schedule '{schedule_id}' not found")
+    
+    schedule = mock_schedules_db[schedule_id]
+    if "cron" in schedule_data:
+        schedule["cron"] = schedule_data["cron"]
+    if "parameters" in schedule_data:
+        schedule["parameters"] = schedule_data["parameters"]
+    schedule["updated_at"] = now_iso()
+    
+    return {"schedule": schedule}
+
+@app.delete("/v1/schedules")
+async def delete_schedule(schedule_data: Dict[str, Any]):
+    """Mock endpoint for deleting schedules."""
+    ids = schedule_data.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="ids are required")
+    
+    deleted_schedules = [mock_schedules_db.pop(id) for id in ids if id in mock_schedules_db]
+    return {"schedules": deleted_schedules}
 
 # Health check for testing
 @app.get("/health")

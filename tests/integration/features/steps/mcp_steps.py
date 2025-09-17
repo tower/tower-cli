@@ -8,7 +8,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 
-async def call_mcp_tool(server_url, tool_name, arguments=None, working_directory=None):
+async def call_mcp_tool_raw(server_url, tool_name, arguments=None, working_directory=None):
     """Pure function to call MCP tool - handles connection and cleanup"""
     args = arguments or {}
     if working_directory:
@@ -23,6 +23,18 @@ async def call_mcp_tool(server_url, tool_name, arguments=None, working_directory
                 "content": result.content,
                 "result": result
             }
+
+async def call_mcp_tool(context, tool_name, arguments=None):
+    """Call MCP tool with standard error handling and context setting"""
+    try:
+        result = await call_mcp_tool_raw(context.mcp_server_url, tool_name, arguments or {}, working_directory=os.getcwd())
+        context.mcp_response = result
+        context.operation_success = result.get("success", False)
+        return result
+    except Exception as e:
+        context.mcp_response = {"success": False, "error": str(e)}
+        context.operation_success = False
+        return context.mcp_response
 
 
 def create_towerfile(app_type="hello_world"):
@@ -70,6 +82,7 @@ def is_error_response(response):
 
 
 
+
 @given('I have a running Tower MCP server')
 def step_have_running_mcp_server(context):
     # This step is handled by the before_scenario hook in environment.py
@@ -114,32 +127,13 @@ version = "0.1.0"
 @when('I call {tool_name} via MCP')
 @async_run_until_complete
 async def step_call_mcp_tool(context, tool_name):
-    try:
-        context.mcp_response = await call_mcp_tool(
-            context.mcp_server_url,
-            tool_name,
-            working_directory=os.getcwd()
-        )
-        context.operation_success = context.mcp_response.get("success", False)
-    except Exception as e:
-        context.mcp_response = {"success": False, "error": str(e)}
-        context.operation_success = False
+    await call_mcp_tool(context, tool_name)
 
 
 @when('I call {tool_name} with app name "{app_name}"')
 @async_run_until_complete
 async def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
-    try:
-        context.mcp_response = await call_mcp_tool(
-            context.mcp_server_url,
-            tool_name,
-            {"name": app_name},
-            working_directory=os.getcwd()
-        )
-        context.operation_success = context.mcp_response.get("success", False)
-    except Exception as e:
-        context.mcp_response = {"success": False, "error": str(e)}
-        context.operation_success = False
+    await call_mcp_tool(context, tool_name, {"name": app_name})
 
 
 @then('I should receive a response')
@@ -276,7 +270,7 @@ async def step_check_server_responsive(context):
             context.server_responsive = False
         else:
             # Test server responsiveness with simple call
-            await call_mcp_tool(context.mcp_server_url, "tower_file_validate", working_directory=os.getcwd())
+            await call_mcp_tool_raw(context.mcp_server_url, "tower_file_validate", working_directory=os.getcwd())
             context.server_responsive = True
     except Exception as e:
         context.server_responsive = False
@@ -284,3 +278,91 @@ async def step_check_server_responsive(context):
 
     if not context.server_responsive:
         print("Note: Server may be unresponsive after timeout, which is expected")
+
+
+# Schedule-related steps
+@given('I have created a schedule for "{app_name}"')
+@async_run_until_complete
+async def step_create_schedule_for_app(context, app_name):
+    """Create a schedule for testing purposes."""
+    result = await call_mcp_tool(context, "tower_schedules_create", {
+        "app_name": app_name,
+        "cron": "0 9 * * *",
+        "environment": "default"
+    })
+    assert result.get("success", False), f"Failed to create schedule: {result}"
+    context.test_app_name = app_name
+
+
+@when('I call tower_schedules_create with app "{app_name}", cron "{cron}", and environment "{environment}"')
+@async_run_until_complete
+async def step_call_schedules_create(context, app_name, cron, environment):
+    """Call tower_schedules_create with specific parameters."""
+    await call_mcp_tool(context, "tower_schedules_create", {
+        "app_name": app_name,
+        "cron": cron,
+        "environment": environment
+    })
+    context.test_app_name = app_name
+    context.test_cron = cron
+    context.test_environment = environment
+
+
+@when('I call tower_schedules_update with new cron "{new_cron}"')
+@async_run_until_complete
+async def step_call_schedules_update(context, new_cron):
+    """Call tower_schedules_update with new cron expression."""
+    await call_mcp_tool(context, "tower_schedules_update", {
+        "schedule_id": "mock-schedule-id",
+        "cron": new_cron
+    })
+    context.updated_cron = new_cron
+
+
+@when('I call tower_schedules_delete with the schedule ID')
+@async_run_until_complete
+async def step_call_schedules_delete(context):
+    """Call tower_schedules_delete with a schedule ID."""
+    await call_mcp_tool(context, "tower_schedules_delete", {
+        "name": "mock-schedule-id"
+    })
+
+
+@then('I should receive a response with empty schedules data')
+def step_check_empty_schedules_response(context):
+    """Verify the response contains empty schedules list."""
+    assert context.mcp_response.get("content"), "Response should have content"
+    found_empty_schedules = has_text_content(context.mcp_response, 
+                                           lambda text: "schedules" in text.lower() and ("[]" in text or "0" in text))
+    assert found_empty_schedules, f"Response should contain empty schedules data, got: {context.mcp_response.get('content')}"
+
+
+@then('I should receive a success response about schedule creation')
+def step_check_schedule_creation_success(context):
+    """Verify the response indicates successful schedule creation."""
+    assert context.mcp_response.get("success", False), f"Expected successful schedule creation, got: {context.mcp_response}"
+    assert "created" in str(context.mcp_response).lower(), f"Response should mention creation, got: {context.mcp_response}"
+
+
+
+@then('I should receive a response with schedule data for "{app_name}"')
+def step_check_schedules_list_with_data(context, app_name):
+    """Verify the response contains schedule data for the specified app."""
+    assert context.mcp_response.get("content"), "Response should have content"
+    found_schedule_data = has_text_content(context.mcp_response, 
+                                         lambda text: "schedules" in text.lower() and app_name in text)
+    assert found_schedule_data, f"Response should contain schedule data for '{app_name}', got: {context.mcp_response.get('content')}"
+
+
+@then('I should receive a success response about schedule update')
+def step_check_schedule_update_success(context):
+    """Verify the response indicates successful schedule update."""
+    assert context.mcp_response.get("success", False), f"Expected successful schedule update, got: {context.mcp_response}"
+    assert "updated" in str(context.mcp_response).lower(), f"Response should mention update, got: {context.mcp_response}"
+
+
+@then('I should receive a success response about schedule deletion')
+def step_check_schedule_deletion_success(context):
+    """Verify the response indicates successful schedule deletion."""
+    assert context.mcp_response.get("success", False), f"Expected successful schedule deletion, got: {context.mcp_response}"
+    assert "deleted" in str(context.mcp_response).lower(), f"Response should mention deletion, got: {context.mcp_response}"

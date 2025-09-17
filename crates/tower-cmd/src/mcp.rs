@@ -61,7 +61,6 @@ struct UpdateTowerfileRequest {
     app_name: Option<String>,
     script: Option<String>,
     description: Option<String>,
-    schedule: Option<String>,
     source: Option<Vec<String>>,
 }
 
@@ -79,6 +78,21 @@ struct GenerateTowerfileRequest {
     #[serde(flatten)]
     common: CommonParams,
     script_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ScheduleRequest {
+    app_name: String,
+    environment: Option<String>,
+    cron: String,
+    parameters: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct UpdateScheduleRequest {
+    schedule_id: String,
+    cron: Option<String>,
+    parameters: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -148,6 +162,7 @@ impl TowerService {
     fn error_result(prefix: &str, error: impl std::fmt::Display + std::fmt::Debug) -> Result<CallToolResult, McpError> {
         Ok(CallToolResult::error(vec![Content::text(format!("{}: {:#?}", prefix, error))]))
     }
+
     
     fn resolve_working_directory(common: &CommonParams) -> std::path::PathBuf {
         common.working_directory
@@ -391,7 +406,6 @@ impl TowerService {
         if let Some(name) = request.app_name { towerfile.app.name = name; }
         if let Some(script) = request.script { towerfile.app.script = script; }
         if let Some(description) = request.description { towerfile.app.description = description; }
-        if let Some(schedule) = request.schedule { towerfile.app.schedule = schedule; }
         if let Some(source) = request.source { towerfile.app.source = source; }
         
         let towerfile_path = working_dir.join("Towerfile");
@@ -474,22 +488,65 @@ All commands support an optional 'working_directory' parameter to specify which 
    - tower_deploy: Deploy your code to the cloud
    - tower_run_remote: Execute on Tower cloud infrastructure
 
-4. MANAGEMENT & MONITORING:
+4. SCHEDULE MANAGEMENT (for automatic recurring execution):
+   - tower_schedules_list: List all schedules for apps
+   - tower_schedules_create: Create a schedule to run an app automatically on a cron schedule
+   - tower_schedules_update: Update an existing schedule
+   - tower_schedules_delete: Delete a schedule
+
+5. MANAGEMENT & MONITORING:
    - tower_apps_list: View your deployed apps
    - tower_apps_show: Get detailed app information and recent runs
    - tower_apps_logs: View execution logs
 
-5. TEAM & SECRETS (optional):
+6. TEAM & SECRETS (optional):
    - tower_teams_list/switch: Manage team contexts
    - tower_secrets_create/list: Manage application secrets
 
-Quick Start: tower_file_generate → tower_run_local (test locally) → tower_apps_create → tower_deploy → tower_run_remote
+Quick Start: tower_file_generate → tower_run_local (test locally) → tower_apps_create → tower_deploy → tower_run_remote → tower_schedules_create (for recurring runs)
 
 Example with working_directory: {"working_directory": "/path/to/project", ...}
 
 Consider taking database username/password/url and making them into secrets to be accessed in app code"#;
 
         Self::text_success(workflow.to_string())
+    }
+
+    #[tool(description = "List all schedules for apps")]
+    async fn tower_schedules_list(&self) -> Result<CallToolResult, McpError> {
+        match api::list_schedules(&self.config, None, None).await {
+            Ok(response) => Self::json_success(serde_json::json!({"schedules": response.schedules})),
+            Err(e) => Self::error_result("Failed to list schedules", e),
+        }
+    }
+
+    #[tool(description = "Create a new schedule for an app")]
+    async fn tower_schedules_create(&self, Parameters(request): Parameters<ScheduleRequest>) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref().unwrap_or("default");
+        
+        match api::create_schedule(&self.config, &request.app_name, environment, &request.cron, request.parameters).await {
+            Ok(response) => Self::text_success(format!(
+                "Created schedule '{}' for app '{}' with cron '{}' in environment '{}'",
+                response.schedule.id, request.app_name, request.cron, environment
+            )),
+            Err(e) => Self::error_result("Failed to create schedule", e),
+        }
+    }
+
+    #[tool(description = "Update an existing schedule")]
+    async fn tower_schedules_update(&self, Parameters(request): Parameters<UpdateScheduleRequest>) -> Result<CallToolResult, McpError> {
+        match api::update_schedule(&self.config, &request.schedule_id, request.cron.as_ref(), request.parameters).await {
+            Ok(_) => Self::text_success(format!("Updated schedule '{}'.", request.schedule_id)),
+            Err(e) => Self::error_result("Failed to update schedule", e),
+        }
+    }
+
+    #[tool(description = "Delete a schedule")]
+    async fn tower_schedules_delete(&self, Parameters(schedule_id): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+        match api::delete_schedule(&self.config, &schedule_id.name).await {
+            Ok(_) => Self::text_success(format!("Deleted schedule '{}'.", schedule_id.name)),
+            Err(e) => Self::error_result("Failed to delete schedule", e),
+        }
     }
 }
 

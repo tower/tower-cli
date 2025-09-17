@@ -56,3 +56,26 @@ Feature: MCP App Management
     When I call tower_file_generate via MCP
     Then I should receive a valid TOML Towerfile
     And the Towerfile should contain the project name and description
+
+  Scenario: List schedules when none exist
+    When I call tower_schedules_list via MCP
+    Then I should receive a response with empty schedules data
+
+  Scenario: Create a new schedule for an app
+    When I call tower_schedules_create with app "test-app", cron "0 9 * * *", and environment "default"
+    Then I should receive a success response about schedule creation
+
+  Scenario: List schedules after creating one
+    Given I have created a schedule for "test-app"
+    When I call tower_schedules_list via MCP
+    Then I should receive a response with schedule data for "test-app"
+
+  Scenario: Update an existing schedule
+    Given I have created a schedule for "test-app"
+    When I call tower_schedules_update with new cron "0 10 * * *"
+    Then I should receive a success response about schedule update
+
+  Scenario: Delete an existing schedule
+    Given I have created a schedule for "test-app"
+    When I call tower_schedules_delete with the schedule ID
+    Then I should receive a success response about schedule deletion
