@@ -150,7 +150,7 @@ description = "A test project"
 
         assert!(result.contains(r#"name = "test-project""#));
         assert!(result.contains(r#"description = "A test project""#));
-        assert!(result.contains(r#"["./main.py", "*.py"]"#));
+        assert!(result.contains(r#"source = []"#));
     }
 
     #[test]
