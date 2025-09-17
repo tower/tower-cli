@@ -51,7 +51,7 @@ jobs:
     - name: Run BDD integration tests
       run: |
         cd tests/integration
-        TOWER_MOCK_API_URL=http://127.0.0.1:8000 uv run behave features/
+        TOWER_MOCK_API_URL=http://127.0.0.1:8000 uv run behave --color features/
 
     - name: Stop mock server
       if: always()

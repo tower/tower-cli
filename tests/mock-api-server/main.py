@@ -1,3 +1,15 @@
+"""
+Tower Mock API Server
+
+This is a MOCK API server that provides fake endpoints for testing Tower CLI 
+integration tests. It simulates the real Tower API without requiring actual 
+backend infrastructure.
+
+IMPORTANT: When the real Tower API schema changes (after regenerating the client
+from OpenAPI specs), this mock API must be updated to match. See README.md for
+debugging steps when integration tests fail with schema errors.
+"""
+
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -209,7 +221,22 @@ async def export_catalogs(export_params: Dict[str, Any]):
 
 @app.get("/v1/session")
 async def get_session():
-    """Mock endpoint for getting current session."""
+    """
+    Mock endpoint for getting current session.
+    
+    IMPORTANT: This response format must match the OpenAPI-generated models in:
+    - crates/tower-api/src/models/describe_session_response.rs
+    - crates/tower-api/src/models/session.rs  
+    - crates/tower-api/src/models/user.rs
+    - crates/tower-api/src/models/featurebase_identity.rs
+    - crates/tower-api/src/models/team.rs
+    - crates/tower-api/src/models/token.rs
+    
+    If integration tests fail with "UnknownDescribeSessionValue" errors after 
+    regenerating the API client, update this response to match the new schema.
+    
+    See tests/mock-api-server/README.md for debugging steps.
+    """
     return {
         "session": {
             "featurebase_identity": {
@@ -217,13 +244,17 @@ async def get_session():
                 "user_hash": "mock_user_hash"
             },
             "user": {
+                # Fields below are required by crates/tower-api/src/models/user.rs
+                # Missing any field may cause "UnknownDescribeSessionValue" errors
                 "company": "Mock Company",
                 "country": "US",
                 "created_at": "2023-01-01T00:00:00Z",
                 "email": "test@example.com",
                 "first_name": "Test",
                 "is_alerts_enabled": True,
+                "is_confirmed": True,
                 "is_invitation_claimed": True,
+                "is_subscribed_to_changelog": False,
                 "last_name": "User",
                 "profile_photo_url": "https://example.com/photo.jpg"
             },

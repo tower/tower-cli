@@ -69,6 +69,7 @@ def is_error_response(response):
                 for content in response.get("content", [])))
 
 
+
 @given('I have a running Tower MCP server')
 def step_have_running_mcp_server(context):
     # This step is handled by the before_scenario hook in environment.py
@@ -167,9 +168,7 @@ def step_check_missing_towerfile_error(context):
 
 @then('I should receive a success response')
 def step_check_success_response(context):
-    is_success = (context.mcp_response.get("success", False) or
-                  has_text_content(context.mcp_response, lambda text: "valid" in text.lower() and "true" in text.lower()))
-    assert is_success, f"Expected success response, got: {context.mcp_response}"
+    assert context.mcp_response.get("success", False), f"Expected success response, got: {context.mcp_response}"
 
 
 @then('I should receive the parsed Towerfile configuration')
@@ -185,12 +184,23 @@ def step_check_parsed_towerfile(context):
 def step_check_run_response(context):
     """Verify the response is about running the application."""
     assert hasattr(context, 'mcp_response'), "No MCP response was recorded"
-
-    response_text = str(context.mcp_response).lower()
-    run_keywords = ["run", "app", "local", "complet", "success", "fail"]
-
-    found_run_keyword = any(keyword in response_text for keyword in run_keywords)
-    assert found_run_keyword, f"Response should be about app run, got: {context.mcp_response}"
+    
+    # Check for common authentication/API schema issues
+    response_text = str(context.mcp_response)
+    if "No session found" in response_text:
+        raise AssertionError(
+            "Authentication failed - this usually means the mock API session endpoint "
+            "response doesn't match the expected schema. See tests/mock-api-server/README.md "
+            f"for debugging steps. Response: {context.mcp_response}"
+        )
+    elif "UnknownDescribeSessionValue" in response_text:
+        raise AssertionError(
+            "API schema mismatch - the mock API response format doesn't match the "
+            "expected OpenAPI-generated models. Update tests/mock-api-server/main.py "
+            f"to match the new schema. Response: {context.mcp_response}"
+        )
+    
+    assert context.mcp_response.get("success", False), f"Expected successful run response, got: {context.mcp_response}"
 
 
 @then('I should receive a timeout message')
