@@ -66,10 +66,9 @@ pub fn schedules_cmd() -> Command {
                 .arg(
                     Arg::new("parameters")
                         .short('p')
-                        .long("parameters")
-                        .value_parser(value_parser!(String))
-                        .help("Parameters to pass when running the app (JSON format)")
-                        .action(clap::ArgAction::Set),
+                        .long("parameter")
+                        .help("Parameters (key=value) to pass to the app")
+                        .action(clap::ArgAction::Append),
                 )
                 .about("Create a new schedule for an app"),
         )
@@ -91,10 +90,9 @@ pub fn schedules_cmd() -> Command {
                 .arg(
                     Arg::new("parameters")
                         .short('p')
-                        .long("parameters")
-                        .value_parser(value_parser!(String))
-                        .help("Parameters to pass when running the app (JSON format)")
-                        .action(clap::ArgAction::Set),
+                        .long("parameter")
+                        .help("Parameters (key=value) to pass to the app")
+                        .action(clap::ArgAction::Append),
                 )
                 .allow_external_subcommands(true)
                 .about("Update an existing schedule"),
@@ -151,18 +149,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
     let app_name = args.get_one::<String>("app").unwrap();
     let environment = args.get_one::<String>("environment").unwrap();
     let cron = args.get_one::<String>("cron").unwrap();
-    let parameters_str = args.get_one::<String>("parameters");
-
-    let parameters = if let Some(params_str) = parameters_str {
-        match serde_json::from_str::<HashMap<String, String>>(params_str) {
-            Ok(params) => Some(params),
-            Err(_) => {
-                output::die("Invalid parameters JSON format. Expected object with string key-value pairs.");
-            }
-        }
-    } else {
-        None
-    };
+    let parameters = parse_parameters(args);
 
     let mut spinner = output::spinner("Creating schedule");
 
@@ -184,20 +171,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 pub async fn do_update(config: Config, args: &ArgMatches) {
     let schedule_id = extract_schedule_id("update", args.subcommand());
     let cron = args.get_one::<String>("cron");
-    let parameters_str = args.get_one::<String>("parameters");
-
-    // Validate the parameters to send to the server
-    let parameters = if let Some(params_str) = parameters_str {
-        match serde_json::from_str::<HashMap<String, String>>(params_str) {
-            Ok(params) => Some(params),
-            Err(_) => {
-                output::die("Invalid parameters JSON format. Expected object with string key-value pairs.");
-            }
-        }
-    } else {
-        None
-    };
-
+    let parameters = parse_parameters(args);
     let mut spinner = output::spinner("Updating schedule");
 
     match api::update_schedule(&config, &schedule_id, cron, parameters).await {
@@ -235,4 +209,37 @@ fn extract_schedule_id(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String
 
     let line = format!("Schedule ID is required. Example: tower schedules {} <schedule-id>", subcmd);
     output::die(&line);
+}
+
+/// Parses `--parameter` arguments into a HashMap of key-value pairs.
+/// Handles format like "--parameter key=value"
+fn parse_parameters(args: &ArgMatches) -> Option<HashMap<String, String>> {
+    let mut param_map = HashMap::new();
+
+    if let Some(parameters) = args.get_many::<String>("parameters") {
+        for param in parameters {
+            match param.split_once('=') {
+                Some((key, value)) => {
+                    if key.is_empty() {
+                        output::failure(&format!(
+                            "Invalid parameter format: '{}'. Key cannot be empty.",
+                            param
+                        ));
+                        continue;
+                    }
+                    param_map.insert(key.to_string(), value.to_string());
+                }
+                None => {
+                    output::failure(&format!(
+                        "Invalid parameter format: '{}'. Expected 'key=value'.",
+                        param
+                    ));
+                }
+            }
+        }
+
+        Some(param_map)
+    } else {
+        None
+    }
 }
