@@ -22,7 +22,9 @@ def check_mock_server_health(url):
     """Check if the mock server is running and responding."""
     try:
         response = requests.get(f"{url}/", timeout=5)
-        return response.status_code == 200 and "Tower Mock API" in response.json().get("message", "")
+        return response.status_code == 200 and "Tower Mock API" in response.json().get(
+            "message", ""
+        )
     except requests.RequestException:
         return False
 
@@ -32,36 +34,42 @@ def start_mock_server():
     mock_server_dir = Path(__file__).parent.parent / "mock-api-server"
     if not mock_server_dir.exists():
         raise RuntimeError(f"Mock server directory not found: {mock_server_dir}")
-    
+
     log("Starting mock API server...")
     process = subprocess.Popen(
         ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
         cwd=mock_server_dir,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.DEVNULL,
     )
-    
+
     for _ in range(30):
         if check_mock_server_health("http://127.0.0.1:8000"):
             log("Mock API server started successfully")
             return process
         time.sleep(1)
-    
+
     process.terminate()
     raise RuntimeError("Mock server failed to start within 30 seconds")
+
 
 def main():
     """Run the integration tests."""
     # Check prerequisites
     project_root = Path(__file__).parent.parent.parent
-    if not any((project_root / "target" / build / "tower").exists() for build in ["debug", "release"]):
+    if not any(
+        (project_root / "target" / build / "tower").exists()
+        for build in ["debug", "release"]
+    ):
         log("ERROR: Tower binary not found. Please run 'cargo build' first.")
         return 1
 
     try:
         subprocess.check_output(["behave", "--version"])
     except (subprocess.CalledProcessError, FileNotFoundError):
-        log("ERROR: behave not found. Please run 'nix develop' to enter the dev environment.")
+        log(
+            "ERROR: behave not found. Please run 'nix develop' to enter the dev environment."
+        )
         return 1
 
     # Set up environment
@@ -75,11 +83,13 @@ def main():
     mock_process = None
     if not check_mock_server_health(env["TOWER_API_URL"]):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        port_in_use = sock.connect_ex(('127.0.0.1', 8000)) == 0
+        port_in_use = sock.connect_ex(("127.0.0.1", 8000)) == 0
         sock.close()
 
         if port_in_use:
-            log("ERROR: Port 8000 is in use but not responding to health check (some unrelated server?).")
+            log(
+                "ERROR: Port 8000 is in use but not responding to health check (some unrelated server?)."
+            )
             return 1
 
         mock_process = start_mock_server()
@@ -91,9 +101,7 @@ def main():
         test_dir = Path(__file__).parent / "features"
         log("Running integration tests...")
         result = subprocess.run(
-            ["behave", str(test_dir)],
-            cwd=Path(__file__).parent,
-            env=env
+            ["behave", str(test_dir)], cwd=Path(__file__).parent, env=env
         )
         return result.returncode
 
