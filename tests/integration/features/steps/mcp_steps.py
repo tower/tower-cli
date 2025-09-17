@@ -341,6 +341,18 @@ async def step_create_schedule_for_app(context, app_name):
         {"app_name": app_name, "cron": "0 9 * * *", "environment": "default"},
     )
     assert result.get("success", False), f"Failed to create schedule: {result}"
+    
+    # Extract schedule ID from the response text
+    if result.get("success") and "content" in result:
+        content = result["content"]
+        if content and len(content) > 0 and hasattr(content[0], 'text'):
+            response_text = content[0].text
+            # Extract schedule ID from text like "Created schedule 'SCHEDULE_ID' for app..."
+            import re
+            match = re.search(r"Created schedule '([^']+)'", response_text)
+            if match:
+                context.created_schedule_id = match.group(1)
+    
     context.test_app_name = app_name
 
 
@@ -364,10 +376,11 @@ async def step_call_schedules_create(context, app_name, cron, environment):
 @async_run_until_complete
 async def step_call_schedules_update(context, new_cron):
     """Call tower_schedules_update with new cron expression."""
+    schedule_id = getattr(context, "created_schedule_id", "mock-schedule-id")
     await call_mcp_tool(
         context,
         "tower_schedules_update",
-        {"schedule_id": "mock-schedule-id", "cron": new_cron},
+        {"schedule_id": schedule_id, "cron": new_cron},
     )
     context.updated_cron = new_cron
 
@@ -376,7 +389,8 @@ async def step_call_schedules_update(context, new_cron):
 @async_run_until_complete
 async def step_call_schedules_delete(context):
     """Call tower_schedules_delete with a schedule ID."""
-    await call_mcp_tool(context, "tower_schedules_delete", {"name": "mock-schedule-id"})
+    schedule_id = getattr(context, "created_schedule_id", "mock-schedule-id")
+    await call_mcp_tool(context, "tower_schedules_delete", {"name": schedule_id})
 
 
 @then("I should receive a response with empty schedules data")

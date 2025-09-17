@@ -101,7 +101,7 @@ def main():
         test_dir = Path(__file__).parent / "features"
         log("Running integration tests...")
         result = subprocess.run(
-            ["behave", str(test_dir)], cwd=Path(__file__).parent, env=env
+            ["behave", str(test_dir)] + sys.argv[1:], cwd=Path(__file__).parent, env=env
         )
         return result.returncode
 
