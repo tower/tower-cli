@@ -194,7 +194,6 @@ requires = ["setuptools"]
     #[test]
     fn test_find_script_from_pyproject() {
         let temp_dir = create_test_env();
-        let _guard = std::env::set_current_dir(&temp_dir);
         
         // Create pyproject.toml with script entry
         fs::write(temp_dir.path().join("pyproject.toml"), r#"
