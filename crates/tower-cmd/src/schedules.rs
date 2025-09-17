@@ -177,10 +177,6 @@ pub async fn do_update(config: Config, args: &ArgMatches) {
     let cron = args.get_one::<String>("cron");
     let parameters_str = args.get_one::<String>("parameters");
 
-    if cron.is_none() {
-        output::die("You must specify a cron string (--cron) for this schedule");
-    }
-
     // Validate the parameters to send to the server
     let parameters = if let Some(params_str) = parameters_str {
         match serde_json::from_str::<HashMap<String, String>>(params_str) {
