@@ -8,6 +8,8 @@ use crate::{
     api,
 };
 
+use tower_api::models::schedule::Status;
+
 pub fn schedules_cmd() -> Command {
     Command::new("schedules")
         .about("Manage schedules for your Tower apps")
@@ -115,17 +117,24 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                 "App".yellow().to_string(),
                 "Environment".yellow().to_string(),
                 "Cron".yellow().to_string(),
+                "Status".yellow().to_string(),
             ];
 
             let rows: Vec<Vec<String>> = response
                 .schedules
                 .iter()
                 .map(|schedule| {
+                    let status = match schedule.status {
+                        Status::Active => "active".green(),
+                        Status::Disabled => "disabled".red(),
+                    };
+
                     vec![
                         schedule.id.clone(),
                         schedule.app_name.clone(),
                         schedule.environment.clone(),
                         schedule.cron.clone(),
+                        status.to_string(),
                     ]
                 })
                 .collect();

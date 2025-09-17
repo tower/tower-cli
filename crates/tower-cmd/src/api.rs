@@ -608,6 +608,7 @@ pub async fn create_schedule(
             environment: Some(environment.to_string()),
             app_version: None,
             parameters: run_parameters,
+            status: None,
         },
     };
 
@@ -637,6 +638,7 @@ pub async fn update_schedule(
             environment: None,
             app_version: None,
             parameters: run_parameters,
+            status: None,
         },
     };
 
