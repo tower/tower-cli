@@ -33,14 +33,11 @@ pub async fn do_list(config: Config) {
                 .map(|h| h.yellow().to_string())
                 .collect();
 
-            // Format the environments data for the table
-            let envs = resp
+            let envs_data: Vec<Vec<String>> = resp
                 .environments
-                .into_iter();
-
-            let envs_data: Vec<Vec<String>> = envs
+                .into_iter()
                 .map(|env| {
-                    vec![env.name.clone()]
+                    vec![env.name]
                 })
                 .collect();
 
