@@ -17,3 +17,5 @@ pytest.ini
 /crates/tower-api/.gitignore
 /scripts/openapi.json
 /scripts/openapi-generator-cli-*.jar
+
+.idea

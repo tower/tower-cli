@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 
+from ..models.create_schedule_params_status import CreateScheduleParamsStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ class CreateScheduleParams:
             version)
         environment (Union[Unset, str]): The environment to run the app in Default: 'default'.
         parameters (Union[Unset, list['RunParameter']]): Parameters to pass when running the app
+        status (Union[Unset, CreateScheduleParamsStatus]): The status of the schedule (defaults to active)
     """
 
     app_name: str
@@ -32,6 +34,7 @@ class CreateScheduleParams:
     app_version: Union[None, Unset, str] = UNSET
     environment: Union[Unset, str] = "default"
     parameters: Union[Unset, list["RunParameter"]] = UNSET
+    status: Union[Unset, CreateScheduleParamsStatus] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         app_name = self.app_name
@@ -55,6 +58,10 @@ class CreateScheduleParams:
                 parameters_item = parameters_item_data.to_dict()
                 parameters.append(parameters_item)
 
+        status: Union[Unset, str] = UNSET
+        if not isinstance(self.status, Unset):
+            status = self.status.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
@@ -70,6 +77,8 @@ class CreateScheduleParams:
             field_dict["environment"] = environment
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
+        if status is not UNSET:
+            field_dict["status"] = status
 
         return field_dict
 
@@ -102,6 +111,13 @@ class CreateScheduleParams:
 
             parameters.append(parameters_item)
 
+        _status = d.pop("status", UNSET)
+        status: Union[Unset, CreateScheduleParamsStatus]
+        if isinstance(_status, Unset):
+            status = UNSET
+        else:
+            status = CreateScheduleParamsStatus(_status)
+
         create_schedule_params = cls(
             app_name=app_name,
             cron=cron,
@@ -109,6 +125,7 @@ class CreateScheduleParams:
             app_version=app_version,
             environment=environment,
             parameters=parameters,
+            status=status,
         )
 
         return create_schedule_params
