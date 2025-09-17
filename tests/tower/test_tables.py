@@ -706,3 +706,26 @@ def test_drop_multiple_tables(in_memory_catalog):
     for name, ref in tables.items():
         success = ref.drop()
         assert success is False, f"Table {name} still exists after dropping"
+
+
+def test_drop_with_catalog_errors(in_memory_catalog):
+    """Test that catalog errors are properly propagated, not masked as False."""
+    from unittest.mock import patch
+    from pyiceberg.exceptions import NoSuchTableError
+
+    ref = tower.tables("test_table", catalog=in_memory_catalog)
+
+    # Test that NoSuchTableError returns False
+    with patch.object(in_memory_catalog, 'drop_table') as mock_drop:
+        mock_drop.side_effect = NoSuchTableError("Table not found")
+        success = ref.drop()
+        assert success is False
+        mock_drop.assert_called_once()
+
+    # Test that other exceptions are propagated
+    with patch.object(in_memory_catalog, 'drop_table') as mock_drop:
+        mock_drop.side_effect = RuntimeError("Catalog connection failed")
+
+        with pytest.raises(RuntimeError, match="Catalog connection failed"):
+            ref.drop()
+        mock_drop.assert_called_once()

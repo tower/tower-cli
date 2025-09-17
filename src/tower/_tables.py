@@ -1,6 +1,8 @@
 from typing import Optional, Generic, TypeVar, Union, List
 from dataclasses import dataclass
 
+from pyiceberg.exceptions import NoSuchTableError
+
 TTable = TypeVar("TTable", bound="Table")
 
 import polars as pl
@@ -517,7 +519,7 @@ class TableReference:
         try:
             self._catalog.drop_table(table_name)
             return True
-        except Exception:
+        except NoSuchTableError:
             # If the table doesn't exist or there's any other issue, return False
             # The underlying PyIceberg catalog will raise different exceptions
             # depending on the catalog implementation, so we catch all exceptions
