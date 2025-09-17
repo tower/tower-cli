@@ -103,11 +103,14 @@ def run_app(
         if e.status_code == 404:
             raise AppNotFoundError(name)
         else:
-            raise UnknownException(f"Unexpected status code {e.status_code} when running app {name}")
+            raise UnknownException(
+                f"Unexpected status code {e.status_code} when running app {name}"
+            )
+
 
 def wait_for_run(
     run: Run,
-    timeout: Optional[float] = 86_400.0, # one day
+    timeout: Optional[float] = 86_400.0,  # one day
     raise_on_failure: bool = False,
 ) -> Run:
     """
@@ -173,12 +176,12 @@ def wait_for_run(
             retries += 1
 
             if retries >= DEFAULT_NUM_TIMEOUT_RETRIES:
-               raise UnknownException("There was a problem with the Tower API.")
+                raise UnknownException("There was a problem with the Tower API.")
 
 
 def wait_for_runs(
     runs: List[Run],
-    timeout: Optional[float] = 86_400.0, # one day
+    timeout: Optional[float] = 86_400.0,  # one day
     raise_on_failure: bool = False,
 ) -> tuple[List[Run], List[Run]]:
     """
@@ -255,7 +258,7 @@ def wait_for_runs(
             retries += 1
 
             if retries >= DEFAULT_NUM_TIMEOUT_RETRIES:
-               raise UnknownException("There was a problem with the Tower API.")
+                raise UnknownException("There was a problem with the Tower API.")
             else:
                 # Add the item back on the list for retry later on.
                 awaiting_runs.append(run)
@@ -273,7 +276,7 @@ def _is_failed_run(run: Run) -> bool:
     Returns:
         bool: True if the run has failed, False otherwise.
     """
-    return run.status in ["crashed", "cancelled", "errored"] 
+    return run.status in ["crashed", "cancelled", "errored"]
 
 
 def _is_successful_run(run: Run) -> bool:
@@ -302,7 +305,9 @@ def _is_run_awaiting_completion(run: Run) -> bool:
     return run.status in ["pending", "scheduled", "running"]
 
 
-def _env_client(ctx: TowerContext, timeout: Optional[float] = None) -> AuthenticatedClient:
+def _env_client(
+    ctx: TowerContext, timeout: Optional[float] = None
+) -> AuthenticatedClient:
     tower_url = ctx.tower_url
 
     if not tower_url.endswith("/v1"):
@@ -338,15 +343,13 @@ def _time_since(start_time: float) -> float:
 def _check_run_status(
     ctx: TowerContext,
     run: Run,
-    timeout: Optional[float] = 2.0, # one day
+    timeout: Optional[float] = 2.0,  # one day
 ) -> Run:
     client = _env_client(ctx, timeout=timeout)
 
     try:
-        output: Optional[Union[DescribeRunResponse, ErrorModel]] = describe_run_api.sync(
-            name=run.app_name,
-            seq=run.number,
-            client=client
+        output: Optional[Union[DescribeRunResponse, ErrorModel]] = (
+            describe_run_api.sync(name=run.app_name, seq=run.number, client=client)
         )
 
         if output is None:

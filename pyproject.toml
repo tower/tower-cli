@@ -70,8 +70,29 @@ include = ["rust-toolchain.toml"]
 [tool.uv.sources]
 tower = { workspace = true }
 
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
 [dependency-groups]
 dev = [
+  "black==24.10.0",
   "openapi-python-client==0.24.3",
   "pytest==8.3.5",
   "pytest-httpx==0.35.0",
