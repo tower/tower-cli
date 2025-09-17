@@ -1,22 +1,24 @@
+use crate::towerfile_gen::TowerfileGenerator;
+use crate::{Config, api, deploy, run};
 use anyhow::Result;
 use clap::Command;
-use crate::{Config, api, deploy, run};
 use config::Session;
+use config::Towerfile;
+use crypto;
 use rmcp::{
     ErrorData as McpError, ServerHandler,
-    handler::server::{tool::{Parameters, ToolRouter}},
-    model::{CallToolResult, Content, ServerInfo, ServerCapabilities, Implementation, ProtocolVersion},
+    handler::server::tool::{Parameters, ToolRouter},
+    model::{
+        CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo,
+    },
     schemars::{self, JsonSchema},
     tool, tool_handler, tool_router,
     transport::sse_server::SseServer,
 };
-use serde::Deserialize;
-use serde_json::{json, Value};
-use std::future::Future;
-use crypto;
 use rsa::pkcs1::DecodeRsaPublicKey;
-use config::Towerfile;
-use crate::towerfile_gen::TowerfileGenerator;
+use serde::Deserialize;
+use serde_json::{Value, json};
+use std::future::Future;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CommonParams {
@@ -101,7 +103,6 @@ struct EmptyRequest {
     common: CommonParams,
 }
 
-
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
         .about("Runs a local SSE MCP server for LLM interaction")
@@ -118,9 +119,9 @@ pub fn mcp_cmd() -> Command {
 pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()> {
     let port = *args.get_one::<u16>("port").unwrap();
     let bind_addr = format!("127.0.0.1:{}", port);
-    
+
     eprintln!("SSE server running on http://{}", bind_addr);
-    
+
     let ct = SseServer::serve(bind_addr.parse()?)
         .await?
         .with_service_directly(move || TowerService::new(config.clone()));
@@ -150,8 +151,12 @@ impl TowerService {
     }
 
     fn json_success<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
-        let text = serde_json::to_string_pretty(&data)
-            .map_err(|e| McpError::internal_error("Serialization failed", Some(json!({"error": e.to_string()}))))?;
+        let text = serde_json::to_string_pretty(&data).map_err(|e| {
+            McpError::internal_error(
+                "Serialization failed",
+                Some(json!({"error": e.to_string()})),
+            )
+        })?;
         Ok(CallToolResult::success(vec![Content::text(text)]))
     }
 
@@ -159,24 +164,33 @@ impl TowerService {
         Ok(CallToolResult::success(vec![Content::text(message)]))
     }
 
-    fn error_result(prefix: &str, error: impl std::fmt::Display + std::fmt::Debug) -> Result<CallToolResult, McpError> {
-        Ok(CallToolResult::error(vec![Content::text(format!("{}: {:#?}", prefix, error))]))
+    fn error_result(
+        prefix: &str,
+        error: impl std::fmt::Display + std::fmt::Debug,
+    ) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::error(vec![Content::text(format!(
+            "{}: {:#?}",
+            prefix, error
+        ))]))
     }
 
-    
     fn resolve_working_directory(common: &CommonParams) -> std::path::PathBuf {
-        common.working_directory
+        common
+            .working_directory
             .as_ref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
+            .unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            })
     }
-
 
     #[tool(description = "List all Tower apps in your account")]
     async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_apps(&self.config).await {
             Ok(response) => {
-                let apps: Vec<Value> = response.apps.into_iter()
+                let apps: Vec<Value> = response
+                    .apps
+                    .into_iter()
                     .map(|app_summary| {
                         let app = app_summary.app;
                         json!({
@@ -188,21 +202,27 @@ impl TowerService {
                     })
                     .collect();
                 Self::json_success(json!({"apps": apps}))
-            },
+            }
             Err(e) => Self::error_result("Failed to list apps", e),
         }
     }
 
     #[tool(description = "Create a new Tower app")]
-    async fn tower_apps_create(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_apps_create(
+        &self,
+        Parameters(request): Parameters<NameRequest>,
+    ) -> Result<CallToolResult, McpError> {
         match api::create_app(&self.config, &request.name, "").await {
             Ok(response) => Self::text_success(format!("Created app '{}'", response.app.name)),
-            Err(e) => Self::error_result("Failed to create app", e)
+            Err(e) => Self::error_result("Failed to create app", e),
         }
     }
 
     #[tool(description = "Show details for a Tower app and its recent runs")]
-    async fn tower_apps_show(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_apps_show(
+        &self,
+        Parameters(request): Parameters<NameRequest>,
+    ) -> Result<CallToolResult, McpError> {
         match api::describe_app(&self.config, &request.name).await {
             Ok(response) => {
                 let data = json!({
@@ -221,43 +241,56 @@ impl TowerService {
                     })).collect::<Vec<_>>()
                 });
                 Self::json_success(data)
-            },
+            }
             Err(e) => Self::error_result("Failed to show app", e),
         }
     }
 
     #[tool(description = "Get logs for a specific Tower app run")]
-    async fn tower_apps_logs(&self, Parameters(request): Parameters<AppLogsRequest>) -> Result<CallToolResult, McpError> {
-        let seq: i64 = request.seq.parse()
+    async fn tower_apps_logs(
+        &self,
+        Parameters(request): Parameters<AppLogsRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let seq: i64 = request
+            .seq
+            .parse()
             .map_err(|_| McpError::invalid_params("seq must be a number", None))?;
 
         match api::describe_run_logs(&self.config, &request.name, seq).await {
             Ok(response) => {
-                let logs = response.log_lines.into_iter()
+                let logs = response
+                    .log_lines
+                    .into_iter()
                     .map(|log| format!("{}: {}", log.reported_at, log.content))
                     .collect::<Vec<_>>()
                     .join("\n");
-                
+
                 let msg = format!("Logs for app '{}' run {}:\n\n{}", request.name, seq, logs);
                 Self::text_success(msg)
-            },
+            }
             Err(e) => Self::error_result("Failed to get logs", e),
         }
     }
 
     #[tool(description = "Delete a Tower app")]
-    async fn tower_apps_delete(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_apps_delete(
+        &self,
+        Parameters(request): Parameters<NameRequest>,
+    ) -> Result<CallToolResult, McpError> {
         match api::delete_app(&self.config, &request.name).await {
             Ok(_) => Self::text_success(format!("Deleted app '{}'", request.name)),
-            Err(e) => Self::error_result("Failed to delete app", e)
+            Err(e) => Self::error_result("Failed to delete app", e),
         }
     }
 
     #[tool(description = "List secrets in your Tower account (shows only previews for security)")]
-    async fn tower_secrets_list(&self, Parameters(request): Parameters<ListSecretsRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_secrets_list(
+        &self,
+        Parameters(request): Parameters<ListSecretsRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let environment = request.environment.as_deref().unwrap_or("default");
         let all = request.all.as_deref() == Some("true");
-        
+
         match api::list_secrets(&self.config, environment, all).await {
             Ok(response) => Self::json_success(json!({"secrets": response.secrets})),
             Err(e) => Self::error_result("Failed to list secrets", e),
@@ -265,109 +298,175 @@ impl TowerService {
     }
 
     #[tool(description = "Create a new secret in Tower")]
-    async fn tower_secrets_create(&self, Parameters(request): Parameters<CreateSecretRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_secrets_create(
+        &self,
+        Parameters(request): Parameters<CreateSecretRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let environment = request.environment.as_deref().unwrap_or("default");
 
-        let key_response = api::describe_secrets_key(&self.config).await
-            .map_err(|e| McpError::internal_error("Failed to get key", Some(json!({"error": e.to_string()}))))?;
-        
-        let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key)
-            .map_err(|e| McpError::internal_error("Invalid public key", Some(json!({"error": e.to_string()}))))?;
+        let key_response = api::describe_secrets_key(&self.config).await.map_err(|e| {
+            McpError::internal_error("Failed to get key", Some(json!({"error": e.to_string()})))
+        })?;
 
-        let encrypted_value = crypto::encrypt(public_key, request.value.clone())
-            .map_err(|e| McpError::internal_error("Encryption failed", Some(json!({"error": e.to_string()}))))?;
-        
-        let preview = if request.value.len() <= 10 { "XXXXXXXXXX".to_string() } 
-                     else { format!("XXXXXX{}", &request.value[request.value.len()-4..]) };
+        let public_key =
+            rsa::RsaPublicKey::from_pkcs1_pem(&key_response.public_key).map_err(|e| {
+                McpError::internal_error(
+                    "Invalid public key",
+                    Some(json!({"error": e.to_string()})),
+                )
+            })?;
 
-        match api::create_secret(&self.config, &request.name, environment, &encrypted_value, &preview).await {
-            Ok(_) => Self::text_success(format!("Created secret '{}' in environment '{}'", request.name, environment)),
+        let encrypted_value = crypto::encrypt(public_key, request.value.clone()).map_err(|e| {
+            McpError::internal_error("Encryption failed", Some(json!({"error": e.to_string()})))
+        })?;
+
+        let preview = if request.value.len() <= 10 {
+            "XXXXXXXXXX".to_string()
+        } else {
+            format!("XXXXXX{}", &request.value[request.value.len() - 4..])
+        };
+
+        match api::create_secret(
+            &self.config,
+            &request.name,
+            environment,
+            &encrypted_value,
+            &preview,
+        )
+        .await
+        {
+            Ok(_) => Self::text_success(format!(
+                "Created secret '{}' in environment '{}'",
+                request.name, environment
+            )),
             Err(e) => Self::error_result("Failed to create secret", e),
         }
     }
 
     #[tool(description = "Delete a secret from Tower")]
-    async fn tower_secrets_delete(&self, Parameters(request): Parameters<DeleteSecretRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_secrets_delete(
+        &self,
+        Parameters(request): Parameters<DeleteSecretRequest>,
+    ) -> Result<CallToolResult, McpError> {
         match api::delete_secret(&self.config, &request.name, &request.environment).await {
-            Ok(_) => Self::text_success(format!("Deleted secret '{}' from environment '{}'", request.name, request.environment)),
+            Ok(_) => Self::text_success(format!(
+                "Deleted secret '{}' from environment '{}'",
+                request.name, request.environment
+            )),
             Err(e) => Self::error_result("Failed to delete secret", e),
         }
     }
 
     #[tool(description = "List teams you belong to")]
     async fn tower_teams_list(&self) -> Result<CallToolResult, McpError> {
-        let response = api::refresh_session(&self.config).await
-            .map_err(|e| McpError::internal_error("Failed to refresh session", Some(json!({"error": e.to_string()}))))?;
-        
-        let mut session = self.config.get_current_session()
-            .map_err(|e| McpError::internal_error("No valid session", Some(json!({"error": e.to_string()}))))?;
-        
-        session.update_from_api_response(&response)
-            .map_err(|e| McpError::internal_error("Failed to update session", Some(json!({"error": e.to_string()}))))?;
+        let response = api::refresh_session(&self.config).await.map_err(|e| {
+            McpError::internal_error(
+                "Failed to refresh session",
+                Some(json!({"error": e.to_string()})),
+            )
+        })?;
+
+        let mut session = self.config.get_current_session().map_err(|e| {
+            McpError::internal_error("No valid session", Some(json!({"error": e.to_string()})))
+        })?;
+
+        session.update_from_api_response(&response).map_err(|e| {
+            McpError::internal_error(
+                "Failed to update session",
+                Some(json!({"error": e.to_string()})),
+            )
+        })?;
 
         let active_team_name = session.active_team.as_ref().map(|t| &t.name);
-        let teams: Vec<Value> = session.teams.into_iter()
+        let teams: Vec<Value> = session
+            .teams
+            .into_iter()
             .map(|team| json!({"name": team.name, "active": Some(&team.name) == active_team_name}))
             .collect();
-        
+
         Self::json_success(json!({"teams": teams}))
     }
 
     #[tool(description = "Switch context to a different team")]
-    async fn tower_teams_switch(&self, Parameters(request): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_teams_switch(
+        &self,
+        Parameters(request): Parameters<NameRequest>,
+    ) -> Result<CallToolResult, McpError> {
         match self.config.set_active_team_by_name(&request.name) {
             Ok(_) => Self::text_success(format!("Switched to team: {}", request.name)),
-            Err(e) => Self::error_result("Failed to switch team", e)
+            Err(e) => Self::error_result("Failed to switch team", e),
         }
     }
 
-    #[tool(description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create")]
+    #[tool(
+        description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create"
+    )]
     async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
         let matches = clap::ArgMatches::default();
         deploy::do_deploy(self.config.clone(), &matches).await;
         Self::text_success("Deploy command completed - check output above for status".to_string())
     }
 
-    #[tool(description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update. Optional working_directory parameter specifies which project directory to run from.")]
-    async fn tower_run_local(&self, Parameters(request): Parameters<EmptyRequest>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update. Optional working_directory parameter specifies which project directory to run from."
+    )]
+    async fn tower_run_local(
+        &self,
+        Parameters(request): Parameters<EmptyRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        match run::do_run_local_capture(self.config.clone(), working_dir, "default", std::collections::HashMap::new()).await {
+        match run::do_run_local_capture(
+            self.config.clone(),
+            working_dir,
+            "default",
+            std::collections::HashMap::new(),
+        )
+        .await
+        {
             Ok(output_lines) => {
                 let output = if output_lines.is_empty() {
                     "App completed successfully (no output)"
                 } else {
-                    &format!("App ran locally successfully:\n\n{}", output_lines.join("\n"))
+                    &format!(
+                        "App ran locally successfully:\n\n{}",
+                        output_lines.join("\n")
+                    )
                 };
                 Self::text_success(output.to_string())
             }
-            Err(e) => Self::error_result("Local run failed", e)
+            Err(e) => Self::error_result("Local run failed", e),
         }
     }
 
-    #[tool(description = "Run your app remotely on Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create, 3) Deploy with tower_deploy")]
+    #[tool(
+        description = "Run your app remotely on Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create, 3) Deploy with tower_deploy"
+    )]
     async fn tower_run_remote(&self) -> Result<CallToolResult, McpError> {
+        use config::Towerfile;
         use std::collections::HashMap;
         use std::path::PathBuf;
-        use config::Towerfile;
-        
+
         let config = self.config.clone();
         let path = PathBuf::from(".");
         let env = "default";
         let params = HashMap::new();
-        
+
         // Load Towerfile to get app name
         let towerfile = match Towerfile::from_local_file() {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
-        
+
         // Try remote run directly to get better error messages
         match run::do_run_remote_capture(config, path, env, params, None).await {
             Ok(output_lines) => {
                 let output = if output_lines.is_empty() {
                     "Remote run completed successfully (no output)"
                 } else {
-                    &format!("Remote run completed successfully:\n\n{}", output_lines.join("\n"))
+                    &format!(
+                        "Remote run completed successfully:\n\n{}",
+                        output_lines.join("\n")
+                    )
                 };
                 Self::text_success(output.to_string())
             }
@@ -385,9 +484,13 @@ impl TowerService {
         }
     }
 
-
-    #[tool(description = "Read and parse the current Towerfile configuration. Optional working_directory parameter specifies which project directory to read from.")]
-    async fn tower_file_read(&self, Parameters(request): Parameters<EmptyRequest>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Read and parse the current Towerfile configuration. Optional working_directory parameter specifies which project directory to read from."
+    )]
+    async fn tower_file_read(
+        &self,
+        Parameters(request): Parameters<EmptyRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
         match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(towerfile) => Self::json_success(serde_json::to_value(&towerfile).unwrap()),
@@ -395,46 +498,75 @@ impl TowerService {
         }
     }
 
-    #[tool(description = "Update Towerfile app configuration. Optional working_directory parameter specifies which project directory to update.")]
-    async fn tower_file_update(&self, Parameters(request): Parameters<UpdateTowerfileRequest>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Update Towerfile app configuration. Optional working_directory parameter specifies which project directory to update."
+    )]
+    async fn tower_file_update(
+        &self,
+        Parameters(request): Parameters<UpdateTowerfileRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
         let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
-        
-        if let Some(name) = request.app_name { towerfile.app.name = name; }
-        if let Some(script) = request.script { towerfile.app.script = script; }
-        if let Some(description) = request.description { towerfile.app.description = description; }
-        if let Some(source) = request.source { towerfile.app.source = source; }
-        
+
+        if let Some(name) = request.app_name {
+            towerfile.app.name = name;
+        }
+        if let Some(script) = request.script {
+            towerfile.app.script = script;
+        }
+        if let Some(description) = request.description {
+            towerfile.app.description = description;
+        }
+        if let Some(source) = request.source {
+            towerfile.app.source = source;
+        }
+
         let towerfile_path = working_dir.join("Towerfile");
         match towerfile.save(Some(&towerfile_path)) {
-            Ok(_) => Self::text_success(format!("Towerfile updated at {}", towerfile_path.display())),
+            Ok(_) => {
+                Self::text_success(format!("Towerfile updated at {}", towerfile_path.display()))
+            }
             Err(e) => Self::error_result("Failed to save Towerfile", e),
         }
     }
 
-    #[tool(description = "Add a new parameter to the Towerfile. Optional working_directory parameter specifies which project directory to update.")]
-    async fn tower_file_add_parameter(&self, Parameters(request): Parameters<AddParameterRequest>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Add a new parameter to the Towerfile. Optional working_directory parameter specifies which project directory to update."
+    )]
+    async fn tower_file_add_parameter(
+        &self,
+        Parameters(request): Parameters<AddParameterRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
         let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
-        
+
         let param_name = request.name.clone();
         towerfile.add_parameter(request.name, request.description, request.default);
-        
+
         let towerfile_path = working_dir.join("Towerfile");
         match towerfile.save(Some(&towerfile_path)) {
-            Ok(_) => Self::text_success(format!("Added parameter '{}' to {}", param_name, towerfile_path.display())),
+            Ok(_) => Self::text_success(format!(
+                "Added parameter '{}' to {}",
+                param_name,
+                towerfile_path.display()
+            )),
             Err(e) => Self::error_result("Failed to save Towerfile", e),
         }
     }
 
-    #[tool(description = "Validate the current Towerfile configuration. Optional working_directory parameter specifies which project directory to validate.")]
-    async fn tower_file_validate(&self, Parameters(request): Parameters<EmptyRequest>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Validate the current Towerfile configuration. Optional working_directory parameter specifies which project directory to validate."
+    )]
+    async fn tower_file_validate(
+        &self,
+        Parameters(request): Parameters<EmptyRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
         match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
             Ok(_) => Self::json_success(json!({"valid": true})),
@@ -442,29 +574,40 @@ impl TowerService {
         }
     }
 
-    #[tool(description = "Generate Towerfile from pyproject.toml. This is typically the first step in the workflow. Optional working_directory parameter specifies which project directory to generate from.")]
-    async fn tower_file_generate(&self, Parameters(request): Parameters<GenerateTowerfileRequest>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Generate Towerfile from pyproject.toml. This is typically the first step in the workflow. Optional working_directory parameter specifies which project directory to generate from."
+    )]
+    async fn tower_file_generate(
+        &self,
+        Parameters(request): Parameters<GenerateTowerfileRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
         let pyproject_path = working_dir.join("pyproject.toml");
         let content = match TowerfileGenerator::from_pyproject(
             Some(pyproject_path.to_str().unwrap()),
-            request.script_path.as_deref()
+            request.script_path.as_deref(),
         ) {
             Ok(content) => content,
             Err(e) => return Self::error_result("Failed to generate Towerfile", e),
         };
-        
+
         let towerfile_path = working_dir.join("Towerfile");
         match std::fs::write(&towerfile_path, &content) {
             Ok(_) => {
-                let success_msg = format!("Generated Towerfile at {}\n\n{}", towerfile_path.display(), content);
+                let success_msg = format!(
+                    "Generated Towerfile at {}\n\n{}",
+                    towerfile_path.display(),
+                    content
+                );
                 Self::text_success(success_msg)
             }
             Err(e) => Self::error_result("Failed to write Towerfile", e),
         }
     }
 
-    #[tool(description = "Show the recommended workflow for developing and deploying Tower applications")]
+    #[tool(
+        description = "Show the recommended workflow for developing and deploying Tower applications"
+    )]
     async fn tower_workflow_help(&self) -> Result<CallToolResult, McpError> {
         let workflow = r#"Tower Application Development Workflow:
 
@@ -515,16 +658,29 @@ Consider taking database username/password/url and making them into secrets to b
     #[tool(description = "List all schedules for apps")]
     async fn tower_schedules_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_schedules(&self.config, None, None).await {
-            Ok(response) => Self::json_success(serde_json::json!({"schedules": response.schedules})),
+            Ok(response) => {
+                Self::json_success(serde_json::json!({"schedules": response.schedules}))
+            }
             Err(e) => Self::error_result("Failed to list schedules", e),
         }
     }
 
     #[tool(description = "Create a new schedule for an app")]
-    async fn tower_schedules_create(&self, Parameters(request): Parameters<ScheduleRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_schedules_create(
+        &self,
+        Parameters(request): Parameters<ScheduleRequest>,
+    ) -> Result<CallToolResult, McpError> {
         let environment = request.environment.as_deref().unwrap_or("default");
-        
-        match api::create_schedule(&self.config, &request.app_name, environment, &request.cron, request.parameters).await {
+
+        match api::create_schedule(
+            &self.config,
+            &request.app_name,
+            environment,
+            &request.cron,
+            request.parameters,
+        )
+        .await
+        {
             Ok(response) => Self::text_success(format!(
                 "Created schedule '{}' for app '{}' with cron '{}' in environment '{}'",
                 response.schedule.id, request.app_name, request.cron, environment
@@ -534,15 +690,28 @@ Consider taking database username/password/url and making them into secrets to b
     }
 
     #[tool(description = "Update an existing schedule")]
-    async fn tower_schedules_update(&self, Parameters(request): Parameters<UpdateScheduleRequest>) -> Result<CallToolResult, McpError> {
-        match api::update_schedule(&self.config, &request.schedule_id, request.cron.as_ref(), request.parameters).await {
+    async fn tower_schedules_update(
+        &self,
+        Parameters(request): Parameters<UpdateScheduleRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        match api::update_schedule(
+            &self.config,
+            &request.schedule_id,
+            request.cron.as_ref(),
+            request.parameters,
+        )
+        .await
+        {
             Ok(_) => Self::text_success(format!("Updated schedule '{}'.", request.schedule_id)),
             Err(e) => Self::error_result("Failed to update schedule", e),
         }
     }
 
     #[tool(description = "Delete a schedule")]
-    async fn tower_schedules_delete(&self, Parameters(schedule_id): Parameters<NameRequest>) -> Result<CallToolResult, McpError> {
+    async fn tower_schedules_delete(
+        &self,
+        Parameters(schedule_id): Parameters<NameRequest>,
+    ) -> Result<CallToolResult, McpError> {
         match api::delete_schedule(&self.config, &schedule_id.name).await {
             Ok(_) => Self::text_success(format!("Deleted schedule '{}'.", schedule_id.name)),
             Err(e) => Self::error_result("Failed to delete schedule", e),
@@ -566,4 +735,3 @@ impl ServerHandler for TowerService {
         }
     }
 }
-
