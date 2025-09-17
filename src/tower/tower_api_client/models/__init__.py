@@ -11,6 +11,8 @@ from .app_statistics import AppStatistics
 from .app_status import AppStatus
 from .app_summary import AppSummary
 from .app_version import AppVersion
+from .batch_schedule_params import BatchScheduleParams
+from .batch_schedule_response import BatchScheduleResponse
 from .cancel_run_response import CancelRunResponse
 from .catalog import Catalog
 from .catalog_property import CatalogProperty
@@ -34,6 +36,7 @@ from .create_environment_response import CreateEnvironmentResponse
 from .create_password_reset_params import CreatePasswordResetParams
 from .create_password_reset_response import CreatePasswordResetResponse
 from .create_schedule_params import CreateScheduleParams
+from .create_schedule_params_status import CreateScheduleParamsStatus
 from .create_schedule_response import CreateScheduleResponse
 from .create_secret_params import CreateSecretParams
 from .create_secret_response import CreateSecretResponse
@@ -131,6 +134,7 @@ from .run_status_group import RunStatusGroup
 from .run_timeseries_point import RunTimeseriesPoint
 from .runner_credentials import RunnerCredentials
 from .schedule import Schedule
+from .schedule_status import ScheduleStatus
 from .search_runs_response import SearchRunsResponse
 from .search_runs_status_item import SearchRunsStatusItem
 from .secret import Secret
@@ -161,6 +165,7 @@ from .update_password_reset_response import UpdatePasswordResetResponse
 from .update_plan_params import UpdatePlanParams
 from .update_plan_response import UpdatePlanResponse
 from .update_schedule_params import UpdateScheduleParams
+from .update_schedule_params_status import UpdateScheduleParamsStatus
 from .update_schedule_response import UpdateScheduleResponse
 from .update_secret_params import UpdateSecretParams
 from .update_secret_response import UpdateSecretResponse
@@ -185,6 +190,8 @@ __all__ = (
     "AppStatus",
     "AppSummary",
     "AppVersion",
+    "BatchScheduleParams",
+    "BatchScheduleResponse",
     "CancelRunResponse",
     "Catalog",
     "CatalogProperty",
@@ -208,6 +215,7 @@ __all__ = (
     "CreatePasswordResetParams",
     "CreatePasswordResetResponse",
     "CreateScheduleParams",
+    "CreateScheduleParamsStatus",
     "CreateScheduleResponse",
     "CreateSecretParams",
     "CreateSecretResponse",
@@ -303,6 +311,7 @@ __all__ = (
     "RunStatusGroup",
     "RunTimeseriesPoint",
     "Schedule",
+    "ScheduleStatus",
     "SearchRunsResponse",
     "SearchRunsStatusItem",
     "Secret",
@@ -333,6 +342,7 @@ __all__ = (
     "UpdatePlanParams",
     "UpdatePlanResponse",
     "UpdateScheduleParams",
+    "UpdateScheduleParamsStatus",
     "UpdateScheduleResponse",
     "UpdateSecretParams",
     "UpdateSecretResponse",
