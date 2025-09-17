@@ -48,7 +48,7 @@ pub fn schedules_cmd() -> Command {
                         .short('e')
                         .long("environment")
                         .value_parser(value_parser!(String))
-                        .required(true)
+                        .default_value("default")
                         .help("The environment to run the app in")
                         .action(clap::ArgAction::Set),
                 )
