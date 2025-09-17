@@ -6,8 +6,8 @@ import socket
 from pathlib import Path
 
 def before_all(context):
-    context.tower_url = os.environ.get("TOWER_MOCK_API_URL")
-    print(f"TOWER_MOCK_API_URL: {context.tower_url}")
+    context.tower_url = os.environ.get("TOWER_API_URL")
+    print(f"TOWER_API_URL: {context.tower_url}")
 
 def before_scenario(context, scenario):
     # Create a temporary working directory for this scenario

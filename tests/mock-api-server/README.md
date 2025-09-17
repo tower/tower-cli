@@ -48,7 +48,7 @@ The mock API is returning JSON that doesn't match the Rust structs generated fro
 4. **Run a single test with debug output**:
    ```bash
    cd tests/integration
-   TOWER_MOCK_API_URL=http://127.0.0.1:8000 uv run behave features/mcp_app_management.feature -n "Run simple application successfully locally" --no-capture
+   TOWER_API_URL=http://127.0.0.1:8000 uv run behave features/mcp_app_management.feature -n "Run simple application successfully locally" --no-capture
    ```
 
 ### Updating the Mock API
