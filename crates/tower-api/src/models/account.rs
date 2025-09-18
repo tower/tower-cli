@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Account {
@@ -22,10 +22,6 @@ pub struct Account {
 
 impl Account {
     pub fn new(name: String) -> Account {
-        Account {
-            name,
-            slug: None,
-        }
+        Account { name, slug: None }
     }
 }
-

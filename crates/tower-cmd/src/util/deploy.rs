@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
-use tower_package::{Package, compute_sha256_file};
+use tower_package::{compute_sha256_file, Package};
 use tower_telemetry::debug;
 
 use tower_api::apis::configuration::Configuration;
-use tower_api::apis::ResponseContent;
-use tower_api::models::DeployAppResponse;
 use tower_api::apis::default_api::DeployAppError;
 use tower_api::apis::Error;
+use tower_api::apis::ResponseContent;
+use tower_api::models::DeployAppResponse;
 
 pub async fn upload_file_with_progress(
     api_config: &Configuration,
@@ -74,7 +74,12 @@ pub async fn upload_file_with_progress(
         let content = response.text().await?;
         let entity: Option<DeployAppError> = serde_json::from_str(&content).ok();
 
-        Err(Error::ResponseError(ResponseContent { tower_trace_id, status, content, entity }))
+        Err(Error::ResponseError(ResponseContent {
+            tower_trace_id,
+            status,
+            content,
+            entity,
+        }))
     }
 }
 

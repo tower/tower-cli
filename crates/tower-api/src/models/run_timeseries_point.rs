@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunTimeseriesPoint {
@@ -33,7 +33,16 @@ pub struct RunTimeseriesPoint {
 }
 
 impl RunTimeseriesPoint {
-    pub fn new(cancelled: i64, crashed: i64, errored: i64, exited: i64, pending: i64, period: String, running: i64, scheduled: i64) -> RunTimeseriesPoint {
+    pub fn new(
+        cancelled: i64,
+        crashed: i64,
+        errored: i64,
+        exited: i64,
+        pending: i64,
+        period: String,
+        running: i64,
+        scheduled: i64,
+    ) -> RunTimeseriesPoint {
         RunTimeseriesPoint {
             cancelled,
             crashed,
@@ -46,4 +55,3 @@ impl RunTimeseriesPoint {
         }
     }
 }
-

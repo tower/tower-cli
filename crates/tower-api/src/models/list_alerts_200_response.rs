@@ -9,16 +9,13 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ListAlerts200Response {
-}
+pub struct ListAlerts200Response {}
 
 impl ListAlerts200Response {
     pub fn new() -> ListAlerts200Response {
-        ListAlerts200Response {
-        }
+        ListAlerts200Response {}
     }
 }
-

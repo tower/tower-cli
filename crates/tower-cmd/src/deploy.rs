@@ -4,9 +4,9 @@ use std::convert::From;
 use std::path::PathBuf;
 
 use crate::{output, util};
+use tower_api::apis::configuration::Configuration;
 use tower_package::{Package, PackageSpec};
 use tower_telemetry::debug;
-use tower_api::apis::configuration::Configuration;
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")
@@ -72,20 +72,13 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
 }
 
 async fn do_deploy_package(api_config: Configuration, package: Package, towerfile: &Towerfile) {
-    let res = util::deploy::deploy_app_package(
-        &api_config,
-        &towerfile.app.name,
-        package,
-    ).await;
+    let res = util::deploy::deploy_app_package(&api_config, &towerfile.app.name, package).await;
 
     match res {
         Ok(resp) => {
             let version = resp.version;
 
-            let line = format!(
-                "Version `{}` has been deployed to Tower!",
-                version.version
-            );
+            let line = format!("Version `{}` has been deployed to Tower!", version.version);
 
             output::success(&line);
         }

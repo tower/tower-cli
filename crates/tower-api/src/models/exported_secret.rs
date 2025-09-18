@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExportedSecret {
@@ -24,7 +24,12 @@ pub struct ExportedSecret {
 }
 
 impl ExportedSecret {
-    pub fn new(created_at: String, encrypted_value: String, environment: String, name: String) -> ExportedSecret {
+    pub fn new(
+        created_at: String,
+        encrypted_value: String,
+        environment: String,
+        name: String,
+    ) -> ExportedSecret {
         ExportedSecret {
             created_at,
             encrypted_value,
@@ -33,4 +38,3 @@ impl ExportedSecret {
         }
     }
 }
-

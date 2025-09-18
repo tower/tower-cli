@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunFailureAlert {
@@ -23,10 +23,6 @@ pub struct RunFailureAlert {
 
 impl RunFailureAlert {
     pub fn new(app: models::App, run: models::Run) -> RunFailureAlert {
-        RunFailureAlert {
-            app,
-            run,
-        }
+        RunFailureAlert { app, run }
     }
 }
-

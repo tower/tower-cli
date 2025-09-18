@@ -1,11 +1,11 @@
 use clap::{value_parser, Arg, Command};
 use config::{Config, Session};
 
+pub mod api;
 mod apps;
 mod deploy;
-pub mod output;
-pub mod api;
 pub mod error;
+pub mod output;
 mod run;
 mod schedules;
 mod secrets;
@@ -32,7 +32,7 @@ impl App {
             Session::from_jwt(&token).ok()
         } else {
             Session::from_config_dir().ok()
-        }; 
+        };
 
         Self { cmd, session }
     }

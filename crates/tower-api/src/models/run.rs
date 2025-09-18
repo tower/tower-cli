@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Run {
@@ -55,7 +55,23 @@ pub struct Run {
 }
 
 impl Run {
-    pub fn new(dollar_link: String, app_name: String, app_version: String, cancelled_at: Option<String>, created_at: String, ended_at: Option<String>, environment: String, exit_code: Option<i64>, number: i64, parameters: Vec<models::RunParameter>, run_id: String, scheduled_at: String, started_at: Option<String>, status: Status, status_group: StatusGroup) -> Run {
+    pub fn new(
+        dollar_link: String,
+        app_name: String,
+        app_version: String,
+        cancelled_at: Option<String>,
+        created_at: String,
+        ended_at: Option<String>,
+        environment: String,
+        exit_code: Option<i64>,
+        number: i64,
+        parameters: Vec<models::RunParameter>,
+        run_id: String,
+        scheduled_at: String,
+        started_at: Option<String>,
+        status: Status,
+        status_group: StatusGroup,
+    ) -> Run {
         Run {
             dollar_link,
             app_name,
@@ -77,7 +93,7 @@ impl Run {
         }
     }
 }
-/// 
+///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum Status {
     #[serde(rename = "scheduled")]
@@ -118,12 +134,20 @@ impl<'de> Deserialize<'de> for Status {
             "cancelled" => Ok(Self::Cancelled),
             _ => Err(serde::de::Error::unknown_variant(
                 &s,
-                &["scheduled", "pending", "running", "crashed", "errored", "exited", "cancelled"],
+                &[
+                    "scheduled",
+                    "pending",
+                    "running",
+                    "crashed",
+                    "errored",
+                    "exited",
+                    "cancelled",
+                ],
             )),
         }
     }
 }
-/// 
+///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 pub enum StatusGroup {
     #[serde(rename = "successful")]
@@ -157,4 +181,3 @@ impl<'de> Deserialize<'de> for StatusGroup {
         }
     }
 }
-

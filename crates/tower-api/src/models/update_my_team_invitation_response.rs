@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateMyTeamInvitationResponse {
@@ -20,9 +20,6 @@ pub struct UpdateMyTeamInvitationResponse {
 
 impl UpdateMyTeamInvitationResponse {
     pub fn new() -> UpdateMyTeamInvitationResponse {
-        UpdateMyTeamInvitationResponse {
-            schema: None,
-        }
+        UpdateMyTeamInvitationResponse { schema: None }
     }
 }
-

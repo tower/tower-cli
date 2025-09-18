@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 
 #[derive(Deserialize, Debug)]
-pub struct Parameter{
+pub struct Parameter {
     #[serde(default)]
     pub name: String,
 
@@ -70,7 +70,9 @@ impl Towerfile {
         let towerfile: Towerfile = toml::from_str(toml)?;
 
         if towerfile.app.name.is_empty() {
-            return Err(Error::MissingRequiredAppField{ field: "name".to_string() });
+            return Err(Error::MissingRequiredAppField {
+                field: "name".to_string(),
+            });
         } else {
             Ok(towerfile)
         }
@@ -156,7 +158,10 @@ mod test {
         "#;
 
         let err = crate::Towerfile::from_toml(toml).err().unwrap();
-        assert_eq!(err.to_string(), "Missing required app field `name` in Towerfile");
+        assert_eq!(
+            err.to_string(),
+            "Missing required app field `name` in Towerfile"
+        );
     }
 
     #[ignore]
@@ -212,7 +217,7 @@ mod test {
         "#;
 
         let temp_dir = std::env::temp_dir();
-        let towerfile_path= temp_dir.join("Towerfile");
+        let towerfile_path = temp_dir.join("Towerfile");
         let mut tempfile = TestFile::new(towerfile_path.clone()).unwrap();
         let file = tempfile.file();
         file.write_all(toml.as_bytes()).unwrap();

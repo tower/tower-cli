@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GenerateRunStatisticsResponse {
@@ -25,7 +25,11 @@ pub struct GenerateRunStatisticsResponse {
 }
 
 impl GenerateRunStatisticsResponse {
-    pub fn new(series: Vec<models::RunTimeseriesPoint>, settings: models::StatisticsSettings, stats: models::RunStatistics) -> GenerateRunStatisticsResponse {
+    pub fn new(
+        series: Vec<models::RunTimeseriesPoint>,
+        settings: models::StatisticsSettings,
+        stats: models::RunStatistics,
+    ) -> GenerateRunStatisticsResponse {
         GenerateRunStatisticsResponse {
             schema: None,
             series,
@@ -34,4 +38,3 @@ impl GenerateRunStatisticsResponse {
         }
     }
 }
-

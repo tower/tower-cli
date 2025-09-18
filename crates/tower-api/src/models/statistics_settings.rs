@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StatisticsSettings {
@@ -31,7 +31,13 @@ pub struct StatisticsSettings {
 }
 
 impl StatisticsSettings {
-    pub fn new(end_at: String, environment: String, interval: Interval, start_at: String, timezone: String) -> StatisticsSettings {
+    pub fn new(
+        end_at: String,
+        environment: String,
+        interval: Interval,
+        start_at: String,
+        timezone: String,
+    ) -> StatisticsSettings {
         StatisticsSettings {
             end_at,
             environment,
@@ -65,11 +71,7 @@ impl<'de> Deserialize<'de> for Interval {
         match s.to_lowercase().as_str() {
             "daily" => Ok(Self::Daily),
             "hourly" => Ok(Self::Hourly),
-            _ => Err(serde::de::Error::unknown_variant(
-                &s,
-                &["daily", "hourly"],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&s, &["daily", "hourly"])),
         }
     }
 }
-

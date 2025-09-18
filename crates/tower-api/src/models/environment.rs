@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Environment {
@@ -20,9 +20,6 @@ pub struct Environment {
 
 impl Environment {
     pub fn new(name: String) -> Environment {
-        Environment {
-            name,
-        }
+        Environment { name }
     }
 }
-

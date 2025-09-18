@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppStatistics {
@@ -24,7 +24,12 @@ pub struct AppStatistics {
 }
 
 impl AppStatistics {
-    pub fn new(all_apps: i64, disabled_apps: i64, healthy_apps: i64, running_apps: i64) -> AppStatistics {
+    pub fn new(
+        all_apps: i64,
+        disabled_apps: i64,
+        healthy_apps: i64,
+        running_apps: i64,
+    ) -> AppStatistics {
         AppStatistics {
             all_apps,
             disabled_apps,
@@ -33,4 +38,3 @@ impl AppStatistics {
         }
     }
 }
-

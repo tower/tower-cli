@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateUserResponse {
@@ -22,10 +22,6 @@ pub struct UpdateUserResponse {
 
 impl UpdateUserResponse {
     pub fn new(user: models::User) -> UpdateUserResponse {
-        UpdateUserResponse {
-            schema: None,
-            user,
-        }
+        UpdateUserResponse { schema: None, user }
     }
 }
-

@@ -2,14 +2,11 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use tokio_tar::Archive;
-use tokio::{
-    sync::Mutex,
-    process::Command,
-};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_zip::tokio::read::seek::ZipFileReader;
 use futures_lite::io::AsyncReadExt;
+use tokio::{process::Command, sync::Mutex};
+use tokio_tar::Archive;
 
 use tower_telemetry::debug;
 
@@ -55,17 +52,17 @@ impl ArchiveSelector {
     pub async fn get_archive_name() -> Result<String, String> {
         let arch = env::consts::ARCH;
         let os = env::consts::OS;
-        
+
         match (arch, os) {
             // macOS
             ("aarch64", "macos") => Ok("uv-aarch64-apple-darwin.tar.gz".to_string()),
             ("x86_64", "macos") => Ok("uv-x86_64-apple-darwin.tar.gz".to_string()),
-            
+
             // Windows
             ("aarch64", "windows") => Ok("uv-aarch64-pc-windows-msvc.zip".to_string()),
             ("x86_64", "windows") => Ok("uv-x86_64-pc-windows-msvc.zip".to_string()),
             ("x86", "windows") => Ok("uv-i686-pc-windows-msvc.zip".to_string()),
-            
+
             // Linux
             ("aarch64", "linux") => {
                 if Self::is_musl_target() {
@@ -135,68 +132,64 @@ impl ArchiveSelector {
                     Err("s390x requires glibc 2.17 or newer".to_string())
                 }
             }
-            
+
             _ => Err(format!("Unsupported platform: {} {}", arch, os)),
         }
     }
-    
+
     /// Check if the current target uses musl libc
     fn is_musl_target() -> bool {
         // Check if we're compiled with musl
         cfg!(target_env = "musl")
     }
-    
+
     /// Check if glibc version meets minimum requirements
     async fn check_glibc(major: u32, minor: u32) -> bool {
         // Only check glibc on Linux with gnu env
         if !cfg!(target_os = "linux") || cfg!(target_env = "musl") {
             return false;
         }
-        
+
         // Try to get glibc version using ldd
-        if let Ok(output) = Command::new("ldd")
-            .arg("--version")
-            .output()
-            .await
-        {
+        if let Ok(output) = Command::new("ldd").arg("--version").output().await {
             if let Ok(version_str) = String::from_utf8(output.stdout) {
                 return Self::parse_glibc_version(&version_str, major, minor);
             }
         }
-        
+
         // Fallback: try to read from /lib/libc.so.6
-        if let Ok(output) = Command::new("/lib/libc.so.6")
-            .output()
-            .await
-        {
+        if let Ok(output) = Command::new("/lib/libc.so.6").output().await {
             if let Ok(version_str) = String::from_utf8(output.stdout) {
                 return Self::parse_glibc_version(&version_str, major, minor);
             }
         }
-        
+
         // If we can't determine the version, assume it's old
         false
     }
-    
+
     /// Parse glibc version string and compare with required version
     fn parse_glibc_version(version_str: &str, req_major: u32, req_minor: u32) -> bool {
         // Look for version pattern like "2.17" or "2.31"
         for line in version_str.lines() {
-            if let Some(version_part) = line.split_whitespace()
-                .find(|part| part.contains('.') && part.chars().next().unwrap_or('0').is_ascii_digit())
-            {
-                let version_clean = version_part.trim_matches(|c: char| !c.is_ascii_digit() && c != '.');
+            if let Some(version_part) = line.split_whitespace().find(|part| {
+                part.contains('.') && part.chars().next().unwrap_or('0').is_ascii_digit()
+            }) {
+                let version_clean =
+                    version_part.trim_matches(|c: char| !c.is_ascii_digit() && c != '.');
                 let parts: Vec<&str> = version_clean.split('.').collect();
-                
+
                 if parts.len() >= 2 {
-                    if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                    if let (Ok(major), Ok(minor)) =
+                        (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+                    {
                         return major > req_major || (major == req_major && minor >= req_minor);
                     }
                 }
             }
         }
         false
-    }    
+    }
 }
 
 fn extract_package_name(archive: String) -> String {
@@ -210,8 +203,11 @@ fn extract_package_name(archive: String) -> String {
 
 async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf, Error> {
     debug!("Downloading UV archive: {}", archive);
-    let url = format!("https://github.com/astral-sh/uv/releases/download/{}/{}", UV_VERSION, archive);
-    
+    let url = format!(
+        "https://github.com/astral-sh/uv/releases/download/{}/{}",
+        UV_VERSION, archive
+    );
+
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(&path).map_err(Error::IoError)?;
 
@@ -219,8 +215,9 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
     let response = reqwest::get(url)
         .await
         .map_err(|e| Error::Other(e.to_string()))?;
-    
-    let bytes = response.bytes()
+
+    let bytes = response
+        .bytes()
         .await
         .map_err(|e| Error::Other(e.to_string()))?;
 
@@ -228,11 +225,9 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
     if archive.ends_with(".tar.gz") {
         let cursor = std::io::Cursor::new(bytes);
         let tar = GzipDecoder::new(cursor);
-        
+
         // Extract the tar.gz archive
-        Archive::new(tar)
-            .unpack(path)
-            .await?;
+        Archive::new(tar).unpack(path).await?;
 
         let package_name = extract_package_name(archive.clone());
         Ok(path.join(package_name).join("uv"))
@@ -240,17 +235,17 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
         // Write zip data to a temporary file since async-zip works with files
         let temp_path = path.join("temp.zip");
         tokio::fs::write(&temp_path, bytes).await?;
-        
+
         // Open the zip file using seek reader with compression support
         let file = tokio::fs::File::open(&temp_path).await?;
         let mut zip = ZipFileReader::with_tokio(file)
             .await
             .map_err(|e| Error::Other(format!("Failed to open zip file: {}", e)))?;
-            
+
         let package_name = extract_package_name(archive.clone());
         let uv_path = "uv".to_string();
         let uv_exe_path = "uv.exe".to_string();
-        
+
         // Find the UV executable entry
         let entries = zip.file().entries();
         let entry_index = entries
@@ -262,26 +257,34 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
             })
             .map(|(index, _)| index)
             .ok_or_else(|| Error::Other("UV executable not found in archive".to_string()))?;
-            
+
         // Create the package directory
         let target_dir = path.join(&package_name);
         std::fs::create_dir_all(&target_dir)?;
-            
+
         // Extract the file with proper error handling for compression
-        let filename = entries[entry_index].filename().as_str().unwrap_or("uv").to_string();
+        let filename = entries[entry_index]
+            .filename()
+            .as_str()
+            .unwrap_or("uv")
+            .to_string();
         let is_exe = filename.ends_with(".exe");
         let target_path = target_dir.join(if is_exe { "uv.exe" } else { "uv" });
-        
-        let mut reader = zip.reader_with_entry(entry_index)
-            .await
-            .map_err(|e| Error::Other(format!("Failed to create entry reader for {}: {}", filename, e)))?;
+
+        let mut reader = zip.reader_with_entry(entry_index).await.map_err(|e| {
+            Error::Other(format!(
+                "Failed to create entry reader for {}: {}",
+                filename, e
+            ))
+        })?;
         let mut file = tokio::fs::File::create(&target_path).await?;
-        
+
         // Manually copy data since ZipEntryReader doesn't implement AsyncRead
         let mut buffer = [0u8; 8192];
         let mut total_bytes = 0;
         loop {
-            let bytes_read = reader.read(&mut buffer)
+            let bytes_read = reader
+                .read(&mut buffer)
                 .await
                 .map_err(|e| Error::Other(format!("Failed to read from zip entry: {}", e)))?;
             if bytes_read == 0 {
@@ -292,9 +295,12 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
                 .map_err(|e| Error::Other(format!("Failed to write to output file: {}", e)))?;
             total_bytes += bytes_read;
         }
-        
-        debug!("Successfully extracted {} bytes to {:?}", total_bytes, target_path);
-            
+
+        debug!(
+            "Successfully extracted {} bytes to {:?}",
+            total_bytes, target_path
+        );
+
         // Make the file executable on Unix systems
         #[cfg(unix)]
         {
@@ -303,13 +309,16 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
             perms.set_mode(0o755);
             std::fs::set_permissions(&target_path, perms)?;
         }
-            
+
         // Clean up temporary zip file
         tokio::fs::remove_file(temp_path).await?;
 
         Ok(target_path)
     } else {
-        return Err(Error::Other(format!("Unsupported archive format: {}", archive)));
+        return Err(Error::Other(format!(
+            "Unsupported archive format: {}",
+            archive
+        )));
     }
 }
 
@@ -329,11 +338,11 @@ async fn find_uv_binary() -> Option<PathBuf> {
             if uv_path.exists() {
                 return Some(uv_path);
             }
-        } 
+        }
     }
-    
+
     None
-} 
+}
 
 pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {
     // We only allow setup in the process space at a given time.
@@ -342,7 +351,7 @@ pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {
     // If we get here, uv wasn't found in PATH, so let's download it
     if let Some(path) = find_uv_binary().await {
         debug!("UV binary found at {:?}", path);
-        Ok(path) 
+        Ok(path)
     } else {
         let path = get_default_uv_bin_dir()?;
         debug!("UV binary not found in PATH, setting up UV at {:?}", path);
@@ -350,7 +359,8 @@ pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {
         // Create the directory if it doesn't exist
         std::fs::create_dir_all(&path).map_err(Error::IoError)?;
 
-        let parent = path.parent()
+        let parent = path
+            .parent()
             .ok_or_else(|| Error::NotFound("Parent directory not found".to_string()))?
             .to_path_buf();
 
@@ -361,8 +371,7 @@ pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {
         let target = path.join("uv");
 
         // Copy the `uv` binary into the default directory
-        tokio::fs::copy(&exe, &target)
-            .await?;
+        tokio::fs::copy(&exe, &target).await?;
 
         #[cfg(unix)]
         {

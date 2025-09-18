@@ -1,7 +1,4 @@
-use tower_uv::{
-    install::get_default_uv_bin_dir,
-    Uv,
-};
+use tower_uv::{install::get_default_uv_bin_dir, Uv};
 
 #[tokio::test]
 async fn test_installing_uv() {

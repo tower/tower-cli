@@ -9,12 +9,15 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Features {
     /// Whether self-hosted runners are enabled
-    #[serde(rename = "has_self_hosted_runners", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "has_self_hosted_runners",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub has_self_hosted_runners: Option<bool>,
     /// The number of apps that can be created
     #[serde(rename = "num_apps", skip_serializing_if = "Option::is_none")]
@@ -41,4 +44,3 @@ impl Features {
         }
     }
 }
-

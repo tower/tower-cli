@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GetFeatureFlagResponseBody {
@@ -30,7 +30,12 @@ pub struct GetFeatureFlagResponseBody {
 }
 
 impl GetFeatureFlagResponseBody {
-    pub fn new(enabled: bool, key: String, value: Option<serde_json::Value>, value_type: ValueType) -> GetFeatureFlagResponseBody {
+    pub fn new(
+        enabled: bool,
+        key: String,
+        value: Option<serde_json::Value>,
+        value_type: ValueType,
+    ) -> GetFeatureFlagResponseBody {
         GetFeatureFlagResponseBody {
             schema: None,
             enabled,
@@ -77,4 +82,3 @@ impl<'de> Deserialize<'de> for ValueType {
         }
     }
 }
-

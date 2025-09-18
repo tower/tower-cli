@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DeleteScheduleResponse {
@@ -21,11 +21,12 @@ pub struct DeleteScheduleResponse {
 }
 
 impl DeleteScheduleResponse {
-    pub fn new(the_schedules_successfully_deleted: Vec<models::Schedule>) -> DeleteScheduleResponse {
+    pub fn new(
+        the_schedules_successfully_deleted: Vec<models::Schedule>,
+    ) -> DeleteScheduleResponse {
         DeleteScheduleResponse {
             schema: None,
             the_schedules_successfully_deleted,
         }
     }
 }
-

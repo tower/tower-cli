@@ -1,25 +1,31 @@
-use tower_api::apis::Error;
 use config::Config;
-use http::StatusCode;
-use std::collections::HashMap;
-use tower_api::apis::ResponseContent;
-use tower_telemetry::debug;
-use tokio::sync::mpsc;
-use reqwest_eventsource::{Event, EventSource};
-use tower_api::apis::configuration;
 use futures_util::StreamExt;
+use http::StatusCode;
+use reqwest_eventsource::{Event, EventSource};
+use std::collections::HashMap;
+use tokio::sync::mpsc;
+use tower_api::apis::configuration;
+use tower_api::apis::Error;
+use tower_api::apis::ResponseContent;
 use tower_api::models::RunParameter;
+use tower_telemetry::debug;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
     /// The type of data contained in the successful response
     type Data;
-    
+
     /// Extract the data from the response, returning None if it's not the expected type
     fn extract_data(self) -> Option<Self::Data>;
 }
 
-pub async fn describe_app(config: &Config, name: &str) -> Result<tower_api::models::DescribeAppResponse, Error<tower_api::apis::default_api::DescribeAppError>> {
+pub async fn describe_app(
+    config: &Config,
+    name: &str,
+) -> Result<
+    tower_api::models::DescribeAppResponse,
+    Error<tower_api::apis::default_api::DescribeAppError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeAppParams {
@@ -30,10 +36,16 @@ pub async fn describe_app(config: &Config, name: &str) -> Result<tower_api::mode
         timezone: None,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::describe_app(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_app(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsResponse, Error<tower_api::apis::default_api::ListAppsError>> {
+pub async fn list_apps(
+    config: &Config,
+) -> Result<tower_api::models::ListAppsResponse, Error<tower_api::apis::default_api::ListAppsError>>
+{
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListAppsParams {
@@ -49,11 +61,16 @@ pub async fn list_apps(config: &Config) -> Result<tower_api::models::ListAppsRes
     unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
 }
 
-pub async fn create_app(config: &Config, name: &str, description: &str) -> Result<tower_api::models::CreateAppResponse, Error<tower_api::apis::default_api::CreateAppError>> {
+pub async fn create_app(
+    config: &Config,
+    name: &str,
+    description: &str,
+) -> Result<tower_api::models::CreateAppResponse, Error<tower_api::apis::default_api::CreateAppError>>
+{
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::CreateAppParams {
-        create_app_params: tower_api::models::CreateAppParams{
+        create_app_params: tower_api::models::CreateAppParams {
             schema: None,
             name: name.to_string(),
             short_description: Some(description.to_string()),
@@ -62,10 +79,14 @@ pub async fn create_app(config: &Config, name: &str, description: &str) -> Resul
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::create_app(api_config, params)).await 
+    unwrap_api_response(tower_api::apis::default_api::create_app(api_config, params)).await
 }
 
-pub async fn delete_app(config: &Config, name: &str) -> Result<tower_api::models::DeleteAppResponse, Error<tower_api::apis::default_api::DeleteAppError>> {
+pub async fn delete_app(
+    config: &Config,
+    name: &str,
+) -> Result<tower_api::models::DeleteAppResponse, Error<tower_api::apis::default_api::DeleteAppError>>
+{
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DeleteAppParams {
@@ -75,7 +96,14 @@ pub async fn delete_app(config: &Config, name: &str) -> Result<tower_api::models
     unwrap_api_response(tower_api::apis::default_api::delete_app(api_config, params)).await
 }
 
-pub async fn describe_run(config: &Config, app_name: &str, seq: i64) -> Result<tower_api::models::DescribeRunResponse, Error<tower_api::apis::default_api::DescribeRunError>> {
+pub async fn describe_run(
+    config: &Config,
+    app_name: &str,
+    seq: i64,
+) -> Result<
+    tower_api::models::DescribeRunResponse,
+    Error<tower_api::apis::default_api::DescribeRunError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeRunParams {
@@ -83,10 +111,20 @@ pub async fn describe_run(config: &Config, app_name: &str, seq: i64) -> Result<t
         seq,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::describe_run(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_run(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn describe_run_logs(config: &Config, name: &str, seq: i64) -> Result<tower_api::models::DescribeRunLogsResponse, Error<tower_api::apis::default_api::DescribeRunLogsError>> {
+pub async fn describe_run_logs(
+    config: &Config,
+    name: &str,
+    seq: i64,
+) -> Result<
+    tower_api::models::DescribeRunLogsResponse,
+    Error<tower_api::apis::default_api::DescribeRunLogsError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeRunLogsParams {
@@ -94,10 +132,18 @@ pub async fn describe_run_logs(config: &Config, name: &str, seq: i64) -> Result<
         seq,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::describe_run_logs(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_run_logs(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn run_app(config: &Config, name: &str, env: &str, params: HashMap<String, String>) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
+pub async fn run_app(
+    config: &Config,
+    name: &str,
+    env: &str,
+    params: HashMap<String, String>,
+) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::RunAppParams {
@@ -113,7 +159,15 @@ pub async fn run_app(config: &Config, name: &str, env: &str, params: HashMap<Str
     unwrap_api_response(tower_api::apis::default_api::run_app(api_config, params)).await
 }
 
-pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: rsa::RsaPublicKey) -> Result<tower_api::models::ExportSecretsResponse, Error<tower_api::apis::default_api::ExportSecretsError>> {
+pub async fn export_secrets(
+    config: &Config,
+    env: &str,
+    all: bool,
+    public_key: rsa::RsaPublicKey,
+) -> Result<
+    tower_api::models::ExportSecretsResponse,
+    Error<tower_api::apis::default_api::ExportSecretsError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ExportSecretsParams {
@@ -127,10 +181,21 @@ pub async fn export_secrets(config: &Config, env: &str, all: bool, public_key: r
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::export_secrets(api_config, params)).await
-} 
+    unwrap_api_response(tower_api::apis::default_api::export_secrets(
+        api_config, params,
+    ))
+    .await
+}
 
-pub async fn export_catalogs(config: &Config, env: &str, all: bool, public_key: rsa::RsaPublicKey) -> Result<tower_api::models::ExportCatalogsResponse, Error<tower_api::apis::default_api::ExportCatalogsError>> {
+pub async fn export_catalogs(
+    config: &Config,
+    env: &str,
+    all: bool,
+    public_key: rsa::RsaPublicKey,
+) -> Result<
+    tower_api::models::ExportCatalogsResponse,
+    Error<tower_api::apis::default_api::ExportCatalogsError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ExportCatalogsParams {
@@ -144,11 +209,20 @@ pub async fn export_catalogs(config: &Config, env: &str, all: bool, public_key: 
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::export_catalogs(api_config, params)).await
-} 
+    unwrap_api_response(tower_api::apis::default_api::export_catalogs(
+        api_config, params,
+    ))
+    .await
+}
 
-
-pub async fn list_secrets(config: &Config, env: &str, all: bool) -> Result<tower_api::models::ListSecretsResponse, Error<tower_api::apis::default_api::ListSecretsError>> {
+pub async fn list_secrets(
+    config: &Config,
+    env: &str,
+    all: bool,
+) -> Result<
+    tower_api::models::ListSecretsResponse,
+    Error<tower_api::apis::default_api::ListSecretsError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListSecretsParams {
@@ -158,10 +232,22 @@ pub async fn list_secrets(config: &Config, env: &str, all: bool) -> Result<tower
         page_size: None,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::list_secrets(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::list_secrets(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn create_secret(config: &Config, name: &str, env: &str, encrypted_value: &str, preview: &str) -> Result<tower_api::models::CreateSecretResponse, Error<tower_api::apis::default_api::CreateSecretError>> {
+pub async fn create_secret(
+    config: &Config,
+    name: &str,
+    env: &str,
+    encrypted_value: &str,
+    preview: &str,
+) -> Result<
+    tower_api::models::CreateSecretResponse,
+    Error<tower_api::apis::default_api::CreateSecretError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::CreateSecretParams {
@@ -174,20 +260,36 @@ pub async fn create_secret(config: &Config, name: &str, env: &str, encrypted_val
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::create_secret(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::create_secret(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn describe_secrets_key(config: &Config) -> Result<tower_api::models::DescribeSecretsKeyResponse, Error<tower_api::apis::default_api::DescribeSecretsKeyError>> {
+pub async fn describe_secrets_key(
+    config: &Config,
+) -> Result<
+    tower_api::models::DescribeSecretsKeyResponse,
+    Error<tower_api::apis::default_api::DescribeSecretsKeyError>,
+> {
     let api_config = &config.into();
 
-    let params = tower_api::apis::default_api::DescribeSecretsKeyParams {
-        format: None,
-    };
+    let params = tower_api::apis::default_api::DescribeSecretsKeyParams { format: None };
 
-    unwrap_api_response(tower_api::apis::default_api::describe_secrets_key(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_secrets_key(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<tower_api::models::DeleteSecretResponse, Error<tower_api::apis::default_api::DeleteSecretError>> {
+pub async fn delete_secret(
+    config: &Config,
+    name: &str,
+    env: &str,
+) -> Result<
+    tower_api::models::DeleteSecretResponse,
+    Error<tower_api::apis::default_api::DeleteSecretError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DeleteSecretParams {
@@ -195,32 +297,60 @@ pub async fn delete_secret(config: &Config, name: &str, env: &str) -> Result<tow
         environment: Some(env.to_string()),
     };
 
-    unwrap_api_response(tower_api::apis::default_api::delete_secret(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::delete_secret(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn create_device_login_ticket(config: &Config) -> Result<tower_api::models::CreateDeviceLoginTicketResponse, Error<tower_api::apis::default_api::CreateDeviceLoginTicketError>> {
+pub async fn create_device_login_ticket(
+    config: &Config,
+) -> Result<
+    tower_api::models::CreateDeviceLoginTicketResponse,
+    Error<tower_api::apis::default_api::CreateDeviceLoginTicketError>,
+> {
     let api_config = &config.into();
-    unwrap_api_response(tower_api::apis::default_api::create_device_login_ticket(api_config)).await
+    unwrap_api_response(tower_api::apis::default_api::create_device_login_ticket(
+        api_config,
+    ))
+    .await
 }
 
-pub async fn describe_device_login_session(config: &Config, device_code: &str) -> Result<tower_api::models::DescribeDeviceLoginSessionResponse, Error<tower_api::apis::default_api::DescribeDeviceLoginSessionError>> {
+pub async fn describe_device_login_session(
+    config: &Config,
+    device_code: &str,
+) -> Result<
+    tower_api::models::DescribeDeviceLoginSessionResponse,
+    Error<tower_api::apis::default_api::DescribeDeviceLoginSessionError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DescribeDeviceLoginSessionParams {
         device_code: device_code.to_string(),
     };
 
-    unwrap_api_response(tower_api::apis::default_api::describe_device_login_session(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::describe_device_login_session(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn refresh_session(config: &Config) -> Result<tower_api::models::RefreshSessionResponse, Error<tower_api::apis::default_api::RefreshSessionError>> {
+pub async fn refresh_session(
+    config: &Config,
+) -> Result<
+    tower_api::models::RefreshSessionResponse,
+    Error<tower_api::apis::default_api::RefreshSessionError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::RefreshSessionParams {
         refresh_session_params: tower_api::models::RefreshSessionParams::new(),
     };
 
-    unwrap_api_response(tower_api::apis::default_api::refresh_session(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::refresh_session(
+        api_config, params,
+    ))
+    .await
 }
 
 pub enum LogStreamEvent {
@@ -249,40 +379,47 @@ async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStre
             }
             Ok(Event::Message(message)) => {
                 match message.event.as_str() {
-                "log" => {
-                    let event_log = serde_json::from_str(&message.data);
+                    "log" => {
+                        let event_log = serde_json::from_str(&message.data);
 
-                    match event_log {
-                        Ok(event) => {
-                            tx.send(LogStreamEvent::EventLog(event)).await.ok();
-                        },
-                        Err(err) => {
-                            debug!("Failed to parse log message: {}. Error: {}", message.data, err);
+                        match event_log {
+                            Ok(event) => {
+                                tx.send(LogStreamEvent::EventLog(event)).await.ok();
+                            }
+                            Err(err) => {
+                                debug!(
+                                    "Failed to parse log message: {}. Error: {}",
+                                    message.data, err
+                                );
+                            }
+                        };
+                    }
+                    "warning" => {
+                        let event_warning = serde_json::from_str(&message.data);
+                        if let Ok(event) = event_warning {
+                            tx.send(LogStreamEvent::EventWarning(event)).await.ok();
+                        } else {
+                            debug!("Failed to parse warning message: {:?}", message.data);
                         }
-                    };
-                },
-                "warning" => {
-                    let event_warning = serde_json::from_str(&message.data);
-                    if let Ok(event) = event_warning {
-                        tx.send(LogStreamEvent::EventWarning(event)).await.ok();
-                    } else {
-                        debug!("Failed to parse warning message: {:?}", message.data);
-                    }    
-                }
-                _ => {
-                    debug!("Unknown or unsupported log message: {:?}", message);
-                }
+                    }
+                    _ => {
+                        debug!("Unknown or unsupported log message: {:?}", message);
+                    }
                 };
-            },
+            }
             Err(err) => {
                 debug!("Error in log stream: {}", err);
                 break; // Exit on error
             }
-        } 
+        }
     }
 }
 
-pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Result<mpsc::Receiver<LogStreamEvent>, LogStreamError>  { 
+pub async fn stream_run_logs(
+    config: &Config,
+    app_name: &str,
+    seq: i64,
+) -> Result<mpsc::Receiver<LogStreamEvent>, LogStreamError> {
     let api_config: configuration::Configuration = config.into();
 
     // These represent the messages that we'll stream to the client.
@@ -291,7 +428,12 @@ pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Resul
     // This code is copied from tower-api. Since that code is generated, there's not really a good
     // way to share this code between here and the rest of the app.
     let name = tower_api::apis::urlencode(app_name);
-    let uri = format!("{}/apps/{name}/runs/{seq}/logs/stream", api_config.base_path, name=name, seq=seq);
+    let uri = format!(
+        "{}/apps/{name}/runs/{seq}/logs/stream",
+        api_config.base_path,
+        name = name,
+        seq = seq
+    );
     let mut builder = api_config.client.request(reqwest::Method::GET, &uri);
 
     if let Some(ref user_agent) = api_config.user_agent {
@@ -310,25 +452,22 @@ pub async fn stream_run_logs(config: &Config, app_name: &str, seq: i64) -> Resul
             Ok(Event::Open) => {
                 tokio::spawn(drain_run_logs_stream(source, tx));
                 Ok(rx)
-            },
+            }
             Ok(Event::Message(message)) => {
                 // This is a bug in the program and should never happen.
-                panic!("Received message when expected an open event. Message: {:?}", message);
-            },
-            Err(err) => {
-                match err {
-                    reqwest_eventsource::Error::Transport(e) => {
-                        Err(LogStreamError::Reqwest(e))
-                    },
-                    reqwest_eventsource::Error::StreamEnded => {
-                        drop(tx);
-                        Ok(rx)
-                    },
-                    _ => {
-                        Err(LogStreamError::Unknown)
-                    }
-                }
+                panic!(
+                    "Received message when expected an open event. Message: {:?}",
+                    message
+                );
             }
+            Err(err) => match err {
+                reqwest_eventsource::Error::Transport(e) => Err(LogStreamError::Reqwest(e)),
+                reqwest_eventsource::Error::StreamEnded => {
+                    drop(tx);
+                    Ok(rx)
+                }
+                _ => Err(LogStreamError::Unknown),
+            },
         }
     } else {
         // If we didn't get an event, we can't stream logs.
@@ -362,14 +501,12 @@ where
                     Err(err)
                 }
             } else {
-                let err = Error::ResponseError(
-                    tower_api::apis::ResponseContent {
-                        tower_trace_id: "".to_string(),
-                        status: StatusCode::NO_CONTENT,
-                        content: "Empty response from server".to_string(),
-                        entity: None,
-                    },
-                );
+                let err = Error::ResponseError(tower_api::apis::ResponseContent {
+                    tower_trace_id: "".to_string(),
+                    status: StatusCode::NO_CONTENT,
+                    content: "Empty response from server".to_string(),
+                    entity: None,
+                });
                 Err(err)
             }
         }
@@ -439,15 +576,13 @@ impl ResponseEntity for tower_api::apis::default_api::ListAppsSuccess {
     fn extract_data(self) -> Option<Self::Data> {
         match self {
             Self::Status200(data) => Some(data),
-            Self::UnknownValue(data) => {
-                match serde_json::from_value(data) {
-                    Ok(obj) => Some(obj),
-                    Err(err) => {
-                        debug!("Failed to deserialize ListAppsResponse from value: {}", err);
-                        None
-                    },
+            Self::UnknownValue(data) => match serde_json::from_value(data) {
+                Ok(obj) => Some(obj),
+                Err(err) => {
+                    debug!("Failed to deserialize ListAppsResponse from value: {}", err);
+                    None
                 }
-            }
+            },
         }
     }
 }
@@ -573,7 +708,14 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeRunSuccess {
     }
 }
 
-pub async fn list_schedules(config: &Config, _app_name: Option<&str>, _environment: Option<&str>) -> Result<tower_api::models::ListSchedulesResponse, Error<tower_api::apis::default_api::ListSchedulesError>> {
+pub async fn list_schedules(
+    config: &Config,
+    _app_name: Option<&str>,
+    _environment: Option<&str>,
+) -> Result<
+    tower_api::models::ListSchedulesResponse,
+    Error<tower_api::apis::default_api::ListSchedulesError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListSchedulesParams {
@@ -581,7 +723,10 @@ pub async fn list_schedules(config: &Config, _app_name: Option<&str>, _environme
         page_size: None,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::list_schedules(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::list_schedules(
+        api_config, params,
+    ))
+    .await
 }
 
 pub async fn create_schedule(
@@ -590,7 +735,10 @@ pub async fn create_schedule(
     environment: &str,
     cron: &str,
     parameters: Option<HashMap<String, String>>,
-) -> Result<tower_api::models::CreateScheduleResponse, Error<tower_api::apis::default_api::CreateScheduleError>> {
+) -> Result<
+    tower_api::models::CreateScheduleResponse,
+    Error<tower_api::apis::default_api::CreateScheduleError>,
+> {
     let api_config = &config.into();
 
     let run_parameters = parameters.map(|params| {
@@ -612,7 +760,10 @@ pub async fn create_schedule(
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::create_schedule(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::create_schedule(
+        api_config, params,
+    ))
+    .await
 }
 
 pub async fn update_schedule(
@@ -620,7 +771,10 @@ pub async fn update_schedule(
     schedule_id: &str,
     cron: Option<&String>,
     parameters: Option<HashMap<String, String>>,
-) -> Result<tower_api::models::UpdateScheduleResponse, Error<tower_api::apis::default_api::UpdateScheduleError>> {
+) -> Result<
+    tower_api::models::UpdateScheduleResponse,
+    Error<tower_api::apis::default_api::UpdateScheduleError>,
+> {
     let api_config = &config.into();
 
     let run_parameters = parameters.map(|params| {
@@ -642,10 +796,19 @@ pub async fn update_schedule(
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::update_schedule(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::update_schedule(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn delete_schedule(config: &Config, schedule_id: &str) -> Result<tower_api::models::DeleteScheduleResponse, Error<tower_api::apis::default_api::DeleteScheduleError>> {
+pub async fn delete_schedule(
+    config: &Config,
+    schedule_id: &str,
+) -> Result<
+    tower_api::models::DeleteScheduleResponse,
+    Error<tower_api::apis::default_api::DeleteScheduleError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DeleteScheduleParams {
@@ -655,7 +818,10 @@ pub async fn delete_schedule(config: &Config, schedule_id: &str) -> Result<tower
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::delete_schedule(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::delete_schedule(
+        api_config, params,
+    ))
+    .await
 }
 
 impl ResponseEntity for tower_api::apis::default_api::ListSchedulesSuccess {

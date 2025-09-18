@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppSummary {
@@ -21,10 +21,6 @@ pub struct AppSummary {
 
 impl AppSummary {
     pub fn new(app: models::App, runs: Vec<models::Run>) -> AppSummary {
-        AppSummary {
-            app,
-            runs,
-        }
+        AppSummary { app, runs }
     }
 }
-

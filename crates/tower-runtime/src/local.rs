@@ -1,29 +1,21 @@
-use std::path::PathBuf;
-use std::env;
-use std::process::Stdio;
 use std::collections::HashMap;
+use std::env;
+use std::path::PathBuf;
+use std::process::Stdio;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::{
-    Status,
-    StartOptions,
-    OutputSender,
-    errors::Error,
-};
+use crate::{errors::Error, OutputSender, StartOptions, Status};
 
 use tokio::{
     fs,
-    io::{AsyncRead, BufReader, AsyncBufReadExt},
-    process::{Child, Command}, 
+    io::{AsyncBufReadExt, AsyncRead, BufReader},
+    process::{Child, Command},
     runtime::Handle,
     sync::{
+        oneshot::{self, error::TryRecvError},
         Mutex,
-        oneshot::{
-            self,
-            error::TryRecvError,
-        },
     },
     task::JoinHandle,
     time::{timeout, Duration},
@@ -31,11 +23,8 @@ use tokio::{
 
 #[cfg(unix)]
 use nix::{
+    sys::signal::{killpg, Signal},
     unistd::Pid,
-    sys::signal::{
-        Signal,
-        killpg,
-    },
 };
 
 use tokio_util::sync::CancellationToken;
@@ -44,12 +33,7 @@ use tower_package::{Manifest, Package};
 use tower_telemetry::debug;
 use tower_uv::Uv;
 
-use crate::{
-    FD,
-    Channel,
-    App,
-    Output,
-};
+use crate::{App, Channel, Output, FD};
 
 pub struct LocalApp {
     status: Mutex<Option<Status>>,
@@ -115,14 +99,15 @@ async fn find_bash() -> Result<PathBuf, Error> {
     }
 }
 
-async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_token: CancellationToken) -> Result<(), Error> {
+async fn execute_local_app(
+    opts: StartOptions,
+    sx: oneshot::Sender<i32>,
+    cancel_token: CancellationToken,
+) -> Result<(), Error> {
     let ctx = opts.ctx.clone();
     let package = opts.package;
     let environment = opts.environment;
-    let package_path = package.unpacked_path
-        .clone()
-        .unwrap()
-        .to_path_buf();
+    let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
 
     // set for later on.
     let working_dir = if package.manifest.version == Some(2) {
@@ -141,7 +126,9 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
     if !package.manifest.import_paths.is_empty() {
         debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
 
-        let import_paths = package.manifest.import_paths
+        let import_paths = package
+            .manifest
+            .import_paths
             .iter()
             .map(|p| package_path.join(p))
             .collect::<Vec<_>>();
@@ -186,12 +173,20 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
             secrets,
             params,
             other_env_vars,
-        ).await?;
+        )
+        .await?;
 
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
-    } else  {
+    } else {
         let uv = Uv::new().await?;
-        let env_vars = make_env_vars(&ctx, &environment, &package_path, &secrets, &params, &other_env_vars);
+        let env_vars = make_env_vars(
+            &ctx,
+            &environment,
+            &package_path,
+            &secrets,
+            &params,
+            &other_env_vars,
+        );
 
         // Now we also need to find the program to execute.
         let program_path = working_dir.join(&manifest.invoke);
@@ -208,10 +203,20 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
 
         // Drain the logs to the output channel.
         let stdout = child.stdout.take().expect("no stdout");
-        tokio::spawn(drain_output(FD::Stdout, Channel::Setup, opts.output_sender.clone(), BufReader::new(stdout)));
+        tokio::spawn(drain_output(
+            FD::Stdout,
+            Channel::Setup,
+            opts.output_sender.clone(),
+            BufReader::new(stdout),
+        ));
 
         let stderr = child.stderr.take().expect("no stderr");
-        tokio::spawn(drain_output(FD::Stderr, Channel::Setup, opts.output_sender.clone(), BufReader::new(stderr)));
+        tokio::spawn(drain_output(
+            FD::Stderr,
+            Channel::Setup,
+            opts.output_sender.clone(),
+            BufReader::new(stderr),
+        ));
 
         // Wait for venv to finish up.
         wait_for_process(ctx.clone(), &cancel_token, child).await;
@@ -227,7 +232,7 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
         match uv.sync(&working_dir, &env_vars).await {
             Err(e) => {
                 // If we were missing a pyproject.toml, then that's fine for us--we'll just
-                // continue execution. 
+                // continue execution.
                 //
                 // Note that we do a match here instead of an if. That's because of the way
                 // tower_uv::Error is implemented. Namely, it doesn't implement PartialEq and can't
@@ -235,20 +240,30 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
                 match e {
                     tower_uv::Error::MissingPyprojectToml => {
                         debug!(ctx: &ctx, "no pyproject.toml found, continuing without sync");
-                    },
+                    }
                     _ => {
                         // If we got any other error, we want to return it.
                         return Err(e.into());
                     }
                 }
-            },
+            }
             Ok(mut child) => {
                 // Drain the logs to the output channel.
                 let stdout = child.stdout.take().expect("no stdout");
-                tokio::spawn(drain_output(FD::Stdout, Channel::Setup, opts.output_sender.clone(), BufReader::new(stdout)));
+                tokio::spawn(drain_output(
+                    FD::Stdout,
+                    Channel::Setup,
+                    opts.output_sender.clone(),
+                    BufReader::new(stdout),
+                ));
 
                 let stderr = child.stderr.take().expect("no stderr");
-                tokio::spawn(drain_output(FD::Stderr, Channel::Setup, opts.output_sender.clone(), BufReader::new(stderr)));
+                tokio::spawn(drain_output(
+                    FD::Stderr,
+                    Channel::Setup,
+                    opts.output_sender.clone(),
+                    BufReader::new(stderr),
+                ));
 
                 // Let's wait for the setup to finish. We don't care about the results.
                 wait_for_process(ctx.clone(), &cancel_token, child).await;
@@ -267,23 +282,33 @@ async fn execute_local_app(opts: StartOptions, sx: oneshot::Sender<i32>, cancel_
 
         // Drain the logs to the output channel.
         let stdout = child.stdout.take().expect("no stdout");
-        tokio::spawn(drain_output(FD::Stdout, Channel::Program, opts.output_sender.clone(), BufReader::new(stdout)));
+        tokio::spawn(drain_output(
+            FD::Stdout,
+            Channel::Program,
+            opts.output_sender.clone(),
+            BufReader::new(stdout),
+        ));
 
         let stderr = child.stderr.take().expect("no stderr");
-        tokio::spawn(drain_output(FD::Stderr, Channel::Program, opts.output_sender.clone(), BufReader::new(stderr)));
+        tokio::spawn(drain_output(
+            FD::Stderr,
+            Channel::Program,
+            opts.output_sender.clone(),
+            BufReader::new(stderr),
+        ));
 
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     }
 
     // Everything was properly executed I suppose.
-    return Ok(())
-} 
+    return Ok(());
+}
 
 impl Drop for LocalApp {
     fn drop(&mut self) {
         // CancellationToken::cancel() is not async
         self.terminator.cancel();
-        
+
         // Optionally spawn a task to wait for the handle
         if let Some(execute_handle) = self.execute_handle.take() {
             if let Ok(handle) = Handle::try_current() {
@@ -345,9 +370,9 @@ impl App for LocalApp {
 
         // Now we should wait for the join handle to finish.
         if let Some(execute_handle) = self.execute_handle.take() {
-            let _  = execute_handle.await;
+            let _ = execute_handle.await;
             self.execute_handle = None;
-        } 
+        }
 
         Ok(())
     }
@@ -374,7 +399,14 @@ async fn execute_bash_program(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .envs(make_env_vars(&ctx, env, &cwd, &secrets, &params, &other_env_vars))
+        .envs(make_env_vars(
+            &ctx,
+            env,
+            &cwd,
+            &secrets,
+            &params,
+            &other_env_vars,
+        ))
         .kill_on_drop(true)
         .spawn()?;
 
@@ -384,13 +416,23 @@ async fn execute_bash_program(
 fn make_env_var_key(src: &str) -> String {
     // TODO: We have this special case defined for dltHub, and I'm not sure that we want to...
     if src.starts_with("dlt.") {
-        src.strip_prefix("dlt.").unwrap().to_uppercase().replace(".", "__")
+        src.strip_prefix("dlt.")
+            .unwrap()
+            .to_uppercase()
+            .replace(".", "__")
     } else {
         src.to_string()
     }
 }
 
-fn make_env_vars(ctx: &tower_telemetry::Context, env: &str, cwd: &PathBuf, secs: &HashMap<String, String>, params: &HashMap<String, String>, other_env_vars: &HashMap<String, String>) -> HashMap<String, String> {
+fn make_env_vars(
+    ctx: &tower_telemetry::Context,
+    env: &str,
+    cwd: &PathBuf,
+    secs: &HashMap<String, String>,
+    params: &HashMap<String, String>,
+    other_env_vars: &HashMap<String, String>,
+) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
     debug!(ctx: &ctx, "converting {} env variables", (params.len() + secs.len()));
@@ -455,24 +497,15 @@ async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
 
     // We first send a SIGTERM to ensure that the child processes are terminated. Using SIGKILL
     // (default behavior in Child::kill) can leave orphaned processes behind.
-    killpg(
-        pid, 
-        Signal::SIGTERM
-    ).ok();
-    
+    killpg(pid, Signal::SIGTERM).ok();
+
     // If it doesn't die after 2 seconds then we'll forcefully kill it. This timeout should be less
     // than the overall timeout for the process (which should likely live on the context as a
     // deadline).
-    let timeout = timeout(
-        Duration::from_secs(2), 
-        child.wait()
-    ).await;
-    
+    let timeout = timeout(Duration::from_secs(2), child.wait()).await;
+
     if timeout.is_err() {
-        killpg(
-            pid,
-            Signal::SIGKILL
-        ).ok();
+        killpg(pid, Signal::SIGKILL).ok();
     }
 }
 
@@ -484,7 +517,11 @@ async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
     };
 }
 
-async fn wait_for_process(ctx: tower_telemetry::Context, cancel_token: &CancellationToken, mut child: Child) -> i32 {
+async fn wait_for_process(
+    ctx: tower_telemetry::Context,
+    cancel_token: &CancellationToken,
+    mut child: Child,
+) -> i32 {
     let code = loop {
         if cancel_token.is_cancelled() {
             debug!(ctx: &ctx, "process cancelled, terminating child process");
@@ -511,11 +548,16 @@ async fn wait_for_process(ctx: tower_telemetry::Context, cancel_token: &Cancella
     code
 }
 
-async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: OutputSender, input: BufReader<R>) {
+async fn drain_output<R: AsyncRead + Unpin>(
+    fd: FD,
+    channel: Channel,
+    output: OutputSender,
+    input: BufReader<R>,
+) {
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
-        let _ = output.send(Output{ 
+        let _ = output.send(Output {
             channel,
             fd,
             line,
@@ -525,5 +567,5 @@ async fn drain_output<R: AsyncRead + Unpin>(fd: FD, channel: Channel, output: Ou
 }
 
 fn is_bash_package(package: &Package) -> bool {
-    return package.manifest.invoke.ends_with(".sh")
+    return package.manifest.invoke.ends_with(".sh");
 }
