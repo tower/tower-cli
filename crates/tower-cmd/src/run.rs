@@ -54,8 +54,7 @@ pub fn run_cmd() -> Command {
 
 pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     if let Err(e) = do_run_inner(config, args, cmd).await {
-        eprintln!("{}", e);
-        std::process::exit(1);
+        output::die(&e.to_string());
     }
 }
 
@@ -79,7 +78,7 @@ pub async fn do_run_inner(config: Config, args: &ArgMatches, cmd: Option<(&str, 
             if local {
                 // For the time being, we should report that we can't run an app by name locally.
                 if app_name.is_some() {
-                    anyhow::bail!("Running apps by name locally is not supported yet.");
+                    output::die("Running apps by name locally is not supported yet.");
                 } else {
                     do_run_local(config, path, env, params).await
                 }
@@ -341,6 +340,7 @@ async fn do_follow_run_impl(
                             _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
                                 sink.send_line("Received Ctrl+C, stopping log streaming...".to_string());
                                 sink.send_line("Note: The run will continue in Tower cloud".to_string());
+                                sink.send_line(format!("  See more: {}", run.dollar_link));
                                 true
                             },
                         };
