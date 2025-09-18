@@ -8,6 +8,7 @@ mod environments;
 pub mod error;
 pub mod output;
 mod run;
+mod schedules;
 mod secrets;
 mod session;
 mod teams;
@@ -129,6 +130,19 @@ impl App {
                     }
                     _ => {
                         environments::environments_cmd().print_help().unwrap();
+                    }
+                }
+            }
+            Some(("schedules", sub_matches)) => {
+                let schedules_command = sub_matches.subcommand();
+
+                match schedules_command {
+                    Some(("list", args)) => schedules::do_list(sessionized_config, args).await,
+                    Some(("create", args)) => schedules::do_create(sessionized_config, args).await,
+                    Some(("update", args)) => schedules::do_update(sessionized_config, args).await,
+                    Some(("delete", args)) => schedules::do_delete(sessionized_config, args).await,
+                    _ => {
+                        schedules::schedules_cmd().print_help().unwrap();
                         std::process::exit(2);
                     }
                 }
@@ -177,6 +191,7 @@ fn root_cmd() -> Command {
         .arg_required_else_help(false)
         .subcommand(session::login_cmd())
         .subcommand(apps::apps_cmd())
+        .subcommand(schedules::schedules_cmd())
         .subcommand(secrets::secrets_cmd())
         .subcommand(environments::environments_cmd())
         .subcommand(deploy::deploy_cmd())
