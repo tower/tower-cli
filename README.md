@@ -171,6 +171,20 @@ All contributions must abide by our code of conduct. Please see
 
 Here are a few handy tips and common workflows when developing the Tower CLI.
 
+### Getting Started
+
+1. Install development dependencies:
+   ```bash
+   uv sync --group dev
+   ```
+
+2. Set up pre-commit hooks for code formatting:
+   ```bash
+   uv run --group dev pre-commit install
+   ```
+
+This will automatically run Black formatter on Python files before each commit.
+
 ### Python SDK development
 
 We use `uv` for all development. You can spawn a REPL in context using `uv` very
@@ -185,6 +199,18 @@ To run tests:
 ```bash
 uv sync --locked --all-extras --dev
 uv run pytest tests
+```
+
+### Code Formatting
+
+We use Black for Python code formatting. The pre-commit hooks will automatically format your code, but you can also run it manually:
+
+```bash
+# Format all Python files in the project
+uv run --group dev black .
+
+# Check formatting without making changes
+uv run --group dev black --check .
 ```
 
 If you need to get the latest OpenAPI SDK, you can run

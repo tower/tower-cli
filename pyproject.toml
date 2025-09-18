@@ -94,6 +94,7 @@ extend-exclude = '''
 dev = [
   "black==24.10.0",
   "openapi-python-client==0.24.3",
+  "pre-commit==4.0.1",
   "pytest==8.3.5",
   "pytest-httpx==0.35.0",
   "pytest-env>=1.1.3",
