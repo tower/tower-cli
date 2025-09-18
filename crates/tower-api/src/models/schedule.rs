@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Schedule {
@@ -43,7 +43,15 @@ pub struct Schedule {
 }
 
 impl Schedule {
-    pub fn new(app_name: String, created_at: String, cron: String, environment: String, id: String, status: Status, updated_at: String) -> Schedule {
+    pub fn new(
+        app_name: String,
+        created_at: String,
+        cron: String,
+        environment: String,
+        id: String,
+        status: Status,
+        updated_at: String,
+    ) -> Schedule {
         Schedule {
             app_name,
             app_version: None,
@@ -88,4 +96,3 @@ impl<'de> Deserialize<'de> for Status {
         }
     }
 }
-

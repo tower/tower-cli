@@ -564,10 +564,12 @@ def test_map_type_simple(in_memory_catalog):
 
 def test_drop_existing_table(in_memory_catalog):
     """Test dropping an existing table returns True."""
-    schema = pa.schema([
-        pa.field("id", pa.int64()),
-        pa.field("name", pa.string()),
-    ])
+    schema = pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("name", pa.string()),
+        ]
+    )
 
     # Create a table first
     ref = tower.tables("users_to_drop", catalog=in_memory_catalog)
@@ -598,13 +600,17 @@ def test_drop_nonexistent_table(in_memory_catalog):
 
 def test_drop_table_with_namespace(in_memory_catalog):
     """Test dropping a table with a specific namespace."""
-    schema = pa.schema([
-        pa.field("id", pa.int64()),
-        pa.field("data", pa.string()),
-    ])
+    schema = pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("data", pa.string()),
+        ]
+    )
 
     # Create a table in a specific namespace
-    ref = tower.tables("test_table", catalog=in_memory_catalog, namespace="test_namespace")
+    ref = tower.tables(
+        "test_table", catalog=in_memory_catalog, namespace="test_namespace"
+    )
     table = ref.create(schema)
     assert table is not None
 
@@ -627,20 +633,21 @@ def test_drop_table_with_namespace(in_memory_catalog):
 
 def test_drop_and_recreate_table(in_memory_catalog):
     """Test that we can drop a table and then recreate it."""
-    schema = pa.schema([
-        pa.field("id", pa.int64()),
-        pa.field("value", pa.string()),
-    ])
+    schema = pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("value", pa.string()),
+        ]
+    )
 
     table_name = "drop_recreate_test"
     ref = tower.tables(table_name, catalog=in_memory_catalog)
 
     # Create and populate the table
     table = ref.create(schema)
-    data = pa.Table.from_pylist([
-        {"id": 1, "value": "first"},
-        {"id": 2, "value": "second"}
-    ], schema=schema)
+    data = pa.Table.from_pylist(
+        [{"id": 1, "value": "first"}, {"id": 2, "value": "second"}], schema=schema
+    )
     table.insert(data)
 
     # Verify original data
@@ -653,11 +660,14 @@ def test_drop_and_recreate_table(in_memory_catalog):
 
     # Recreate the table with different data
     new_table = ref.create(schema)
-    new_data = pa.Table.from_pylist([
-        {"id": 10, "value": "new_first"},
-        {"id": 20, "value": "new_second"},
-        {"id": 30, "value": "new_third"}
-    ], schema=schema)
+    new_data = pa.Table.from_pylist(
+        [
+            {"id": 10, "value": "new_first"},
+            {"id": 20, "value": "new_second"},
+            {"id": 30, "value": "new_third"},
+        ],
+        schema=schema,
+    )
     new_table.insert(new_data)
 
     # Verify new data
@@ -675,10 +685,12 @@ def test_drop_and_recreate_table(in_memory_catalog):
 
 def test_drop_multiple_tables(in_memory_catalog):
     """Test dropping multiple tables."""
-    schema = pa.schema([
-        pa.field("id", pa.int64()),
-        pa.field("name", pa.string()),
-    ])
+    schema = pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("name", pa.string()),
+        ]
+    )
 
     # Create multiple tables
     table_names = ["table1", "table2", "table3"]
@@ -716,14 +728,14 @@ def test_drop_with_catalog_errors(in_memory_catalog):
     ref = tower.tables("test_table", catalog=in_memory_catalog)
 
     # Test that NoSuchTableError returns False
-    with patch.object(in_memory_catalog, 'drop_table') as mock_drop:
+    with patch.object(in_memory_catalog, "drop_table") as mock_drop:
         mock_drop.side_effect = NoSuchTableError("Table not found")
         success = ref.drop()
         assert success is False
         mock_drop.assert_called_once()
 
     # Test that other exceptions are propagated
-    with patch.object(in_memory_catalog, 'drop_table') as mock_drop:
+    with patch.object(in_memory_catalog, "drop_table") as mock_drop:
         mock_drop.side_effect = RuntimeError("Catalog connection failed")
 
         with pytest.raises(RuntimeError, match="Catalog connection failed"):

@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunResults {
@@ -28,7 +28,14 @@ pub struct RunResults {
 }
 
 impl RunResults {
-    pub fn new(cancelled: i64, crashed: i64, errored: i64, exited: i64, pending: i64, running: i64) -> RunResults {
+    pub fn new(
+        cancelled: i64,
+        crashed: i64,
+        errored: i64,
+        exited: i64,
+        pending: i64,
+        running: i64,
+    ) -> RunResults {
         RunResults {
             cancelled,
             crashed,
@@ -39,4 +46,3 @@ impl RunResults {
         }
     }
 }
-

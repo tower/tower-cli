@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct App {
@@ -52,7 +52,16 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(created_at: String, health_status: HealthStatus, name: String, next_run_at: Option<String>, owner: String, schedule: Option<String>, short_description: String, version: Option<String>) -> App {
+    pub fn new(
+        created_at: String,
+        health_status: HealthStatus,
+        name: String,
+        next_run_at: Option<String>,
+        owner: String,
+        schedule: Option<String>,
+        short_description: String,
+        version: Option<String>,
+    ) -> App {
         App {
             created_at,
             health_status,
@@ -131,4 +140,3 @@ impl<'de> Deserialize<'de> for Status {
         }
     }
 }
-

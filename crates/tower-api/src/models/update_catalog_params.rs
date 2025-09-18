@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateCatalogParams {
@@ -24,7 +24,10 @@ pub struct UpdateCatalogParams {
 }
 
 impl UpdateCatalogParams {
-    pub fn new(environment: String, properties: Vec<models::EncryptedCatalogProperty>) -> UpdateCatalogParams {
+    pub fn new(
+        environment: String,
+        properties: Vec<models::EncryptedCatalogProperty>,
+    ) -> UpdateCatalogParams {
         UpdateCatalogParams {
             schema: None,
             environment,
@@ -32,4 +35,3 @@ impl UpdateCatalogParams {
         }
     }
 }
-

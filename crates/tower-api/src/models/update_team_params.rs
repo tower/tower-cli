@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateTeamParams {
@@ -23,10 +23,6 @@ pub struct UpdateTeamParams {
 
 impl UpdateTeamParams {
     pub fn new(name: Option<String>) -> UpdateTeamParams {
-        UpdateTeamParams {
-            schema: None,
-            name,
-        }
+        UpdateTeamParams { schema: None, name }
     }
 }
-

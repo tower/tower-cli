@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunAppParams {
@@ -23,12 +23,20 @@ pub struct RunAppParams {
     #[serde(rename = "parameters")]
     pub parameters: std::collections::HashMap<String, String>,
     /// The ID of the run that invoked this run, if relevant. Should be null, if none.
-    #[serde(rename = "parent_run_id", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "parent_run_id",
+        default,
+        with = "::serde_with::rust::double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub parent_run_id: Option<Option<String>>,
 }
 
 impl RunAppParams {
-    pub fn new(environment: String, parameters: std::collections::HashMap<String, String>) -> RunAppParams {
+    pub fn new(
+        environment: String,
+        parameters: std::collections::HashMap<String, String>,
+    ) -> RunAppParams {
         RunAppParams {
             schema: None,
             environment,
@@ -37,4 +45,3 @@ impl RunAppParams {
         }
     }
 }
-

@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CatalogProperty {
@@ -21,10 +21,6 @@ pub struct CatalogProperty {
 
 impl CatalogProperty {
     pub fn new(name: String, preview: String) -> CatalogProperty {
-        CatalogProperty {
-            name,
-            preview,
-        }
+        CatalogProperty { name, preview }
     }
 }
-

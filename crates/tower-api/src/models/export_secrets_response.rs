@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExportSecretsResponse {
@@ -23,7 +23,10 @@ pub struct ExportSecretsResponse {
 }
 
 impl ExportSecretsResponse {
-    pub fn new(pages: models::Pagination, secrets: Vec<models::ExportedSecret>) -> ExportSecretsResponse {
+    pub fn new(
+        pages: models::Pagination,
+        secrets: Vec<models::ExportedSecret>,
+    ) -> ExportSecretsResponse {
         ExportSecretsResponse {
             schema: None,
             pages,
@@ -31,4 +34,3 @@ impl ExportSecretsResponse {
         }
     }
 }
-

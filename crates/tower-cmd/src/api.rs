@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 use tower_api::apis::configuration;
 use tower_api::apis::Error;
 use tower_api::apis::ResponseContent;
-use tower_telemetry::debug;
 use tower_api::models::RunParameter;
+use tower_telemetry::debug;
 
 /// Helper trait to extract the successful response data from API responses
 pub trait ResponseEntity {
@@ -752,7 +752,14 @@ pub async fn create_environment(
     .await
 }
 
-pub async fn list_schedules(config: &Config, _app_name: Option<&str>, _environment: Option<&str>) -> Result<tower_api::models::ListSchedulesResponse, Error<tower_api::apis::default_api::ListSchedulesError>> {
+pub async fn list_schedules(
+    config: &Config,
+    _app_name: Option<&str>,
+    _environment: Option<&str>,
+) -> Result<
+    tower_api::models::ListSchedulesResponse,
+    Error<tower_api::apis::default_api::ListSchedulesError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListSchedulesParams {
@@ -760,7 +767,10 @@ pub async fn list_schedules(config: &Config, _app_name: Option<&str>, _environme
         page_size: None,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::list_schedules(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::list_schedules(
+        api_config, params,
+    ))
+    .await
 }
 
 pub async fn create_schedule(
@@ -769,7 +779,10 @@ pub async fn create_schedule(
     environment: &str,
     cron: &str,
     parameters: Option<HashMap<String, String>>,
-) -> Result<tower_api::models::CreateScheduleResponse, Error<tower_api::apis::default_api::CreateScheduleError>> {
+) -> Result<
+    tower_api::models::CreateScheduleResponse,
+    Error<tower_api::apis::default_api::CreateScheduleError>,
+> {
     let api_config = &config.into();
 
     let run_parameters = parameters.map(|params| {
@@ -791,7 +804,10 @@ pub async fn create_schedule(
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::create_schedule(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::create_schedule(
+        api_config, params,
+    ))
+    .await
 }
 
 pub async fn update_schedule(
@@ -799,7 +815,10 @@ pub async fn update_schedule(
     schedule_id: &str,
     cron: Option<&String>,
     parameters: Option<HashMap<String, String>>,
-) -> Result<tower_api::models::UpdateScheduleResponse, Error<tower_api::apis::default_api::UpdateScheduleError>> {
+) -> Result<
+    tower_api::models::UpdateScheduleResponse,
+    Error<tower_api::apis::default_api::UpdateScheduleError>,
+> {
     let api_config = &config.into();
 
     let run_parameters = parameters.map(|params| {
@@ -821,10 +840,19 @@ pub async fn update_schedule(
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::update_schedule(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::update_schedule(
+        api_config, params,
+    ))
+    .await
 }
 
-pub async fn delete_schedule(config: &Config, schedule_id: &str) -> Result<tower_api::models::DeleteScheduleResponse, Error<tower_api::apis::default_api::DeleteScheduleError>> {
+pub async fn delete_schedule(
+    config: &Config,
+    schedule_id: &str,
+) -> Result<
+    tower_api::models::DeleteScheduleResponse,
+    Error<tower_api::apis::default_api::DeleteScheduleError>,
+> {
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::DeleteScheduleParams {
@@ -834,7 +862,10 @@ pub async fn delete_schedule(config: &Config, schedule_id: &str) -> Result<tower
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::delete_schedule(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::delete_schedule(
+        api_config, params,
+    ))
+    .await
 }
 
 impl ResponseEntity for tower_api::apis::default_api::ListSchedulesSuccess {

@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunLogLine {
@@ -37,7 +37,13 @@ pub struct RunLogLine {
 }
 
 impl RunLogLine {
-    pub fn new(channel: Channel, content: String, line_num: i64, reported_at: String, run_id: String) -> RunLogLine {
+    pub fn new(
+        channel: Channel,
+        content: String,
+        line_num: i64,
+        reported_at: String,
+        run_id: String,
+    ) -> RunLogLine {
         RunLogLine {
             channel,
             content,
@@ -73,11 +79,7 @@ impl<'de> Deserialize<'de> for Channel {
         match s.to_lowercase().as_str() {
             "program" => Ok(Self::Program),
             "setup" => Ok(Self::Setup),
-            _ => Err(serde::de::Error::unknown_variant(
-                &s,
-                &["program", "setup"],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&s, &["program", "setup"])),
         }
     }
 }
-

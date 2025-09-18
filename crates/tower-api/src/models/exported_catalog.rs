@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExportedCatalog {
@@ -29,7 +29,13 @@ pub struct ExportedCatalog {
 }
 
 impl ExportedCatalog {
-    pub fn new(created_at: String, environment: String, name: String, properties: Vec<models::ExportedCatalogProperty>, r#type: String) -> ExportedCatalog {
+    pub fn new(
+        created_at: String,
+        environment: String,
+        name: String,
+        properties: Vec<models::ExportedCatalogProperty>,
+        r#type: String,
+    ) -> ExportedCatalog {
         ExportedCatalog {
             created_at,
             environment,
@@ -40,4 +46,3 @@ impl ExportedCatalog {
         }
     }
 }
-

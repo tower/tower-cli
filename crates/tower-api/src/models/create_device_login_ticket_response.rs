@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreateDeviceLoginTicketResponse {
@@ -40,7 +40,15 @@ pub struct CreateDeviceLoginTicketResponse {
 }
 
 impl CreateDeviceLoginTicketResponse {
-    pub fn new(device_code: String, expires_in: i64, generated_at: String, interval: i64, login_url: String, user_code: String, verification_url: String) -> CreateDeviceLoginTicketResponse {
+    pub fn new(
+        device_code: String,
+        expires_in: i64,
+        generated_at: String,
+        interval: i64,
+        login_url: String,
+        user_code: String,
+        verification_url: String,
+    ) -> CreateDeviceLoginTicketResponse {
         CreateDeviceLoginTicketResponse {
             schema: None,
             device_code,
@@ -53,4 +61,3 @@ impl CreateDeviceLoginTicketResponse {
         }
     }
 }
-

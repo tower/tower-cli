@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExportCatalogsResponse {
@@ -23,7 +23,10 @@ pub struct ExportCatalogsResponse {
 }
 
 impl ExportCatalogsResponse {
-    pub fn new(catalogs: Vec<models::ExportedCatalog>, pages: models::Pagination) -> ExportCatalogsResponse {
+    pub fn new(
+        catalogs: Vec<models::ExportedCatalog>,
+        pages: models::Pagination,
+    ) -> ExportCatalogsResponse {
         ExportCatalogsResponse {
             schema: None,
             catalogs,
@@ -31,4 +34,3 @@ impl ExportCatalogsResponse {
         }
     }
 }
-

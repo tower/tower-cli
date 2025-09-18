@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Token {
@@ -19,9 +19,6 @@ pub struct Token {
 
 impl Token {
     pub fn new(jwt: String) -> Token {
-        Token {
-            jwt,
-        }
+        Token { jwt }
     }
 }
-

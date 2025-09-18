@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateAccountNameParams {
@@ -23,10 +23,6 @@ pub struct UpdateAccountNameParams {
 
 impl UpdateAccountNameParams {
     pub fn new(name: String) -> UpdateAccountNameParams {
-        UpdateAccountNameParams {
-            schema: None,
-            name,
-        }
+        UpdateAccountNameParams { schema: None, name }
     }
 }
-

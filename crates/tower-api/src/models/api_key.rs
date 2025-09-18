@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ApiKey {
@@ -24,7 +24,12 @@ pub struct ApiKey {
 }
 
 impl ApiKey {
-    pub fn new(created_at: String, identifier: String, last_used_at: Option<String>, name: String) -> ApiKey {
+    pub fn new(
+        created_at: String,
+        identifier: String,
+        last_used_at: Option<String>,
+        name: String,
+    ) -> ApiKey {
         ApiKey {
             created_at,
             identifier,
@@ -33,4 +38,3 @@ impl ApiKey {
         }
     }
 }
-

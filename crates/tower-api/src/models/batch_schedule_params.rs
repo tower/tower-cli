@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BatchScheduleParams {
@@ -23,10 +23,6 @@ pub struct BatchScheduleParams {
 
 impl BatchScheduleParams {
     pub fn new(ids: Vec<String>) -> BatchScheduleParams {
-        BatchScheduleParams {
-            schema: None,
-            ids,
-        }
+        BatchScheduleParams { schema: None, ids }
     }
 }
-

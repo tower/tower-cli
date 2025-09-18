@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -44,11 +44,7 @@ impl<'de> Deserialize<'de> for Event {
         let s = String::deserialize(deserializer)?;
         match s.to_lowercase().as_str() {
             "warning" => Ok(Self::Warning),
-            _ => Err(serde::de::Error::unknown_variant(
-                &s,
-                &["warning"],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&s, &["warning"])),
         }
     }
 }
-

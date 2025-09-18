@@ -9,7 +9,7 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RefreshSessionParams {
@@ -20,9 +20,6 @@ pub struct RefreshSessionParams {
 
 impl RefreshSessionParams {
     pub fn new() -> RefreshSessionParams {
-        RefreshSessionParams {
-            schema: None,
-        }
+        RefreshSessionParams { schema: None }
     }
 }
-
