@@ -3523,7 +3523,6 @@ dependencies = [
 name = "tower-cmd"
 version = "0.3.30"
 dependencies = [
- "anyhow",
  "axum",
  "bytes",
  "chrono",

@@ -4,7 +4,6 @@ version = { workspace = true }
 edition = "2021"
 
 [dependencies]
-anyhow = { workspace = true }
 axum = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }

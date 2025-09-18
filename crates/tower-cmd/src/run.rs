@@ -1,16 +1,16 @@
-use anyhow::Result;
+use crate::Error;
 use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
-use tower_telemetry::{debug, Context};
+use tower_runtime::{App, AppLauncher, OutputReceiver, local::LocalApp};
+use tower_telemetry::{Context, debug};
 
 use tokio::sync::{mpsc::unbounded_channel, oneshot};
 
-use crate::{api, output, util::dates, Error};
+use crate::{api, output, util::dates};
 
 pub fn run_cmd() -> Command {
     Command::new("run")
@@ -60,7 +60,11 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 
 /// do_run is the primary entrypoint into running apps both locally and remotely in Tower. It will
 /// use the configuration to determine the requested way of running a Tower app.
-pub async fn do_run_inner(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) -> Result<()> {
+pub async fn do_run_inner(
+    config: Config,
+    args: &ArgMatches,
+    cmd: Option<(&str, &ArgMatches)>,
+) -> Result<(), Error> {
     let res = get_run_parameters(args, cmd);
 
     // We always expect there to be an environment due to the fact that there is a
@@ -87,9 +91,7 @@ pub async fn do_run_inner(config: Config, args: &ArgMatches, cmd: Option<(&str, 
                 do_run_remote(config, path, env, params, app_name, follow).await
             }
         }
-        Err(err) => {
-            Err(err.into())
-        }
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -100,7 +102,7 @@ async fn do_run_local_impl<F, Fut, T>(
     env: &str,
     mut params: HashMap<String, String>,
     output_handler: F,
-) -> Result<T>
+) -> Result<T, Error>
 where
     F: FnOnce(OutputReceiver) -> Fut,
     Fut: std::future::Future<Output = T> + Send + 'static,
@@ -120,7 +122,7 @@ where
     env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
 
     // There should always be a session, if there isn't one then I'm not sure how we got here?
-    let session = config.session.ok_or_else(|| anyhow::anyhow!("No session found. Please log in to Tower first."))?;
+    let session = config.session.ok_or(Error::NoSession)?;
 
     env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
 
@@ -147,7 +149,15 @@ where
 
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
     launcher
-        .launch(Context::new(), sender, package, env.to_string(), secrets, params, env_vars)
+        .launch(
+            Context::new(),
+            sender,
+            package,
+            env.to_string(),
+            secrets,
+            params,
+            env_vars,
+        )
         .await?;
 
     // Monitor app output and status concurrently
@@ -156,25 +166,36 @@ where
 
     // Wait for the output task to complete naturally
     let final_result = output_task.await.unwrap();
-    
+
     // The status task can be aborted since we don't need to wait for it
     status_task.abort();
-    
+
     Ok(final_result)
 }
 
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
 /// the package, and launch the app. The relevant package is cleaned up after execution is
 /// complete.
-pub async fn do_run_local(config: Config, path: PathBuf, env: &str, params: HashMap<String, String>) -> Result<()> {
+pub async fn do_run_local(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    params: HashMap<String, String>,
+) -> Result<(), Error> {
     do_run_local_impl(config, path, env, params, |receiver| async {
         monitor_output(receiver).await;
         ()
-    }).await
+    })
+    .await
 }
 
 /// do_run_local_capture is like do_run_local but returns captured output lines instead of printing
-pub async fn do_run_local_capture(config: Config, path: PathBuf, env: &str, params: HashMap<String, String>) -> Result<Vec<String>> {
+pub async fn do_run_local_capture(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    params: HashMap<String, String>,
+) -> Result<Vec<String>, Error> {
     do_run_local_impl(config, path, env, params, monitor_output_capture).await
 }
 
@@ -184,7 +205,7 @@ pub async fn do_run_remote_capture(
     env: &str,
     params: HashMap<String, String>,
     app_name: Option<String>,
-) -> Result<Vec<String>> {
+) -> Result<Vec<String>, Error> {
     let app_slug = if let Some(name) = app_name {
         name
     } else {
@@ -211,7 +232,7 @@ pub async fn do_run_remote(
     params: HashMap<String, String>,
     app_name: Option<String>,
     should_follow_run: bool,
-) -> Result<()> {
+) -> Result<(), Error> {
     let app_slug = if let Some(name) = app_name {
         name
     } else {
@@ -228,7 +249,7 @@ pub async fn do_run_remote(
             spinner.failure();
             debug!("Failed to schedule run: {}", err);
             Err(err.into())
-        },
+        }
         Ok(res) => {
             spinner.success();
 
@@ -277,27 +298,21 @@ impl OutputSink for ChannelSink {
     }
 }
 
-pub async fn do_follow_run_capture(
-    config: Config,
-    run: &Run,
-) -> Result<Vec<String>> {
+pub async fn do_follow_run_capture(config: Config, run: &Run) -> Result<Vec<String>, Error> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let sink = ChannelSink(tx);
-    
+
     let result = do_follow_run_impl(config, run, &sink, false).await;
-    
+
     let mut output_lines = Vec::new();
     while let Ok(line) = rx.try_recv() {
         output_lines.push(line);
     }
-    
+
     result.map(|_| output_lines)
 }
 
-async fn do_follow_run(
-    config: Config,
-    run: &Run,
-) {
+async fn do_follow_run(config: Config, run: &Run) {
     let sink = StdoutSink;
     let _ = do_follow_run_impl(config, run, &sink, true).await;
 }
@@ -307,12 +322,12 @@ async fn do_follow_run_impl(
     run: &Run,
     sink: &dyn OutputSink,
     enable_ctrl_c: bool,
-) -> Result<()> {
+) -> Result<(), Error> {
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
             sink.send_error(format!("Failed to wait for run to start: {}", err));
             return Err(err.into());
-        },
+        }
         Ok(()) => {
             sink.send_line("Run started, streaming logs...".to_string());
 
@@ -323,66 +338,76 @@ async fn do_follow_run_impl(
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
-                Ok(mut output) => {
-                    loop {
-                        let should_exit = tokio::select! {
-                            Some(event) = output.recv() => {
-                                if let api::LogStreamEvent::EventLog(log) = &event {
-                                    let ts = dates::format_str(&log.reported_at);
-                                    sink.send_line(format!("{}: {}", ts, log.content));
-                                }
-                                false
-                            },
-                            res = &mut run_complete => {
-                                handle_run_completion(res, sink)?;
-                                true
-                            },
-                            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                                sink.send_line("Received Ctrl+C, stopping log streaming...".to_string());
-                                sink.send_line("Note: The run will continue in Tower cloud".to_string());
-                                sink.send_line(format!("  See more: {}", run.dollar_link));
-                                true
-                            },
-                        };
-                        if should_exit { break; }
+                Ok(mut output) => loop {
+                    let should_exit = tokio::select! {
+                        Some(event) = output.recv() => {
+                            if let api::LogStreamEvent::EventLog(log) = &event {
+                                let ts = dates::format_str(&log.reported_at);
+                                sink.send_line(format!("{}: {}", ts, log.content));
+                            }
+                            false
+                        },
+                        res = &mut run_complete => {
+                            handle_run_completion(res, sink)?;
+                            true
+                        },
+                        _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
+                            sink.send_line("Received Ctrl+C, stopping log streaming...".to_string());
+                            sink.send_line("Note: The run will continue in Tower cloud".to_string());
+                            sink.send_line(format!("  See more: {}", run.dollar_link));
+                            true
+                        },
+                    };
+                    if should_exit {
+                        break;
                     }
                 },
                 Err(err) => {
                     sink.send_error(format!("Failed to stream run logs: {:?}", err));
-                    return Err(anyhow::anyhow!("Failed to stream run logs: {:?}", err));
+                    return Err(Error::LogStreamFailed);
                 }
             }
         }
     };
-    
+
     Ok(())
 }
 
 fn handle_run_completion(
-    res: Result<Run, tokio::sync::oneshot::error::RecvError>, 
-    sink: &dyn OutputSink
-) -> Result<()> {
+    res: Result<Run, tokio::sync::oneshot::error::RecvError>,
+    sink: &dyn OutputSink,
+) -> Result<(), Error> {
     match res {
-        Ok(completed_run) => {
-            match completed_run.status {
-                tower_api::models::run::Status::Errored => {
-                    sink.send_error(format!("Run #{} for app '{}' had an error", completed_run.number, completed_run.app_name));
-                    Err(anyhow::anyhow!("Run failed with error status"))
-                },
-                tower_api::models::run::Status::Crashed => {
-                    sink.send_error(format!("Run #{} for app '{}' crashed", completed_run.number, completed_run.app_name));
-                    Err(anyhow::anyhow!("Run crashed"))
-                },
-                tower_api::models::run::Status::Cancelled => {
-                    sink.send_error(format!("Run #{} for app '{}' was cancelled", completed_run.number, completed_run.app_name));
-                    Err(anyhow::anyhow!("Run was cancelled"))
-                },
-                _ => {
-                    sink.send_line(format!("Run #{} for app '{}' completed successfully", completed_run.number, completed_run.app_name));
-                    Ok(())
-                }
+        Ok(completed_run) => match completed_run.status {
+            tower_api::models::run::Status::Errored => {
+                sink.send_error(format!(
+                    "Run #{} for app '{}' had an error",
+                    completed_run.number, completed_run.app_name
+                ));
+                Err(Error::RunFailed)
             }
-        }
+            tower_api::models::run::Status::Crashed => {
+                sink.send_error(format!(
+                    "Run #{} for app '{}' crashed",
+                    completed_run.number, completed_run.app_name
+                ));
+                Err(Error::RunCrashed)
+            }
+            tower_api::models::run::Status::Cancelled => {
+                sink.send_error(format!(
+                    "Run #{} for app '{}' was cancelled",
+                    completed_run.number, completed_run.app_name
+                ));
+                Err(Error::RunCancelled)
+            }
+            _ => {
+                sink.send_line(format!(
+                    "Run #{} for app '{}' completed successfully",
+                    completed_run.number, completed_run.app_name
+                ));
+                Ok(())
+            }
+        },
         Err(err) => {
             sink.send_error(format!("Failed to monitor run completion: {:?}", err));
             Err(err.into())
@@ -464,15 +489,18 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
 async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    let res = api::export_secrets(&config, env, false, public_key).await.map_err(|err| {
-        debug!("API error fetching secrets: {:?}", err);
-        Error::FetchingSecretsFailed
-    })?;
+    let res = api::export_secrets(&config, env, false, public_key)
+        .await
+        .map_err(|err| {
+            debug!("API error fetching secrets: {:?}", err);
+            Error::FetchingSecretsFailed
+        })?;
     let mut secrets = HashMap::new();
 
     for secret in res.secrets {
         // we will decrypt each property and inject it into the vals map.
-        let decrypted_value = crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
+        let decrypted_value =
+            crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
         secrets.insert(secret.name, decrypted_value);
     }
 
@@ -484,16 +512,19 @@ async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, Strin
 async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    let res = api::export_catalogs(&config, env, false, public_key).await.map_err(|err| {
-        debug!("API error fetching catalogs: {:?}", err);
-        Error::FetchingCatalogsFailed
-    })?;
+    let res = api::export_catalogs(&config, env, false, public_key)
+        .await
+        .map_err(|err| {
+            debug!("API error fetching catalogs: {:?}", err);
+            Error::FetchingCatalogsFailed
+        })?;
     let mut vals = HashMap::new();
 
     for catalog in res.catalogs {
         // we will decrypt each property and inject it into the vals map.
         for property in catalog.properties {
-            let decrypted_value = crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
+            let decrypted_value =
+                crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
             let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
             vals.insert(name, decrypted_value);
         }
@@ -505,16 +536,22 @@ async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, Stri
 /// load_towerfile manages the process of loading a Towerfile from a given path in an interactive
 /// way. That means it will not return if the Towerfile can't be loaded and instead will publish an
 /// error.
-fn load_towerfile(path: &PathBuf) -> Result<Towerfile> {
-    Towerfile::from_path(path.clone()).map_err(|err| {
-        debug!("Failed to load Towerfile from path `{:?}`: {}", path, err);
-        anyhow::anyhow!("Failed to load Towerfile from {}: {}", path.display(), err)
+fn load_towerfile(path: &PathBuf) -> Result<Towerfile, Error> {
+    Towerfile::from_path(path.clone()).map_err(|source| {
+        debug!(
+            "Failed to load Towerfile from path `{:?}`: {}",
+            path, source
+        );
+        Error::TowerfileLoadFailed {
+            path: path.display().to_string(),
+            source,
+        }
     })
 }
 
 /// build_package manages the process of building a package in an interactive way for local app
 /// execution. If the pacakge fails to build for wahatever reason, the app will exit.
-async fn build_package(towerfile: &Towerfile) -> Result<Package> {
+async fn build_package(towerfile: &Towerfile) -> Result<Package, Error> {
     let mut spinner = output::spinner("Building package...");
     let package_spec = PackageSpec::from_towerfile(towerfile);
     match Package::build(package_spec).await {
@@ -563,10 +600,13 @@ async fn monitor_status(app: LocalApp) {
     debug!("Starting status monitoring for LocalApp");
     let mut check_count = 0;
     let max_checks = 600; // 60 seconds with 100ms intervals
-    
+
     loop {
-        debug!("Status check #{}, attempting to get app status", check_count);
-        
+        debug!(
+            "Status check #{}, attempting to get app status",
+            check_count
+        );
+
         match app.status().await {
             Ok(status) => {
                 debug!("Got app status (some status)");
@@ -586,7 +626,9 @@ async fn monitor_status(app: LocalApp) {
                         check_count += 1;
                         if check_count >= max_checks {
                             debug!("Status monitoring timed out after {} checks", max_checks);
-                            output::error("App status monitoring timed out, but app may still be running");
+                            output::error(
+                                "App status monitoring timed out, but app may still be running",
+                            );
                             break;
                         }
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -598,7 +640,10 @@ async fn monitor_status(app: LocalApp) {
                 debug!("Failed to get app status: {:?}", e);
                 check_count += 1;
                 if check_count >= max_checks {
-                    debug!("Failed to get app status after {} attempts, giving up", max_checks);
+                    debug!(
+                        "Failed to get app status after {} attempts, giving up",
+                        max_checks
+                    );
                     output::error("Failed to get app status after timeout");
                     break;
                 }
@@ -693,4 +738,3 @@ fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> 
 
     rx
 }
-

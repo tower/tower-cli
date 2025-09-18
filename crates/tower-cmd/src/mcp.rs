@@ -1,6 +1,6 @@
+use crate::Error;
 use crate::towerfile_gen::TowerfileGenerator;
 use crate::{Config, api, deploy, run};
-use anyhow::Result;
 use clap::Command;
 use config::Session;
 use config::Towerfile;
@@ -116,7 +116,7 @@ pub fn mcp_cmd() -> Command {
         )
 }
 
-pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()> {
+pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<(), Error> {
     let port = *args.get_one::<u16>("port").unwrap();
     let bind_addr = format!("127.0.0.1:{}", port);
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::Error;
 use std::fs;
 use std::path::Path;
 
@@ -8,24 +8,22 @@ impl TowerfileGenerator {
     pub fn from_pyproject(
         pyproject_path: Option<&str>,
         script_path: Option<&str>,
-    ) -> Result<String> {
+    ) -> Result<String, Error> {
         let pyproject_path = pyproject_path.unwrap_or("pyproject.toml");
         let pyproject_dir = Path::new(pyproject_path).parent().unwrap_or(Path::new("."));
 
         if !Path::new(pyproject_path).exists() {
-            return Err(anyhow::anyhow!(
-                "pyproject.toml not found at {}",
-                pyproject_path
-            ));
+            return Err(Error::PyprojectNotFound {
+                path: pyproject_path.to_string(),
+            });
         }
 
         let content = fs::read_to_string(pyproject_path)?;
-        let pyproject: serde_json::Value = toml::from_str(&content)
-            .map_err(|e| anyhow::anyhow!("Failed to parse pyproject.toml: {}", e))?;
+        let pyproject: serde_json::Value = toml::from_str(&content)?;
 
         let project = pyproject
             .get("project")
-            .ok_or_else(|| anyhow::anyhow!("No [project] section found in pyproject.toml"))?;
+            .ok_or(Error::MissingProjectSection)?;
 
         let app_name = project
             .get("name")
@@ -182,10 +180,12 @@ name = "custom-script-project"
         let result =
             TowerfileGenerator::from_pyproject(Some("/nonexistent/path/pyproject.toml"), None);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("pyproject.toml not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("pyproject.toml not found")
+        );
     }
 
     #[test]
@@ -205,10 +205,12 @@ requires = ["setuptools"]
         let result =
             TowerfileGenerator::from_pyproject(Some(pyproject_path.to_str().unwrap()), None);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("No [project] section found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("No [project] section found")
+        );
     }
 
     #[test]
