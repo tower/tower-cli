@@ -346,7 +346,6 @@ async fn do_follow_run_impl(
                         };
                         if should_exit { break; }
                     }
-                }
                 },
                 Err(err) => {
                     sink.send_error(format!("Failed to stream run logs: {:?}", err));
