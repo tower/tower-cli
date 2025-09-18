@@ -28,6 +28,7 @@ class RunFailedError(RuntimeError):
     def __init__(self, app_name: str, number: int, state: str):
         super().__init__(f"Run {app_name}#{number} failed with status '{state}'")
 
+
 class AppNotFoundError(RuntimeError):
     def __init__(self, app_name: str):
         super().__init__(f"App '{app_name}' not found in the Tower.")

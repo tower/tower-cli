@@ -25,6 +25,7 @@ from .utils.tables import (
     namespace_or_default,
 )
 
+
 @dataclass
 class RowsAffectedInformation:
     inserts: int
@@ -66,7 +67,6 @@ class Table:
         self._context = context
         self._table = table
 
-
     def read(self) -> pl.DataFrame:
         """
         Reads all data from the Iceberg table and returns it as a Polars DataFrame.
@@ -90,7 +90,6 @@ class Table:
         # We call `collect` here to force the execution of the query and get
         # the result as a DataFrame.
         return pl.scan_iceberg(self._table).collect()
-
 
     def to_polars(self) -> pl.LazyFrame:
         """
@@ -117,9 +116,8 @@ class Table:
             ...     .sort("department"))
             >>> # Execute the plan
             >>> final_df = result.collect()
-        """        
+        """
         return pl.scan_iceberg(self._table)
-
 
     def rows_affected(self) -> RowsAffectedInformation:
         """
@@ -146,7 +144,6 @@ class Table:
             >>> print(f"Updated {stats.updates} rows")
         """
         return self._stats
-
 
     def insert(self, data: pa.Table) -> TTable:
         """
@@ -180,7 +177,6 @@ class Table:
         self._table.append(data)
         self._stats.inserts += data.num_rows
         return self
-
 
     def upsert(self, data: pa.Table, join_cols: Optional[list[str]] = None) -> TTable:
         """
@@ -224,11 +220,9 @@ class Table:
         res = self._table.upsert(
             data,
             join_cols=join_cols,
-
             # All upserts will always be case sensitive. Perhaps we'll add this
             # as a parameter in the future?
             case_sensitive=True,
-            
             # These are the defaults, but we're including them to be complete.
             when_matched_update_all=True,
             when_not_matched_insert_all=True,
@@ -239,7 +233,6 @@ class Table:
         self._stats.inserts += res.rows_inserted
 
         return self
-
 
     def delete(self, filters: Union[str, List[pc.Expression]]) -> TTable:
         """
@@ -284,7 +277,6 @@ class Table:
 
         self._table.delete(
             delete_filter=filters,
-
             # We want this to always be the case. Not sure why you wouldn't?
             case_sensitive=True,
         )
@@ -293,7 +285,6 @@ class Table:
         # deleted besides comparing the two snapshots that were created.
 
         return self
-
 
     def schema(self) -> pa.Schema:
         """
@@ -310,7 +301,6 @@ class Table:
         """
         iceberg_schema = self._table.schema()
         return iceberg_schema.as_arrow()
-
 
     def column(self, name: str) -> pa.compute.Expression:
         """
@@ -337,7 +327,7 @@ class Table:
             >>> table.delete(age_expr)
         """
         field = self.schema().field(name)
-        
+
         if field is None:
             raise ValueError(f"Column {name} not found in table schema")
 
@@ -346,12 +336,17 @@ class Table:
 
 
 class TableReference:
-    def __init__(self, ctx: TowerContext, catalog: Catalog, name: str, namespace: Optional[str] = None):
+    def __init__(
+        self,
+        ctx: TowerContext,
+        catalog: Catalog,
+        name: str,
+        namespace: Optional[str] = None,
+    ):
         self._context = ctx
         self._catalog = catalog
         self._name = name
         self._namespace = namespace
-
 
     def load(self) -> Table:
         """
@@ -379,9 +374,7 @@ class TableReference:
         table = self._catalog.load_table(table_name)
         return Table(self._context, table)
 
-
     def create(self, schema: pa.Schema) -> Table:
-
         """
         Creates a new Iceberg table with the specified schema.
 
@@ -431,7 +424,6 @@ class TableReference:
         )
 
         return Table(self._context, table)
-
 
     def create_if_not_exists(self, schema: pa.Schema) -> Table:
         """
@@ -488,7 +480,6 @@ class TableReference:
 
         return Table(self._context, table)
 
-
     def drop(self) -> bool:
         """
         Drops (deletes) the Iceberg table from the catalog.
@@ -527,9 +518,7 @@ class TableReference:
 
 
 def tables(
-    name: str,
-    catalog: Union[str, Catalog] = "default",
-    namespace: Optional[str] = None
+    name: str, catalog: Union[str, Catalog] = "default", namespace: Optional[str] = None
 ) -> TableReference:
     """
     Creates a reference to an Iceberg table that can be used to load or create tables.
@@ -564,17 +553,17 @@ def tables(
         >>> # Load an existing table from the default catalog
         >>> table = tables("my_table").load()
         >>> df = table.read()
-        
+
         >>> # Create a new table in a specific namespace
         >>> schema = pa.schema([
         ...     pa.field("id", pa.int64()),
         ...     pa.field("name", pa.string())
         ... ])
         >>> table = tables("new_table", namespace="my_namespace").create(schema)
-        
+
         >>> # Use a specific catalog
         >>> table = tables("my_table", catalog="my_catalog").load()
-        
+
         >>> # Create a table if it doesn't exist
         >>> table = tables("my_table").create_if_not_exists(schema)
 

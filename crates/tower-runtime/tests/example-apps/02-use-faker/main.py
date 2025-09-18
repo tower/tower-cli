@@ -1,5 +1,6 @@
 from faker import Faker
 
+
 def main():
     fake = Faker()
     print(fake.name())
