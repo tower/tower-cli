@@ -341,18 +341,19 @@ async def step_create_schedule_for_app(context, app_name):
         {"app_name": app_name, "cron": "0 9 * * *", "environment": "default"},
     )
     assert result.get("success", False), f"Failed to create schedule: {result}"
-    
+
     # Extract schedule ID from the response text
     if result.get("success") and "content" in result:
         content = result["content"]
-        if content and len(content) > 0 and hasattr(content[0], 'text'):
+        if content and len(content) > 0 and hasattr(content[0], "text"):
             response_text = content[0].text
             # Extract schedule ID from text like "Created schedule 'SCHEDULE_ID' for app..."
             import re
+
             match = re.search(r"Created schedule '([^']+)'", response_text)
             if match:
                 context.created_schedule_id = match.group(1)
-    
+
     context.test_app_name = app_name
 
 
