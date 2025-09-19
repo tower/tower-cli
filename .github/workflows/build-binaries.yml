@@ -223,15 +223,6 @@ jobs:
             arch: armv7
           - target: arm-unknown-linux-musleabihf
             arch: arm
-          # NOTE: Removing this to eliminate transient release failures.
-          # - target: powerpc64le-unknown-linux-gnu
-          #   arch: ppc64le
-          # - target: powerpc64-unknown-linux-gnu
-          #   arch: ppc64
-          # NOTE: Removing this for now, as it's not supported by OpenSSL in
-          # particular. Probably need a new version?
-          #- target: s390x-unknown-linux-gnu
-          #  arch: s390x
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -320,14 +311,11 @@ jobs:
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.platform.target == 'armv7-unknown-linux-musleabihf' }}
     strategy:
       matrix:
         platform:
           - target: aarch64-unknown-linux-musl
             arch: aarch64
-          - target: armv7-unknown-linux-musleabihf
-            arch: armv7
     steps:
       - uses: actions/checkout@v4.2.2
         with:

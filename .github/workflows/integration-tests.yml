@@ -1,0 +1,36 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '**'
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install the latest version of uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: "Set up Python"
+      uses: actions/setup-python@v5
+      with:
+        python-version-file: ".python-version"
+
+    - name: Build Tower CLI
+      run: cargo build
+
+    - name: Install Python dependencies
+      run: uv sync --locked --group dev
+
+    - name: Run integration tests
+      run: tests/integration/run_tests.py

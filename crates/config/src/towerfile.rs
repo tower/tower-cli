@@ -1,9 +1,9 @@
 use crate::Error;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Deserialize, Debug)]
-pub struct Parameter {
+#[derive(Deserialize, Serialize, Debug)]
+pub struct Parameter{
     #[serde(default)]
     pub name: String,
 
@@ -14,7 +14,7 @@ pub struct Parameter {
     pub default: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct App {
     #[serde(default)]
     pub name: String,
@@ -35,11 +35,11 @@ pub struct App {
     pub import_paths: Vec<PathBuf>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Towerfile {
     /// file_path is the path to where this file was read on disk. It's always populated by the
     /// parser/application, never by the data.
-    #[serde(skip_deserializing)]
+    #[serde(skip)]
     pub file_path: PathBuf,
 
     pub app: App,
@@ -107,6 +107,23 @@ impl Towerfile {
         } else {
             Self::from_path(path)
         }
+    }
+
+    /// save writes the Towerfile as TOML to the specified path, defaulting to current dir
+    pub fn save(&self, path: Option<&std::path::Path>) -> Result<(), Error> {
+        let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
+        std::fs::write(target_path, toml::to_string_pretty(self)?)?;
+        Ok(())
+    }
+
+
+    /// add_parameter adds a new parameter to the Towerfile
+    pub fn add_parameter(&mut self, name: String, description: String, default: String) {
+        self.parameters.push(Parameter {
+            name,
+            description,
+            default,
+        });
     }
 }
 
@@ -254,5 +271,54 @@ mod test {
         assert_eq!(towerfile.parameters.len(), 2);
         assert_eq!(towerfile.parameters[0].name, "my_first_param");
         assert_eq!(towerfile.parameters[1].name, "my_second_param");
+    }
+
+    #[test]
+    fn test_add_parameter() {
+        let mut towerfile = crate::Towerfile::default();
+        assert_eq!(towerfile.parameters.len(), 0);
+        
+        towerfile.add_parameter(
+            "test-param".to_string(),
+            "A test parameter".to_string(),
+            "default-value".to_string()
+        );
+        
+        assert_eq!(towerfile.parameters.len(), 1);
+        assert_eq!(towerfile.parameters[0].name, "test-param");
+        assert_eq!(towerfile.parameters[0].description, "A test parameter");
+        assert_eq!(towerfile.parameters[0].default, "default-value");
+    }
+
+
+    #[test]
+    fn test_roundtrip_serialization() {
+        let original_toml = r#"[app]
+name = "test-app"
+script = "./script.py"
+source = ["*.py", "src/*.py"]
+description = "A test application"
+schedule = "0 9 * * *"
+
+[[parameters]]
+name = "param1"
+description = "First parameter"
+default = "value1"
+
+[[parameters]]
+name = "param2"
+description = "Second parameter"
+default = "value2"
+"#;
+        
+        let towerfile = crate::Towerfile::from_toml(original_toml).unwrap();
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+        
+        assert_eq!(towerfile.app.name, reparsed.app.name);
+        assert_eq!(towerfile.app.script, reparsed.app.script);
+        assert_eq!(towerfile.app.source, reparsed.app.source);
+        assert_eq!(towerfile.parameters.len(), reparsed.parameters.len());
+        assert_eq!(towerfile.parameters[0].name, reparsed.parameters[0].name);
     }
 }
