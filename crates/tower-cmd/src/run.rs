@@ -7,6 +7,7 @@ use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{App, AppLauncher, OutputReceiver, local::LocalApp};
 use tower_telemetry::{Context, debug};
+use colored::Colorize;
 
 use tokio::sync::{mpsc::unbounded_channel, oneshot};
 
@@ -164,11 +165,10 @@ where
     let app = launcher.app.unwrap();
     let status_task = tokio::spawn(monitor_status(app));
 
-    // Wait for the output task to complete naturally
-    let final_result = output_task.await.unwrap();
-
-    // The status task can be aborted since we don't need to wait for it
-    status_task.abort();
+    let (output_result, status_result) = tokio::join!(output_task, status_task);
+    
+    let final_result = output_result.unwrap();
+    status_result.unwrap(); // This will report crash/success status
 
     Ok(final_result)
 }
@@ -215,10 +215,41 @@ pub async fn do_run_remote_capture(
     };
 
     match api::run_app(&config, &app_slug, env, params).await {
-        Err(err) => Err(err.into()),
+        Err(err) => {
+            debug!("Failed to schedule run: {}", err);
+            output::tower_error(err);
+            Err(Error::RunFailed)
+        }
         Ok(res) => {
             let run = res.run;
             do_follow_run_capture(config, &run).await
+        }
+    }
+}
+
+pub async fn do_run_remote_capture_plain(
+    config: Config,
+    path: PathBuf,
+    env: &str,
+    params: HashMap<String, String>,
+    app_name: Option<String>,
+) -> Result<Vec<String>, Error> {
+    let app_slug = if let Some(name) = app_name {
+        name
+    } else {
+        let towerfile_path = path.join("Towerfile");
+        let towerfile = load_towerfile(&towerfile_path)?;
+        towerfile.app.name
+    };
+
+    match api::run_app(&config, &app_slug, env, params).await {
+        Err(err) => {
+            debug!("Failed to schedule run: {}", err);
+            Err(err.into())
+        }
+        Ok(res) => {
+            let run = res.run;
+            do_follow_run_capture_plain(config, &run).await
         }
     }
 }
@@ -248,7 +279,8 @@ pub async fn do_run_remote(
         Err(err) => {
             spinner.failure();
             debug!("Failed to schedule run: {}", err);
-            Err(err.into())
+            output::tower_error(err);
+            Err(Error::RunFailed)
         }
         Ok(res) => {
             spinner.success();
@@ -281,7 +313,11 @@ trait OutputSink: Send + Sync {
 struct StdoutSink;
 impl OutputSink for StdoutSink {
     fn send_line(&self, line: String) {
-        output::write(&line);
+        if let Some((ts, msg)) = line.split_once(": ") {
+            output::log_line(ts, msg, output::LogLineType::Remote);
+        } else {
+            output::write(&format!("{}\n", line));
+        }
     }
     fn send_error(&self, error: String) {
         output::failure(&error);
@@ -291,10 +327,30 @@ impl OutputSink for StdoutSink {
 struct ChannelSink(tokio::sync::mpsc::UnboundedSender<String>);
 impl OutputSink for ChannelSink {
     fn send_line(&self, line: String) {
-        let _ = self.0.send(line);
+        if let Some((ts, msg)) = line.split_once(": ") {
+            let formatted = format!("{} {}", output::format_timestamp(ts, output::LogLineType::Remote), msg);
+            let _ = self.0.send(formatted);
+        } else {
+            let _ = self.0.send(line);
+        }
     }
     fn send_error(&self, error: String) {
-        let _ = self.0.send(error);
+        let _ = self.0.send(format!("{} {}", "Oh no!".red(), error));
+    }
+}
+
+struct PlainChannelSink(tokio::sync::mpsc::UnboundedSender<String>);
+impl OutputSink for PlainChannelSink {
+    fn send_line(&self, line: String) {
+        if let Some((ts, msg)) = line.split_once(": ") {
+            let formatted = format!("{} | {}", ts, msg);
+            let _ = self.0.send(formatted);
+        } else {
+            let _ = self.0.send(line);
+        }
+    }
+    fn send_error(&self, error: String) {
+        let _ = self.0.send(format!("ERROR: {}", error));
     }
 }
 
@@ -302,19 +358,33 @@ pub async fn do_follow_run_capture(config: Config, run: &Run) -> Result<Vec<Stri
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let sink = ChannelSink(tx);
 
-    let result = do_follow_run_impl(config, run, &sink, false).await;
+    let _ = do_follow_run_impl(config, run, &sink, false, false).await;
 
     let mut output_lines = Vec::new();
     while let Ok(line) = rx.try_recv() {
         output_lines.push(line);
     }
 
-    result.map(|_| output_lines)
+    Ok(output_lines)
+}
+
+pub async fn do_follow_run_capture_plain(config: Config, run: &Run) -> Result<Vec<String>, Error> {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let sink = PlainChannelSink(tx);
+
+    let _ = do_follow_run_impl(config, run, &sink, false, false).await;
+
+    let mut output_lines = Vec::new();
+    while let Ok(line) = rx.try_recv() {
+        output_lines.push(line);
+    }
+
+    Ok(output_lines)
 }
 
 async fn do_follow_run(config: Config, run: &Run) {
     let sink = StdoutSink;
-    let _ = do_follow_run_impl(config, run, &sink, true).await;
+    let _ = do_follow_run_impl(config, run, &sink, true, true).await;
 }
 
 async fn do_follow_run_impl(
@@ -322,13 +392,26 @@ async fn do_follow_run_impl(
     run: &Run,
     sink: &dyn OutputSink,
     enable_ctrl_c: bool,
+    show_spinner: bool,
 ) -> Result<(), Error> {
+    let mut spinner = if show_spinner {
+        Some(output::spinner("Waiting for run to start..."))
+    } else {
+        None
+    };
+
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
+            if let Some(ref mut s) = spinner {
+                s.failure();
+            }
             sink.send_error(format!("Failed to wait for run to start: {}", err));
             return Err(err.into());
         }
         Ok(()) => {
+            if let Some(ref mut s) = spinner {
+                s.success();
+            }
             sink.send_line("Run started, streaming logs...".to_string());
 
             // We do this here, explicitly, to not double-monitor our API via the

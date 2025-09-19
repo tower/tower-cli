@@ -103,6 +103,13 @@ struct EmptyRequest {
     common: CommonParams,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+struct RunRequest {
+    #[serde(flatten)]
+    common: CommonParams,
+    parameters: Option<std::collections::HashMap<String, String>>,
+}
+
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
         .about("Runs a local SSE MCP server for LLM interaction")
@@ -441,15 +448,17 @@ impl TowerService {
     #[tool(
         description = "Run your app remotely on Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create, 3) Deploy with tower_deploy"
     )]
-    async fn tower_run_remote(&self) -> Result<CallToolResult, McpError> {
+    async fn tower_run_remote(
+        &self,
+        Parameters(request): Parameters<RunRequest>,
+    ) -> Result<CallToolResult, McpError> {
         use config::Towerfile;
-        use std::collections::HashMap;
-        use std::path::PathBuf;
 
         let config = self.config.clone();
-        let path = PathBuf::from(".");
+        let working_dir = Self::resolve_working_directory(&request.common);
+        let path = working_dir;
         let env = "default";
-        let params = HashMap::new();
+        let params = request.parameters.unwrap_or_default();
 
         // Load Towerfile to get app name
         let towerfile = match Towerfile::from_local_file() {
@@ -458,7 +467,7 @@ impl TowerService {
         };
 
         // Try remote run directly to get better error messages
-        match run::do_run_remote_capture(config, path, env, params, None).await {
+        match run::do_run_remote_capture_plain(config, path, env, params, None).await {
             Ok(output_lines) => {
                 let output = if output_lines.is_empty() {
                     "Remote run completed successfully (no output)"

@@ -145,6 +145,16 @@ async def run_app(name: str, run_params: Dict[str, Any]):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
+    parameters = run_params.get("parameters", {})
+    if "nonexistent_param" in parameters:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "detail": "Validation error",
+                "errors": [{"message": "Unknown parameter"}],
+            },
+        )
+
     run_id = generate_id()
     new_run = {
         "$link": f"/runs/{run_id}",

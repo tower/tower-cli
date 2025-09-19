@@ -451,3 +451,139 @@ def step_check_schedule_deletion_success(context):
     assert (
         "deleted" in str(context.mcp_response).lower()
     ), f"Response should mention deletion, got: {context.mcp_response}"
+
+
+@when('I call tower_run_remote with invalid parameter "{param}"')
+@async_run_until_complete
+async def step_call_tower_run_remote_with_invalid_param(context, param):
+    """Call tower_run_remote with an invalid parameter"""
+    key, value = param.split("=", 1)
+    arguments = {"parameters": {key: value}}
+    await call_mcp_tool(context, "tower_run_remote", arguments)
+
+
+@then("the response should contain plain text log lines")
+def step_response_should_contain_plain_text_log_lines(context):
+    """Verify response contains properly formatted plain text log lines"""
+    response_content = str(context.mcp_response.get("content", ""))
+    assert (
+        response_content
+    ), f"Response should have content, got: {context.mcp_response}"
+
+    # Check for timestamp formatting (should have | separator for plain text)
+    assert (
+        " | " in response_content
+    ), f"Expected plain text format with '|' separator, got: {response_content[:200]}..."
+
+
+@then("the response should not contain ANSI color codes")
+def step_response_should_not_contain_ansi_codes(context):
+    """Verify response doesn't contain ANSI color escape sequences"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Check for common ANSI color codes
+    ansi_patterns = ["\033[", "\x1b[", "[0m", "[1;33m", "[31m"]
+    for pattern in ansi_patterns:
+        assert (
+            pattern not in response_content
+        ), f"Found ANSI color code '{pattern}' in response: {response_content[:200]}..."
+
+
+@then("each log line should be properly formatted with timestamp")
+def step_log_lines_should_be_formatted_with_timestamp(context):
+    """Verify log lines have proper timestamp formatting"""
+    response_content = str(context.mcp_response.get("content", ""))
+    lines = response_content.split("\n")
+
+    # Find lines that look like log entries (contain timestamp patterns)
+    log_lines = [line for line in lines if " | " in line and "2025-" in line]
+    assert (
+        len(log_lines) > 0
+    ), f"Expected to find log lines with timestamps, got: {response_content[:300]}..."
+
+    # Check timestamp format (should be YYYY-MM-DD HH:MM:SS | message)
+    for line in log_lines[:3]:  # Check first few log lines
+        parts = line.split(" | ", 1)
+        assert (
+            len(parts) == 2
+        ), f"Log line should have timestamp | message format, got: {line}"
+        timestamp, message = parts
+        assert (
+            len(timestamp.strip()) >= 19
+        ), f"Timestamp should be at least YYYY-MM-DD HH:MM:SS, got: {timestamp}"
+
+
+@then("I should receive a detailed validation error")
+def step_should_receive_detailed_validation_error(context):
+    """Verify response contains detailed validation error information"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Should be an error but with detailed content, not just a status code
+    assert (
+        not context.operation_success
+    ), f"Expected error response, got success: {context.mcp_response}"
+    assert (
+        len(response_content) > 10
+    ), f"Expected detailed error message, got short response: {response_content}"
+
+
+@then('the error should mention "{expected_text}"')
+def step_error_should_mention_text(context, expected_text):
+    """Verify error message contains specific expected text"""
+    response_content = str(context.mcp_response.get("content", ""))
+    assert (
+        expected_text.lower() in response_content.lower()
+    ), f"Expected '{expected_text}' in error response, got: {response_content}"
+
+
+@then("the error should not just be a status code")
+def step_error_should_not_be_just_status_code(context):
+    """Verify error is not just a bare status code like '422'"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Should not be just a number (status code)
+    assert (
+        not response_content.strip().isdigit()
+    ), f"Error should not be just a status code, got: {response_content}"
+    assert (
+        "422" not in response_content or len(response_content) > 20
+    ), f"Should have detailed error, not just '422', got: {response_content}"
+
+
+@given("I have a simple hello world application that exits with code 1")
+def step_have_hello_world_app_with_exit_1(context):
+    """Create a hello world app that exits with code 1 for crash testing"""
+    create_towerfile("hello_world")
+
+    # Create a Python file that exits with code 1
+    crash_app_content = """import time
+print("Hello, World!")
+time.sleep(1)
+print("About to crash...")
+exit(1)
+"""
+    with open("task.py", "w") as f:
+        f.write(crash_app_content)
+
+
+@then("the response should indicate the app crashed")
+def step_response_should_indicate_crash(context):
+    """Verify response indicates the application crashed"""
+    response_content = str(context.mcp_response.get("content", "")).lower()
+
+    crash_indicators = ["crash", "error", "failed", "exit"]
+    found_indicator = any(
+        indicator in response_content for indicator in crash_indicators
+    )
+    assert (
+        found_indicator
+    ), f"Expected crash indication in response, got: {context.mcp_response}"
+
+
+@then('the response should contain "{expected_text}" message')
+def step_response_should_contain_message(context, expected_text):
+    """Verify response contains expected message text"""
+    response_content = str(context.mcp_response.get("content", "")).lower()
+    assert (
+        expected_text.lower() in response_content
+    ), f"Expected '{expected_text}' in response, got: {context.mcp_response}"

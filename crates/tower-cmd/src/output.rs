@@ -29,7 +29,7 @@ pub enum LogLineType {
     Local,
 }
 
-fn format_timestamp(timestamp: &str, t: LogLineType) -> String {
+pub fn format_timestamp(timestamp: &str, t: LogLineType) -> String {
     let ts = timestamp.bold();
 
     let sep = "|".bold();

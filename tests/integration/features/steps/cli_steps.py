@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+
+import subprocess
+import os
+import tempfile
+import shutil
+from pathlib import Path
+from behave import given, when, then
+
+
+@given("I have a Tower CLI binary available")
+def step_have_tower_cli_binary(context):
+    """Ensure Tower CLI binary is available for testing"""
+    # Assume binary is built and available in target/debug/tower
+    cli_path = (
+        Path(__file__).parent.parent.parent.parent.parent / "target" / "debug" / "tower"
+    )
+    assert cli_path.exists(), f"Tower CLI binary not found at {cli_path}"
+    context.cli_path = str(cli_path)
+
+
+@when('I run "{command}" via CLI')
+def step_run_cli_command(context, command):
+    """Run a Tower CLI command and capture output"""
+    # Create temporary directory for test
+    with tempfile.TemporaryDirectory() as temp_dir:
+        os.chdir(temp_dir)
+
+        # Copy test files if they exist in context
+        if hasattr(context, "test_files"):
+            for filename, content in context.test_files.items():
+                with open(filename, "w") as f:
+                    f.write(content)
+
+        # Run the CLI command
+        cmd_parts = command.split()
+        full_command = [context.cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
+
+        try:
+            result = subprocess.run(
+                full_command,
+                capture_output=True,
+                text=True,
+                timeout=60,  # 1 minute timeout
+            )
+            context.cli_output = result.stdout + result.stderr
+            context.cli_return_code = result.returncode
+        except subprocess.TimeoutExpired:
+            context.cli_output = "Command timed out"
+            context.cli_return_code = 124
+
+
+@then("timestamps should be yellow colored")
+def step_timestamps_should_be_yellow(context):
+    """Verify timestamps are colored yellow (ANSI code 33)"""
+    output = context.cli_output
+    # Yellow is ANSI code 33, bold yellow is 1;33
+    assert (
+        "\x1b[1;33m" in output or "\x1b[33m" in output
+    ), f"Expected yellow color codes in output, got: {output[:300]}..."
+
+
+@then("timestamps should be green colored")
+def step_timestamps_should_be_green(context):
+    """Verify timestamps are colored green (ANSI code 32)"""
+    output = context.cli_output
+    # Green is ANSI code 32, bold green is 1;32
+    assert (
+        "\x1b[1;32m" in output or "\x1b[32m" in output
+    ), f"Expected green color codes in output, got: {output[:300]}..."
+
+
+@then("each log line should be on a separate line")
+def step_log_lines_should_be_separate(context):
+    """Verify log lines are properly separated with newlines"""
+    output = context.cli_output
+    lines = output.split("\n")
+
+    # Should have multiple lines
+    assert len(lines) > 3, f"Expected multiple lines of output, got: {len(lines)} lines"
+
+    # Lines with timestamps should not be concatenated
+    timestamp_lines = [
+        line
+        for line in lines
+        if "2025-" in line and ("Hello" in line or "Creating" in line)
+    ]
+    assert (
+        len(timestamp_lines) > 1
+    ), f"Expected multiple timestamped lines, got: {timestamp_lines}"
+
+
+@then('the final crash status should show red "Oh no!"')
+def step_final_crash_status_should_be_red(context):
+    """Verify crash status shows red 'Oh no!' message"""
+    output = context.cli_output
+    # Red is ANSI code 31
+    assert "\x1b[31m" in output, f"Expected red color codes in output"
+    assert "Oh no!" in output, f"Expected 'Oh no!' in crash message, got: {output}"
+
+
+@then('the final status should show "Your app crashed!" in red')
+def step_final_status_should_show_crashed_in_red(context):
+    """Verify local run shows 'Your app crashed!' in red"""
+    output = context.cli_output
+    assert "\x1b[31m" in output, f"Expected red color codes in output"
+    assert (
+        "Your app crashed!" in output
+    ), f"Expected 'Your app crashed!' message, got: {output}"
+
+
+@then('the output should show "{expected_text}"')
+def step_output_should_show_text(context, expected_text):
+    """Verify output contains expected text"""
+    output = context.cli_output
+    assert (
+        expected_text in output
+    ), f"Expected '{expected_text}' in output, got: {output}"
+
+
+@then('the output should not just show "{forbidden_text}"')
+def step_output_should_not_just_show_text(context, forbidden_text):
+    """Verify output is not just the forbidden text (e.g., not just '422')"""
+    output = context.cli_output.strip()
+    assert (
+        output != forbidden_text
+    ), f"Output should not be just '{forbidden_text}', got: {output}"
+    if forbidden_text in output:
+        assert (
+            len(output) > len(forbidden_text) + 10
+        ), f"Output should have more than just '{forbidden_text}', got: {output}"
+
+
+@then('the output should show "{spinner_text}" spinner')
+def step_output_should_show_spinner(context, spinner_text):
+    """Verify spinner text appears in output"""
+    output = context.cli_output
+    assert (
+        spinner_text in output
+    ), f"Expected spinner text '{spinner_text}' in output, got: {output[:500]}..."
+
+
+@then("both spinners should complete successfully")
+def step_both_spinners_should_complete(context):
+    """Verify spinners show completion"""
+    output = context.cli_output
+    # Look for spinner completion indicators (✔ or "Done!")
+    completion_indicators = ["✔", "Done!", "success"]
+    found_completion = any(indicator in output for indicator in completion_indicators)
+    assert (
+        found_completion
+    ), f"Expected spinner completion indicators in output, got: {output[:500]}..."
