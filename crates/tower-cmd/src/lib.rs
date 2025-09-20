@@ -4,6 +4,7 @@ use config::{Config, Session};
 pub mod api;
 mod apps;
 mod deploy;
+mod environments;
 pub mod error;
 pub mod output;
 mod run;
@@ -121,6 +122,19 @@ impl App {
                     }
                 }
             }
+            Some(("environments", sub_matches)) => {
+                let environments_command = sub_matches.subcommand();
+
+                match environments_command {
+                    Some(("list", _)) => environments::do_list(sessionized_config).await,
+                    Some(("create", args)) => {
+                        environments::do_create(sessionized_config, args).await
+                    }
+                    _ => {
+                        environments::environments_cmd().print_help().unwrap();
+                    }
+                }
+            }
             Some(("schedules", sub_matches)) => {
                 let schedules_command = sub_matches.subcommand();
 
@@ -185,6 +199,7 @@ fn root_cmd() -> Command {
         .subcommand(apps::apps_cmd())
         .subcommand(schedules::schedules_cmd())
         .subcommand(secrets::secrets_cmd())
+        .subcommand(environments::environments_cmd())
         .subcommand(deploy::deploy_cmd())
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())

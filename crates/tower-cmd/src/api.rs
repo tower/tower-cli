@@ -708,6 +708,50 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeRunSuccess {
     }
 }
 
+impl ResponseEntity for tower_api::apis::default_api::ListEnvironmentsSuccess {
+    type Data = tower_api::models::ListEnvironmentsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+
+pub async fn list_environments(
+    config: &Config,
+) -> Result<
+    tower_api::models::ListEnvironmentsResponse,
+    Error<tower_api::apis::default_api::ListEnvironmentsError>,
+> {
+    let api_config = &config.into();
+    unwrap_api_response(tower_api::apis::default_api::list_environments(api_config)).await
+}
+
+pub async fn create_environment(
+    config: &Config,
+    name: &str,
+) -> Result<
+    tower_api::models::CreateEnvironmentResponse,
+    Error<tower_api::apis::default_api::CreateEnvironmentError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::CreateEnvironmentParams {
+        create_environment_params: tower_api::models::CreateEnvironmentParams {
+            schema: None,
+            name: name.to_string(),
+        },
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::create_environment(
+        api_config, params,
+    ))
+    .await
+}
+
 pub async fn list_schedules(
     config: &Config,
     _app_name: Option<&str>,
@@ -830,6 +874,17 @@ impl ResponseEntity for tower_api::apis::default_api::ListSchedulesSuccess {
     fn extract_data(self) -> Option<Self::Data> {
         match self {
             Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::CreateEnvironmentSuccess {
+    type Data = tower_api::models::CreateEnvironmentResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status201(data) => Some(data),
             Self::UnknownValue(_) => None,
         }
     }
