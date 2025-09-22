@@ -681,18 +681,11 @@ async fn monitor_output(output: OutputReceiver) {
 /// it to progress to a terminal state.
 async fn monitor_status(app: LocalApp) {
     debug!("Starting status monitoring for LocalApp");
-    let mut check_count = 0;
-    let max_checks = 600; // 60 seconds with 100ms intervals
 
     loop {
-        debug!(
-            "Status check #{}, attempting to get app status",
-            check_count
-        );
-
         match app.status().await {
             Ok(status) => {
-                debug!("Got app status (some status)");
+                debug!("Got app status: {:?}", status);
                 match status {
                     tower_runtime::Status::Exited => {
                         debug!("App exited cleanly, stopping status monitoring");
@@ -705,31 +698,13 @@ async fn monitor_status(app: LocalApp) {
                         break;
                     }
                     _ => {
-                        debug!("App status: other, continuing to monitor");
-                        check_count += 1;
-                        if check_count >= max_checks {
-                            debug!("Status monitoring timed out after {} checks", max_checks);
-                            output::error(
-                                "App status monitoring timed out, but app may still be running",
-                            );
-                            break;
-                        }
+                        debug!("App status: continuing to monitor");
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                        continue;
                     }
                 }
             }
             Err(e) => {
                 debug!("Failed to get app status: {:?}", e);
-                check_count += 1;
-                if check_count >= max_checks {
-                    debug!(
-                        "Failed to get app status after {} attempts, giving up",
-                        max_checks
-                    );
-                    output::error("Failed to get app status after timeout");
-                    break;
-                }
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
