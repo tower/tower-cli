@@ -6,6 +6,7 @@ mod apps;
 mod deploy;
 mod environments;
 pub mod error;
+mod package;
 pub mod output;
 mod run;
 mod schedules;
@@ -150,6 +151,7 @@ impl App {
                 }
             }
             Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
+            Some(("package", args)) => package::do_package(sessionized_config, args).await,
             Some(("run", args)) => run::do_run(sessionized_config, args, args.subcommand()).await,
             Some(("teams", sub_matches)) => {
                 let teams_command = sub_matches.subcommand();
@@ -201,6 +203,7 @@ fn root_cmd() -> Command {
         .subcommand(secrets::secrets_cmd())
         .subcommand(environments::environments_cmd())
         .subcommand(deploy::deploy_cmd())
+        .subcommand(package::package_cmd())
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())
         .subcommand(teams::teams_cmd())
