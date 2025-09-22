@@ -182,3 +182,61 @@ async fn test_running_legacy_app() {
     let status = app.status().await.expect("Failed to get app status");
     assert!(status == Status::Exited, "App should be running");
 }
+
+#[tokio::test]
+async fn test_running_app_with_secret() {
+    debug!("Running 04-app-with-secret");
+    let app_dir = get_example_app_dir("04-app-with-secret");
+    let package = build_package_from_dir(&app_dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let mut secrets = HashMap::new();
+    secrets.insert("MY_SECRET".to_string(), "It's in the sauce!".to_string());
+
+    // We need to create the package, which will load the app
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new(),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: secrets,
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+    };
+
+    // Start the app using the LocalApp runtime
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    // The status should be running
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(status == Status::Running, "App should be running");
+
+    let mut count_setup = 0;
+    let mut count_stdout = 0;
+
+    while let Some(output) = receiver.recv().await {
+        match output.channel {
+            tower_runtime::Channel::Setup => {
+                // We always have some setup lines to count on.
+                count_setup += 1;
+            }
+            tower_runtime::Channel::Program => {
+                if output.line.starts_with("The secret is:") {
+                    // Indicate that we found the line.
+                    count_stdout += 1;
+
+                    // Require that the right suffix is there.
+                    assert!(output.line.ends_with("It's in the sauce!"));
+                }
+            }
+        }
+    }
+
+    assert!(count_setup > 0, "There should be some setup output");
+    assert!(count_stdout > 0, "should be more than one output");
+
+    // check the status once more, should be done.
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(status == Status::Exited, "App should be running");
+}

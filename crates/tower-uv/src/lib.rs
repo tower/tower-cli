@@ -180,6 +180,7 @@ impl Uv {
             .arg("--no-progress")
             .arg("run")
             .arg(program)
+            .env_clear()
             .envs(env_vars);
 
         #[cfg(unix)]
