@@ -7,47 +7,43 @@ import shutil
 from pathlib import Path
 from behave import given, when, then
 
-
-@given("I have a Tower CLI binary available")
-def step_have_tower_cli_binary(context):
-    """Ensure Tower CLI binary is available for testing"""
-    # Assume binary is built and available in target/debug/tower
-    cli_path = (
-        Path(__file__).parent.parent.parent.parent.parent / "target" / "debug" / "tower"
-    )
-    assert cli_path.exists(), f"Tower CLI binary not found at {cli_path}"
-    context.cli_path = str(cli_path)
-
-
 @when('I run "{command}" via CLI')
 def step_run_cli_command(context, command):
     """Run a Tower CLI command and capture output"""
-    # Create temporary directory for test
-    with tempfile.TemporaryDirectory() as temp_dir:
-        os.chdir(temp_dir)
+    cli_path = context.tower_binary
 
-        # Copy test files if they exist in context
-        if hasattr(context, "test_files"):
-            for filename, content in context.test_files.items():
-                with open(filename, "w") as f:
-                    f.write(content)
+    # Run the CLI command in the current directory (where environment.py set up the temp dir)
+    # The MCP steps have already created the necessary files in the current directory
 
-        # Run the CLI command
-        cmd_parts = command.split()
-        full_command = [context.cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
+    # Run the CLI command
+    cmd_parts = command.split()
+    full_command = [cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
 
-        try:
-            result = subprocess.run(
-                full_command,
-                capture_output=True,
-                text=True,
-                timeout=60,  # 1 minute timeout
-            )
-            context.cli_output = result.stdout + result.stderr
-            context.cli_return_code = result.returncode
-        except subprocess.TimeoutExpired:
-            context.cli_output = "Command timed out"
-            context.cli_return_code = 124
+    try:
+        # Force colored output by setting environment variables
+        test_env = os.environ.copy()
+        test_env["FORCE_COLOR"] = "1"  # Force colored output
+        test_env["CLICOLOR_FORCE"] = "1"  # Force colored output
+        test_env["TOWER_URL"] = context.tower_url  # Use mock API
+        test_env["TOWER_JWT"] = "mock_jwt_token"
+
+        result = subprocess.run(
+            full_command,
+            capture_output=True,
+            text=True,
+            timeout=60,  # 1 minute timeout
+            env=test_env,
+        )
+        context.cli_output = result.stdout + result.stderr
+        context.cli_return_code = result.returncode
+    except subprocess.TimeoutExpired:
+        context.cli_output = "Command timed out"
+        context.cli_return_code = 124
+    except Exception as e:
+        print(f"DEBUG: Exception in CLI command: {type(e).__name__}: {e}")
+        print(f"DEBUG: Command was: {full_command}")
+        print(f"DEBUG: Working directory: {os.getcwd()}")
+        raise
 
 
 @then("timestamps should be yellow colored")
@@ -150,3 +146,5 @@ def step_both_spinners_should_complete(context):
     assert (
         found_completion
     ), f"Expected spinner completion indicators in output, got: {output[:500]}..."
+
+

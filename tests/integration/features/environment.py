@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def before_all(context):
-    context.tower_url = os.environ.get("TOWER_API_URL")
+    context.tower_url = os.environ.get("TOWER_API_URL", "http://127.0.0.1:8000")
     print(f"TOWER_API_URL: {context.tower_url}")
 
 
@@ -21,6 +21,9 @@ def before_scenario(context, scenario):
     tower_binary = _find_tower_binary()
     if not tower_binary:
         raise RuntimeError("Could not find tower binary. Run 'cargo build' first.")
+
+    # Make binary available to all steps
+    context.tower_binary = tower_binary
 
     # Set up environment
     test_env = os.environ.copy()

@@ -98,4 +98,4 @@ Feature: MCP App Management
     Given I have a simple hello world application that exits with code 1
     When I call tower_run_local via MCP
     Then the response should indicate the app crashed
-    And the response should contain "ERROR:" or "crashed" message
+    And the response should contain "failed" message

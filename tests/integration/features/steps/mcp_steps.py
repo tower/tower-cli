@@ -562,7 +562,7 @@ time.sleep(1)
 print("About to crash...")
 exit(1)
 """
-    with open("task.py", "w") as f:
+    with open("hello.py", "w") as f:
         f.write(crash_app_content)
 
 

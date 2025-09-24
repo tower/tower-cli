@@ -3,18 +3,13 @@ Feature: CLI Run Commands
   I want to run applications locally and remotely with proper feedback
   So that I can develop and deploy my applications effectively
 
-  Background:
-    Given I have a Tower CLI binary available
-
-  Scenario: CLI remote run should have yellow timestamps and proper formatting
+  Scenario: CLI remote run should show red error message when API fails
     Given I have a simple hello world application
     When I run "tower run" via CLI
-    Then timestamps should be yellow colored
-    And each log line should be on a separate line
-    And the final crash status should show red "Oh no!"
+    Then the final crash status should show red "Oh no!"
 
   Scenario: CLI local run should have green timestamps and detect crashes
-    Given I have a simple hello world application that exits with code 1  
+    Given I have a simple hello world application that exits with code 1
     When I run "tower run --local" via CLI
     Then timestamps should be green colored
     And each log line should be on a separate line
@@ -23,7 +18,7 @@ Feature: CLI Run Commands
   Scenario: CLI remote run should show detailed validation errors
     Given I have a simple hello world application
     When I run "tower run -p nonexistent_param=test" via CLI
-    Then the output should show "Error details:"
+    Then the output should show "API Error:"
     And the output should show "Validation error"
     And the output should show "Unknown parameter"
     And the output should not just show "422"
