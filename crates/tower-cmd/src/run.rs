@@ -7,7 +7,6 @@ use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{App, AppLauncher, OutputReceiver, local::LocalApp};
 use tower_telemetry::{Context, debug};
-use colored::Colorize;
 
 use tokio::sync::{mpsc::unbounded_channel, oneshot};
 
@@ -168,7 +167,7 @@ where
     let (output_result, status_result) = tokio::join!(output_task, status_task);
     
     let final_result = output_result.unwrap();
-    status_result.unwrap(); // This will report crash/success status
+    status_result.unwrap()?; // Propagate crash/error status
 
     Ok(final_result)
 }
@@ -196,33 +195,26 @@ pub async fn do_run_local_capture(
     env: &str,
     params: HashMap<String, String>,
 ) -> Result<Vec<String>, Error> {
-    do_run_local_impl(config, path, env, params, monitor_output_capture).await
-}
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    crate::output::set_capture_sender(tx);
 
-pub async fn do_run_remote_capture(
-    config: Config,
-    path: PathBuf,
-    env: &str,
-    params: HashMap<String, String>,
-    app_name: Option<String>,
-) -> Result<Vec<String>, Error> {
-    let app_slug = if let Some(name) = app_name {
-        name
-    } else {
-        let towerfile_path = path.join("Towerfile");
-        let towerfile = load_towerfile(&towerfile_path)?;
-        towerfile.app.name
-    };
+    let result = do_run_local_impl(config, path, env, params, monitor_output_capture).await;
 
-    match api::run_app(&config, &app_slug, env, params).await {
-        Err(err) => {
-            debug!("Failed to schedule run: {}", err);
-            output::tower_error(err);
-            Err(Error::RunFailed)
+    let mut all_output = Vec::new();
+
+    // Collect any captured CLI output messages
+    while let Ok(msg) = rx.try_recv() {
+        all_output.push(msg);
+    }
+
+    match result {
+        Ok(mut app_output) => {
+            all_output.append(&mut app_output);
+            Ok(all_output)
         }
-        Ok(res) => {
-            let run = res.run;
-            do_follow_run_capture(config, &run).await
+        Err(e) => {
+            all_output.push(format!("Error: {}", e));
+            Err(e)  // Return error to MCP instead of success with error content
         }
     }
 }
@@ -234,6 +226,9 @@ pub async fn do_run_remote_capture_plain(
     params: HashMap<String, String>,
     app_name: Option<String>,
 ) -> Result<Vec<String>, Error> {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    crate::output::set_capture_sender(tx);
+
     let app_slug = if let Some(name) = app_name {
         name
     } else {
@@ -242,14 +237,38 @@ pub async fn do_run_remote_capture_plain(
         towerfile.app.name
     };
 
-    match api::run_app(&config, &app_slug, env, params).await {
+    let result = match api::run_app(&config, &app_slug, env, params).await {
         Err(err) => {
             debug!("Failed to schedule run: {}", err);
-            Err(err.into())
+            // Collect any error output before returning error
+            let mut all_output = Vec::new();
+            while let Ok(msg) = rx.try_recv() {
+                all_output.push(msg);
+            }
+            all_output.push(format!("Error: {}", err));
+            return Err(Error::ApiError);  // Return error to MCP instead of success with error content
         }
         Ok(res) => {
             let run = res.run;
             do_follow_run_capture_plain(config, &run).await
+        }
+    };
+
+    let mut all_output = Vec::new();
+
+    // Collect any captured CLI output messages
+    while let Ok(msg) = rx.try_recv() {
+        all_output.push(msg);
+    }
+
+    match result {
+        Ok(mut app_output) => {
+            all_output.append(&mut app_output);
+            Ok(all_output)
+        }
+        Err(e) => {
+            all_output.push(format!("Error: {}", e));
+            Err(e)  // Return error to MCP instead of success with error content
         }
     }
 }
@@ -288,7 +307,7 @@ pub async fn do_run_remote(
             let run = res.run;
 
             if should_follow_run {
-                do_follow_run(config, &run).await;
+                let _ = do_follow_run(config, &run, true, true).await;
             } else {
                 let line = format!(
                     "Run #{} for app `{}` has been scheduled",
@@ -305,74 +324,11 @@ pub async fn do_run_remote(
     }
 }
 
-trait OutputSink: Send + Sync {
-    fn send_line(&self, line: String);
-    fn send_error(&self, error: String);
-}
-
-struct StdoutSink;
-impl OutputSink for StdoutSink {
-    fn send_line(&self, line: String) {
-        if let Some((ts, msg)) = line.split_once(": ") {
-            output::log_line(ts, msg, output::LogLineType::Remote);
-        } else {
-            output::write(&format!("{}\n", line));
-        }
-    }
-    fn send_error(&self, error: String) {
-        output::failure(&error);
-    }
-}
-
-struct ChannelSink(tokio::sync::mpsc::UnboundedSender<String>);
-impl OutputSink for ChannelSink {
-    fn send_line(&self, line: String) {
-        if let Some((ts, msg)) = line.split_once(": ") {
-            let formatted = format!("{} {}", output::format_timestamp(ts, output::LogLineType::Remote), msg);
-            let _ = self.0.send(formatted);
-        } else {
-            let _ = self.0.send(line);
-        }
-    }
-    fn send_error(&self, error: String) {
-        let _ = self.0.send(format!("{} {}", "Oh no!".red(), error));
-    }
-}
-
-struct PlainChannelSink(tokio::sync::mpsc::UnboundedSender<String>);
-impl OutputSink for PlainChannelSink {
-    fn send_line(&self, line: String) {
-        if let Some((ts, msg)) = line.split_once(": ") {
-            let formatted = format!("{} | {}", ts, msg);
-            let _ = self.0.send(formatted);
-        } else {
-            let _ = self.0.send(line);
-        }
-    }
-    fn send_error(&self, error: String) {
-        let _ = self.0.send(format!("ERROR: {}", error));
-    }
-}
-
-pub async fn do_follow_run_capture(config: Config, run: &Run) -> Result<Vec<String>, Error> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    let sink = ChannelSink(tx);
-
-    let _ = do_follow_run_impl(config, run, &sink, false, false).await;
-
-    let mut output_lines = Vec::new();
-    while let Ok(line) = rx.try_recv() {
-        output_lines.push(line);
-    }
-
-    Ok(output_lines)
-}
-
 pub async fn do_follow_run_capture_plain(config: Config, run: &Run) -> Result<Vec<String>, Error> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    let sink = PlainChannelSink(tx);
+    crate::output::set_capture_sender(tx);
 
-    let _ = do_follow_run_impl(config, run, &sink, false, false).await;
+    let _ = do_follow_run(config, run, false, false).await;
 
     let mut output_lines = Vec::new();
     while let Ok(line) = rx.try_recv() {
@@ -382,15 +338,9 @@ pub async fn do_follow_run_capture_plain(config: Config, run: &Run) -> Result<Ve
     Ok(output_lines)
 }
 
-async fn do_follow_run(config: Config, run: &Run) {
-    let sink = StdoutSink;
-    let _ = do_follow_run_impl(config, run, &sink, true, true).await;
-}
-
-async fn do_follow_run_impl(
+async fn do_follow_run(
     config: Config,
     run: &Run,
-    sink: &dyn OutputSink,
     enable_ctrl_c: bool,
     show_spinner: bool,
 ) -> Result<(), Error> {
@@ -405,14 +355,14 @@ async fn do_follow_run_impl(
             if let Some(ref mut s) = spinner {
                 s.failure();
             }
-            sink.send_error(format!("Failed to wait for run to start: {}", err));
+            output::error(&format!("Failed to wait for run to start: {}", err));
             return Err(err.into());
         }
         Ok(()) => {
             if let Some(ref mut s) = spinner {
                 s.success();
             }
-            sink.send_line("Run started, streaming logs...".to_string());
+            output::write("Run started, streaming logs...\n");
 
             // We do this here, explicitly, to not double-monitor our API via the
             // `wait_for_run_start` function above.
@@ -426,18 +376,18 @@ async fn do_follow_run_impl(
                         Some(event) = output.recv() => {
                             if let api::LogStreamEvent::EventLog(log) = &event {
                                 let ts = dates::format_str(&log.reported_at);
-                                sink.send_line(format!("{}: {}", ts, log.content));
+                                output::log_line(&ts, &log.content, output::LogLineType::Remote);
                             }
                             false
                         },
                         res = &mut run_complete => {
-                            handle_run_completion(res, sink)?;
+                            handle_run_completion(res)?;
                             true
                         },
                         _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                            sink.send_line("Received Ctrl+C, stopping log streaming...".to_string());
-                            sink.send_line("Note: The run will continue in Tower cloud".to_string());
-                            sink.send_line(format!("  See more: {}", run.dollar_link));
+                            output::write("Received Ctrl+C, stopping log streaming...\n");
+                            output::write("Note: The run will continue in Tower cloud\n");
+                            output::write(&format!("  See more: {}\n", run.dollar_link));
                             true
                         },
                     };
@@ -446,7 +396,7 @@ async fn do_follow_run_impl(
                     }
                 },
                 Err(err) => {
-                    sink.send_error(format!("Failed to stream run logs: {:?}", err));
+                    output::error(&format!("Failed to stream run logs: {:?}", err));
                     return Err(Error::LogStreamFailed);
                 }
             }
@@ -458,33 +408,32 @@ async fn do_follow_run_impl(
 
 fn handle_run_completion(
     res: Result<Run, tokio::sync::oneshot::error::RecvError>,
-    sink: &dyn OutputSink,
 ) -> Result<(), Error> {
     match res {
         Ok(completed_run) => match completed_run.status {
             tower_api::models::run::Status::Errored => {
-                sink.send_error(format!(
+                output::error(&format!(
                     "Run #{} for app '{}' had an error",
                     completed_run.number, completed_run.app_name
                 ));
                 Err(Error::RunFailed)
             }
             tower_api::models::run::Status::Crashed => {
-                sink.send_error(format!(
+                output::error(&format!(
                     "Run #{} for app '{}' crashed",
                     completed_run.number, completed_run.app_name
                 ));
                 Err(Error::RunCrashed)
             }
             tower_api::models::run::Status::Cancelled => {
-                sink.send_error(format!(
+                output::error(&format!(
                     "Run #{} for app '{}' was cancelled",
                     completed_run.number, completed_run.app_name
                 ));
                 Err(Error::RunCancelled)
             }
             _ => {
-                sink.send_line(format!(
+                output::success(&format!(
                     "Run #{} for app '{}' completed successfully",
                     completed_run.number, completed_run.app_name
                 ));
@@ -492,7 +441,7 @@ fn handle_run_completion(
             }
         },
         Err(err) => {
-            sink.send_error(format!("Failed to monitor run completion: {:?}", err));
+            output::error(&format!("Failed to monitor run completion: {:?}", err));
             Err(err.into())
         }
     }
@@ -679,23 +628,22 @@ async fn monitor_output(output: OutputReceiver) {
 
 /// monitor_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_status(app: LocalApp) {
+async fn monitor_status(app: LocalApp) -> Result<(), Error> {
     debug!("Starting status monitoring for LocalApp");
 
     loop {
         match app.status().await {
             Ok(status) => {
-                debug!("Got app status: {:?}", status);
                 match status {
                     tower_runtime::Status::Exited => {
                         debug!("App exited cleanly, stopping status monitoring");
                         output::success("Your app exited cleanly.");
-                        break;
+                        return Ok(());
                     }
                     tower_runtime::Status::Crashed { .. } => {
                         debug!("App crashed, stopping status monitoring");
                         output::failure("Your app crashed!");
-                        break;
+                        return Err(Error::AppCrashed);
                     }
                     _ => {
                         debug!("App status: continuing to monitor");
@@ -709,7 +657,6 @@ async fn monitor_status(app: LocalApp) {
             }
         }
     }
-    debug!("Status monitoring completed");
 }
 
 fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &str) -> String {

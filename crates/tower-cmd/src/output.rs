@@ -5,7 +5,10 @@ use cli_table::{
 };
 use colored::Colorize;
 use http::StatusCode;
+use regex::Regex;
 use std::io::{self, Write};
+use std::sync::OnceLock;
+use tokio::sync::mpsc::UnboundedSender;
 use tower_api::{
     apis::{Error as ApiError, ResponseContent},
     models::ErrorModel,
@@ -14,8 +17,14 @@ use tower_telemetry::debug;
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
+static CAPTURE_SENDER: OnceLock<UnboundedSender<String>> = OnceLock::new();
+
+pub fn set_capture_sender(sender: UnboundedSender<String>) {
+    CAPTURE_SENDER.set(sender).ok();
+}
+
 pub fn success(msg: &str) {
-    let line = format!("{} {}\n", "Success!".green(), msg);
+    let line = format!("{} {msg}\n", "Success!".green());
     write(&line);
 }
 
@@ -101,39 +110,45 @@ pub fn config_error(err: config::Error) {
 }
 
 pub fn write(msg: &str) {
-    io::stdout().write_all(msg.as_bytes()).unwrap();
+    if let Some(tx) = CAPTURE_SENDER.get() {
+        let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+        let clean_msg = re.replace_all(msg, "").trim_end().to_string();
+        tx.send(clean_msg).ok();
+    } else {
+        io::stdout().write_all(msg.as_bytes()).unwrap();
+    }
 }
 
 pub fn error(msg: &str) {
     let line = format!("{} {}\n", "Oh no!".red(), msg);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
 }
 
 pub fn runtime_error(err: tower_runtime::errors::Error) {
     let line = format!("{} {}\n", "Runtime Error:".red(), err.to_string());
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
 }
 
 // Outputs both the model.detail and the model.errors fields in a human readable format.
 pub fn output_full_error_details(model: &ErrorModel) {
     // Show the main detail message if available
     if let Some(detail) = &model.detail {
-        writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
-        writeln!(io::stdout(), "{}", detail.red()).unwrap();
+        write(&format!("\n{}\n", "Error details:".yellow()));
+        write(&format!("{}\n", detail.red()));
     }
 
     // Show any additional error details from the errors field
     if let Some(errors) = &model.errors {
         if !errors.is_empty() {
             if model.detail.is_none() {
-                writeln!(io::stdout(), "\n{}", "Error details:".yellow()).unwrap();
+                write(&format!("\n{}\n", "Error details:".yellow()));
             }
             for error in errors {
                 let msg = format!(
                     "  • {}",
                     error.message.as_deref().unwrap_or("Unknown error")
                 );
-                writeln!(io::stdout(), "{}", msg.red()).unwrap();
+                write(&format!("{}\n", msg.red()));
             }
         }
     }
@@ -150,8 +165,8 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
             debug!("Failed to parse error content as JSON: {}", e);
             debug!("Raw error content: {}", err.content);
             // Show the raw error content if JSON parsing fails
-            writeln!(io::stdout(), "\n{}", "API Error:".yellow()).unwrap();
-            writeln!(io::stdout(), "{}", err.content.red()).unwrap();
+            write(&format!("\n{}\n", "API Error:".yellow()));
+            write(&format!("{}\n", err.content.red()));
             return;
         }
     };
@@ -220,7 +235,7 @@ pub fn list(items: Vec<String>) {
         let line = format!(" * {}\n", item);
         let line = line.replace("\n", "\n   ");
         let line = format!("{}\n", line);
-        io::stdout().write_all(line.as_bytes()).unwrap();
+        write(&line);
     }
 }
 
@@ -230,25 +245,35 @@ pub fn banner() {
 
 pub struct Spinner {
     msg: String,
-    spinner: spinners::Spinner,
+    spinner: Option<spinners::Spinner>,
 }
 
 impl Spinner {
     pub fn new(msg: String) -> Spinner {
-        let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
-        Spinner { spinner, msg }
+        if CAPTURE_SENDER.get().is_some() {
+            Spinner { spinner: None, msg }
+        } else {
+            let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
+            Spinner { spinner: Some(spinner), msg }
+        }
     }
 
     pub fn success(&mut self) {
-        let sym = "✔".bold().green().to_string();
-        self.spinner
-            .stop_and_persist(&sym, format!("{} Done!", self.msg));
+        if let Some(ref mut spinner) = self.spinner {
+            let sym = "✔".bold().green().to_string();
+            spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
+        } else if let Some(tx) = CAPTURE_SENDER.get() {
+            tx.send(format!("{} Done!", self.msg)).ok();
+        }
     }
 
     pub fn failure(&mut self) {
-        let sym = "✘".bold().red().to_string();
-        self.spinner
-            .stop_and_persist(&sym, format!("{} Failed!", self.msg));
+        if let Some(ref mut spinner) = self.spinner {
+            let sym = "✘".bold().red().to_string();
+            spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
+        } else if let Some(tx) = CAPTURE_SENDER.get() {
+            tx.send(format!("{} Failed!", self.msg)).ok();
+        }
     }
 }
 
@@ -269,18 +294,18 @@ pub fn write_update_message(latest: &str, current: &str) {
         "To upgrade, run: pip install --upgrade tower".yellow()
     );
 
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
 }
 
 /// newline just outputs a newline. This is useful when you have a very specific formatting you
 /// want to maintain and you don't want to use println!.
 pub fn newline() {
-    io::stdout().write_all("\n".as_bytes()).unwrap();
+    write("\n");
 }
 
 pub fn die(msg: &str) -> ! {
     let line = format!("{} {}\n", "Error:".red(), msg);
-    io::stdout().write_all(line.as_bytes()).unwrap();
+    write(&line);
     std::process::exit(1);
 }
 

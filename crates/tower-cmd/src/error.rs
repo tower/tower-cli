@@ -36,6 +36,12 @@ pub enum Error {
     #[snafu(display("Run was cancelled"))]
     RunCancelled,
 
+    #[snafu(display("App crashed during local execution"))]
+    AppCrashed,
+
+    #[snafu(display("API error occurred"))]
+    ApiError,
+
     #[snafu(display("Failed to load Towerfile from {}: {}", path, source))]
     TowerfileLoadFailed { path: String, source: config::Error },
 
