@@ -188,90 +188,7 @@ pub async fn do_run_local(
     .await
 }
 
-/// do_run_local_capture is like do_run_local but returns captured output lines instead of printing
-pub async fn do_run_local_capture(
-    config: Config,
-    path: PathBuf,
-    env: &str,
-    params: HashMap<String, String>,
-) -> Result<Vec<String>, Error> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    crate::output::set_capture_sender(tx);
 
-    let result = do_run_local_impl(config, path, env, params, monitor_output_capture).await;
-
-    let mut all_output = Vec::new();
-
-    // Collect any captured CLI output messages
-    while let Ok(msg) = rx.try_recv() {
-        all_output.push(msg);
-    }
-
-    match result {
-        Ok(mut app_output) => {
-            all_output.append(&mut app_output);
-            Ok(all_output)
-        }
-        Err(e) => {
-            all_output.push(format!("Error: {}", e));
-            Err(e)  // Return error to MCP instead of success with error content
-        }
-    }
-}
-
-pub async fn do_run_remote_capture_plain(
-    config: Config,
-    path: PathBuf,
-    env: &str,
-    params: HashMap<String, String>,
-    app_name: Option<String>,
-) -> Result<Vec<String>, Error> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    crate::output::set_capture_sender(tx);
-
-    let app_slug = if let Some(name) = app_name {
-        name
-    } else {
-        let towerfile_path = path.join("Towerfile");
-        let towerfile = load_towerfile(&towerfile_path)?;
-        towerfile.app.name
-    };
-
-    let result = match api::run_app(&config, &app_slug, env, params).await {
-        Err(err) => {
-            debug!("Failed to schedule run: {}", err);
-            // Collect any error output before returning error
-            let mut all_output = Vec::new();
-            while let Ok(msg) = rx.try_recv() {
-                all_output.push(msg);
-            }
-            all_output.push(format!("Error: {}", err));
-            return Err(Error::ApiError);  // Return error to MCP instead of success with error content
-        }
-        Ok(res) => {
-            let run = res.run;
-            do_follow_run_capture_plain(config, &run).await
-        }
-    };
-
-    let mut all_output = Vec::new();
-
-    // Collect any captured CLI output messages
-    while let Ok(msg) = rx.try_recv() {
-        all_output.push(msg);
-    }
-
-    match result {
-        Ok(mut app_output) => {
-            all_output.append(&mut app_output);
-            Ok(all_output)
-        }
-        Err(e) => {
-            all_output.push(format!("Error: {}", e));
-            Err(e)  // Return error to MCP instead of success with error content
-        }
-    }
-}
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
@@ -324,19 +241,6 @@ pub async fn do_run_remote(
     }
 }
 
-pub async fn do_follow_run_capture_plain(config: Config, run: &Run) -> Result<Vec<String>, Error> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    crate::output::set_capture_sender(tx);
-
-    let _ = do_follow_run(config, run, false, false).await;
-
-    let mut output_lines = Vec::new();
-    while let Ok(line) = rx.try_recv() {
-        output_lines.push(line);
-    }
-
-    Ok(output_lines)
-}
 
 async fn do_follow_run(
     config: Config,
@@ -599,29 +503,15 @@ async fn build_package(towerfile: &Towerfile) -> Result<Package, Error> {
     }
 }
 
-/// monitor_output_capture captures output lines and returns them as a Vec<String>
-pub async fn monitor_output_capture(mut output: OutputReceiver) -> Vec<String> {
-    let mut lines = Vec::new();
+/// monitor_output is a helper function that will monitor the output of a given output channel and
+/// plops it down on stdout.
+async fn monitor_output(mut output: OutputReceiver) {
     loop {
         if let Some(line) = output.recv().await {
             let ts = dates::format(line.time);
-            let formatted = format!("{}: {}", ts, line.line);
-            lines.push(formatted);
+            output::log_line(&ts, &line.line, output::LogLineType::Local);
         } else {
             break;
-        }
-    }
-    lines
-}
-
-/// monitor_output is a helper function that will monitor the output of a given output channel and
-/// plops it down on stdout. Refactored to use monitor_output_capture.
-async fn monitor_output(output: OutputReceiver) {
-    let lines = monitor_output_capture(output).await;
-    for line in lines {
-        // Extract timestamp and message from the formatted line
-        if let Some((ts, msg)) = line.split_once(": ") {
-            output::log_line(ts, msg, output::LogLineType::Local);
         }
     }
 }

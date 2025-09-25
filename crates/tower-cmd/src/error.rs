@@ -98,7 +98,7 @@ impl From<crypto::Error> for Error {
 impl From<tower_api::apis::Error<DescribeRunError>> for Error {
     fn from(err: tower_api::apis::Error<DescribeRunError>) -> Self {
         debug!("API error: {:?}", err);
-        Self::UnknownError
+        Self::ApiError
     }
 }
 

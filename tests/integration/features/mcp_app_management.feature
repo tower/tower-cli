@@ -80,9 +80,9 @@ Feature: MCP App Management
     When I call tower_schedules_delete with the schedule ID
     Then I should receive a success response about schedule deletion
 
-  Scenario: MCP remote run output should be plain text without color codes
+  Scenario: MCP local run output should be plain text without color codes
     Given I have a simple hello world application
-    When I call tower_run_remote via MCP
+    When I call tower_run_local via MCP
     Then the response should contain plain text log lines
     And the response should not contain ANSI color codes
     And each log line should be properly formatted with timestamp

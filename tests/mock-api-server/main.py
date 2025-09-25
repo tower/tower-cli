@@ -179,6 +179,41 @@ async def run_app(name: str, run_params: Dict[str, Any]):
     return {"run": new_run}
 
 
+@app.get("/v1/apps/{name}/runs/{seq}")
+async def describe_run(name: str, seq: int):
+    """Mock endpoint for describing a specific run."""
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    # Find the run by sequence number (this is simplified)
+    for run_id, run_data in mock_runs_db.items():
+        if run_data["app_name"] == name and run_data["number"] == seq:
+            # Update status to completed after a moment
+            run_data["status"] = "completed"
+            run_data["ended_at"] = now_iso()
+            return {"run": run_data}
+
+    # If not found, create a mock completed run
+    mock_run = {
+        "$link": f"/runs/mock-{seq}",
+        "run_id": f"mock-{seq}",
+        "number": seq,
+        "app_name": name,
+        "status": "completed",
+        "status_group": "",
+        "parameters": [],
+        "environment": "default",
+        "exit_code": 0,
+        "created_at": now_iso(),
+        "scheduled_at": now_iso(),
+        "cancelled_at": None,
+        "started_at": now_iso(),
+        "ended_at": now_iso(),
+        "app_version": "1.0.0",
+    }
+    return {"run": mock_run}
+
+
 # Placeholder for /secrets endpoints
 @app.get("/v1/secrets")
 async def list_secrets():
@@ -372,6 +407,45 @@ async def describe_run_logs(name: str, seq: int):
             },
         ]
     }
+
+
+@app.get("/v1/apps/{name}/runs/{seq}/logs/stream")
+async def stream_run_logs(name: str, seq: int):
+    """Mock endpoint for streaming run logs."""
+    from fastapi.responses import StreamingResponse
+    import asyncio
+
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    async def generate_log_stream():
+        # Simulate streaming logs with SSE format
+        mock_logs = [
+            {"timestamp": "2025-08-22T12:00:00Z", "content": "Starting application..."},
+            {"timestamp": "2025-08-22T12:00:01Z", "content": "Hello, World!"},
+            {"timestamp": "2025-08-22T12:00:02Z", "content": "Application completed successfully"},
+        ]
+
+        for log_entry in mock_logs:
+            # Format as SSE event
+            log_data = {
+                "event_type": "log",
+                "data": {
+                    "reported_at": log_entry["timestamp"],
+                    "content": log_entry["content"]
+                }
+            }
+            yield f"data: {json.dumps(log_data)}\n\n"
+            await asyncio.sleep(0.1)  # Small delay between logs
+
+        # Send completion event
+        yield f"data: {json.dumps({'event_type': 'complete'})}\n\n"
+
+    return StreamingResponse(
+        generate_log_stream(),
+        media_type="text/plain",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
 
 
 # Schedule endpoints
