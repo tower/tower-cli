@@ -415,7 +415,7 @@ impl TowerService {
         Parameters(request): Parameters<EmptyRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        match run::do_run_local_capture(
+        match run::do_run_local(
             self.config.clone(),
             working_dir,
             "default",
@@ -423,17 +423,7 @@ impl TowerService {
         )
         .await
         {
-            Ok(output_lines) => {
-                let output = if output_lines.is_empty() {
-                    "App completed successfully (no output)"
-                } else {
-                    &format!(
-                        "App ran locally successfully:\n\n{}",
-                        output_lines.join("\n")
-                    )
-                };
-                Self::text_success(output.to_string())
-            }
+            Ok(_) => Self::text_success("App completed successfully".to_string()),
             Err(e) => Self::error_result("Local run failed", e),
         }
     }
@@ -458,18 +448,8 @@ impl TowerService {
         };
 
         // Try remote run directly to get better error messages
-        match run::do_run_remote_capture(config, path, env, params, None).await {
-            Ok(output_lines) => {
-                let output = if output_lines.is_empty() {
-                    "Remote run completed successfully (no output)"
-                } else {
-                    &format!(
-                        "Remote run completed successfully:\n\n{}",
-                        output_lines.join("\n")
-                    )
-                };
-                Self::text_success(output.to_string())
-            }
+        match run::do_run_remote(config, path, env, params, None, true).await {
+            Ok(_) => Self::text_success("Remote run completed successfully".to_string()),
             Err(e) => {
                 let error_msg = format!("{}", e);
                 if error_msg.contains("404") || error_msg.contains("Not found") {
