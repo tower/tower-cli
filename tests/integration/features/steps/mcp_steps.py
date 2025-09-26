@@ -618,3 +618,18 @@ def step_response_should_contain_message(context, expected_text):
     assert (
         expected_text.lower() in response_content
     ), f"Expected '{expected_text}' in response, got: {context.mcp_response}"
+
+
+@then("I should receive a success response about deployment")
+def step_success_response_about_deployment(context):
+    """Verify the response indicates successful deployment"""
+    assert context.operation_success, f"Deploy operation should succeed, got: {context.mcp_response}"
+
+    response_content = str(context.mcp_response.get("content", "")).lower()
+    deployment_keywords = ["deploy", "version", "tower"]
+    found_deployment_success = any(
+        keyword in response_content for keyword in deployment_keywords
+    )
+    assert (
+        found_deployment_success
+    ), f"Response should mention deployment success, got: {context.mcp_response}"

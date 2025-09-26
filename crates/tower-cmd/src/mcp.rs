@@ -381,6 +381,10 @@ impl TowerService {
             })
     }
 
+    fn load_towerfile_from_dir(working_dir: &std::path::PathBuf) -> Result<Towerfile, config::Error> {
+        Towerfile::from_dir_str(working_dir.to_str().unwrap())
+    }
+
     #[tool(description = "List all Tower apps in your account")]
     async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_apps(&self.config).await {
@@ -598,9 +602,12 @@ impl TowerService {
     #[tool(
         description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create"
     )]
-    async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
-        let matches = clap::ArgMatches::default();
-        deploy::do_deploy(self.config.clone(), &matches).await;
+    async fn tower_deploy(
+        &self,
+        Parameters(request): Parameters<EmptyRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(&request.common);
+        deploy::deploy_from_dir(self.config.clone(), working_dir).await;
         Self::text_success("Deploy command completed - check output above for status".to_string())
     }
 
@@ -639,19 +646,19 @@ impl TowerService {
         Parameters(request): Parameters<RunRequest>,
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
-        use config::Towerfile;
 
         let config = self.config.clone();
         let working_dir = Self::resolve_working_directory(&request.common);
-        let path = working_dir;
         let env = "default";
         let params = request.parameters.unwrap_or_default();
 
         // Load Towerfile to get app name
-        let towerfile = match Towerfile::from_local_file() {
+        let towerfile = match Self::load_towerfile_from_dir(&working_dir) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
+
+        let path = working_dir;
 
         let app_name = towerfile.app.name.clone();
 
@@ -672,7 +679,7 @@ impl TowerService {
         Parameters(request): Parameters<EmptyRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
+        match Self::load_towerfile_from_dir(&working_dir) {
             Ok(towerfile) => Self::json_success(serde_json::to_value(&towerfile).unwrap()),
             Err(e) => Self::error_result("Failed to read Towerfile", e),
         }
@@ -686,7 +693,7 @@ impl TowerService {
         Parameters(request): Parameters<UpdateTowerfileRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
+        let mut towerfile = match Self::load_towerfile_from_dir(&working_dir) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
@@ -721,7 +728,7 @@ impl TowerService {
         Parameters(request): Parameters<AddParameterRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
+        let mut towerfile = match Self::load_towerfile_from_dir(&working_dir) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
@@ -748,7 +755,7 @@ impl TowerService {
         Parameters(request): Parameters<EmptyRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
+        match Self::load_towerfile_from_dir(&working_dir) {
             Ok(_) => Self::json_success(json!({"valid": true})),
             Err(e) => Self::json_success(json!({"valid": false, "error": e.to_string()})),
         }

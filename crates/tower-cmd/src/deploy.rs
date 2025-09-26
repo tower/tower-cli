@@ -29,8 +29,11 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 }
 
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
-    // Determine the directory to build the package from
     let dir = resolve_path(args);
+    deploy_from_dir(config, dir, auto_create).await;
+}
+
+pub async fn deploy_from_dir(config: Config, dir: PathBuf) {
     debug!("Building package from directory: {:?}", dir);
 
     let path = dir.join("Towerfile");
