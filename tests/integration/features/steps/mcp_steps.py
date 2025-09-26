@@ -49,6 +49,7 @@ def create_towerfile(app_type="hello_world"):
     """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
     configs = {
         "hello_world": ("hello-world", "hello.py", "Simple hello world app"),
+        "test_app": ("test-app", "hello.py", "Pre-existing test app for CLI tests"),
         "long_running": (
             "long-runner",
             "long_runner.py",
@@ -121,6 +122,11 @@ def step_create_valid_towerfile(context):
 @given("I have a simple hello world application")
 def step_create_hello_world_app(context):
     create_towerfile("hello_world")
+
+
+@given("I have a test app for CLI validation")
+def step_create_test_app_for_cli(context):
+    create_towerfile("test_app")
 
 
 @given("I have a long-running application")
@@ -613,7 +619,9 @@ def step_response_should_contain_message(context, expected_text):
 @then("I should receive a success response about deployment")
 def step_success_response_about_deployment(context):
     """Verify the response indicates successful deployment"""
-    assert context.operation_success, f"Deploy operation should succeed, got: {context.mcp_response}"
+    assert (
+        context.operation_success
+    ), f"Deploy operation should succeed, got: {context.mcp_response}"
 
     response_content = str(context.mcp_response.get("content", "")).lower()
     deployment_keywords = ["deploy", "version", "tower"]
@@ -630,4 +638,6 @@ def step_success_response_about_deployment(context):
 async def step_app_should_be_visible_in_tower(context, app_name):
     """Verify that the specified app is now visible in Tower"""
     result = await call_mcp_tool(context, "tower_apps_show", {"name": app_name})
-    assert result.get("success", False), f"App '{app_name}' should be visible in Tower, but tower_apps_show failed: {result}"
+    assert result.get(
+        "success", False
+    ), f"App '{app_name}' should be visible in Tower, but tower_apps_show failed: {result}"

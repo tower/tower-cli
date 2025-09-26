@@ -31,6 +31,26 @@ mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
 
+# Pre-populate with test-app for CLI validation/spinner tests
+mock_apps_db["test-app"] = {
+    "name": "test-app",
+    "owner": "mock_owner",
+    "short_description": "Pre-existing test app for CLI tests",
+    "version": "1.0.0",
+    "schedule": None,
+    "created_at": datetime.datetime.now().isoformat(),
+    "next_run_at": None,
+    "health_status": "healthy",
+    "run_results": {
+        "cancelled": 0,
+        "crashed": 0,
+        "errored": 0,
+        "exited": 0,
+        "pending": 0,
+        "running": 0,
+    },
+}
+
 
 def generate_id():
     return str(uuid.uuid4())
@@ -76,13 +96,19 @@ async def list_apps():
 
 @app.post("/v1/apps")
 async def create_app(app_data: Dict[str, Any]):
+    print(f"DEBUG: create_app called with app_data={app_data}")
     app_name = app_data.get("name")
     if not app_name:
+        print(f"DEBUG: App name is missing from request")
         raise HTTPException(status_code=400, detail="App name is required")
+
+    print(f"DEBUG: Creating/checking app '{app_name}'")
+    print(f"DEBUG: mock_apps_db keys before create: {list(mock_apps_db.keys())}")
 
     # For testing purposes, always succeed even if app exists
     # Just return the existing app or create a new one
     if app_name in mock_apps_db:
+        print(f"DEBUG: App '{app_name}' already exists, returning existing app")
         return {"app": mock_apps_db[app_name]}
 
     new_app = {
@@ -104,14 +130,21 @@ async def create_app(app_data: Dict[str, Any]):
         },
     }
     mock_apps_db[app_name] = new_app
+    print(f"DEBUG: Successfully created app '{app_name}'. mock_apps_db now has: {list(mock_apps_db.keys())}")
     return {"app": new_app}
 
 
 @app.get("/v1/apps/{name}")
-async def describe_app(name: str):
+async def describe_app(name: str, response: Response):
     app_info = mock_apps_db.get(name)
     if not app_info:
-        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+        response.status_code = 404
+        return {
+            "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
+            "title": "Not Found",
+            "status": 404,
+            "detail": f"App '{name}' not found"
+        }
     return {"app": app_info, "runs": []}  # Simplistic, no runs yet
 
 
@@ -142,6 +175,9 @@ async def deploy_app(name: str, response: Response):
 
 @app.post("/v1/apps/{name}/runs")
 async def run_app(name: str, run_params: Dict[str, Any]):
+    print(f"DEBUG: run_app called with name={name}, run_params={run_params}")
+    print(f"DEBUG: Current mock_runs_db has {len(mock_runs_db)} runs before creating new run")
+
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
@@ -156,10 +192,13 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         )
 
     run_id = generate_id()
+    run_number = len(mock_runs_db) + 1
+    print(f"DEBUG: Creating new run with id={run_id}, number={run_number}")
+
     new_run = {
         "$link": f"/runs/{run_id}",
         "run_id": run_id,
-        "number": len(mock_runs_db) + 1,
+        "number": run_number,
         "app_name": name,
         "status": "running",
         "status_group": "",
@@ -176,31 +215,53 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         "app_version": mock_apps_db[name].get("version", "1.0.0"),
     }
     mock_runs_db[run_id] = new_run
+    print(f"DEBUG: Run {run_id} stored in mock_runs_db. Total runs now: {len(mock_runs_db)}")
     return {"run": new_run}
 
 
 @app.get("/v1/apps/{name}/runs/{seq}")
 async def describe_run(name: str, seq: int):
     """Mock endpoint for describing a specific run."""
+    print(f"DEBUG: describe_run called with name={name}, seq={seq}")
+    print(f"DEBUG: mock_apps_db keys: {list(mock_apps_db.keys())}")
+    print(f"DEBUG: mock_runs_db has {len(mock_runs_db)} runs: {list(mock_runs_db.keys())}")
+
     if name not in mock_apps_db:
+        print(f"DEBUG: App '{name}' not found in mock_apps_db")
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
     # Find the run by sequence number (this is simplified)
     for run_id, run_data in mock_runs_db.items():
+        print(f"DEBUG: Checking run {run_id}: app_name={run_data['app_name']}, number={run_data['number']}")
         if run_data["app_name"] == name and run_data["number"] == seq:
-            # Update status to completed after a moment
-            run_data["status"] = "completed"
-            run_data["ended_at"] = now_iso()
+            print(f"DEBUG: Found matching run {run_id}")
+            # Simulate run progression: running -> exited after a few seconds
+            import datetime
+            created_time = datetime.datetime.fromisoformat(run_data["created_at"])
+            now_time = datetime.datetime.now()
+            elapsed = (now_time - created_time).total_seconds()
+
+            if elapsed > 2:  # After 2 seconds, mark as exited
+                run_data["status"] = "exited"
+                run_data["status_group"] = "successful"
+                run_data["ended_at"] = now_iso()
+            else:
+                run_data["status"] = "running"
+                run_data["status_group"] = ""
+                if not run_data.get("started_at"):
+                    run_data["started_at"] = now_iso()
+
             return {"run": run_data}
 
+    print(f"DEBUG: No matching run found for app={name}, seq={seq}")
     # If not found, create a mock completed run
     mock_run = {
         "$link": f"/runs/mock-{seq}",
         "run_id": f"mock-{seq}",
         "number": seq,
         "app_name": name,
-        "status": "completed",
-        "status_group": "",
+        "status": "exited",
+        "status_group": "successful",
         "parameters": [],
         "environment": "default",
         "exit_code": 0,
@@ -419,7 +480,7 @@ async def stream_run_logs(name: str, seq: int):
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
     async def generate_log_stream():
-        # Simulate streaming logs with SSE format
+        # Simulate streaming logs with proper SSE format for Tower CLI
         mock_logs = [
             {"timestamp": "2025-08-22T12:00:00Z", "content": "Starting application..."},
             {"timestamp": "2025-08-22T12:00:01Z", "content": "Hello, World!"},
@@ -429,24 +490,22 @@ async def stream_run_logs(name: str, seq: int):
             },
         ]
 
-        for log_entry in mock_logs:
-            # Format as SSE event
+        for i, log_entry in enumerate(mock_logs):
+            # Format as RunLogLine structure expected by CLI
             log_data = {
-                "event_type": "log",
-                "data": {
-                    "reported_at": log_entry["timestamp"],
-                    "content": log_entry["content"],
-                },
+                "channel": "program",
+                "content": log_entry["content"],
+                "line_num": i + 1,
+                "reported_at": log_entry["timestamp"],
+                "run_id": f"mock-run-{seq}",
             }
-            yield f"data: {json.dumps(log_data)}\n\n"
+            # Proper SSE format with event type and data
+            yield f"event: log\ndata: {json.dumps(log_data)}\n\n"
             await asyncio.sleep(0.1)  # Small delay between logs
-
-        # Send completion event
-        yield f"data: {json.dumps({'event_type': 'complete'})}\n\n"
 
     return StreamingResponse(
         generate_log_stream(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
