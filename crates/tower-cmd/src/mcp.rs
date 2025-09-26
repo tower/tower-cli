@@ -541,7 +541,7 @@ impl TowerService {
 
         Self::with_streaming(
             &ctx,
-            || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new(), false),
+            || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new()),
             "App completed successfully",
             "Local run failed",
         ).await
@@ -573,7 +573,7 @@ impl TowerService {
 
         Self::with_streaming_remote(
             &ctx,
-            || run::do_run_remote(config, path, env, params, None),
+            || run::do_run_remote(config, path, env, params, None, true),
             "Remote run completed successfully",
             &app_name,
         ).await

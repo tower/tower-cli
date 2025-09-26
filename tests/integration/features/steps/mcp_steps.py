@@ -103,10 +103,12 @@ def is_error_response(response):
 def step_have_running_mcp_server(context):
     # This step is handled by the before_scenario hook in environment.py
     # Just verify the MCP server was set up properly
-    assert hasattr(context, "tower_process"), "Tower process should be set up"
+    assert hasattr(
+        context, "tower_mcpserver_process"
+    ), "Tower mcp server process should be set up"
     assert hasattr(context, "mcp_server_url"), "MCP server URL should be set up"
 
-    server_alive = context.tower_process.poll() is None
+    server_alive = context.tower_mcpserver_process.poll() is None
     print(f"DEBUG: MCP server alive check: {server_alive}")
     assert server_alive, "MCP server should be running"
 
@@ -311,7 +313,7 @@ async def step_check_server_responsive(context):
     """Verify the MCP server is still responsive after the operation."""
     try:
         # Check if process is alive and server responds
-        if context.tower_process.poll() is not None:
+        if context.tower_mcpserver_process.poll() is not None:
             print("Warning: MCP server process died")
             context.server_responsive = False
         else:

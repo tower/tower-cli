@@ -36,12 +36,12 @@ def before_scenario(context, scenario):
     # Find a free port for this test scenario
     mcp_port = _find_free_port()
 
-    # Start the server process
-    context.tower_process = subprocess.Popen(
+    # Start the mcp server process
+    context.tower_mcpserver_process = subprocess.Popen(
         [tower_binary, "mcp-server", "--port", str(mcp_port)],
         env=test_env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
     )
 
@@ -49,25 +49,44 @@ def before_scenario(context, scenario):
     time.sleep(2)
 
     # Check if process is still running
-    if context.tower_process.poll() is not None:
-        stderr_output = context.tower_process.stderr.read()
+    if context.tower_mcpserver_process.poll() is not None:
+        stderr_output = context.tower_mcpserver_process.stderr.read()
         if stderr_output:
             print(f"DEBUG: MCP server stderr: {stderr_output}")
         raise RuntimeError(
-            f"MCP server exited with code {context.tower_process.returncode}"
+            f"MCP server exited with code {context.tower_mcpserver_process.returncode}"
         )
 
     context.mcp_server_url = f"http://127.0.0.1:{mcp_port}"
 
 
 def after_scenario(context, scenario):
-    if hasattr(context, "tower_process") and context.tower_process:
+    if hasattr(context, "tower_mcpserver_process") and context.tower_mcpserver_process:
         try:
-            context.tower_process.terminate()
-            context.tower_process.wait(timeout=5)
+            # If you wanna debug a test not working, being able to println in the rust
+            # mcp server process is super convenient, so let's capture and print that out here:
+            stdout, stderr = context.tower_mcpserver_process.communicate(timeout=2)
+            if scenario.status.name in ["failed", "error"] or os.environ.get(
+                "DEBUG_MCP_SERVER"
+            ):
+                if stdout:
+                    print(f"\n=== Rust STDOUT ===")
+                    print(stdout)
+                if stderr:
+                    print(f"\n=== MCP Server STDERR ===")
+                    print(stderr)
+
         except subprocess.TimeoutExpired:
-            context.tower_process.kill()
-            context.tower_process.wait()
+            # Force kill if it doesn't respond
+            context.tower_mcpserver_process.kill()
+            stdout, stderr = context.tower_mcpserver_process.communicate()
+
+            if stdout:
+                print(f"\n=== MCP Server STDOUT (force killed) ===")
+                print(stdout)
+            if stderr:
+                print(f"\n=== MCP Server STDERR (force killed) ===")
+                print(stderr)
 
     # Clean up temp directory
     if hasattr(context, "original_cwd"):
