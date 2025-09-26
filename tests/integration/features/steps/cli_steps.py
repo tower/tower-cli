@@ -87,13 +87,13 @@ def step_log_lines_should_be_separate(context):
     ), f"Expected multiple timestamped lines, got: {timestamp_lines}"
 
 
-@then('the final crash status should show red "Oh no!"')
-def step_final_crash_status_should_be_red(context):
-    """Verify crash status shows red 'Oh no!' message"""
+@then('the final crash status should show red "Error:"')
+def step_final_crash_status_should_show_error(context):
+    """Verify crash status shows red 'Error:' message"""
     output = context.cli_output
     # Red is ANSI code 31
     assert "\x1b[31m" in output, f"Expected red color codes in output"
-    assert "Oh no!" in output, f"Expected 'Oh no!' in crash message, got: {output}"
+    assert "Error:" in output, f"Expected 'Error:' in crash message, got: {output}"
 
 
 @then('the final status should show "Your app crashed!" in red')

@@ -267,7 +267,7 @@ impl TowerService {
         ctx: &RequestContext<RoleServer>,
         operation: F,
         success_message: &str,
-        error_prefix: &str,
+        error_message: &str,
     ) -> Result<CallToolResult, McpError>
     where
         F: FnOnce() -> Fut,
@@ -294,20 +294,20 @@ impl TowerService {
 
         match result {
             Ok(_) => {
-                if output_lines.is_empty() {
-                    Self::text_success(success_message.to_string())
+                let message = if output_lines.is_empty() {
+                    success_message.to_string()
                 } else {
-                    let full_output = output_lines.join("\n");
-                    Self::text_success(format!("{}\n{}", full_output, success_message))
-                }
+                    format!("{}\n{}", output_lines.join("\n"), success_message)
+                };
+                Self::text_success(message)
             }
             Err(e) => {
-                if output_lines.is_empty() {
-                    Self::error_result(error_prefix, e)
+                let error_text = if output_lines.is_empty() {
+                    e.to_string()
                 } else {
-                    let full_output = output_lines.join("\n");
-                    Self::error_result(error_prefix, format!("{}\n{}", full_output, e))
-                }
+                    format!("{}\n{}", output_lines.join("\n"), e)
+                };
+                Self::error_result(error_message, error_text)
             }
         }
     }
@@ -343,30 +343,25 @@ impl TowerService {
 
         match result {
             Ok(_) => {
-                if output_lines.is_empty() {
-                    Self::text_success(success_message.to_string())
+                let message = if output_lines.is_empty() {
+                    success_message.to_string()
                 } else {
-                    let full_output = output_lines.join("\n");
-                    Self::text_success(format!("{}\n{}", full_output, success_message))
-                }
+                    format!("{}\n{}", output_lines.join("\n"), success_message)
+                };
+                Self::text_success(message)
             }
             Err(e) => {
-                if output_lines.is_empty() {
-                    let error_message = Self::extract_api_error_message(&e);
-                    let final_error = if Self::is_deployment_error(&error_message) {
-                        format!(
-                            "App '{}' not deployed. Try running tower_deploy first.",
-                            app_name
-                        )
+                let error_text = if output_lines.is_empty() {
+                    let api_error = Self::extract_api_error_message(&e);
+                    if Self::is_deployment_error(&api_error) {
+                        format!("App '{}' not deployed. Try running tower_deploy first.", app_name)
                     } else {
-                        error_message
-                    };
-                    Self::error_result("Remote run failed", final_error)
+                        api_error
+                    }
                 } else {
-                    // If we have captured output, it likely contains the detailed error already
-                    let full_output = output_lines.join("\n");
-                    Self::error_result("Remote run failed", full_output)
-                }
+                    output_lines.join("\n")
+                };
+                Self::error_result("Remote run failed", error_text)
             }
         }
     }

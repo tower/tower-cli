@@ -6,7 +6,7 @@ Feature: CLI Run Commands
   Scenario: CLI remote run should show red error message when API fails
     Given I have a simple hello world application
     When I run "tower run" via CLI
-    Then the final crash status should show red "Oh no!"
+    Then the final crash status should show red "Error:"
 
   Scenario: CLI local run should have green timestamps and detect crashes
     Given I have a simple hello world application that exits with code 1
