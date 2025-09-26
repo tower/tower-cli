@@ -80,3 +80,36 @@ Feature: MCP App Management
     Given I have created a schedule for "test-app"
     When I call tower_schedules_delete with the schedule ID
     Then I should receive a success response about schedule deletion
+
+  Scenario: Remote run succeeds after proper deployment
+    Given I have a simple hello world application
+    When I call tower_deploy via MCP
+    Then I should receive a success response about deployment
+    When I call tower_run_remote via MCP
+    Then I should receive a response about the run
+
+  Scenario: MCP local run output should be plain text without color codes
+    Given I have a simple hello world application
+    When I call tower_run_local via MCP
+    Then the response should contain plain text log lines
+    And the response should not contain ANSI color codes
+    And each log line should be properly formatted with timestamp
+
+  Scenario: MCP remote run should show detailed validation errors
+    Given I have a simple hello world application
+    When I call tower_run_remote with invalid parameter "nonexistent_param=test"
+    Then I should receive a detailed validation error
+    And the error should mention "Unknown parameter"
+    And the error should not just be a status code
+
+  Scenario: Local run should detect exit code failures
+    Given I have a simple hello world application that exits with code 1
+    When I call tower_run_local via MCP
+    Then the response should indicate the app crashed
+    And the response should contain "failed" message
+
+  Scenario: Deploy auto-creates app when it doesn't exist
+    Given I have a simple hello world application
+    When I call tower_deploy via MCP
+    Then I should receive a success response about deployment
+    And the app "hello-world" should be visible in Tower

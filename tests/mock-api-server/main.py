@@ -31,6 +31,26 @@ mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
 
+# Pre-populate with test-app for CLI validation/spinner tests
+mock_apps_db["test-app"] = {
+    "name": "test-app",
+    "owner": "mock_owner",
+    "short_description": "Pre-existing test app for CLI tests",
+    "version": "1.0.0",
+    "schedule": None,
+    "created_at": datetime.datetime.now().isoformat(),
+    "next_run_at": None,
+    "health_status": "healthy",
+    "run_results": {
+        "cancelled": 0,
+        "crashed": 0,
+        "errored": 0,
+        "exited": 0,
+        "pending": 0,
+        "running": 0,
+    },
+}
+
 
 def generate_id():
     return str(uuid.uuid4())
@@ -167,6 +187,34 @@ async def run_app(name: str, run_params: Dict[str, Any]):
     }
     mock_runs_db[run_id] = new_run
     return {"run": new_run}
+
+
+@app.get("/v1/apps/{name}/runs/{seq}")
+async def describe_run(name: str, seq: int):
+    """Mock endpoint for describing a specific run."""
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    # Find the run by sequence number (this is simplified)
+    for run_id, run_data in mock_runs_db.items():
+        if run_data["app_name"] == name and run_data["number"] == seq:
+            # Simulate run progression: running -> exited after a few seconds
+            import datetime
+            created_time = datetime.datetime.fromisoformat(run_data["created_at"])
+            now_time = datetime.datetime.now()
+            elapsed = (now_time - created_time).total_seconds()
+
+            if elapsed > 5:  # After 5 seconds, mark as completed
+                run_data["status"] = "exited"
+                run_data["status_group"] = "completed"
+                run_data["exit_code"] = 0
+                run_data["ended_at"] = now_time.isoformat()
+
+            return {"run": run_data}
+
+    raise HTTPException(
+        status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
+    )
 
 
 # Placeholder for /secrets endpoints
