@@ -229,13 +229,14 @@ impl TowerService {
     ) -> (
         tokio::sync::mpsc::UnboundedSender<String>,
         std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+        tokio::task::JoinHandle<()>,
     ) {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let peer = ctx.peer.clone();
         let collected_output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let collected_output_clone = collected_output.clone();
 
-        tokio::spawn(async move {
+        let join_handle = tokio::spawn(async move {
             let mut progress_counter = 0.0;
             while let Some(message) = rx.recv().await {
                 // Collect the message
@@ -259,7 +260,7 @@ impl TowerService {
             }
         });
 
-        (tx, collected_output)
+        (tx, collected_output, join_handle)
     }
 
     async fn with_streaming<F, Fut, T>(
@@ -272,7 +273,7 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let (streaming_tx, collected_output) = Self::setup_streaming_output(ctx);
+        let (streaming_tx, collected_output, join_handle) = Self::setup_streaming_output(ctx);
         crate::output::set_current_sender(streaming_tx.clone());
 
         let result = operation().await;
@@ -280,6 +281,9 @@ impl TowerService {
         // Clear the current sender and close the channel
         crate::output::clear_current_sender();
         drop(streaming_tx);
+
+        // Wait for the collection task to finish processing all messages
+        join_handle.await.ok();
 
         // Collect all captured output
         let output_lines = if let Ok(output) = collected_output.lock() {
@@ -318,7 +322,7 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let (streaming_tx, collected_output) = Self::setup_streaming_output(ctx);
+        let (streaming_tx, collected_output, join_handle) = Self::setup_streaming_output(ctx);
         crate::output::set_current_sender(streaming_tx.clone());
 
         let result = operation().await;
@@ -327,8 +331,8 @@ impl TowerService {
         crate::output::clear_current_sender();
         drop(streaming_tx);
 
-        // Give the collection task a moment to process any remaining messages
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        // Wait for the collection task to finish processing all messages
+        join_handle.await.ok();
 
         // Collect all captured output
         let output_lines = if let Ok(output) = collected_output.lock() {
