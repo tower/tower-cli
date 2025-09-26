@@ -423,7 +423,10 @@ async def stream_run_logs(name: str, seq: int):
         mock_logs = [
             {"timestamp": "2025-08-22T12:00:00Z", "content": "Starting application..."},
             {"timestamp": "2025-08-22T12:00:01Z", "content": "Hello, World!"},
-            {"timestamp": "2025-08-22T12:00:02Z", "content": "Application completed successfully"},
+            {
+                "timestamp": "2025-08-22T12:00:02Z",
+                "content": "Application completed successfully",
+            },
         ]
 
         for log_entry in mock_logs:
@@ -432,8 +435,8 @@ async def stream_run_logs(name: str, seq: int):
                 "event_type": "log",
                 "data": {
                     "reported_at": log_entry["timestamp"],
-                    "content": log_entry["content"]
-                }
+                    "content": log_entry["content"],
+                },
             }
             yield f"data: {json.dumps(log_data)}\n\n"
             await asyncio.sleep(0.1)  # Small delay between logs
@@ -444,7 +447,7 @@ async def stream_run_logs(name: str, seq: int):
     return StreamingResponse(
         generate_log_stream(),
         media_type="text/plain",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
 

@@ -524,7 +524,7 @@ def step_each_log_line_should_be_formatted_with_timestamp(context):
     response_content = str(context.mcp_response.get("content", ""))
 
     # Split into lines and check timestamp format
-    lines = [line.strip() for line in response_content.split('\n') if line.strip()]
+    lines = [line.strip() for line in response_content.split("\n") if line.strip()]
 
     # Find lines that contain the pipe separator (these should be log lines)
     log_lines = [line for line in lines if " | " in line]

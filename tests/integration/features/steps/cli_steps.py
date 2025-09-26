@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 from behave import given, when, then
 
+
 @when('I run "{command}" via CLI')
 def step_run_cli_command(context, command):
     """Run a Tower CLI command and capture output"""
@@ -146,5 +147,3 @@ def step_both_spinners_should_complete(context):
     assert (
         found_completion
     ), f"Expected spinner completion indicators in output, got: {output[:500]}..."
-
-
