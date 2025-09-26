@@ -220,7 +220,7 @@ pub async fn do_run_remote(
             let run = res.run;
 
             if should_follow_run {
-                let _ = do_follow_run(config, &run, true, true).await;
+                do_follow_run(config, &run, true, true).await?;
             } else {
                 let line = format!(
                     "Run #{} for app `{}` has been scheduled",
@@ -254,8 +254,7 @@ async fn do_follow_run(
             if let Some(ref mut s) = spinner {
                 s.failure();
             }
-            output::error(&format!("Failed to wait for run to start: {}", err));
-            return Err(err.into());
+            return Err(err);
         }
         Ok(()) => {
             if let Some(ref mut s) = spinner {
@@ -559,7 +558,11 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
 /// if it's started yet.
 async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
     loop {
-        let res = api::describe_run(config, &run.app_name, run.number).await?;
+        let res = api::describe_run(config, &run.app_name, run.number).await
+            .map_err(|api_err| {
+                output::tower_error(api_err);
+                Error::RunFailed
+            })?;
 
         if is_run_started(&res.run)? {
             break;
