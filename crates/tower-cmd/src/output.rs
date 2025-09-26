@@ -7,7 +7,7 @@ use colored::Colorize;
 use http::StatusCode;
 use regex::Regex;
 use std::io::{self, Write};
-use std::sync::OnceLock;
+use std::sync::{OnceLock, Mutex};
 use tokio::sync::mpsc::UnboundedSender;
 use tower_api::{
     apis::{Error as ApiError, ResponseContent},
@@ -17,10 +17,27 @@ use tower_telemetry::debug;
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
-static CAPTURE_SENDER: OnceLock<UnboundedSender<String>> = OnceLock::new();
+static CAPTURE_MODE: OnceLock<bool> = OnceLock::new();
+static CURRENT_SENDER: Mutex<Option<UnboundedSender<String>>> = Mutex::new(None);
 
-pub fn set_capture_sender(sender: UnboundedSender<String>) {
-    CAPTURE_SENDER.set(sender).ok();
+pub fn set_capture_mode() {
+    CAPTURE_MODE.set(true).ok();
+}
+
+pub fn set_current_sender(sender: UnboundedSender<String>) {
+    *CURRENT_SENDER.lock().unwrap() = Some(sender);
+}
+
+pub fn clear_current_sender() {
+    *CURRENT_SENDER.lock().unwrap() = None;
+}
+
+fn send_to_current_sender(msg: String) {
+    if let Ok(sender_guard) = CURRENT_SENDER.lock() {
+        if let Some(tx) = sender_guard.as_ref() {
+            tx.send(msg).ok();
+        }
+    }
 }
 
 pub fn success(msg: &str) {
@@ -110,10 +127,10 @@ pub fn config_error(err: config::Error) {
 }
 
 pub fn write(msg: &str) {
-    if let Some(tx) = CAPTURE_SENDER.get() {
+    if CAPTURE_MODE.get().is_some() {
         let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
         let clean_msg = re.replace_all(msg, "").trim_end().to_string();
-        tx.send(clean_msg).ok();
+        send_to_current_sender(clean_msg);
     } else {
         io::stdout().write_all(msg.as_bytes()).unwrap();
     }
@@ -250,7 +267,7 @@ pub struct Spinner {
 
 impl Spinner {
     pub fn new(msg: String) -> Spinner {
-        if CAPTURE_SENDER.get().is_some() {
+        if CAPTURE_MODE.get().is_some() {
             Spinner { spinner: None, msg }
         } else {
             let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
@@ -262,8 +279,8 @@ impl Spinner {
         if let Some(ref mut spinner) = self.spinner {
             let sym = "✔".bold().green().to_string();
             spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
-        } else if let Some(tx) = CAPTURE_SENDER.get() {
-            tx.send(format!("{} Done!", self.msg)).ok();
+        } else if CAPTURE_MODE.get().is_some() {
+            send_to_current_sender(format!("{} Done!", self.msg));
         }
     }
 
@@ -271,8 +288,8 @@ impl Spinner {
         if let Some(ref mut spinner) = self.spinner {
             let sym = "✘".bold().red().to_string();
             spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
-        } else if let Some(tx) = CAPTURE_SENDER.get() {
-            tx.send(format!("{} Failed!", self.msg)).ok();
+        } else if CAPTURE_MODE.get().is_some() {
+            send_to_current_sender(format!("{} Failed!", self.msg));
         }
     }
 }

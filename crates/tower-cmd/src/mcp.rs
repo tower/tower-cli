@@ -150,6 +150,9 @@ pub struct TowerService {
 #[tool_router]
 impl TowerService {
     pub fn new(config: Config) -> Self {
+        // Initialize capture mode for MCP server
+        crate::output::set_capture_mode();
+
         Self {
             config: std::env::var("TOWER_JWT")
                 .ok()
@@ -224,10 +227,18 @@ impl TowerService {
     fn setup_streaming_output(ctx: &RequestContext<RoleServer>) -> (tokio::sync::mpsc::UnboundedSender<String>, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let peer = ctx.peer.clone();
+        let collected_output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let collected_output_clone = collected_output.clone();
 
         tokio::spawn(async move {
             let mut progress_counter = 0.0;
             while let Some(message) = rx.recv().await {
+                // Collect the message
+                if let Ok(mut output) = collected_output_clone.lock() {
+                    output.push(message.clone());
+                }
+
+                // Send progress notification
                 progress_counter += 1.0;
                 let progress_param = ProgressNotificationParam {
                     progress_token: ProgressToken(NumberOrString::Number(progress_counter as u32)),
@@ -243,7 +254,7 @@ impl TowerService {
             }
         });
 
-        tx
+        (tx, collected_output)
     }
 
     async fn with_streaming<F, Fut, T>(
@@ -257,7 +268,7 @@ impl TowerService {
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
         let streaming_tx = Self::setup_streaming_output(ctx);
-        crate::output::set_capture_sender(streaming_tx);
+        crate::output::set_current_sender(streaming_tx.clone());
 
         match operation().await {
             Ok(_) => Self::text_success(success_message.to_string()),
@@ -276,7 +287,7 @@ impl TowerService {
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
         let streaming_tx = Self::setup_streaming_output(ctx);
-        crate::output::set_capture_sender(streaming_tx);
+        crate::output::set_current_sender(streaming_tx.clone());
 
         match operation().await {
             Ok(_) => Self::text_success(success_message.to_string()),
