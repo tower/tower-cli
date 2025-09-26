@@ -227,31 +227,22 @@ impl TowerService {
         tx
     }
 
-    async fn with_streaming<F, Fut, T, E>(
+    async fn execute_with_progress<F, Fut, T>(
         ctx: &RequestContext<RoleServer>,
         operation: F,
-        success_message: &str,
-        error_handler: E,
-    ) -> Result<CallToolResult, McpError>
+    ) -> Result<T, crate::Error>
     where
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
-        E: FnOnce(crate::Error) -> Result<CallToolResult, McpError>,
     {
         let streaming_tx = Self::setup_streaming_output(ctx);
         crate::output::set_capture_mode();
         crate::output::set_current_sender(streaming_tx);
 
-        match operation().await {
-            Ok(_) => {
-                crate::output::clear_current_sender();
-                Self::text_success(success_message.to_string())
-            },
-            Err(e) => {
-                crate::output::clear_current_sender();
-                error_handler(e)
-            },
-        }
+        let result = operation().await;
+
+        crate::output::clear_current_sender();
+        result
     }
 
     #[tool(description = "List all Tower apps in your account")]
@@ -491,12 +482,10 @@ impl TowerService {
         let working_dir = Self::resolve_working_directory(&request.common);
         let config = self.config.clone();
 
-        Self::with_streaming(
-            &ctx,
-            || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new()),
-            "App completed successfully",
-            |e| Self::error_result("Local run failed", e),
-        ).await
+        match Self::execute_with_progress(&ctx, || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new())).await {
+            Ok(_) => Self::text_success("App completed successfully".to_string()),
+            Err(e) => Self::error_result("Local run failed", e),
+        }
     }
 
     #[tool(
@@ -523,11 +512,9 @@ impl TowerService {
 
         let app_name = towerfile.app.name.clone();
 
-        Self::with_streaming(
-            &ctx,
-            || run::do_run_remote(config, path, env, params, None, true),
-            "Remote run completed successfully",
-            |e| {
+        match Self::execute_with_progress(&ctx, || run::do_run_remote(config, path, env, params, None, true)).await {
+            Ok(_) => Self::text_success("Remote run completed successfully".to_string()),
+            Err(e) => {
                 let error_message = Self::extract_api_error_message(&e);
                 if Self::is_deployment_error(&error_message) {
                     Self::error_result(
@@ -537,8 +524,8 @@ impl TowerService {
                 } else {
                     Self::error_result("Remote run failed", e)
                 }
-            },
-        ).await
+            }
+        }
     }
 
     #[tool(
