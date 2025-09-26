@@ -17,6 +17,12 @@ pub fn deploy_cmd() -> Command {
                 .help("The directory containing the app to deploy")
                 .default_value("."),
         )
+        .arg(
+            Arg::new("auto-create")
+                .long("auto-create")
+                .help("Automatically create app if it doesn't exist")
+                .action(clap::ArgAction::SetTrue),
+        )
         .about("Deploy your latest code to Tower")
 }
 
@@ -30,10 +36,11 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
     let dir = resolve_path(args);
+    let auto_create = args.get_flag("auto-create");
     deploy_from_dir(config, dir, auto_create).await;
 }
 
-pub async fn deploy_from_dir(config: Config, dir: PathBuf) {
+pub async fn deploy_from_dir(config: Config, dir: PathBuf, auto_create: bool) {
     debug!("Building package from directory: {:?}", dir);
 
     let path = dir.join("Towerfile");
@@ -47,6 +54,7 @@ pub async fn deploy_from_dir(config: Config, dir: PathBuf) {
                 &api_config,
                 &towerfile.app.name,
                 &towerfile.app.description,
+                auto_create,
             )
             .await
             {

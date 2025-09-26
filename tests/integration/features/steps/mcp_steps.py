@@ -468,18 +468,8 @@ async def step_app_exists_in_tower(context, app_name):
 @given('the app "{app_name}" exists and is deployed in Tower')
 @async_run_until_complete
 async def step_app_exists_and_deployed_in_tower(context, app_name):
-    """Ensure the specified app exists and is marked as deployed in Tower"""
-    import httpx
-    import os
-
-    # Create the app using the MCP server
-    result = await call_mcp_tool(context, "tower_apps_create", {"name": app_name})
-
-    # Deploy the app by calling the mock API directly
-    api_url = os.environ.get("TOWER_API_URL", "http://127.0.0.1:8000")
-    async with httpx.AsyncClient() as client:
-        deploy_response = await client.post(f"{api_url}/v1/apps/{app_name}/deploy")
-        # We don't need to check the response - the mock will handle it
+    """Ensure the specified app exists and is deployed in Tower"""
+    result = await call_mcp_tool(context, "tower_deploy", {})
 
 
 @when('I call tower_run_remote with invalid parameter "{param}"')
@@ -633,3 +623,11 @@ def step_success_response_about_deployment(context):
     assert (
         found_deployment_success
     ), f"Response should mention deployment success, got: {context.mcp_response}"
+
+
+@then('the app "{app_name}" should be visible in Tower')
+@async_run_until_complete
+async def step_app_should_be_visible_in_tower(context, app_name):
+    """Verify that the specified app is now visible in Tower"""
+    result = await call_mcp_tool(context, "tower_apps_show", {"name": app_name})
+    assert result.get("success", False), f"App '{app_name}' should be visible in Tower, but tower_apps_show failed: {result}"

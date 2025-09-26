@@ -106,3 +106,9 @@ Feature: MCP App Management
     When I call tower_run_local via MCP
     Then the response should indicate the app crashed
     And the response should contain "failed" message
+
+  Scenario: Deploy auto-creates app when it doesn't exist
+    Given I have a simple hello world application
+    When I call tower_deploy via MCP
+    Then I should receive a success response about deployment
+    And the app "hello-world" should be visible in Tower
