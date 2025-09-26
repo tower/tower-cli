@@ -267,12 +267,39 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let streaming_tx = Self::setup_streaming_output(ctx);
+        let (streaming_tx, collected_output) = Self::setup_streaming_output(ctx);
         crate::output::set_current_sender(streaming_tx.clone());
 
-        match operation().await {
-            Ok(_) => Self::text_success(success_message.to_string()),
-            Err(e) => Self::error_result(error_prefix, e),
+        let result = operation().await;
+
+        // Clear the current sender and close the channel
+        crate::output::clear_current_sender();
+        drop(streaming_tx);
+
+        // Collect all captured output
+        let output_lines = if let Ok(output) = collected_output.lock() {
+            output.clone()
+        } else {
+            Vec::new()
+        };
+
+        match result {
+            Ok(_) => {
+                if output_lines.is_empty() {
+                    Self::text_success(success_message.to_string())
+                } else {
+                    let full_output = output_lines.join("\n");
+                    Self::text_success(format!("{}\n{}", full_output, success_message))
+                }
+            }
+            Err(e) => {
+                if output_lines.is_empty() {
+                    Self::error_result(error_prefix, e)
+                } else {
+                    let full_output = output_lines.join("\n");
+                    Self::error_result(error_prefix, format!("{}\n{}", full_output, e))
+                }
+            }
         }
     }
 
@@ -286,21 +313,47 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let streaming_tx = Self::setup_streaming_output(ctx);
+        let (streaming_tx, collected_output) = Self::setup_streaming_output(ctx);
         crate::output::set_current_sender(streaming_tx.clone());
 
-        match operation().await {
-            Ok(_) => Self::text_success(success_message.to_string()),
-            Err(e) => {
-                let error_message = Self::extract_api_error_message(&e);
+        let result = operation().await;
 
-                if Self::is_deployment_error(&error_message) {
-                    Self::error_result(
-                        "App not deployed",
-                        format!("App '{}' not deployed. Try running tower_deploy first.", app_name)
-                    )
+        // Clear the current sender and close the channel
+        crate::output::clear_current_sender();
+        drop(streaming_tx);
+
+        // Give the collection task a moment to process any remaining messages
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Collect all captured output
+        let output_lines = if let Ok(output) = collected_output.lock() {
+            output.clone()
+        } else {
+            Vec::new()
+        };
+
+        match result {
+            Ok(_) => {
+                if output_lines.is_empty() {
+                    Self::text_success(success_message.to_string())
                 } else {
-                    Self::error_result("Remote run failed", error_message)
+                    let full_output = output_lines.join("\n");
+                    Self::text_success(format!("{}\n{}", full_output, success_message))
+                }
+            }
+            Err(e) => {
+                if output_lines.is_empty() {
+                    let error_message = Self::extract_api_error_message(&e);
+                    let final_error = if Self::is_deployment_error(&error_message) {
+                        format!("App '{}' not deployed. Try running tower_deploy first.", app_name)
+                    } else {
+                        error_message
+                    };
+                    Self::error_result("Remote run failed", final_error)
+                } else {
+                    // If we have captured output, it likely contains the detailed error already
+                    let full_output = output_lines.join("\n");
+                    Self::error_result("Remote run failed", full_output)
                 }
             }
         }
