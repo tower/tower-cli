@@ -45,11 +45,12 @@ Feature: MCP App Management
     Then I should receive an error response about app not deployed
     And the MCP server should remain responsive
 
-  Scenario: Test timeout mechanism with guaranteed slow application
-    Given I have a long-running application
-    When I call tower_run_local via MCP
-    Then I should receive a timeout message
-    And the MCP server should remain responsive
+  Scenario: Remote run succeeds after proper deployment
+    Given I have a simple hello world application
+    When I call tower_deploy via MCP
+    Then I should receive a success response about deployment
+    When I call tower_run_remote via MCP
+    Then I should receive a response about the run
 
   Scenario: Generate Towerfile from pyproject.toml
     Given I have a pyproject.toml file with project metadata

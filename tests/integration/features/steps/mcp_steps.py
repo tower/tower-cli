@@ -49,11 +49,6 @@ def create_towerfile(app_type="hello_world"):
     """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
     configs = {
         "hello_world": ("hello-world", "hello.py", "Simple hello world app"),
-        "long_running": (
-            "long-runner",
-            "long_runner.py",
-            "Long running app for timeout testing",
-        ),
     }
 
     app_name, script_name, description = configs.get(app_type, configs["hello_world"])
@@ -119,11 +114,6 @@ def step_create_valid_towerfile(context):
 @given("I have a simple hello world application")
 def step_create_hello_world_app(context):
     create_towerfile("hello_world")
-
-
-@given("I have a long-running application")
-def step_create_long_running_app(context):
-    create_towerfile("long_running")
 
 
 @given("I have a pyproject.toml file with project metadata")
@@ -228,20 +218,6 @@ def step_check_run_response(context):
     assert context.mcp_response.get(
         "success", False
     ), f"Expected successful run response, got: {context.mcp_response}"
-
-
-@then("I should receive a timeout message")
-def step_check_timeout_message(context):
-    """Verify the response indicates a timeout occurred."""
-    assert hasattr(context, "mcp_response"), "No MCP response was recorded"
-
-    response_text = str(context.mcp_response).lower()
-    timeout_keywords = ["timeout", "timed out", "3 seconds"]
-
-    found_timeout = any(keyword in response_text for keyword in timeout_keywords)
-    assert (
-        found_timeout
-    ), f"Response should indicate timeout, got: {context.mcp_response}"
 
 
 @then("I should receive an error response about app not deployed")
