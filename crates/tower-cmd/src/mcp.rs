@@ -402,9 +402,12 @@ impl TowerService {
         description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create"
     )]
     async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
-        let matches = clap::ArgMatches::default();
-        deploy::do_deploy(self.config.clone(), &matches).await;
-        Self::text_success("Deploy command completed - check output above for status".to_string())
+        use std::path::PathBuf;
+
+        match deploy::deploy_from_dir(self.config.clone(), PathBuf::from(".")).await {
+            Ok(_) => Self::text_success("Deploy completed successfully".to_string()),
+            Err(e) => Self::error_result("Deploy failed", e),
+        }
     }
 
     #[tool(
