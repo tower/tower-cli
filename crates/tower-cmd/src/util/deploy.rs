@@ -1,17 +1,19 @@
-use crate::{output, util};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
+
 use reqwest::{Body, Client as ReqwestClient, Method};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
+use tower_api::{
+    apis::{configuration::Configuration, default_api::DeployAppError, Error, ResponseContent},
+    models::DeployAppResponse,
+};
 use tower_package::{compute_sha256_file, Package};
 use tower_telemetry::debug;
 
-use tower_api::apis::configuration::Configuration;
-use tower_api::apis::default_api::DeployAppError;
-use tower_api::apis::Error;
-use tower_api::apis::ResponseContent;
-use tower_api::models::DeployAppResponse;
+use crate::{output, util};
 
 pub async fn upload_file_with_progress(
     api_config: &Configuration,

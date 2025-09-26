@@ -1,11 +1,11 @@
+use std::collections::HashMap;
+
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
-use std::collections::HashMap;
+use tower_api::models::schedule::Status;
 
 use crate::{api, output};
-
-use tower_api::models::schedule::Status;
 
 pub fn schedules_cmd() -> Command {
     Command::new("schedules")

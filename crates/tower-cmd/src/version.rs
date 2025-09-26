@@ -1,5 +1,6 @@
-use crate::output;
 use clap::Command;
+
+use crate::output;
 
 pub fn version_cmd() -> Command {
     Command::new("version").about("Print the current version of Tower")

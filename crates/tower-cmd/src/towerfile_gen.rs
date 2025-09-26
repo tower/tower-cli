@@ -1,6 +1,6 @@
+use std::{fs, path::Path};
+
 use crate::Error;
-use std::fs;
-use std::path::Path;
 
 pub struct TowerfileGenerator;
 
@@ -180,12 +180,10 @@ name = "custom-script-project"
         let result =
             TowerfileGenerator::from_pyproject(Some("/nonexistent/path/pyproject.toml"), None);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("pyproject.toml not found")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("pyproject.toml not found"));
     }
 
     #[test]
@@ -205,12 +203,10 @@ requires = ["setuptools"]
         let result =
             TowerfileGenerator::from_pyproject(Some(pyproject_path.to_str().unwrap()), None);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("No [project] section found")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No [project] section found"));
     }
 
     #[test]

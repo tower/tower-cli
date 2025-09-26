@@ -1,9 +1,10 @@
-use futures_util::stream::Stream;
-use std::sync::{Arc, Mutex};
 use std::{
     pin::Pin,
+    sync::{Arc, Mutex},
     task::{Context, Poll},
 };
+
+use futures_util::stream::Stream;
 
 pub struct ProgressStream<R> {
     inner: R,

@@ -1,12 +1,12 @@
+use std::{convert::From, path::PathBuf};
+
 use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
-use std::convert::From;
-use std::path::PathBuf;
-
-use crate::{output, util};
 use tower_api::apis::configuration::Configuration;
 use tower_package::{Package, PackageSpec};
 use tower_telemetry::debug;
+
+use crate::{output, util};
 
 pub fn deploy_cmd() -> Command {
     Command::new("deploy")

@@ -3,7 +3,6 @@ use colored::Colorize;
 use config::Config;
 use crypto::encrypt;
 use rsa::pkcs1::DecodeRsaPublicKey;
-
 use tower_api::{
     apis::{default_api::CreateSecretError, Error},
     models::CreateSecretResponse,

@@ -1,7 +1,6 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
-
 use tower_api::models::Run;
 
 use crate::{api, output, util::dates};

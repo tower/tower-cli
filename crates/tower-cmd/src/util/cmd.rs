@@ -1,5 +1,6 @@
-use crate::output;
 use clap::ArgMatches;
+
+use crate::output;
 
 pub fn get_string_flag(args: &ArgMatches, name: &str) -> String {
     args.get_one::<String>(name)

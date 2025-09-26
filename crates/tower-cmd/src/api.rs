@@ -1,13 +1,14 @@
+use std::collections::HashMap;
+
 use config::Config;
 use futures_util::StreamExt;
 use http::StatusCode;
 use reqwest_eventsource::{Event, EventSource};
-use std::collections::HashMap;
 use tokio::sync::mpsc;
-use tower_api::apis::configuration;
-use tower_api::apis::Error;
-use tower_api::apis::ResponseContent;
-use tower_api::models::RunParameter;
+use tower_api::{
+    apis::{configuration, Error, ResponseContent},
+    models::RunParameter,
+};
 use tower_telemetry::debug;
 
 /// Helper trait to extract the successful response data from API responses

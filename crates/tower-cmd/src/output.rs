@@ -1,4 +1,8 @@
-pub use cli_table::{format::Justify, Cell};
+use std::{
+    io::{self, Write},
+    sync::{Mutex, OnceLock},
+};
+
 use cli_table::{
     format::{Border, HorizontalLine, Separator},
     print_stdout, Table,
@@ -6,14 +10,14 @@ use cli_table::{
 use colored::Colorize;
 use http::StatusCode;
 use regex::Regex;
-use std::io::{self, Write};
-use std::sync::{OnceLock, Mutex};
 use tokio::sync::mpsc::UnboundedSender;
 use tower_api::{
     apis::{Error as ApiError, ResponseContent},
     models::ErrorModel,
 };
 use tower_telemetry::debug;
+
+pub use cli_table::{format::Justify, Cell};
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
@@ -271,7 +275,10 @@ impl Spinner {
             Spinner { spinner: None, msg }
         } else {
             let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
-            Spinner { spinner: Some(spinner), msg }
+            Spinner {
+                spinner: Some(spinner),
+                msg,
+            }
         }
     }
 

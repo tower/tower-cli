@@ -1,27 +1,26 @@
-use crate::Error;
-use crate::towerfile_gen::TowerfileGenerator;
-use crate::{Config, api, deploy, run};
-use tower_api::apis::Error as ApiError;
+use std::future::Future;
+
 use clap::Command;
-use config::Session;
-use config::Towerfile;
+use config::{Session, Towerfile};
 use crypto;
 use rmcp::{
-    ErrorData as McpError, RoleServer, ServerHandler,
     handler::server::tool::{Parameters, ToolRouter},
     model::{
-        CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo,
-        ProgressNotificationParam, ProgressToken, NumberOrString,
+        CallToolResult, Content, Implementation, NumberOrString, ProgressNotificationParam,
+        ProgressToken, ProtocolVersion, ServerCapabilities, ServerInfo,
     },
     schemars::{self, JsonSchema},
     service::RequestContext,
     tool, tool_handler, tool_router,
     transport::sse_server::SseServer,
+    ErrorData as McpError, RoleServer, ServerHandler,
 };
 use rsa::pkcs1::DecodeRsaPublicKey;
 use serde::Deserialize;
-use serde_json::{Value, json};
-use std::future::Future;
+use serde_json::{json, Value};
+use tower_api::apis::Error as ApiError;
+
+use crate::{api, deploy, run, towerfile_gen::TowerfileGenerator, Config, Error};
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CommonParams {
@@ -205,7 +204,8 @@ impl TowerService {
         let error_model: tower_api::models::ErrorModel =
             serde_json::from_str(&resp.content).ok()?;
 
-        error_model.detail
+        error_model
+            .detail
             .or_else(|| error_model.errors?.first()?.message.clone())
     }
 
@@ -224,7 +224,12 @@ impl TowerService {
             || (message.contains("API error occurred") && !message.contains("422"))
     }
 
-    fn setup_streaming_output(ctx: &RequestContext<RoleServer>) -> (tokio::sync::mpsc::UnboundedSender<String>, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    fn setup_streaming_output(
+        ctx: &RequestContext<RoleServer>,
+    ) -> (
+        tokio::sync::mpsc::UnboundedSender<String>,
+        std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    ) {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let peer = ctx.peer.clone();
         let collected_output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -345,7 +350,10 @@ impl TowerService {
                 if output_lines.is_empty() {
                     let error_message = Self::extract_api_error_message(&e);
                     let final_error = if Self::is_deployment_error(&error_message) {
-                        format!("App '{}' not deployed. Try running tower_deploy first.", app_name)
+                        format!(
+                            "App '{}' not deployed. Try running tower_deploy first.",
+                            app_name
+                        )
                     } else {
                         error_message
                     };
@@ -605,10 +613,18 @@ impl TowerService {
 
         Self::with_streaming(
             &ctx,
-            || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new()),
+            || {
+                run::do_run_local(
+                    config,
+                    working_dir,
+                    "default",
+                    std::collections::HashMap::new(),
+                )
+            },
             "App completed successfully",
             "Local run failed",
-        ).await
+        )
+        .await
     }
 
     #[tool(
@@ -640,7 +656,8 @@ impl TowerService {
             || run::do_run_remote(config, path, env, params, None, true),
             "Remote run completed successfully",
             &app_name,
-        ).await
+        )
+        .await
     }
 
     #[tool(

@@ -1,11 +1,14 @@
-use crate::output;
 use http::StatusCode;
 use promptly::prompt_default;
-use tower_api::apis::{
-    configuration::Configuration,
-    default_api::{self, CreateAppParams, DescribeAppParams},
+use tower_api::{
+    apis::{
+        configuration::Configuration,
+        default_api::{self, CreateAppParams, DescribeAppParams},
+    },
+    models::CreateAppParams as CreateAppParamsModel,
 };
-use tower_api::models::CreateAppParams as CreateAppParamsModel;
+
+use crate::output;
 
 pub async fn ensure_app_exists(
     api_config: &Configuration,

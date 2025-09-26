@@ -1,16 +1,14 @@
-use crate::Error;
+use std::{collections::HashMap, path::PathBuf};
+
 use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
-use std::collections::HashMap;
-use std::path::PathBuf;
+use tokio::sync::{mpsc::unbounded_channel, oneshot};
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{App, AppLauncher, OutputReceiver, local::LocalApp};
-use tower_telemetry::{Context, debug};
+use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver};
+use tower_telemetry::{debug, Context};
 
-use tokio::sync::{mpsc::unbounded_channel, oneshot};
-
-use crate::{api, output, util::dates};
+use crate::{api, output, util::dates, Error};
 
 pub fn run_cmd() -> Command {
     Command::new("run")
@@ -165,7 +163,7 @@ where
     let status_task = tokio::spawn(monitor_status(app));
 
     let (output_result, status_result) = tokio::join!(output_task, status_task);
-    
+
     let final_result = output_result.unwrap();
     status_result.unwrap()?; // Propagate crash/error status
 
@@ -187,8 +185,6 @@ pub async fn do_run_local(
     })
     .await
 }
-
-
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
@@ -240,7 +236,6 @@ pub async fn do_run_remote(
         }
     }
 }
-
 
 async fn do_follow_run(
     config: Config,
@@ -523,24 +518,22 @@ async fn monitor_status(app: LocalApp) -> Result<(), Error> {
 
     loop {
         match app.status().await {
-            Ok(status) => {
-                match status {
-                    tower_runtime::Status::Exited => {
-                        debug!("App exited cleanly, stopping status monitoring");
-                        output::success("Your app exited cleanly.");
-                        return Ok(());
-                    }
-                    tower_runtime::Status::Crashed { .. } => {
-                        debug!("App crashed, stopping status monitoring");
-                        output::failure("Your app crashed!");
-                        return Err(Error::AppCrashed);
-                    }
-                    _ => {
-                        debug!("App status: continuing to monitor");
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    }
+            Ok(status) => match status {
+                tower_runtime::Status::Exited => {
+                    debug!("App exited cleanly, stopping status monitoring");
+                    output::success("Your app exited cleanly.");
+                    return Ok(());
                 }
-            }
+                tower_runtime::Status::Crashed { .. } => {
+                    debug!("App crashed, stopping status monitoring");
+                    output::failure("Your app crashed!");
+                    return Err(Error::AppCrashed);
+                }
+                _ => {
+                    debug!("App status: continuing to monitor");
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            },
             Err(e) => {
                 debug!("Failed to get app status: {:?}", e);
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;

@@ -6,8 +6,9 @@ mod apps;
 mod deploy;
 mod environments;
 pub mod error;
-mod package;
+mod mcp;
 pub mod output;
+mod package;
 mod run;
 mod schedules;
 mod secrets;
@@ -16,7 +17,6 @@ mod teams;
 mod towerfile_gen;
 mod util;
 mod version;
-mod mcp;
 
 pub use error::Error;
 
@@ -165,10 +165,12 @@ impl App {
                     }
                 }
             }
-            Some(("mcp-server", args)) => mcp::do_mcp_server(sessionized_config, args).await.unwrap_or_else(|e| {
-                eprintln!("MCP server error: {}", e);
-                std::process::exit(1);
-            }),
+            Some(("mcp-server", args)) => mcp::do_mcp_server(sessionized_config, args)
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("MCP server error: {}", e);
+                    std::process::exit(1);
+                }),
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);

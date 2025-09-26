@@ -1,11 +1,10 @@
-use crate::output;
 use clap::Command;
 use config::{Config, Session};
 use tokio::{time, time::Duration};
 use tower_api::models::CreateDeviceLoginTicketResponse;
 use tower_telemetry::debug;
 
-use crate::api;
+use crate::{api, output};
 
 pub fn login_cmd() -> Command {
     Command::new("login").about("Create a session with Tower")
