@@ -558,7 +558,8 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
 /// if it's started yet.
 async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
     loop {
-        let res = api::describe_run(config, &run.app_name, run.number).await
+        let res = api::describe_run(config, &run.app_name, run.number)
+            .await
             .map_err(|api_err| {
                 output::tower_error(api_err);
                 Error::RunFailed

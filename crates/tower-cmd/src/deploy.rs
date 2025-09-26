@@ -46,7 +46,11 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
     }
 }
 
-pub async fn deploy_from_dir(config: Config, dir: PathBuf, auto_create: bool) -> Result<(), crate::Error> {
+pub async fn deploy_from_dir(
+    config: Config,
+    dir: PathBuf,
+    auto_create: bool,
+) -> Result<(), crate::Error> {
     debug!("Building package from directory: {:?}", dir);
 
     let path = dir.join("Towerfile");
@@ -81,7 +85,11 @@ pub async fn deploy_from_dir(config: Config, dir: PathBuf, auto_create: bool) ->
     Ok(())
 }
 
-async fn do_deploy_package(api_config: Configuration, package: Package, towerfile: &Towerfile) -> Result<tower_api::models::DeployAppResponse, crate::Error> {
+async fn do_deploy_package(
+    api_config: Configuration,
+    package: Package,
+    towerfile: &Towerfile,
+) -> Result<tower_api::models::DeployAppResponse, crate::Error> {
     let res = util::deploy::deploy_app_package(&api_config, &towerfile.app.name, package).await;
 
     match res {

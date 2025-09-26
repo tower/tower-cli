@@ -1,5 +1,7 @@
 use snafu::prelude::*;
-use tower_api::apis::default_api::{DeployAppError, DescribeAppError, DescribeRunError, RunAppError};
+use tower_api::apis::default_api::{
+    DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
+};
 use tower_telemetry::debug;
 
 #[derive(Debug, Snafu)]

@@ -53,14 +53,15 @@ pub async fn ensure_app_exists(
     }
 
     // Decide whether to create the app
-    let create_app = auto_create || prompt_default(
-        format!(
-            "App '{}' does not exist. Would you like to create it?",
-            app_name
-        ),
-        false,
-    )
-    .unwrap_or(false);
+    let create_app = auto_create
+        || prompt_default(
+            format!(
+                "App '{}' does not exist. Would you like to create it?",
+                app_name
+            ),
+            false,
+        )
+        .unwrap_or(false);
 
     // If the user doesn't want to create the app, return the original error
     if !create_app {

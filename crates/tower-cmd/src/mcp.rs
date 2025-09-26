@@ -284,7 +284,10 @@ impl TowerService {
         drop(streaming.sender);
         streaming.task.await.ok();
 
-        let output_lines = streaming.collected.lock().ok()
+        let output_lines = streaming
+            .collected
+            .lock()
+            .ok()
             .map(|output| output.clone())
             .unwrap_or_default();
 
@@ -327,7 +330,10 @@ impl TowerService {
         drop(streaming.sender);
         streaming.task.await.ok();
 
-        let output_lines = streaming.collected.lock().ok()
+        let output_lines = streaming
+            .collected
+            .lock()
+            .ok()
             .map(|output| output.clone())
             .unwrap_or_default();
 
@@ -344,7 +350,10 @@ impl TowerService {
                 let error_text = if output_lines.is_empty() {
                     let api_error = Self::extract_api_error_message(&e);
                     if Self::is_deployment_error(&api_error) {
-                        format!("App '{}' not deployed. Try running tower_deploy first.", app_name)
+                        format!(
+                            "App '{}' not deployed. Try running tower_deploy first.",
+                            app_name
+                        )
                     } else {
                         api_error
                     }
@@ -366,7 +375,9 @@ impl TowerService {
             })
     }
 
-    fn load_towerfile_from_dir(working_dir: &std::path::PathBuf) -> Result<Towerfile, config::Error> {
+    fn load_towerfile_from_dir(
+        working_dir: &std::path::PathBuf,
+    ) -> Result<Towerfile, config::Error> {
         Towerfile::from_dir_str(working_dir.to_str().unwrap())
     }
 
@@ -593,9 +604,7 @@ impl TowerService {
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
         match deploy::deploy_from_dir(self.config.clone(), working_dir, true).await {
-            Ok(()) => {
-                Self::text_success("Deploy completed successfully".to_string())
-            }
+            Ok(()) => Self::text_success("Deploy completed successfully".to_string()),
             Err(e) => Self::error_result("Deploy failed", e),
         }
     }
@@ -635,7 +644,6 @@ impl TowerService {
         Parameters(request): Parameters<RunRequest>,
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
-
         let config = self.config.clone();
         let working_dir = Self::resolve_working_directory(&request.common);
         let env = "default";
