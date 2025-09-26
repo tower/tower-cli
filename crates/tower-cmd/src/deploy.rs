@@ -37,64 +37,66 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
     let dir = resolve_path(args);
     let auto_create = args.get_flag("auto-create");
-    deploy_from_dir(config, dir, auto_create).await;
-}
-
-pub async fn deploy_from_dir(config: Config, dir: PathBuf, auto_create: bool) {
-    debug!("Building package from directory: {:?}", dir);
-
-    let path = dir.join("Towerfile");
-
-    match Towerfile::from_path(path) {
-        Ok(towerfile) => {
-            let api_config = config.into();
-
-            // Add app existence check before proceeding
-            if let Err(err) = util::apps::ensure_app_exists(
-                &api_config,
-                &towerfile.app.name,
-                &towerfile.app.description,
-                auto_create,
-            )
-            .await
-            {
-                output::tower_error(err);
-                return;
-            }
-
-            let spec = PackageSpec::from_towerfile(&towerfile);
-            let mut spinner = output::spinner("Building package...");
-
-            match Package::build(spec).await {
-                Ok(package) => {
-                    spinner.success();
-                    do_deploy_package(api_config, package, &towerfile).await;
-                }
-                Err(err) => {
-                    spinner.failure();
-                    output::package_error(err);
-                }
-            }
-        }
-        Err(err) => {
-            output::config_error(err);
+    if let Err(err) = deploy_from_dir(config, dir, auto_create).await {
+        match err {
+            crate::Error::ApiDeployError { source } => output::tower_error(source),
+            crate::Error::ApiDescribeAppError { source } => output::tower_error(source),
+            _ => eprintln!("Deploy error: {}", err),
         }
     }
 }
 
-async fn do_deploy_package(api_config: Configuration, package: Package, towerfile: &Towerfile) {
+pub async fn deploy_from_dir(config: Config, dir: PathBuf, auto_create: bool) -> Result<(), crate::Error> {
+    debug!("Building package from directory: {:?}", dir);
+
+    let path = dir.join("Towerfile");
+
+    let towerfile = Towerfile::from_path(path)?;
+    let api_config = config.into();
+
+    // Add app existence check before proceeding
+    util::apps::ensure_app_exists(
+        &api_config,
+        &towerfile.app.name,
+        &towerfile.app.description,
+        auto_create,
+    )
+    .await?;
+
+    let spec = PackageSpec::from_towerfile(&towerfile);
+    let mut spinner = output::spinner("Building package...");
+
+    let package = match Package::build(spec).await {
+        Ok(package) => package,
+        Err(err) => {
+            spinner.failure();
+            let error = crate::Error::PackageError { source: err };
+            eprintln!("Package build failed: {}", error);
+            return Err(error);
+        }
+    };
+
+    spinner.success();
+    do_deploy_package(api_config, package, &towerfile).await?;
+    Ok(())
+}
+
+async fn do_deploy_package(api_config: Configuration, package: Package, towerfile: &Towerfile) -> Result<tower_api::models::DeployAppResponse, crate::Error> {
     let res = util::deploy::deploy_app_package(&api_config, &towerfile.app.name, package).await;
 
     match res {
         Ok(resp) => {
-            let version = resp.version;
+            let version = &resp.version;
 
             let line = format!("Version `{}` has been deployed to Tower!", version.version);
 
             output::success(&line);
+            Ok(resp)
         }
         Err(err) => {
-            output::tower_error(err);
+            let error = crate::Error::from(err);
+            eprintln!("Deploy failed: {}", error);
+            Err(error)
         }
     }
 }

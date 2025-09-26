@@ -592,8 +592,12 @@ impl TowerService {
         Parameters(request): Parameters<EmptyRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        deploy::deploy_from_dir(self.config.clone(), working_dir, true).await;
-        Self::text_success("Deploy command completed - check output above for status".to_string())
+        match deploy::deploy_from_dir(self.config.clone(), working_dir, true).await {
+            Ok(()) => {
+                Self::text_success("Deploy completed successfully".to_string())
+            }
+            Err(e) => Self::error_result("Deploy failed", e),
+        }
     }
 
     #[tool(
