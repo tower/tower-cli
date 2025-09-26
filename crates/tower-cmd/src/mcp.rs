@@ -184,6 +184,16 @@ impl TowerService {
             })
     }
 
+    fn extract_api_error_message(error: &crate::Error) -> String {
+        format!("{:?}", error)
+    }
+
+    fn is_deployment_error(message: &str) -> bool {
+        message.contains("not found")
+            || message.contains("not deployed")
+            || (message.contains("API error occurred") && !message.contains("422"))
+    }
+
     #[tool(description = "List all Tower apps in your account")]
     async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_apps(&self.config).await {
@@ -454,12 +464,12 @@ impl TowerService {
         match run::do_run_remote(config, path, env, params, None, true).await {
             Ok(_) => Self::text_success("Remote run completed successfully".to_string()),
             Err(e) => {
-                let error_msg = format!("{}", e);
-                if error_msg.contains("404") || error_msg.contains("Not found") {
-                    Self::text_success(format!(
-                        "App '{}' exists but may not be deployed. Try running tower_deploy first, or check if the app has any successful deployments.",
-                        towerfile.app.name
-                    ))
+                let error_message = Self::extract_api_error_message(&e);
+                if Self::is_deployment_error(&error_message) {
+                    Self::error_result(
+                        "App not deployed",
+                        format!("App '{}' not deployed. Try running tower_deploy first.", towerfile.app.name)
+                    )
                 } else {
                     Self::error_result("Remote run failed", e)
                 }
