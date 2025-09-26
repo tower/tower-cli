@@ -140,6 +140,12 @@ pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()
     Ok(())
 }
 
+struct StreamingOutput {
+    sender: tokio::sync::mpsc::UnboundedSender<String>,
+    collected: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
 #[derive(Clone)]
 pub struct TowerService {
     config: Config,
@@ -224,27 +230,19 @@ impl TowerService {
             || (message.contains("API error occurred") && !message.contains("422"))
     }
 
-    fn setup_streaming_output(
-        ctx: &RequestContext<RoleServer>,
-    ) -> (
-        tokio::sync::mpsc::UnboundedSender<String>,
-        std::sync::Arc<std::sync::Mutex<Vec<String>>>,
-        tokio::task::JoinHandle<()>,
-    ) {
+    fn setup_streaming_output(ctx: &RequestContext<RoleServer>) -> StreamingOutput {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let peer = ctx.peer.clone();
         let collected_output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let collected_output_clone = collected_output.clone();
 
-        let join_handle = tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             let mut progress_counter = 0.0;
             while let Some(message) = rx.recv().await {
-                // Collect the message
                 if let Ok(mut output) = collected_output_clone.lock() {
                     output.push(message.clone());
                 }
 
-                // Send progress notification
                 progress_counter += 1.0;
                 let progress_param = ProgressNotificationParam {
                     progress_token: ProgressToken(NumberOrString::Number(progress_counter as u32)),
@@ -260,7 +258,11 @@ impl TowerService {
             }
         });
 
-        (tx, collected_output, join_handle)
+        StreamingOutput {
+            sender: tx,
+            collected: collected_output,
+            task,
+        }
     }
 
     async fn with_streaming<F, Fut, T>(
@@ -273,24 +275,18 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let (streaming_tx, collected_output, join_handle) = Self::setup_streaming_output(ctx);
-        crate::output::set_current_sender(streaming_tx.clone());
+        let streaming = Self::setup_streaming_output(ctx);
+        crate::output::set_current_sender(streaming.sender.clone());
 
         let result = operation().await;
 
-        // Clear the current sender and close the channel
         crate::output::clear_current_sender();
-        drop(streaming_tx);
+        drop(streaming.sender);
+        streaming.task.await.ok();
 
-        // Wait for the collection task to finish processing all messages
-        join_handle.await.ok();
-
-        // Collect all captured output
-        let output_lines = if let Ok(output) = collected_output.lock() {
-            output.clone()
-        } else {
-            Vec::new()
-        };
+        let output_lines = streaming.collected.lock().ok()
+            .map(|output| output.clone())
+            .unwrap_or_default();
 
         match result {
             Ok(_) => {
@@ -312,7 +308,7 @@ impl TowerService {
         }
     }
 
-    async fn with_streaming_remote<F, Fut, T>(
+    async fn with_remote_streaming<F, Fut, T>(
         ctx: &RequestContext<RoleServer>,
         operation: F,
         success_message: &str,
@@ -322,24 +318,18 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let (streaming_tx, collected_output, join_handle) = Self::setup_streaming_output(ctx);
-        crate::output::set_current_sender(streaming_tx.clone());
+        let streaming = Self::setup_streaming_output(ctx);
+        crate::output::set_current_sender(streaming.sender.clone());
 
         let result = operation().await;
 
-        // Clear the current sender and close the channel
         crate::output::clear_current_sender();
-        drop(streaming_tx);
+        drop(streaming.sender);
+        streaming.task.await.ok();
 
-        // Wait for the collection task to finish processing all messages
-        join_handle.await.ok();
-
-        // Collect all captured output
-        let output_lines = if let Ok(output) = collected_output.lock() {
-            output.clone()
-        } else {
-            Vec::new()
-        };
+        let output_lines = streaming.collected.lock().ok()
+            .map(|output| output.clone())
+            .unwrap_or_default();
 
         match result {
             Ok(_) => {
@@ -657,7 +647,7 @@ impl TowerService {
 
         let app_name = towerfile.app.name.clone();
 
-        Self::with_streaming_remote(
+        Self::with_remote_streaming(
             &ctx,
             || run::do_run_remote(config, path, env, params, None, true),
             "Remote run completed successfully",
