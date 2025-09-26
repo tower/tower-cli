@@ -11,6 +11,7 @@ pub async fn ensure_app_exists(
     api_config: &Configuration,
     app_name: &str,
     description: &str,
+    auto_create: bool,
 ) -> Result<(), tower_api::apis::Error<default_api::DescribeAppError>> {
     // Try to describe the app first
     let describe_result = default_api::describe_app(
@@ -48,15 +49,16 @@ pub async fn ensure_app_exists(
         return Err(err);
     }
 
-    // Prompt the user to create the app
-    let create_app = prompt_default(
-        format!(
-            "App '{}' does not exist. Would you like to create it?",
-            app_name
-        ),
-        false,
-    )
-    .unwrap_or(false);
+    // Decide whether to create the app
+    let create_app = auto_create
+        || prompt_default(
+            format!(
+                "App '{}' does not exist. Would you like to create it?",
+                app_name
+            ),
+            false,
+        )
+        .unwrap_or(false);
 
     // If the user doesn't want to create the app, return the original error
     if !create_app {

@@ -17,6 +17,12 @@ pub fn deploy_cmd() -> Command {
                 .help("The directory containing the app to deploy")
                 .default_value("."),
         )
+        .arg(
+            Arg::new("auto-create")
+                .long("auto-create")
+                .help("Automatically create app if it doesn't exist")
+                .action(clap::ArgAction::SetTrue),
+        )
         .about("Deploy your latest code to Tower")
 }
 
@@ -30,7 +36,8 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
     let dir = resolve_path(args);
-    if let Err(err) = deploy_from_dir(config, dir).await {
+    let auto_create = args.get_flag("auto-create");
+    if let Err(err) = deploy_from_dir(config, dir, auto_create).await {
         match err {
             crate::Error::ApiDeployError { source } => output::tower_error(source),
             crate::Error::ApiDescribeAppError { source } => output::tower_error(source),
@@ -42,6 +49,7 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
 pub async fn deploy_from_dir(
     config: Config,
     dir: PathBuf,
+    auto_create: bool,
 ) -> Result<(), crate::Error> {
     debug!("Building package from directory: {:?}", dir);
 
@@ -55,6 +63,7 @@ pub async fn deploy_from_dir(
         &api_config,
         &towerfile.app.name,
         &towerfile.app.description,
+        auto_create,
     )
     .await?;
 

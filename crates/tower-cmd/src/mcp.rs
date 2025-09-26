@@ -404,7 +404,7 @@ impl TowerService {
     async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
         use std::path::PathBuf;
 
-        match deploy::deploy_from_dir(self.config.clone(), PathBuf::from(".")).await {
+        match deploy::deploy_from_dir(self.config.clone(), PathBuf::from("."), true).await {
             Ok(_) => Self::text_success("Deploy completed successfully".to_string()),
             Err(e) => Self::error_result("Deploy failed", e),
         }
