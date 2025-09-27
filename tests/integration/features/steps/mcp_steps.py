@@ -53,8 +53,13 @@ async def call_mcp_tool(context, tool_name, arguments=None):
 
 def create_towerfile(app_type="hello_world"):
     """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
+    import uuid
+
+    # Add unique suffix to avoid test interference
+    unique_suffix = str(uuid.uuid4())[:8]
+
     configs = {
-        "hello_world": ("hello-world", "hello.py", "Simple hello world app"),
+        "hello_world": (f"hello-world-{unique_suffix}", "hello.py", "Simple hello world app"),
         "test_app": ("test-app", "hello.py", "Pre-existing test app for CLI tests"),
     }
 
