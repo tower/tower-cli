@@ -96,7 +96,7 @@ Feature: MCP App Management
     And each log line should be properly formatted with timestamp
 
   Scenario: MCP remote run should show detailed validation errors
-    Given I have a simple hello world application
+    Given I have a pre-deployed test app
     When I call tower_run_remote with invalid parameter "nonexistent_param=test"
     Then I should receive a detailed validation error
     And the error should mention "Unknown parameter"

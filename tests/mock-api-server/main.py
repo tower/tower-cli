@@ -30,6 +30,7 @@ mock_secrets_db = {}
 mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
+mock_deployed_apps = set()  # Track which apps have been deployed
 
 # Pre-populate with test-app for CLI validation/spinner tests
 mock_apps_db["test-app"] = {
@@ -50,6 +51,8 @@ mock_apps_db["test-app"] = {
         "running": 0,
     },
 }
+# Pre-deploy the test-app so it can be used for validation tests
+mock_deployed_apps.add("test-app")
 
 
 def generate_id():
@@ -128,10 +131,16 @@ async def create_app(app_data: Dict[str, Any]):
 
 
 @app.get("/v1/apps/{name}")
-async def describe_app(name: str):
+async def describe_app(name: str, response: Response):
     app_info = mock_apps_db.get(name)
     if not app_info:
-        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+        response.status_code = 404
+        return {
+            "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
+            "title": "Not Found",
+            "status": 404,
+            "detail": f"App '{name}' not found"
+        }
     return {"app": app_info, "runs": []}  # Simplistic, no runs yet
 
 
@@ -155,8 +164,9 @@ async def deploy_app(name: str, response: Response):
         "created_at": datetime.datetime.now().isoformat(),
         "towerfile": "mock_towerfile_content",
     }
-    # Update app's version
+    # Update app's version and mark as deployed
     mock_apps_db[name]["version"] = version_num
+    mock_deployed_apps.add(name)
     return {"version": deployed_version}
 
 
@@ -164,6 +174,29 @@ async def deploy_app(name: str, response: Response):
 async def run_app(name: str, run_params: Dict[str, Any]):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    # Check if app has been deployed
+    if name not in mock_deployed_apps:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "detail": f"App '{name}' has not been deployed yet. Please deploy the app first.",
+                "status": 400,
+                "title": "App Not Deployed"
+            }
+        )
+
+    parameters = run_params.get("parameters", {})
+    if "nonexistent_param" in parameters:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "detail": "Validation error",
+                "status": 422,
+                "title": "Unprocessable Entity",
+                "errors": [{"message": "Unknown parameter"}],
+            },
+        )
 
     run_id = generate_id()
     new_run = {

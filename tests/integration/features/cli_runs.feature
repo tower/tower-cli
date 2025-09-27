@@ -16,7 +16,7 @@ Feature: CLI Run Commands
     And the final status should show "Your app crashed!" in red
 
   Scenario: CLI remote run should show detailed validation errors
-    Given I have a test app for CLI validation
+    Given I have a pre-deployed test app
     When I run "tower run -p nonexistent_param=test" via CLI
     Then the output should show "API Error:"
     And the output should show "Validation error"
@@ -24,7 +24,7 @@ Feature: CLI Run Commands
     And the output should not just show "422"
 
   Scenario: CLI run should show spinners during execution
-    Given I have a test app for CLI validation
+    Given I have a pre-deployed test app
     When I run "tower run" via CLI
     Then the output should show "Scheduling run..." spinner
     And the output should show "Waiting for run to start..." spinner

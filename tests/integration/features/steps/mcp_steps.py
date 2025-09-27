@@ -117,7 +117,7 @@ def step_create_hello_world_app(context):
     create_towerfile("hello_world")
 
 
-@given("I have a test app for CLI validation")
+@given("I have a pre-deployed test app")
 def step_create_test_app_for_cli(context):
     create_towerfile("test_app")
 
