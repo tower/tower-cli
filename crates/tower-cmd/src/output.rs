@@ -5,10 +5,10 @@ use cli_table::{
 };
 use colored::Colorize;
 use http::StatusCode;
+use regex::Regex;
 use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
 use tokio::sync::mpsc::UnboundedSender;
-use regex::Regex;
 use tower_api::{
     apis::{Error as ApiError, ResponseContent},
     models::ErrorModel,
@@ -22,6 +22,10 @@ static CURRENT_SENDER: Mutex<Option<UnboundedSender<String>>> = Mutex::new(None)
 
 pub fn set_capture_mode() {
     CAPTURE_MODE.set(true).ok();
+}
+
+pub fn is_capture_mode_set() -> bool {
+    CAPTURE_MODE.get().is_some()
 }
 
 pub fn set_current_sender(sender: UnboundedSender<String>) {

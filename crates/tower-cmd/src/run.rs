@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{App, AppLauncher, OutputReceiver, local::LocalApp, Status};
-use tower_telemetry::{Context, debug};
+use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver, Status};
+use tower_telemetry::{debug, Context};
 
 use tokio::sync::{mpsc::unbounded_channel, oneshot};
 
@@ -192,7 +192,6 @@ pub async fn do_run_local(
     .await
 }
 
-
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
 pub async fn do_run_remote(
@@ -244,10 +243,7 @@ pub async fn do_run_remote(
     }
 }
 
-async fn do_follow_run(
-    config: Config,
-    run: &Run,
-) -> Result<(), Error> {
+async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
     let enable_ctrl_c = !output::is_capture_mode_set(); // Disable Ctrl+C in MCP mode
     let mut spinner = output::spinner("Waiting for run to start...");
     match wait_for_run_start(&config, &run).await {
