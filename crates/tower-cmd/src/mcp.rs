@@ -6,8 +6,8 @@ use crypto;
 use rmcp::{
     handler::server::tool::{Parameters, ToolRouter},
     model::{
-        CallToolResult, Content, Implementation, NumberOrString, ProgressNotificationParam,
-        ProgressToken, ProtocolVersion, ServerCapabilities, ServerInfo,
+        CallToolResult, Content, Implementation, LoggingLevel, LoggingMessageNotificationParam,
+        ProtocolVersion, ServerCapabilities, ServerInfo,
     },
     schemars::{self, JsonSchema},
     service::RequestContext,
@@ -207,18 +207,18 @@ impl TowerService {
         let peer = ctx.peer.clone();
 
         tokio::spawn(async move {
-            let mut progress_counter = 0.0;
             while let Some(message) = rx.recv().await {
-                progress_counter += 1.0;
-                let progress_param = ProgressNotificationParam {
-                    progress_token: ProgressToken(NumberOrString::Number(progress_counter as u32)),
-                    progress: progress_counter,
-                    total: None,
-                    message: Some(message),
+                let logging_param = LoggingMessageNotificationParam {
+                    level: LoggingLevel::Info,
+                    data: serde_json::json!({
+                        "message": message,
+                        "timestamp": chrono::Utc::now().to_rfc3339(),
+                    }),
+                    logger: Some("tower-process".to_string()),
                 };
 
-                if let Err(e) = peer.notify_progress(progress_param).await {
-                    eprintln!("Failed to send progress notification: {}", e);
+                if let Err(e) = peer.notify_logging_message(logging_param).await {
+                    eprintln!("Failed to send logging notification: {}", e);
                     break;
                 }
             }
@@ -227,7 +227,7 @@ impl TowerService {
         tx
     }
 
-    async fn execute_with_progress<F, Fut, T>(
+    async fn execute_with_streaming<F, Fut, T>(
         ctx: &RequestContext<RoleServer>,
         operation: F,
     ) -> Result<T, crate::Error>
@@ -482,7 +482,7 @@ impl TowerService {
         let working_dir = Self::resolve_working_directory(&request.common);
         let config = self.config.clone();
 
-        match Self::execute_with_progress(&ctx, || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new())).await {
+        match Self::execute_with_streaming(&ctx, || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new())).await {
             Ok(_) => Self::text_success("App completed successfully".to_string()),
             Err(e) => Self::error_result("Local run failed", e),
         }
@@ -512,7 +512,7 @@ impl TowerService {
 
         let app_name = towerfile.app.name.clone();
 
-        match Self::execute_with_progress(&ctx, || run::do_run_remote(config, path, env, params, None, true)).await {
+        match Self::execute_with_streaming(&ctx, || run::do_run_remote(config, path, env, params, None, true)).await {
             Ok(_) => Self::text_success("Remote run completed successfully".to_string()),
             Err(e) => {
                 let error_message = Self::extract_api_error_message(&e);
