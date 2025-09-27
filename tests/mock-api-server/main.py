@@ -11,12 +11,14 @@ debugging steps when integration tests fail with schema errors.
 """
 
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
 import json
 import datetime
 import uuid
+import asyncio
 
 app = FastAPI(
     title="Tower Mock API",
@@ -443,6 +445,44 @@ async def describe_run_logs(name: str, seq: int):
             },
         ]
     }
+
+
+@app.get("/v1/apps/{name}/runs/{seq}/logs/stream")
+async def stream_run_logs(name: str, seq: int):
+    """Mock endpoint for streaming run logs."""
+
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    async def generate_log_stream():
+        # Simulate streaming logs with proper SSE format for Tower CLI
+        mock_logs = [
+            {"timestamp": "2025-08-22T12:00:00Z", "content": "Starting application..."},
+            {"timestamp": "2025-08-22T12:00:01Z", "content": "Hello, World!"},
+            {
+                "timestamp": "2025-08-22T12:00:02Z",
+                "content": "Application completed successfully",
+            },
+        ]
+
+        for i, log_entry in enumerate(mock_logs):
+            # Format as RunLogLine structure expected by CLI
+            log_data = {
+                "channel": "program",
+                "content": log_entry["content"],
+                "line_num": i + 1,
+                "reported_at": log_entry["timestamp"],
+                "run_id": f"mock-run-{seq}",
+            }
+            # Proper SSE format with event type and data
+            yield f"event: log\ndata: {json.dumps(log_data)}\n\n"
+            await asyncio.sleep(0.1)  # Small delay between logs
+
+    return StreamingResponse(
+        generate_log_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 # Schedule endpoints

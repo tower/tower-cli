@@ -16,14 +16,20 @@ async def call_mcp_tool_raw(
     if working_directory:
         args["working_directory"] = working_directory
 
+    captured_logs = []
+
+    async def logging_callback(params):
+        captured_logs.append(params)
+
     async with sse_client(f"{server_url}/sse") as (read, write):
-        async with ClientSession(read, write) as session:
+        async with ClientSession(read, write, logging_callback=logging_callback) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, args)
             return {
                 "success": not result.isError,
                 "content": result.content,
                 "result": result,
+                "captured_logs": captured_logs,
             }
 
 
@@ -615,3 +621,24 @@ async def step_app_should_be_visible_in_tower(context, app_name):
     assert result.get(
         "success", False
     ), f"App '{app_name}' should be visible in Tower, but tower_apps_show failed: {result}"
+
+
+@then("I should receive logging notifications")
+def step_should_receive_logging_notifications(context):
+    """Verify that logging notifications were captured"""
+    logs = context.mcp_response.get("captured_logs", [])
+    assert len(logs) > 0, "Expected logging notifications but got none"
+
+
+@then("the logs should contain process output")
+def step_logs_should_contain_output(context):
+    """Verify logs contain actual process messages"""
+    logs = context.mcp_response.get("captured_logs", [])
+    assert any(log.data.get("message", "").strip() for log in logs), "No process output in logs"
+
+
+@then("the logs should have tower-process logger")
+def step_logs_should_have_correct_logger(context):
+    """Verify logs use the correct logger name"""
+    logs = context.mcp_response.get("captured_logs", [])
+    assert any(log.logger == "tower-process" for log in logs), "Missing tower-process logger"
