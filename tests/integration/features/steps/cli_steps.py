@@ -92,7 +92,7 @@ def step_final_crash_status_should_show_error(context):
     """Verify crash status shows red 'Error:' message"""
     output = context.cli_output
     # Red is ANSI code 31
-    assert "\x1b[31m" in output, f"Expected red color codes in output"
+    assert "\x1b[31m" in output, f"Expected red color codes in output, got: {repr(output[:200])}"
     assert "Error:" in output, f"Expected 'Error:' in crash message, got: {output}"
 
 

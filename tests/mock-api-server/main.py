@@ -239,7 +239,7 @@ async def describe_run(name: str, seq: int):
 
             if elapsed > 5:  # After 5 seconds, mark as completed
                 run_data["status"] = "exited"
-                run_data["status_group"] = "completed"
+                run_data["status_group"] = "successful"
                 run_data["exit_code"] = 0
                 run_data["ended_at"] = now_time.isoformat()
 
