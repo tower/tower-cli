@@ -22,7 +22,9 @@ async def call_mcp_tool_raw(
         captured_logs.append(params)
 
     async with sse_client(f"{server_url}/sse") as (read, write):
-        async with ClientSession(read, write, logging_callback=logging_callback) as session:
+        async with ClientSession(
+            read, write, logging_callback=logging_callback
+        ) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, args)
             return {
@@ -59,7 +61,11 @@ def create_towerfile(app_type="hello_world"):
     unique_suffix = str(uuid.uuid4())[:8]
 
     configs = {
-        "hello_world": (f"hello-world-{unique_suffix}", "hello.py", "Simple hello world app"),
+        "hello_world": (
+            f"hello-world-{unique_suffix}",
+            "hello.py",
+            "Simple hello world app",
+        ),
         "test_app": ("test-app", "hello.py", "Pre-existing test app for CLI tests"),
     }
 
@@ -110,7 +116,9 @@ def is_error_response(response):
 def step_have_running_mcp_server(context):
     # This step is handled by the before_scenario hook in environment.py
     # Just verify the MCP server was set up properly
-    assert hasattr(context, "tower_mcpserver_process"), "Tower MCP server process should be set up"
+    assert hasattr(
+        context, "tower_mcpserver_process"
+    ), "Tower MCP server process should be set up"
     assert hasattr(context, "mcp_server_url"), "MCP server URL should be set up"
 
     server_alive = context.tower_mcpserver_process.poll() is None
@@ -639,11 +647,15 @@ def step_should_receive_logging_notifications(context):
 def step_logs_should_contain_output(context):
     """Verify logs contain actual process messages"""
     logs = context.mcp_response.get("captured_logs", [])
-    assert any(log.data.get("message", "").strip() for log in logs), "No process output in logs"
+    assert any(
+        log.data.get("message", "").strip() for log in logs
+    ), "No process output in logs"
 
 
 @then("the logs should have tower-process logger")
 def step_logs_should_have_correct_logger(context):
     """Verify logs use the correct logger name"""
     logs = context.mcp_response.get("captured_logs", [])
-    assert any(log.logger == "tower-process" for log in logs), "Missing tower-process logger"
+    assert any(
+        log.logger == "tower-process" for log in logs
+    ), "Missing tower-process logger"

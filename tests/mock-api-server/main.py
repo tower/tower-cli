@@ -141,7 +141,7 @@ async def describe_app(name: str, response: Response):
             "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
             "title": "Not Found",
             "status": 404,
-            "detail": f"App '{name}' not found"
+            "detail": f"App '{name}' not found",
         }
     return {"app": app_info, "runs": []}  # Simplistic, no runs yet
 
@@ -184,8 +184,8 @@ async def run_app(name: str, run_params: Dict[str, Any]):
             detail={
                 "detail": f"App '{name}' has not been deployed yet. Please deploy the app first.",
                 "status": 400,
-                "title": "App Not Deployed"
-            }
+                "title": "App Not Deployed",
+            },
         )
 
     parameters = run_params.get("parameters", {})
@@ -235,6 +235,7 @@ async def describe_run(name: str, seq: int):
         if run_data["app_name"] == name and run_data["number"] == seq:
             # Simulate run progression: running -> exited after a few seconds
             import datetime
+
             created_time = datetime.datetime.fromisoformat(run_data["created_at"])
             now_time = datetime.datetime.now()
             elapsed = (now_time - created_time).total_seconds()
