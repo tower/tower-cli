@@ -729,7 +729,6 @@ impl ResponseEntity for tower_api::apis::default_api::ListEnvironmentsSuccess {
     }
 }
 
-
 pub async fn list_environments(
     config: &Config,
 ) -> Result<
