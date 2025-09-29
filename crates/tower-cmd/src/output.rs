@@ -131,7 +131,7 @@ pub fn config_error(err: config::Error) {
 }
 
 pub fn write(msg: &str) {
-    if CAPTURE_MODE.get().is_some() {
+    if is_capture_mode_set() {
         let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
         let clean_msg = re.replace_all(msg, "").trim_end().to_string();
         send_to_current_sender(clean_msg);
@@ -271,7 +271,7 @@ pub struct Spinner {
 
 impl Spinner {
     pub fn new(msg: String) -> Spinner {
-        if CAPTURE_MODE.get().is_some() {
+        if is_capture_mode_set() {
             Spinner { spinner: None, msg }
         } else {
             let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
@@ -286,7 +286,7 @@ impl Spinner {
         if let Some(ref mut spinner) = self.spinner {
             let sym = "✔".bold().green().to_string();
             spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
-        } else if CAPTURE_MODE.get().is_some() {
+        } else if is_capture_mode_set() {
             send_to_current_sender(format!("{} Done!", self.msg));
         }
     }
@@ -295,7 +295,7 @@ impl Spinner {
         if let Some(ref mut spinner) = self.spinner {
             let sym = "✘".bold().red().to_string();
             spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
-        } else if CAPTURE_MODE.get().is_some() {
+        } else if is_capture_mode_set() {
             send_to_current_sender(format!("{} Failed!", self.msg));
         }
     }
