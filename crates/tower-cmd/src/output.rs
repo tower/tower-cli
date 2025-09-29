@@ -3,9 +3,8 @@ use cli_table::{
     format::{Border, HorizontalLine, Separator},
     print_stdout, Table,
 };
-use colored::Colorize;
+use colored::{control, Colorize};
 use http::StatusCode;
-use regex::Regex;
 use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
 use tokio::sync::mpsc::UnboundedSender;
@@ -22,6 +21,7 @@ static CURRENT_SENDER: Mutex<Option<UnboundedSender<String>>> = Mutex::new(None)
 
 pub fn set_capture_mode() {
     CAPTURE_MODE.set(true).ok();
+    control::set_override(false);
 }
 
 pub fn is_capture_mode_set() -> bool {
@@ -132,8 +132,7 @@ pub fn config_error(err: config::Error) {
 
 pub fn write(msg: &str) {
     if is_capture_mode_set() {
-        let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
-        let clean_msg = re.replace_all(msg, "").trim_end().to_string();
+        let clean_msg = msg.trim_end().to_string();
         send_to_current_sender(clean_msg);
     } else {
         io::stdout().write_all(msg.as_bytes()).unwrap();

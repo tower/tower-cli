@@ -18,7 +18,6 @@ http = { workspace = true }
 indicatif = { workspace = true }
 promptly = { workspace = true }
 reqwest = { workspace = true }
-regex = "1.0"
 reqwest-eventsource = { workspace = true }
 rpassword = { workspace = true }
 rsa = { workspace = true }

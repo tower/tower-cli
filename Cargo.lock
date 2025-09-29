@@ -3538,7 +3538,6 @@ dependencies = [
  "http",
  "indicatif",
  "promptly",
- "regex",
  "reqwest",
  "reqwest-eventsource",
  "rmcp",
