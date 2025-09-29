@@ -30,7 +30,10 @@ pub fn package_cmd() -> Command {
 
 pub async fn do_package(_config: Config, args: &ArgMatches) {
     // Determine the directory to build the package from
-    let dir = PathBuf::from(args.get_one::<String>("dir").expect("dir argument should have default value"));
+    let dir = PathBuf::from(
+        args.get_one::<String>("dir")
+            .expect("dir argument should have default value"),
+    );
     debug!("Building package from directory: {:?}", dir);
 
     let path = dir.join("Towerfile");
@@ -43,14 +46,19 @@ pub async fn do_package(_config: Config, args: &ArgMatches) {
             match Package::build(spec).await {
                 Ok(package) => {
                     spinner.success();
-                    
+
                     // Get the output path
-                    let output_path = args.get_one::<String>("output").expect("output path is required");
-                    
+                    let output_path = args
+                        .get_one::<String>("output")
+                        .expect("output path is required");
+
                     // Save the package
                     match save_package(&package, output_path).await {
                         Ok(_) => {
-                            output::success(&format!("Package created successfully: {}", output_path));
+                            output::success(&format!(
+                                "Package created successfully: {}",
+                                output_path
+                            ));
                         }
                         Err(err) => {
                             output::error(&format!("Failed to save package: {}", err));
@@ -69,19 +77,24 @@ pub async fn do_package(_config: Config, args: &ArgMatches) {
     }
 }
 
-async fn save_package(package: &Package, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let package_path = package.package_file_path.as_ref()
+async fn save_package(
+    package: &Package,
+    output_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let package_path = package
+        .package_file_path
+        .as_ref()
         .ok_or("No package file path found")?;
-    
+
     let output_path = PathBuf::from(output_path);
-    
+
     // Create parent directories if they don't exist
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).await?;
     }
-    
+
     // Copy the package file to the specified location
     fs::copy(package_path, &output_path).await?;
-    
+
     Ok(())
 }

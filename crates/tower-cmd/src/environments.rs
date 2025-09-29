@@ -36,9 +36,7 @@ pub async fn do_list(config: Config) {
             let envs_data: Vec<Vec<String>> = resp
                 .environments
                 .into_iter()
-                .map(|env| {
-                    vec![env.name]
-                })
+                .map(|env| vec![env.name])
                 .collect();
 
             // Display the table using the existing table function
