@@ -41,7 +41,9 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
         match err {
             crate::Error::ApiDeployError { source } => output::tower_error(source),
             crate::Error::ApiDescribeAppError { source } => output::tower_error(source),
-            _ => eprintln!("Deploy error: {}", err),
+            crate::Error::PackageError { source } => output::package_error(source),
+            crate::Error::TowerfileLoadFailed { source, .. } => output::config_error(source),
+            _ => output::error(&err.to_string()),
         }
     }
 }
@@ -75,7 +77,6 @@ pub async fn deploy_from_dir(
         Err(err) => {
             spinner.failure();
             let error = crate::Error::PackageError { source: err };
-            eprintln!("Package build failed: {}", error);
             return Err(error);
         }
     };
