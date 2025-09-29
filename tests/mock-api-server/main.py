@@ -35,7 +35,7 @@ mock_schedules_db = {}
 mock_deployed_apps = set()  # Track which apps have been deployed
 
 # Pre-populate with test-app for CLI validation/spinner tests
-mock_apps_db["test-app"] = {
+mock_apps_db["predeployed-test-app"] = {
     "name": "test-app",
     "owner": "mock_owner",
     "short_description": "Pre-existing test app for CLI tests",
@@ -54,7 +54,7 @@ mock_apps_db["test-app"] = {
     },
 }
 # Pre-deploy the test-app so it can be used for validation tests
-mock_deployed_apps.add("test-app")
+mock_deployed_apps.add("predeployed-test-app")
 
 
 def generate_id():

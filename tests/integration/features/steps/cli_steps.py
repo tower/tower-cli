@@ -8,7 +8,7 @@ from pathlib import Path
 from behave import given, when, then
 
 
-@when('I run "{command}" via CLI')
+@step('I run "{command}" via CLI')
 def step_run_cli_command(context, command):
     """Run a Tower CLI command and capture output"""
     cli_path = context.tower_binary
@@ -47,7 +47,7 @@ def step_run_cli_command(context, command):
         raise
 
 
-@then("timestamps should be yellow colored")
+@step("timestamps should be yellow colored")
 def step_timestamps_should_be_yellow(context):
     """Verify timestamps are colored yellow (ANSI code 33)"""
     output = context.cli_output
@@ -57,7 +57,7 @@ def step_timestamps_should_be_yellow(context):
     ), f"Expected yellow color codes in output, got: {output[:300]}..."
 
 
-@then("timestamps should be green colored")
+@step("timestamps should be green colored")
 def step_timestamps_should_be_green(context):
     """Verify timestamps are colored green (ANSI code 32)"""
     output = context.cli_output
@@ -67,7 +67,7 @@ def step_timestamps_should_be_green(context):
     ), f"Expected green color codes in output, got: {output[:300]}..."
 
 
-@then("each log line should be on a separate line")
+@step("each log line should be on a separate line")
 def step_log_lines_should_be_separate(context):
     """Verify log lines are properly separated with newlines"""
     output = context.cli_output
@@ -87,28 +87,33 @@ def step_log_lines_should_be_separate(context):
     ), f"Expected multiple timestamped lines, got: {timestamp_lines}"
 
 
-@then('the final crash status should show red "Error:"')
+red_color_code = "\x1b[31m"
+
+
+@step('the final crash status should show red "Error:"')
 def step_final_crash_status_should_show_error(context):
     """Verify crash status shows red 'Error:' message"""
     output = context.cli_output
     # Red is ANSI code 31
     assert (
-        "\x1b[31m" in output
-    ), f"Expected red color codes in output, got: {repr(output[:200])}"
+        red_color_code in output
+    ), f"Expected red color codes in output, got: {output}"
     assert "Error:" in output, f"Expected 'Error:' in crash message, got: {output}"
 
 
-@then('the final status should show "Your app crashed!" in red')
+@step('the final status should show "Your app crashed!" in red')
 def step_final_status_should_show_crashed_in_red(context):
     """Verify local run shows 'Your app crashed!' in red"""
     output = context.cli_output
-    assert "\x1b[31m" in output, f"Expected red color codes in output"
+    assert (
+        red_color_code in output
+    ), f"Expected red color codes in output, got: {output}"
     assert (
         "Your app crashed!" in output
     ), f"Expected 'Your app crashed!' message, got: {output}"
 
 
-@then('the output should show "{expected_text}"')
+@step('the output should show "{expected_text}"')
 def step_output_should_show_text(context, expected_text):
     """Verify output contains expected text"""
     output = context.cli_output
@@ -117,7 +122,7 @@ def step_output_should_show_text(context, expected_text):
     ), f"Expected '{expected_text}' in output, got: {output}"
 
 
-@then('the output should not just show "{forbidden_text}"')
+@step('the output should not just show "{forbidden_text}"')
 def step_output_should_not_just_show_text(context, forbidden_text):
     """Verify output is not just the forbidden text (e.g., not just '422')"""
     output = context.cli_output.strip()
@@ -130,7 +135,7 @@ def step_output_should_not_just_show_text(context, forbidden_text):
         ), f"Output should have more than just '{forbidden_text}', got: {output}"
 
 
-@then('the output should show "{spinner_text}" spinner')
+@step('the output should show "{spinner_text}" spinner')
 def step_output_should_show_spinner(context, spinner_text):
     """Verify spinner text appears in output"""
     output = context.cli_output
@@ -139,7 +144,7 @@ def step_output_should_show_spinner(context, spinner_text):
     ), f"Expected spinner text '{spinner_text}' in output, got: {output[:500]}..."
 
 
-@then("both spinners should complete successfully")
+@step("both spinners should complete successfully")
 def step_both_spinners_should_complete(context):
     """Verify spinners show completion"""
     output = context.cli_output
