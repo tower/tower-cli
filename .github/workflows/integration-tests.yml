@@ -2,35 +2,26 @@ name: Integration Tests
 
 on:
   pull_request:
-    branches:
-      - '*'
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install the latest version of uv
-      uses: astral-sh/setup-uv@v6
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
-    - name: "Set up Python"
-      uses: actions/setup-python@v5
-      with:
-        python-version-file: ".python-version"
+      - name: Install Python dependencies
+        run: uv sync --locked --group test
 
-    - name: Build Tower CLI
-      run: cargo build
-
-    - name: Install Python dependencies
-      run: uv sync --locked --group dev
-
-    - name: Run integration tests
-      run: tests/integration/run_tests.py
+      - name: Run integration tests
+        run: tests/integration/run_tests.py --format progress3 --color always
