@@ -156,17 +156,7 @@ pub async fn run_app(
         },
     };
 
-    match tower_api::apis::default_api::run_app(api_config, params).await {
-        Ok(response) if response.status.is_client_error() || response.status.is_server_error() => {
-            Err(Error::ResponseError(tower_api::apis::ResponseContent {
-                tower_trace_id: response.tower_trace_id,
-                status: response.status,
-                content: response.content,
-                entity: None,
-            }))
-        }
-        response => unwrap_api_response(async { response }).await,
-    }
+    unwrap_api_response(tower_api::apis::default_api::run_app(api_config, params)).await
 }
 
 pub async fn export_secrets(
@@ -493,6 +483,15 @@ where
 {
     match api_call.await {
         Ok(response) => {
+            if response.status.is_client_error() || response.status.is_server_error() {
+                return Err(Error::ResponseError(tower_api::apis::ResponseContent {
+                    tower_trace_id: response.tower_trace_id,
+                    status: response.status,
+                    content: response.content,
+                    entity: None,
+                }));
+            }
+
             debug!("tower trace ID: {}", response.tower_trace_id);
             debug!("Response from server: {}", response.content);
 
