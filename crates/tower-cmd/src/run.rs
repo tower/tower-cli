@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{App, AppLauncher, OutputReceiver, local::LocalApp};
-use tower_telemetry::{Context, debug};
+use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver, Status};
+use tower_telemetry::{debug, Context};
 
 use tokio::sync::{mpsc::unbounded_channel, oneshot};
 
@@ -164,11 +164,14 @@ where
     let app = launcher.app.unwrap();
     let status_task = tokio::spawn(monitor_status(app));
 
-    // Wait for the output task to complete naturally
+    // Wait for both tasks to complete
     let final_result = output_task.await.unwrap();
+    let status_result = status_task.await;
 
-    // The status task can be aborted since we don't need to wait for it
-    status_task.abort();
+    // And if we crashed, err out
+    if let Ok(Status::Crashed { .. }) = status_result {
+        return Err(Error::AppCrashed);
+    }
 
     Ok(final_result)
 }
@@ -188,7 +191,6 @@ pub async fn do_run_local(
     })
     .await
 }
-
 
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
@@ -215,7 +217,8 @@ pub async fn do_run_remote(
         Err(err) => {
             spinner.failure();
             debug!("Failed to schedule run: {}", err);
-            Err(err.into())
+            output::tower_error(err);
+            Err(Error::RunFailed)
         }
         Ok(res) => {
             spinner.success();
@@ -223,7 +226,7 @@ pub async fn do_run_remote(
             let run = res.run;
 
             if should_follow_run {
-                do_follow_run(config, &run).await;
+                do_follow_run(config, &run).await?;
             } else {
                 let line = format!(
                     "Run #{} for app `{}` has been scheduled",
@@ -240,20 +243,16 @@ pub async fn do_run_remote(
     }
 }
 
-async fn do_follow_run(config: Config, run: &Run) {
-    let _ = do_follow_run_impl(config, run).await;
-}
-
-async fn do_follow_run_impl(
-    config: Config,
-    run: &Run,
-) -> Result<(), Error> {
+async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
+    let enable_ctrl_c = !output::is_capture_mode_set(); // Disable Ctrl+C in MCP mode
+    let mut spinner = output::spinner("Waiting for run to start...");
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
-            output::failure(&format!("Failed to wait for run to start: {}", err));
-            return Err(err.into());
+            spinner.failure();
+            return Err(err);
         }
         Ok(()) => {
+            spinner.success();
             output::write("Run started, streaming logs...\n");
 
             // We do this here, explicitly, to not double-monitor our API via the
@@ -276,7 +275,7 @@ async fn do_follow_run_impl(
                             handle_run_completion(res)?;
                             true
                         },
-                        _ = tokio::signal::ctrl_c() => {
+                        _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
                             output::write("Received Ctrl+C, stopping log streaming...\n");
                             output::write("Note: The run will continue in Tower cloud\n");
                             output::write(&format!("  See more: {}\n", run.dollar_link));
@@ -288,7 +287,7 @@ async fn do_follow_run_impl(
                     }
                 },
                 Err(err) => {
-                    output::failure(&format!("Failed to stream run logs: {:?}", err));
+                    output::error(&format!("Failed to stream run logs: {:?}", err));
                     return Err(Error::LogStreamFailed);
                 }
             }
@@ -506,7 +505,7 @@ async fn monitor_output(mut output: OutputReceiver) {
 
 /// monitor_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_status(app: LocalApp) {
+async fn monitor_status(app: LocalApp) -> Status {
     debug!("Starting status monitoring for LocalApp");
     let mut check_count = 0;
     let max_checks = 600; // 60 seconds with 100ms intervals
@@ -524,12 +523,12 @@ async fn monitor_status(app: LocalApp) {
                     tower_runtime::Status::Exited => {
                         debug!("App exited cleanly, stopping status monitoring");
                         output::success("Your app exited cleanly.");
-                        break;
+                        return status;
                     }
                     tower_runtime::Status::Crashed { .. } => {
                         debug!("App crashed, stopping status monitoring");
                         output::failure("Your app crashed!");
-                        break;
+                        return status;
                     }
                     _ => {
                         debug!("App status: other, continuing to monitor");
@@ -539,7 +538,7 @@ async fn monitor_status(app: LocalApp) {
                             output::error(
                                 "App status monitoring timed out, but app may still be running",
                             );
-                            break;
+                            return tower_runtime::Status::Running; // Return a default status for timeout
                         }
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                         continue;
@@ -555,13 +554,12 @@ async fn monitor_status(app: LocalApp) {
                         max_checks
                     );
                     output::error("Failed to get app status after timeout");
-                    break;
+                    return tower_runtime::Status::Running; // Return a default status for timeout
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
     }
-    debug!("Status monitoring completed");
 }
 
 fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &str) -> String {
@@ -639,11 +637,15 @@ fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> 
     let run_clone = run.clone();
 
     tokio::spawn(async move {
-        let run = wait_for_run_completion(&config_clone, &run_clone)
-            .await
-            .unwrap();
-
-        let _ = tx.send(run);
+        match wait_for_run_completion(&config_clone, &run_clone).await {
+            Ok(run) => {
+                let _ = tx.send(run);
+            }
+            Err(err) => {
+                debug!("Failed to monitor run completion: {:?}", err);
+                // Channel will be dropped, causing RecvError on the receiver side
+            }
+        }
     });
 
     rx

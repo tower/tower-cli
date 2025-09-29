@@ -7,11 +7,6 @@ name: "[tower] Test python"
 
 on:
   pull_request:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
