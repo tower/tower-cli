@@ -156,7 +156,17 @@ pub async fn run_app(
         },
     };
 
-    unwrap_api_response(tower_api::apis::default_api::run_app(api_config, params)).await
+    match tower_api::apis::default_api::run_app(api_config, params).await {
+        Ok(response) if response.status.is_client_error() || response.status.is_server_error() => {
+            Err(Error::ResponseError(tower_api::apis::ResponseContent {
+                tower_trace_id: response.tower_trace_id,
+                status: response.status,
+                content: response.content,
+                entity: None,
+            }))
+        }
+        response => unwrap_api_response(async { response }).await,
+    }
 }
 
 pub async fn export_secrets(
@@ -718,7 +728,6 @@ impl ResponseEntity for tower_api::apis::default_api::ListEnvironmentsSuccess {
         }
     }
 }
-
 
 pub async fn list_environments(
     config: &Config,

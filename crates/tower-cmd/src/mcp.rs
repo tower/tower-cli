@@ -18,8 +18,15 @@ use rmcp::{
 use rsa::pkcs1::DecodeRsaPublicKey;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tower_api::apis::Error as ApiError;
 
 use crate::{api, deploy, run, towerfile_gen::TowerfileGenerator, Config, Error};
+
+struct StreamingOutput {
+    sender: tokio::sync::mpsc::UnboundedSender<String>,
+    collected: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    task: tokio::task::JoinHandle<()>,
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CommonParams {
@@ -193,21 +200,56 @@ impl TowerService {
     }
 
     fn extract_api_error_message(error: &crate::Error) -> String {
-        format!("{:?}", error)
+        let crate::Error::ApiRunError { source } = error else {
+            return error.to_string();
+        };
+
+        let ApiError::ResponseError(resp) = source else {
+            return source.to_string();
+        };
+
+        Self::parse_error_response(resp)
+            .or_else(|| Self::status_code_message(resp))
+            .unwrap_or_else(|| format!("API error ({}): {}", resp.status, resp.content))
+    }
+
+    fn parse_error_response<T>(resp: &tower_api::apis::ResponseContent<T>) -> Option<String> {
+        let error_model: tower_api::models::ErrorModel =
+            serde_json::from_str(&resp.content).ok()?;
+
+        error_model
+            .detail
+            .or_else(|| error_model.errors?.first()?.message.clone())
+    }
+
+    fn status_code_message<T>(resp: &tower_api::apis::ResponseContent<T>) -> Option<String> {
+        match resp.status.as_u16() {
+            404 => Some("App not found or not deployed".to_string()),
+            422 => Some(format!("Validation error: {}", resp.content)),
+            _ => None,
+        }
     }
 
     fn is_deployment_error(message: &str) -> bool {
-        message.contains("not found")
+        message.contains("404")
+            || message.contains("not found")
             || message.contains("not deployed")
             || (message.contains("API error occurred") && !message.contains("422"))
     }
 
-    fn setup_streaming_output(ctx: &RequestContext<RoleServer>) -> tokio::sync::mpsc::UnboundedSender<String> {
+    fn setup_streaming_output(ctx: &RequestContext<RoleServer>) -> StreamingOutput {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let peer = ctx.peer.clone();
+        let captured_output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let captured_output_clone = captured_output.clone();
 
-        tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
+                // Store the message for final output
+                if let Ok(mut output) = captured_output_clone.lock() {
+                    output.push(message.clone());
+                }
+
                 let logging_param = LoggingMessageNotificationParam {
                     level: LoggingLevel::Info,
                     data: serde_json::json!({
@@ -224,25 +266,40 @@ impl TowerService {
             }
         });
 
-        tx
+        StreamingOutput {
+            sender: tx,
+            collected: captured_output,
+            task,
+        }
     }
 
     async fn execute_with_streaming<F, Fut, T>(
         ctx: &RequestContext<RoleServer>,
         operation: F,
-    ) -> Result<T, crate::Error>
+    ) -> (Result<T, crate::Error>, String)
     where
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let streaming_tx = Self::setup_streaming_output(ctx);
+        let streaming = Self::setup_streaming_output(ctx);
         crate::output::set_capture_mode();
-        crate::output::set_current_sender(streaming_tx);
+        crate::output::set_current_sender(streaming.sender.clone());
 
         let result = operation().await;
 
         crate::output::clear_current_sender();
-        result
+        drop(streaming.sender);
+        streaming.task.await.ok();
+
+        // Collect the captured output
+        let output = streaming
+            .collected
+            .lock()
+            .ok()
+            .map(|output| output.join("\n"))
+            .unwrap_or_default();
+
+        (result, output)
     }
 
     #[tool(description = "List all Tower apps in your account")]
@@ -460,12 +517,15 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create"
+        description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create. Optional working_directory parameter specifies which project directory to deploy from."
     )]
-    async fn tower_deploy(&self) -> Result<CallToolResult, McpError> {
-        use std::path::PathBuf;
+    async fn tower_deploy(
+        &self,
+        Parameters(request): Parameters<EmptyRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(&request.common);
 
-        match deploy::deploy_from_dir(self.config.clone(), PathBuf::from("."), true).await {
+        match deploy::deploy_from_dir(self.config.clone(), working_dir, true).await {
             Ok(_) => Self::text_success("Deploy completed successfully".to_string()),
             Err(e) => Self::error_result("Deploy failed", e),
         }
@@ -482,9 +542,31 @@ impl TowerService {
         let working_dir = Self::resolve_working_directory(&request.common);
         let config = self.config.clone();
 
-        match Self::execute_with_streaming(&ctx, || run::do_run_local(config, working_dir, "default", std::collections::HashMap::new())).await {
-            Ok(_) => Self::text_success("App completed successfully".to_string()),
-            Err(e) => Self::error_result("Local run failed", e),
+        let (result, output) = Self::execute_with_streaming(&ctx, || {
+            run::do_run_local(
+                config,
+                working_dir,
+                "default",
+                std::collections::HashMap::new(),
+            )
+        })
+        .await;
+        match result {
+            Ok(_) => {
+                if output.trim().is_empty() {
+                    Self::text_success("App completed successfully".to_string())
+                } else {
+                    Self::text_success(format!("App completed successfully\n\n{}", output))
+                }
+            }
+            Err(e) => {
+                let error_text = if output.trim().is_empty() {
+                    e.to_string()
+                } else {
+                    output
+                };
+                Self::error_result("Local run failed", error_text)
+            }
         }
     }
 
@@ -505,25 +587,40 @@ impl TowerService {
         let params = request.parameters.unwrap_or_default();
 
         // Load Towerfile to get app name
-        let towerfile = match Towerfile::from_local_file() {
+        let towerfile = match Towerfile::from_dir_str(path.to_str().unwrap()) {
             Ok(tf) => tf,
             Err(e) => return Self::error_result("Failed to read Towerfile", e),
         };
 
         let app_name = towerfile.app.name.clone();
 
-        match Self::execute_with_streaming(&ctx, || run::do_run_remote(config, path, env, params, None, true)).await {
-            Ok(_) => Self::text_success("Remote run completed successfully".to_string()),
-            Err(e) => {
-                let error_message = Self::extract_api_error_message(&e);
-                if Self::is_deployment_error(&error_message) {
-                    Self::error_result(
-                        "App not deployed",
-                        format!("App '{}' not deployed. Try running tower_deploy first.", app_name)
-                    )
+        let (result, output) = Self::execute_with_streaming(&ctx, || {
+            run::do_run_remote(config, path, env, params, None, true)
+        })
+        .await;
+        match result {
+            Ok(_) => {
+                if output.trim().is_empty() {
+                    Self::text_success("Remote run completed successfully".to_string())
                 } else {
-                    Self::error_result("Remote run failed", e)
+                    Self::text_success(format!("Remote run completed successfully\n\n{}", output))
                 }
+            }
+            Err(e) => {
+                let error_text = if output.trim().is_empty() {
+                    let api_error = Self::extract_api_error_message(&e);
+                    if Self::is_deployment_error(&api_error) {
+                        format!(
+                            "App '{}' not deployed. Try running tower_deploy first.",
+                            app_name
+                        )
+                    } else {
+                        api_error
+                    }
+                } else {
+                    output
+                };
+                Self::error_result("Remote run failed", error_text)
             }
         }
     }
