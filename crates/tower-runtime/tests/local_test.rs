@@ -71,7 +71,10 @@ async fn test_running_hello_world() {
     }
 
     let found_hello = outputs.iter().any(|line| line.contains("Hello, world!"));
-    assert!(found_hello, "Should have received 'Hello, world!' output from the application");
+    assert!(
+        found_hello,
+        "Should have received 'Hello, world!' output from the application"
+    );
 
     // check the status once more, should be done.
     let status = app.status().await.expect("Failed to get app status");
