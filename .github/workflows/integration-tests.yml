@@ -2,11 +2,10 @@ name: Integration Tests
 
 on:
   pull_request:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration-tests:
@@ -18,12 +17,11 @@ jobs:
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-
-      - name: Build Tower CLI
-        run: cargo build
+        with:
+          enable-cache: true
 
       - name: Install Python dependencies
-        run: uv sync --locked --group dev
+        run: uv sync --locked --group test
 
       - name: Run integration tests
-        run: tests/integration/run_tests.py --color always
+        run: tests/integration/run_tests.py --format progress3 --color always
