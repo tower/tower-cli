@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct Parameter{
+pub struct Parameter {
     #[serde(default)]
     pub name: String,
 
@@ -115,7 +115,6 @@ impl Towerfile {
         std::fs::write(target_path, toml::to_string_pretty(self)?)?;
         Ok(())
     }
-
 
     /// add_parameter adds a new parameter to the Towerfile
     pub fn add_parameter(&mut self, name: String, description: String, default: String) {
@@ -277,19 +276,18 @@ mod test {
     fn test_add_parameter() {
         let mut towerfile = crate::Towerfile::default();
         assert_eq!(towerfile.parameters.len(), 0);
-        
+
         towerfile.add_parameter(
             "test-param".to_string(),
             "A test parameter".to_string(),
-            "default-value".to_string()
+            "default-value".to_string(),
         );
-        
+
         assert_eq!(towerfile.parameters.len(), 1);
         assert_eq!(towerfile.parameters[0].name, "test-param");
         assert_eq!(towerfile.parameters[0].description, "A test parameter");
         assert_eq!(towerfile.parameters[0].default, "default-value");
     }
-
 
     #[test]
     fn test_roundtrip_serialization() {
@@ -310,11 +308,11 @@ name = "param2"
 description = "Second parameter"
 default = "value2"
 "#;
-        
+
         let towerfile = crate::Towerfile::from_toml(original_toml).unwrap();
         let serialized = toml::to_string_pretty(&towerfile).unwrap();
         let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
-        
+
         assert_eq!(towerfile.app.name, reparsed.app.name);
         assert_eq!(towerfile.app.script, reparsed.app.script);
         assert_eq!(towerfile.app.source, reparsed.app.source);

@@ -11,12 +11,14 @@ debugging steps when integration tests fail with schema errors.
 """
 
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
 import json
 import datetime
 import uuid
+import asyncio
 
 app = FastAPI(
     title="Tower Mock API",
@@ -30,6 +32,29 @@ mock_secrets_db = {}
 mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
+mock_deployed_apps = set()  # Track which apps have been deployed
+
+# Pre-populate with test-app for CLI validation/spinner tests
+mock_apps_db["predeployed-test-app"] = {
+    "name": "test-app",
+    "owner": "mock_owner",
+    "short_description": "Pre-existing test app for CLI tests",
+    "version": "1.0.0",
+    "schedule": None,
+    "created_at": datetime.datetime.now().isoformat(),
+    "next_run_at": None,
+    "health_status": "healthy",
+    "run_results": {
+        "cancelled": 0,
+        "crashed": 0,
+        "errored": 0,
+        "exited": 0,
+        "pending": 0,
+        "running": 0,
+    },
+}
+# Pre-deploy the test-app so it can be used for validation tests
+mock_deployed_apps.add("predeployed-test-app")
 
 
 def generate_id():
@@ -108,10 +133,16 @@ async def create_app(app_data: Dict[str, Any]):
 
 
 @app.get("/v1/apps/{name}")
-async def describe_app(name: str):
+async def describe_app(name: str, response: Response):
     app_info = mock_apps_db.get(name)
     if not app_info:
-        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+        response.status_code = 404
+        return {
+            "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
+            "title": "Not Found",
+            "status": 404,
+            "detail": f"App '{name}' not found",
+        }
     return {"app": app_info, "runs": []}  # Simplistic, no runs yet
 
 
@@ -135,8 +166,9 @@ async def deploy_app(name: str, response: Response):
         "created_at": datetime.datetime.now().isoformat(),
         "towerfile": "mock_towerfile_content",
     }
-    # Update app's version
+    # Update app's version and mark as deployed
     mock_apps_db[name]["version"] = version_num
+    mock_deployed_apps.add(name)
     return {"version": deployed_version}
 
 
@@ -144,6 +176,29 @@ async def deploy_app(name: str, response: Response):
 async def run_app(name: str, run_params: Dict[str, Any]):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    # Check if app has been deployed
+    if name not in mock_deployed_apps:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "detail": f"App '{name}' has not been deployed yet. Please deploy the app first.",
+                "status": 400,
+                "title": "App Not Deployed",
+            },
+        )
+
+    parameters = run_params.get("parameters", {})
+    if "nonexistent_param" in parameters:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "detail": "Validation error",
+                "status": 422,
+                "title": "Unprocessable Entity",
+                "errors": [{"message": "Unknown parameter"}],
+            },
+        )
 
     run_id = generate_id()
     new_run = {
@@ -167,6 +222,35 @@ async def run_app(name: str, run_params: Dict[str, Any]):
     }
     mock_runs_db[run_id] = new_run
     return {"run": new_run}
+
+
+@app.get("/v1/apps/{name}/runs/{seq}")
+async def describe_run(name: str, seq: int):
+    """Mock endpoint for describing a specific run."""
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    # Find the run by sequence number (this is simplified)
+    for run_id, run_data in mock_runs_db.items():
+        if run_data["app_name"] == name and run_data["number"] == seq:
+            # Simulate run progression: running -> exited after a few seconds
+            import datetime
+
+            created_time = datetime.datetime.fromisoformat(run_data["created_at"])
+            now_time = datetime.datetime.now()
+            elapsed = (now_time - created_time).total_seconds()
+
+            if elapsed > 5:  # After 5 seconds, mark as completed
+                run_data["status"] = "exited"
+                run_data["status_group"] = "successful"
+                run_data["exit_code"] = 0
+                run_data["ended_at"] = now_time.isoformat()
+
+            return {"run": run_data}
+
+    raise HTTPException(
+        status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
+    )
 
 
 # Placeholder for /secrets endpoints
@@ -362,6 +446,44 @@ async def describe_run_logs(name: str, seq: int):
             },
         ]
     }
+
+
+@app.get("/v1/apps/{name}/runs/{seq}/logs/stream")
+async def stream_run_logs(name: str, seq: int):
+    """Mock endpoint for streaming run logs."""
+
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    async def generate_log_stream():
+        # Simulate streaming logs with proper SSE format for Tower CLI
+        mock_logs = [
+            {"timestamp": "2025-08-22T12:00:00Z", "content": "Starting application..."},
+            {"timestamp": "2025-08-22T12:00:01Z", "content": "Hello, World!"},
+            {
+                "timestamp": "2025-08-22T12:00:02Z",
+                "content": "Application completed successfully",
+            },
+        ]
+
+        for i, log_entry in enumerate(mock_logs):
+            # Format as RunLogLine structure expected by CLI
+            log_data = {
+                "channel": "program",
+                "content": log_entry["content"],
+                "line_num": i + 1,
+                "reported_at": log_entry["timestamp"],
+                "run_id": f"mock-run-{seq}",
+            }
+            # Proper SSE format with event type and data
+            yield f"event: log\ndata: {json.dumps(log_data)}\n\n"
+            await asyncio.sleep(0.1)  # Small delay between logs
+
+    return StreamingResponse(
+        generate_log_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 # Schedule endpoints

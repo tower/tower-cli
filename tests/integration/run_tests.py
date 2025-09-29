@@ -99,9 +99,23 @@ def main():
     # Actually run tests
     try:
         test_dir = Path(__file__).parent / "features"
-        log("Running integration tests...")
+
+        args = sys.argv[1:]
+
+        # Enable parallel execution by default unless single test is specified
+        single_test_mode = any(arg.startswith("-n") or arg in ["-n"] for arg in args)
+
+        # defaulting to 2 workers if user doesn't override
+        if not single_test_mode and "--jobs" not in " ".join(args) and "-j" not in args:
+            args = ["--jobs", "2"] + args
+            log("Running tests in parallel (2 workers)")
+        elif single_test_mode:
+            log("Running single test (no parallelization)")
+        else:
+            log("Running integration tests...")
+
         result = subprocess.run(
-            ["behave", str(test_dir)] + sys.argv[1:], cwd=Path(__file__).parent, env=env
+            ["behave", str(test_dir)] + args, cwd=Path(__file__).parent, env=env
         )
         return result.returncode
 

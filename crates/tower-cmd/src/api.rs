@@ -483,6 +483,15 @@ where
 {
     match api_call.await {
         Ok(response) => {
+            if response.status.is_client_error() || response.status.is_server_error() {
+                return Err(Error::ResponseError(tower_api::apis::ResponseContent {
+                    tower_trace_id: response.tower_trace_id,
+                    status: response.status,
+                    content: response.content,
+                    entity: None,
+                }));
+            }
+
             debug!("tower trace ID: {}", response.tower_trace_id);
             debug!("Response from server: {}", response.content);
 
@@ -718,7 +727,6 @@ impl ResponseEntity for tower_api::apis::default_api::ListEnvironmentsSuccess {
         }
     }
 }
-
 
 pub async fn list_environments(
     config: &Config,

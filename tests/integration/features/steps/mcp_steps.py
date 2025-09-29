@@ -6,6 +6,7 @@ from behave import given, when, then
 from behave.api.async_step import async_run_until_complete
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+import uuid
 
 
 async def call_mcp_tool_raw(
@@ -16,14 +17,22 @@ async def call_mcp_tool_raw(
     if working_directory:
         args["working_directory"] = working_directory
 
+    captured_logs = []
+
+    async def logging_callback(params):
+        captured_logs.append(params)
+
     async with sse_client(f"{server_url}/sse") as (read, write):
-        async with ClientSession(read, write) as session:
+        async with ClientSession(
+            read, write, logging_callback=logging_callback
+        ) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, args)
             return {
                 "success": not result.isError,
                 "content": result.content,
                 "result": result,
+                "captured_logs": captured_logs,
             }
 
 
@@ -45,19 +54,21 @@ async def call_mcp_tool(context, tool_name, arguments=None):
         return context.mcp_response
 
 
-def create_towerfile(app_type="hello_world"):
-    """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
-    configs = {
-        "hello_world": ("hello-world", "hello.py", "Simple hello world app"),
-        "long_running": (
-            "long-runner",
-            "long_runner.py",
-            "Long running app for timeout testing",
-        ),
-    }
+def unique_app_name(context, name="hello-world", force_new=False):
+    if force_new:
+        context.unique_suffix = str(uuid.uuid4())
+    suffix = getattr(context, "unique_suffix", "")
+    return f"{name}-{context.unique_suffix}"
 
-    app_name, script_name, description = configs.get(app_type, configs["hello_world"])
-    template_dir = Path(__file__).parent.parent.parent / "templates"
+
+def create_towerfile(
+    context, app_name="hello-world", script_name="hello.py", description="A test app"
+):
+    """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
+
+    app_name = unique_app_name(context, app_name, force_new=True)
+
+    template_dir = Path(__file__).parents[2] / "templates"
 
     # Create Towerfile from template if it exists
     towerfile_template = template_dir / "Towerfile.j2"
@@ -103,27 +114,24 @@ def is_error_response(response):
 def step_have_running_mcp_server(context):
     # This step is handled by the before_scenario hook in environment.py
     # Just verify the MCP server was set up properly
-    assert hasattr(context, "tower_process"), "Tower process should be set up"
+    assert hasattr(
+        context, "tower_mcpserver_process"
+    ), "Tower MCP server process should be set up"
     assert hasattr(context, "mcp_server_url"), "MCP server URL should be set up"
 
-    server_alive = context.tower_process.poll() is None
+    server_alive = context.tower_mcpserver_process.poll() is None
     print(f"DEBUG: MCP server alive check: {server_alive}")
     assert server_alive, "MCP server should be running"
 
 
 @given("I have a valid Towerfile in the current directory")
 def step_create_valid_towerfile(context):
-    create_towerfile("hello_world")
+    create_towerfile(context)
 
 
 @given("I have a simple hello world application")
 def step_create_hello_world_app(context):
-    create_towerfile("hello_world")
-
-
-@given("I have a long-running application")
-def step_create_long_running_app(context):
-    create_towerfile("long_running")
+    create_towerfile(context)
 
 
 @given("I have a pyproject.toml file with project metadata")
@@ -142,24 +150,26 @@ version = "0.1.0"
         f.write('print("Hello from test project")\n')
 
 
-@when("I call {tool_name} via MCP")
+@step("I call {tool_name} via MCP")
 @async_run_until_complete
 async def step_call_mcp_tool(context, tool_name):
     await call_mcp_tool(context, tool_name)
 
 
-@when('I call {tool_name} with app name "{app_name}"')
+@step('I call {tool_name} with new app name "{app_name}"')
 @async_run_until_complete
-async def step_call_mcp_tool_with_app_name(context, tool_name, app_name):
-    await call_mcp_tool(context, tool_name, {"name": app_name})
+async def step_call_mcp_tool_with_unique_app_name(context, tool_name, app_name):
+    await call_mcp_tool(
+        context, tool_name, {"name": unique_app_name(context, app_name, force_new=True)}
+    )
 
 
-@then("I should receive a response")
+@step("I should receive a response")
 def step_check_response_exists(context):
     assert hasattr(context, "mcp_response") and context.mcp_response is not None
 
 
-@then("I should receive a response with apps data")
+@step("I should receive a response with apps data")
 def step_check_apps_data_response(context):
     assert context.mcp_response.get("content"), "Response should have content"
     found_apps_data = has_text_content(
@@ -170,14 +180,14 @@ def step_check_apps_data_response(context):
     ), f"Response should contain apps data, got: {context.mcp_response.get('content')}"
 
 
-@then("I should receive an error response")
+@step("I should receive an error response")
 def step_check_error_response(context):
     assert is_error_response(
         context.mcp_response
     ), f"Expected error response, got: {context.mcp_response}"
 
 
-@then("I should receive an error response about missing Towerfile")
+@step("I should receive an error response about missing Towerfile")
 def step_check_missing_towerfile_error(context):
     response_text = str(context.mcp_response).lower()
     assert (
@@ -185,14 +195,14 @@ def step_check_missing_towerfile_error(context):
     ), f"Error should mention Towerfile, got: {context.mcp_response}"
 
 
-@then("I should receive a success response")
+@step("I should receive a success response")
 def step_check_success_response(context):
     assert context.mcp_response.get(
         "success", False
     ), f"Expected success response, got: {context.mcp_response}"
 
 
-@then("I should receive the parsed Towerfile configuration")
+@step("I should receive the parsed Towerfile configuration")
 def step_check_parsed_towerfile(context):
     """Verify the response contains parsed Towerfile data."""
     assert context.mcp_response.get("content"), "Response should have content"
@@ -205,7 +215,7 @@ def step_check_parsed_towerfile(context):
     ), f"Response should contain Towerfile config, got: {context.mcp_response.get('content')}"
 
 
-@then("I should receive a response about the run")
+@step("I should receive a response about the run")
 def step_check_run_response(context):
     """Verify the response is about running the application."""
     assert hasattr(context, "mcp_response"), "No MCP response was recorded"
@@ -230,21 +240,7 @@ def step_check_run_response(context):
     ), f"Expected successful run response, got: {context.mcp_response}"
 
 
-@then("I should receive a timeout message")
-def step_check_timeout_message(context):
-    """Verify the response indicates a timeout occurred."""
-    assert hasattr(context, "mcp_response"), "No MCP response was recorded"
-
-    response_text = str(context.mcp_response).lower()
-    timeout_keywords = ["timeout", "timed out", "3 seconds"]
-
-    found_timeout = any(keyword in response_text for keyword in timeout_keywords)
-    assert (
-        found_timeout
-    ), f"Response should indicate timeout, got: {context.mcp_response}"
-
-
-@then("I should receive an error response about app not deployed")
+@step("I should receive an error response about app not deployed")
 def step_check_app_not_deployed_error(context):
     """Verify the error mentions app not being deployed."""
     assert hasattr(context, "mcp_response"), "No MCP response was recorded"
@@ -260,7 +256,7 @@ def step_check_app_not_deployed_error(context):
     ), f"Error should mention deployment, got: {context.mcp_response}"
 
 
-@then("I should receive a valid TOML Towerfile")
+@step("I should receive a valid TOML Towerfile")
 def step_check_valid_toml_towerfile(context):
     """Verify the response contains valid TOML Towerfile content."""
     assert hasattr(context, "mcp_response"), "No MCP response was recorded"
@@ -282,7 +278,7 @@ def step_check_valid_toml_towerfile(context):
     ), f"Response should contain valid TOML Towerfile, got: {response_content}"
 
 
-@then("the Towerfile should contain the project name and description")
+@step("the Towerfile should contain the project name and description")
 def step_check_towerfile_metadata(context):
     """Verify the Towerfile contains expected project metadata."""
     assert hasattr(context, "mcp_response"), "No MCP response was recorded"
@@ -305,13 +301,13 @@ def step_check_towerfile_metadata(context):
     ), f"Towerfile should contain project name and description, got: {response_content}"
 
 
-@then("the MCP server should remain responsive")
+@step("the MCP server should remain responsive")
 @async_run_until_complete
 async def step_check_server_responsive(context):
     """Verify the MCP server is still responsive after the operation."""
     try:
         # Check if process is alive and server responds
-        if context.tower_process.poll() is not None:
+        if context.tower_mcpserver_process.poll() is not None:
             print("Warning: MCP server process died")
             context.server_responsive = False
         else:
@@ -331,14 +327,18 @@ async def step_check_server_responsive(context):
 
 
 # Schedule-related steps
-@given('I have created a schedule for "{app_name}"')
+@given('I have created a schedule for "predeployed-test-app"')
 @async_run_until_complete
-async def step_create_schedule_for_app(context, app_name):
+async def step_create_schedule_for_app(context):
     """Create a schedule for testing purposes."""
     result = await call_mcp_tool(
         context,
         "tower_schedules_create",
-        {"app_name": app_name, "cron": "0 9 * * *", "environment": "default"},
+        {
+            "app_name": "predeployed-test-app",
+            "cron": "0 9 * * *",
+            "environment": "default",
+        },
     )
     assert result.get("success", False), f"Failed to create schedule: {result}"
 
@@ -354,26 +354,25 @@ async def step_create_schedule_for_app(context, app_name):
             if match:
                 context.created_schedule_id = match.group(1)
 
-    context.test_app_name = app_name
 
-
-@when(
-    'I call tower_schedules_create with app "{app_name}", cron "{cron}", and environment "{environment}"'
+@step(
+    'I call tower_schedules_create with app "predeployed-test-app", cron "{cron}", and environment "{environment}"'
 )
 @async_run_until_complete
-async def step_call_schedules_create(context, app_name, cron, environment):
+async def step_call_schedules_create(context, cron, environment):
     """Call tower_schedules_create with specific parameters."""
     await call_mcp_tool(
         context,
         "tower_schedules_create",
-        {"app_name": app_name, "cron": cron, "environment": environment},
+        {
+            "app_name": "predeployed-test-app",
+            "cron": cron,
+            "environment": environment,
+        },
     )
-    context.test_app_name = app_name
-    context.test_cron = cron
-    context.test_environment = environment
 
 
-@when('I call tower_schedules_update with new cron "{new_cron}"')
+@step('I call tower_schedules_update with new cron "{new_cron}"')
 @async_run_until_complete
 async def step_call_schedules_update(context, new_cron):
     """Call tower_schedules_update with new cron expression."""
@@ -386,7 +385,7 @@ async def step_call_schedules_update(context, new_cron):
     context.updated_cron = new_cron
 
 
-@when("I call tower_schedules_delete with the schedule ID")
+@step("I call tower_schedules_delete with the schedule ID")
 @async_run_until_complete
 async def step_call_schedules_delete(context):
     """Call tower_schedules_delete with a schedule ID."""
@@ -394,7 +393,7 @@ async def step_call_schedules_delete(context):
     await call_mcp_tool(context, "tower_schedules_delete", {"name": schedule_id})
 
 
-@then("I should receive a response with empty schedules data")
+@step("I should receive a response with empty schedules data")
 def step_check_empty_schedules_response(context):
     """Verify the response contains empty schedules list."""
     assert context.mcp_response.get("content"), "Response should have content"
@@ -407,7 +406,7 @@ def step_check_empty_schedules_response(context):
     ), f"Response should contain empty schedules data, got: {context.mcp_response.get('content')}"
 
 
-@then("I should receive a success response about schedule creation")
+@step("I should receive a success response about schedule creation")
 def step_check_schedule_creation_success(context):
     """Verify the response indicates successful schedule creation."""
     assert context.mcp_response.get(
@@ -418,20 +417,20 @@ def step_check_schedule_creation_success(context):
     ), f"Response should mention creation, got: {context.mcp_response}"
 
 
-@then('I should receive a response with schedule data for "{app_name}"')
-def step_check_schedules_list_with_data(context, app_name):
+@step('I should receive a response with schedule data for "predeployed-test-app"')
+def step_check_schedules_list_with_data(context):
     """Verify the response contains schedule data for the specified app."""
     assert context.mcp_response.get("content"), "Response should have content"
     found_schedule_data = has_text_content(
         context.mcp_response,
-        lambda text: "schedules" in text.lower() and app_name in text,
+        lambda text: "schedules" in text.lower() and "predeployed-test-app" in text,
     )
     assert (
         found_schedule_data
-    ), f"Response should contain schedule data for '{app_name}', got: {context.mcp_response.get('content')}"
+    ), f"Response should contain schedule data for 'predeployed-test-app', got: {context.mcp_response.get('content')}"
 
 
-@then("I should receive a success response about schedule update")
+@step("I should receive a success response about schedule update")
 def step_check_schedule_update_success(context):
     """Verify the response indicates successful schedule update."""
     assert context.mcp_response.get(
@@ -442,7 +441,7 @@ def step_check_schedule_update_success(context):
     ), f"Response should mention update, got: {context.mcp_response}"
 
 
-@then("I should receive a success response about schedule deletion")
+@step("I should receive a success response about schedule deletion")
 def step_check_schedule_deletion_success(context):
     """Verify the response indicates successful schedule deletion."""
     assert context.mcp_response.get(
@@ -451,3 +450,194 @@ def step_check_schedule_deletion_success(context):
     assert (
         "deleted" in str(context.mcp_response).lower()
     ), f"Response should mention deletion, got: {context.mcp_response}"
+
+
+@step('I call tower_run_remote with invalid parameter "{param}"')
+@async_run_until_complete
+async def step_call_tower_run_remote_with_invalid_param(context, param):
+    """Call tower_run_remote with an invalid parameter"""
+    key, value = param.split("=", 1)
+    arguments = {"parameters": {key: value}}
+    await call_mcp_tool(context, "tower_run_remote", arguments)
+
+
+@step("the response should contain plain text log lines")
+def step_response_should_contain_plain_text_log_lines(context):
+    """Verify response contains properly formatted plain text log lines"""
+    response_content = str(context.mcp_response.get("content", ""))
+    assert (
+        response_content
+    ), f"Response should have content, got: {context.mcp_response}"
+
+    # Check for timestamp formatting (should have | separator for plain text)
+    assert (
+        " | " in response_content
+    ), f"Expected plain text format with '|' separator, got: {response_content[:200]}..."
+
+
+@step("the response should not contain ANSI color codes")
+def step_response_should_not_contain_ansi_codes(context):
+    """Verify response doesn't contain ANSI color escape sequences"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Check for common ANSI color codes
+    ansi_patterns = ["\033[", "\x1b[", "[0m", "[1;33m", "[31m"]
+    for pattern in ansi_patterns:
+        assert (
+            pattern not in response_content
+        ), f"Found ANSI color code '{pattern}' in response: {response_content[:200]}..."
+
+
+@step("each log line should be properly formatted with timestamp")
+def step_each_log_line_should_be_formatted_with_timestamp(context):
+    """Verify each log line has proper timestamp format"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Split into lines and check timestamp format
+    lines = [line.strip() for line in response_content.split("\n") if line.strip()]
+
+    # Find lines that contain the pipe separator (these should be log lines)
+    log_lines = [line for line in lines if " | " in line]
+    assert (
+        len(log_lines) > 0
+    ), f"Expected to find log lines with '|' separator, got: {response_content[:300]}..."
+
+    # Check timestamp format for a few log lines
+    for line in log_lines[:3]:  # Check first few log lines
+        parts = line.split(" | ", 1)
+        assert (
+            len(parts) == 2
+        ), f"Log line should have 'timestamp | message' format, got: {line}"
+        timestamp, message = parts
+        assert (
+            len(timestamp.strip()) >= 10
+        ), f"Timestamp should be substantial, got: '{timestamp}'"
+
+
+@step("I should receive a detailed validation error")
+def step_should_receive_detailed_validation_error(context):
+    """Verify response contains detailed validation error information"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Should be an error but with detailed content, not just a status code
+    assert (
+        not context.operation_success
+    ), f"Expected error response, got success: {context.mcp_response}"
+    assert (
+        len(response_content) > 10
+    ), f"Expected detailed error message, got short response: {response_content}"
+
+
+@step('the error should mention "{expected_text}"')
+def step_error_should_mention_text(context, expected_text):
+    """Verify error message contains specific expected text"""
+    response_content = str(context.mcp_response.get("content", ""))
+    assert (
+        expected_text.lower() in response_content.lower()
+    ), f"Expected '{expected_text}' in error response, got: {response_content}"
+
+
+@step("the error should not just be a status code")
+def step_error_should_not_be_just_status_code(context):
+    """Verify error is not just a bare status code like '422'"""
+    response_content = str(context.mcp_response.get("content", ""))
+
+    # Should not be just a number (status code)
+    assert (
+        not response_content.strip().isdigit()
+    ), f"Error should not be just a status code, got: {response_content}"
+    assert (
+        "422" not in response_content or len(response_content) > 20
+    ), f"Should have detailed error, not just '422', got: {response_content}"
+
+
+@given("I have a simple hello world application that exits with code 1")
+def step_have_hello_world_app_with_exit_1(context):
+    """Create a hello world app that exits with code 1 for crash testing"""
+    create_towerfile(context)
+
+    # Create a Python file that exits with code 1
+    crash_app_content = """import time
+print("Hello, World!")
+time.sleep(1)
+print("About to crash...")
+exit(1)
+"""
+    with open("hello.py", "w") as f:
+        f.write(crash_app_content)
+
+
+@step("the response should indicate the app crashed")
+def step_response_should_indicate_crash(context):
+    """Verify response indicates the application crashed"""
+    response_content = str(context.mcp_response.get("content", "")).lower()
+
+    crash_indicators = ["crash", "error", "failed", "exit"]
+    found_indicator = any(
+        indicator in response_content for indicator in crash_indicators
+    )
+    assert (
+        found_indicator
+    ), f"Expected crash indication in response, got: {context.mcp_response}"
+
+
+@step('the response should contain "{expected_text}" message')
+def step_response_should_contain_message(context, expected_text):
+    """Verify response contains expected message text"""
+    response_content = str(context.mcp_response.get("content", "")).lower()
+    assert (
+        expected_text.lower() in response_content
+    ), f"Expected '{expected_text}' in response, got: {context.mcp_response}"
+
+
+@step("I should receive a success response about deployment")
+def step_success_response_about_deployment(context):
+    """Verify the response indicates successful deployment"""
+    assert (
+        context.operation_success
+    ), f"Deploy operation should succeed, got: {context.mcp_response}"
+
+    response_content = str(context.mcp_response.get("content", "")).lower()
+    deployment_keywords = ["deploy", "version", "tower"]
+    found_deployment_success = any(
+        keyword in response_content for keyword in deployment_keywords
+    )
+    assert (
+        found_deployment_success
+    ), f"Response should mention deployment success, got: {context.mcp_response}"
+
+
+@step('the app "{app_name}" should be visible in Tower')
+@async_run_until_complete
+async def step_app_should_be_visible_in_tower(context, app_name):
+    """Verify that the specified app is now visible in Tower"""
+    app_name = unique_app_name(context, app_name)
+    result = await call_mcp_tool(context, "tower_apps_show", {"name": app_name})
+    assert result.get(
+        "success", False
+    ), f"App '{app_name}' should be visible in Tower, but tower_apps_show failed: {result}"
+
+
+@step("I should receive logging notifications")
+def step_should_receive_logging_notifications(context):
+    """Verify that logging notifications were captured"""
+    logs = context.mcp_response.get("captured_logs", [])
+    assert len(logs) > 0, "Expected logging notifications but got none"
+
+
+@step("the logs should contain process output")
+def step_logs_should_contain_output(context):
+    """Verify logs contain actual process messages"""
+    logs = context.mcp_response.get("captured_logs", [])
+    assert any(
+        log.data.get("message", "").strip() for log in logs
+    ), "No process output in logs"
+
+
+@step("the logs should have tower-process logger")
+def step_logs_should_have_correct_logger(context):
+    """Verify logs use the correct logger name"""
+    logs = context.mcp_response.get("captured_logs", [])
+    assert any(
+        log.logger == "tower-process" for log in logs
+    ), "Missing tower-process logger"
