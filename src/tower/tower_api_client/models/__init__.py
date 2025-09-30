@@ -61,10 +61,12 @@ from .deploy_app_response import DeployAppResponse
 from .describe_app_response import DescribeAppResponse
 from .describe_app_version_response import DescribeAppVersionResponse
 from .describe_device_login_session_response import DescribeDeviceLoginSessionResponse
+from .describe_email_preferences_body import DescribeEmailPreferencesBody
 from .describe_run_logs_response import DescribeRunLogsResponse
 from .describe_run_response import DescribeRunResponse
 from .describe_secrets_key_response import DescribeSecretsKeyResponse
 from .describe_session_response import DescribeSessionResponse
+from .email_subscriptions import EmailSubscriptions
 from .encrypted_catalog_property import EncryptedCatalogProperty
 from .environment import Environment
 from .error_detail import ErrorDetail
@@ -156,6 +158,7 @@ from .update_app_params import UpdateAppParams
 from .update_app_response import UpdateAppResponse
 from .update_catalog_params import UpdateCatalogParams
 from .update_catalog_response import UpdateCatalogResponse
+from .update_email_preferences_body import UpdateEmailPreferencesBody
 from .update_environment_params import UpdateEnvironmentParams
 from .update_environment_response import UpdateEnvironmentResponse
 from .update_my_team_invitation_params import UpdateMyTeamInvitationParams
@@ -240,10 +243,12 @@ __all__ = (
     "DescribeAppResponse",
     "DescribeAppVersionResponse",
     "DescribeDeviceLoginSessionResponse",
+    "DescribeEmailPreferencesBody",
     "DescribeRunLogsResponse",
     "DescribeRunResponse",
     "DescribeSecretsKeyResponse",
     "DescribeSessionResponse",
+    "EmailSubscriptions",
     "EncryptedCatalogProperty",
     "Environment",
     "ErrorDetail",
@@ -333,6 +338,7 @@ __all__ = (
     "UpdateAppResponse",
     "UpdateCatalogParams",
     "UpdateCatalogResponse",
+    "UpdateEmailPreferencesBody",
     "UpdateEnvironmentParams",
     "UpdateEnvironmentResponse",
     "UpdateMyTeamInvitationParams",

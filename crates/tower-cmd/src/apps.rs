@@ -4,11 +4,7 @@ use config::Config;
 
 use tower_api::models::Run;
 
-use crate::{
-    util::dates,
-    output,
-    api,
-};
+use crate::{api, output, util::dates};
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
@@ -65,7 +61,7 @@ pub async fn do_logs(config: Config, cmd: &ArgMatches) {
 pub async fn do_show(config: Config, cmd: &ArgMatches) {
     let name = extract_app_name("show", cmd.subcommand());
 
-    match  api::describe_app(&config, &name).await {
+    match api::describe_app(&config, &name).await {
         Ok(app_response) => {
             let app = app_response.app;
             let runs = app_response.runs;
@@ -115,8 +111,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
                             {
                                 let start =
                                     started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                let end =
-                                    ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                let end = ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
                                 if let (Some(start), Some(end)) = (start, end) {
                                     format!("{:.1}s", (end - start).num_seconds())
                                 } else {
@@ -136,12 +131,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
                         "Pending".into()
                     };
 
-                    vec![
-                        run.number.to_string(),
-                        status_str,
-                        start_time,
-                        elapsed_time,
-                    ]
+                    vec![run.number.to_string(), status_str, start_time, elapsed_time]
                 })
                 .collect();
 
@@ -172,7 +162,7 @@ pub async fn do_list_apps(config: Config) {
                 })
                 .collect();
             output::list(items);
-        },
+        }
         Err(err) => {
             output::tower_error(err);
         }
@@ -194,7 +184,6 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
         spinner.success();
         output::success(&format!("App '{}' created", name));
     }
-
 }
 
 pub async fn do_delete(config: Config, cmd: &ArgMatches) {
@@ -221,10 +210,16 @@ fn extract_app_name_and_run(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> (
             );
         }
 
-        let line = format!("Run number is required. Example: tower apps {} <app name>#<run number>", subcmd);
+        let line = format!(
+            "Run number is required. Example: tower apps {} <app name>#<run number>",
+            subcmd
+        );
         output::die(&line);
     }
-    let line = format!("App name is required. Example: tower apps {} <app name>#<run number>", subcmd);
+    let line = format!(
+        "App name is required. Example: tower apps {} <app name>#<run number>",
+        subcmd
+    );
     output::die(&line)
 }
 
@@ -233,6 +228,9 @@ fn extract_app_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
         return name.to_string();
     }
 
-    let line = format!("App name is required. Example: tower apps {} <app name>", subcmd);
+    let line = format!(
+        "App name is required. Example: tower apps {} <app name>",
+        subcmd
+    );
     output::die(&line);
 }

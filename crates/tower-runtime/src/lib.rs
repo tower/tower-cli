@@ -1,17 +1,14 @@
-use std::path::PathBuf;
-use std::future::Future;
-use std::collections::HashMap;
-use tokio::sync::mpsc::{
-    UnboundedReceiver,
-    UnboundedSender,
-};
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+use std::future::Future;
+use std::path::PathBuf;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use tower_package::Package;
 use tower_telemetry::debug;
 
-pub mod local;
 pub mod errors;
+pub mod local;
 
 use errors::Error;
 
@@ -53,12 +50,13 @@ pub type OutputSender = UnboundedSender<Output>;
 pub trait App {
     // start will start the process
     fn start(opts: StartOptions) -> impl Future<Output = Result<Self, Error>> + Send
-        where Self: Sized;
+    where
+        Self: Sized;
 
     // terminate will terminate the subprocess
     fn terminate(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 
-    // status checks the status of an app 
+    // status checks the status of an app
     fn status(&self) -> impl Future<Output = Result<Status, Error>> + Send;
 }
 
@@ -68,9 +66,7 @@ pub struct AppLauncher<A: App> {
 
 impl<A: App> std::default::Default for AppLauncher<A> {
     fn default() -> Self {
-        Self {
-            app: None,
-        }
+        Self { app: None }
     }
 }
 

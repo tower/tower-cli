@@ -7,11 +7,6 @@ name: "[tower] Test python"
 
 on:
   pull_request:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,6 +34,9 @@ jobs:
 
       - name: Install the project
         run: uv sync --locked --all-extras --dev
+
+      - name: Check Python formatting with Black
+        run: uv run --group dev black --check --diff .
 
       - name: Run tests
         run: uv run pytest tests

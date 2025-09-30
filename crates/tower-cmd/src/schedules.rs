@@ -3,10 +3,7 @@ use colored::Colorize;
 use config::Config;
 use std::collections::HashMap;
 
-use crate::{
-    output,
-    api,
-};
+use crate::{api, output};
 
 use tower_api::models::schedule::Status;
 
@@ -207,7 +204,10 @@ fn extract_schedule_id(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String
         return id.to_string();
     }
 
-    let line = format!("Schedule ID is required. Example: tower schedules {} <schedule-id>", subcmd);
+    let line = format!(
+        "Schedule ID is required. Example: tower schedules {} <schedule-id>",
+        subcmd
+    );
     output::die(&line);
 }
 

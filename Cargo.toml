@@ -4,7 +4,8 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.30"
+version = "0.3.31"
+
 
 
 
@@ -24,6 +25,7 @@ aes-gcm = "0.10"
 anyhow = "1.0.95"
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 async_zip = { version = "0.0.16", features = ["tokio", "tokio-fs", "deflate"] }
+axum = "0.8.4"
 base64 = "0.22"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
@@ -61,6 +63,7 @@ tokio-stream = { version = "0.1.11", features = ["net"] }
 tokio-tar = "0.3"
 tokio-util = "0.7"
 toml = "0.8"
+toml_edit = "0.22"
 tower-api = { path = "crates/tower-api" }
 tower-cmd = { path = "crates/tower-cmd" }
 tower-package = { path = "crates/tower-package" }

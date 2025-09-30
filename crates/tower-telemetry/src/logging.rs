@@ -1,10 +1,5 @@
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::{
-    registry::Registry,
-    layer::Layer,
-    filter::EnvFilter,
-    fmt,
-};
+use tracing_subscriber::{filter::EnvFilter, fmt, layer::Layer, registry::Registry};
 
 #[macro_export]
 macro_rules! event_with_level {
@@ -171,29 +166,23 @@ type BoxedFmtLayer = Box<dyn Layer<Registry> + Send + Sync>;
 
 fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtLayer {
     match destination {
-        LogDestination::Stdout => {
-            match format {
-                LogFormat::Plain => Box::new(fmt::layer().event_format(fmt::format().pretty())),
-                LogFormat::Json => Box::new(fmt::layer().event_format(fmt::format().json())),
-            }
-        }
+        LogDestination::Stdout => match format {
+            LogFormat::Plain => Box::new(fmt::layer().event_format(fmt::format().pretty())),
+            LogFormat::Json => Box::new(fmt::layer().event_format(fmt::format().json())),
+        },
         LogDestination::File(path) => {
             let file_appender = tracing_appender::rolling::daily(".", path);
             match format {
-                LogFormat::Plain => {
-                    Box::new(
-                        fmt::layer()
-                            .event_format(fmt::format().pretty())
-                            .with_writer(file_appender)
-                    )
-                }
-                LogFormat::Json => {
-                    Box::new(
-                        fmt::layer()
-                            .event_format(fmt::format().json())
-                            .with_writer(file_appender)
-                    )
-                }
+                LogFormat::Plain => Box::new(
+                    fmt::layer()
+                        .event_format(fmt::format().pretty())
+                        .with_writer(file_appender),
+                ),
+                LogFormat::Json => Box::new(
+                    fmt::layer()
+                        .event_format(fmt::format().json())
+                        .with_writer(file_appender),
+                ),
             }
         }
     }
@@ -209,6 +198,5 @@ pub fn enable_logging(level: LogLevel, format: LogFormat, destination: LogDestin
         .with(create_fmt_layer(format, destination))
         .with(filter);
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("Failed to set global default subscriber");
+    let _ = tracing::subscriber::set_global_default(subscriber);
 }

@@ -23,5 +23,4 @@ additionalProperties:
   bestFitInt: true
   dateLibrary: chrono
   useRustLogging: true
-  rustfmt: true
   avoidBoxedModels: true

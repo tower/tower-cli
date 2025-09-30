@@ -1,7 +1,7 @@
-use std::future::Future;
+use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, TimeZone};
 use std::fs;
+use std::future::Future;
 use std::path::PathBuf;
 use url::Url;
 
@@ -77,18 +77,22 @@ pub fn get_last_version_check_timestamp() -> DateTime<Utc> {
     // called last_version_check.txt and contains a chrono::DateTime timestamp in ISO 8601 format.
     match find_or_create_config_dir() {
         Ok(path) => {
-            if let Ok(last_version_check) = fs::read_to_string(path.join("last_version_check.txt")) {
+            if let Ok(last_version_check) = fs::read_to_string(path.join("last_version_check.txt"))
+            {
                 if let Ok(dt) = DateTime::parse_from_rfc3339(&last_version_check) {
                     dt.into()
                 } else {
-                    debug!("Error parsing last version check timestamp: {}", last_version_check);
+                    debug!(
+                        "Error parsing last version check timestamp: {}",
+                        last_version_check
+                    );
                     default
                 }
             } else {
                 debug!("Error reading last version check timestamp");
                 default
             }
-        },
+        }
         Err(err) => {
             debug!("Error finding config dir: {}", err);
             default
@@ -104,7 +108,7 @@ pub fn set_last_version_check_timestamp(dt: DateTime<Utc>) {
             if let Err(err) = fs::write(path.join("last_version_check.txt"), dt_str) {
                 debug!("Error writing last version check timestamp: {}", err);
             }
-        },
+        }
         Err(err) => {
             debug!("Error finding config dir: {}", err);
         }
@@ -307,11 +311,9 @@ impl Session {
 
 // This hairy little function is a workaround for the fact that we can't use async/await in the
 // context of some of the functions in this file.
-fn run_future_sync<F, T>(future: F) -> T 
+fn run_future_sync<F, T>(future: F) -> T
 where
     F: Future<Output = T>,
 {
-    tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(future)
-    })
+    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
 }

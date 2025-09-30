@@ -8,6 +8,7 @@ BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SEMVER_EXP = re.compile(r"\d+\.\d+(\.\d+)?(-rc\.(\d+))?")
 
+
 class Version:
     def __init__(self, version_str):
         version_str = version_str.removeprefix("v")
@@ -43,21 +44,40 @@ class Version:
 
     def __eq__(self, other):
         if isinstance(other, Version):
-            return self.major == other.major and self.minor == other.minor and self.patch == other.patch
+            return (
+                self.major == other.major
+                and self.minor == other.minor
+                and self.patch == other.patch
+            )
         else:
             return False
 
     def to_tag_string(self):
         if self.prerelease > 0:
-            return "{major}.{minor}.{patch}-rc.{prerelease}".format(major=self.major, minor=self.minor, patch=self.patch, prerelease=self.prerelease)
+            return "{major}.{minor}.{patch}-rc.{prerelease}".format(
+                major=self.major,
+                minor=self.minor,
+                patch=self.patch,
+                prerelease=self.prerelease,
+            )
         else:
-            return "{major}.{minor}.{patch}".format(major=self.major, minor=self.minor, patch=self.patch)
+            return "{major}.{minor}.{patch}".format(
+                major=self.major, minor=self.minor, patch=self.patch
+            )
 
     def to_python_string(self):
         if self.prerelease > 0:
-            return "{major}.{minor}.{patch}rc{prerelease}".format(major=self.major, minor=self.minor, patch=self.patch, prerelease=self.prerelease)
+            return "{major}.{minor}.{patch}rc{prerelease}".format(
+                major=self.major,
+                minor=self.minor,
+                patch=self.patch,
+                prerelease=self.prerelease,
+            )
         else:
-            return "{major}.{minor}.{patch}".format(major=self.major, minor=self.minor, patch=self.patch)
+            return "{major}.{minor}.{patch}".format(
+                major=self.major, minor=self.minor, patch=self.patch
+            )
+
 
 def get_all_versions():
     # Wait for this to complete.
@@ -70,12 +90,17 @@ def get_all_versions():
     tags = stream.read().split("\n")
     return [Version(tag) for tag in tags]
 
+
 def get_version_set(version):
     all_versions = get_all_versions()
-    return [v for v in all_versions if v.major == version.major and v.minor == version.minor]
+    return [
+        v for v in all_versions if v.major == version.major and v.minor == version.minor
+    ]
+
 
 def get_version_patch(version):
     return version.patch
+
 
 def get_current_version(base):
     v = Version(base)
@@ -101,6 +126,7 @@ def get_current_version(base):
         else:
             return same_versions[0]
 
+
 def get_version_base():
     path = os.path.join(BASE_PATH, "version.txt")
 
@@ -108,53 +134,90 @@ def get_version_base():
         line = file.readline().rstrip()
         return line
 
+
 def str2bool(value):
     if isinstance(value, bool):
         return value
-    if value.lower() in {'true', 'yes', '1'}:
+    if value.lower() in {"true", "yes", "1"}:
         return True
-    elif value.lower() in {'false', 'no', '0'}:
+    elif value.lower() in {"false", "no", "0"}:
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected (true/false).')
+        raise argparse.ArgumentTypeError("Boolean value expected (true/false).")
+
 
 def replace_line_with_regex(file_path, pattern, replace_text):
     """
     Replace lines matching a regex pattern with replace_text in the specified file.
-    
+
     Args:
         file_path (str): Path to the file to modify
         pattern (re.Pattern): Regex pattern to match lines
         replace_text (str): Text to replace the entire line with
     """
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         content = file.read()
-    
+
     # Use regex to replace lines matching the pattern
-    new_content = pattern.sub(replace_text + '\n', content)
-    
-    with open(file_path, 'w') as file:
+    new_content = pattern.sub(replace_text + "\n", content)
+
+    with open(file_path, "w") as file:
         file.write(new_content)
+
 
 def update_cargo_file(version):
     pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
-    replace_line_with_regex("Cargo.toml", pattern, f'version = "{version.to_tag_string()}"')
+    replace_line_with_regex(
+        "Cargo.toml", pattern, f'version = "{version.to_tag_string()}"'
+    )
+
 
 def update_pyproject_file(version):
     pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
-    replace_line_with_regex("pyproject.toml", pattern, f'version = "{version.to_python_string()}"')
+    replace_line_with_regex(
+        "pyproject.toml", pattern, f'version = "{version.to_python_string()}"'
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog='semver',
-        description='Manages the semantic versioning of the projects',
-        epilog='This is the epilog'
+        prog="semver",
+        description="Manages the semantic versioning of the projects",
+        epilog="This is the epilog",
     )
 
-    parser.add_argument("-i", "--patch", type=str2bool, required=False, default=False, help="Increment the patch version")
-    parser.add_argument("-p", "--prerelease", type=str2bool, required=False, default=False, help="Include the fact that this is a prerelease version")
-    parser.add_argument("-r", "--release", type=str2bool, required=False, default=False, help="Remove the perelease designation")
-    parser.add_argument("-w", "--write", type=str2bool, required=False, default=False, help="Update the various tools in this repository")
+    parser.add_argument(
+        "-i",
+        "--patch",
+        type=str2bool,
+        required=False,
+        default=False,
+        help="Increment the patch version",
+    )
+    parser.add_argument(
+        "-p",
+        "--prerelease",
+        type=str2bool,
+        required=False,
+        default=False,
+        help="Include the fact that this is a prerelease version",
+    )
+    parser.add_argument(
+        "-r",
+        "--release",
+        type=str2bool,
+        required=False,
+        default=False,
+        help="Remove the perelease designation",
+    )
+    parser.add_argument(
+        "-w",
+        "--write",
+        type=str2bool,
+        required=False,
+        default=False,
+        help="Update the various tools in this repository",
+    )
     args = parser.parse_args()
 
     version_base = get_version_base()
@@ -183,4 +246,4 @@ if __name__ == "__main__":
         os.system("cargo build")
         os.system("uv lock")
     else:
-        print(version.to_tag_string(), end='', flush=True)
+        print(version.to_tag_string(), end="", flush=True)

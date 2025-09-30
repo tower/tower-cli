@@ -27,7 +27,9 @@ pub enum Error {
     #[snafu(display("Unknown describe session value: {}", value))]
     UnknownDescribeSessionValue { value: serde_json::Value },
 
-    DescribeSessionError { err: tower_api::apis::Error<tower_api::apis::default_api::DescribeSessionError> },
+    DescribeSessionError {
+        err: tower_api::apis::Error<tower_api::apis::default_api::DescribeSessionError>,
+    },
 }
 
 impl From<std::io::Error> for Error {
@@ -45,6 +47,13 @@ impl From<serde_json::Error> for Error {
 impl From<toml::de::Error> for Error {
     fn from(err: toml::de::Error) -> Self {
         debug!("error parsing Towerfile TOMl: {}", err);
+        Error::InvalidTowerfile
+    }
+}
+
+impl From<toml::ser::Error> for Error {
+    fn from(err: toml::ser::Error) -> Self {
+        debug!("error serializing Towerfile TOML: {}", err);
         Error::InvalidTowerfile
     }
 }

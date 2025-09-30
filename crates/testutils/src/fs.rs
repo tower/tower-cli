@@ -1,6 +1,6 @@
-use std::fs::{File, remove_file};
-use std::path::{Path, PathBuf};
+use std::fs::{remove_file, File};
 use std::io;
+use std::path::{Path, PathBuf};
 
 pub struct TestFile {
     path: PathBuf,

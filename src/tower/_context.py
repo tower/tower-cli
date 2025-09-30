@@ -1,9 +1,17 @@
 import os
 
+
 class TowerContext:
-    def __init__(self, tower_url: str, environment: str, api_key: str = None, 
-                 inference_router: str = None, inference_router_api_key: str = None,
-                 inference_provider: str = None, jwt: str = None):
+    def __init__(
+        self,
+        tower_url: str,
+        environment: str,
+        api_key: str = None,
+        inference_router: str = None,
+        inference_router_api_key: str = None,
+        inference_provider: str = None,
+        jwt: str = None,
+    ):
         self.tower_url = tower_url
         self.environment = environment
         self.api_key = api_key
@@ -33,12 +41,11 @@ class TowerContext:
         inference_provider = os.getenv("TOWER_INFERENCE_PROVIDER")
 
         return cls(
-            tower_url = tower_url,
-            environment = tower_environment,
-            api_key = tower_api_key,
-            inference_router = inference_router,
-            inference_router_api_key = inference_router_api_key,
-            inference_provider = inference_provider,
-            jwt = tower_jwt,
+            tower_url=tower_url,
+            environment=tower_environment,
+            api_key=tower_api_key,
+            inference_router=inference_router,
+            inference_router_api_key=inference_router_api_key,
+            inference_provider=inference_provider,
+            jwt=tower_jwt,
         )
-

@@ -20,6 +20,9 @@ class UpdateUserParams:
         is_alerts_enabled (Union[None, Unset, bool]):
         is_subscribed_to_changelog (Union[None, Unset, bool]): If true, the user will receive changelog updates via
             email.
+        is_subscribed_to_marketing_emails (Union[None, Unset, bool]): If true, the user will receive marketing emails
+            from Tower.
+        is_subscribed_to_newsletter (Union[None, Unset, bool]): If true, the user will receive the Tower newsletter.
         last_name (Union[None, Unset, str]):
         password (Union[None, Unset, str]):
     """
@@ -30,6 +33,8 @@ class UpdateUserParams:
     first_name: Union[None, Unset, str] = UNSET
     is_alerts_enabled: Union[None, Unset, bool] = UNSET
     is_subscribed_to_changelog: Union[None, Unset, bool] = UNSET
+    is_subscribed_to_marketing_emails: Union[None, Unset, bool] = UNSET
+    is_subscribed_to_newsletter: Union[None, Unset, bool] = UNSET
     last_name: Union[None, Unset, str] = UNSET
     password: Union[None, Unset, str] = UNSET
 
@@ -66,6 +71,18 @@ class UpdateUserParams:
         else:
             is_subscribed_to_changelog = self.is_subscribed_to_changelog
 
+        is_subscribed_to_marketing_emails: Union[None, Unset, bool]
+        if isinstance(self.is_subscribed_to_marketing_emails, Unset):
+            is_subscribed_to_marketing_emails = UNSET
+        else:
+            is_subscribed_to_marketing_emails = self.is_subscribed_to_marketing_emails
+
+        is_subscribed_to_newsletter: Union[None, Unset, bool]
+        if isinstance(self.is_subscribed_to_newsletter, Unset):
+            is_subscribed_to_newsletter = UNSET
+        else:
+            is_subscribed_to_newsletter = self.is_subscribed_to_newsletter
+
         last_name: Union[None, Unset, str]
         if isinstance(self.last_name, Unset):
             last_name = UNSET
@@ -92,6 +109,12 @@ class UpdateUserParams:
             field_dict["is_alerts_enabled"] = is_alerts_enabled
         if is_subscribed_to_changelog is not UNSET:
             field_dict["is_subscribed_to_changelog"] = is_subscribed_to_changelog
+        if is_subscribed_to_marketing_emails is not UNSET:
+            field_dict["is_subscribed_to_marketing_emails"] = (
+                is_subscribed_to_marketing_emails
+            )
+        if is_subscribed_to_newsletter is not UNSET:
+            field_dict["is_subscribed_to_newsletter"] = is_subscribed_to_newsletter
         if last_name is not UNSET:
             field_dict["last_name"] = last_name
         if password is not UNSET:
@@ -151,6 +174,32 @@ class UpdateUserParams:
             d.pop("is_subscribed_to_changelog", UNSET)
         )
 
+        def _parse_is_subscribed_to_marketing_emails(
+            data: object,
+        ) -> Union[None, Unset, bool]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, bool], data)
+
+        is_subscribed_to_marketing_emails = _parse_is_subscribed_to_marketing_emails(
+            d.pop("is_subscribed_to_marketing_emails", UNSET)
+        )
+
+        def _parse_is_subscribed_to_newsletter(
+            data: object,
+        ) -> Union[None, Unset, bool]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, bool], data)
+
+        is_subscribed_to_newsletter = _parse_is_subscribed_to_newsletter(
+            d.pop("is_subscribed_to_newsletter", UNSET)
+        )
+
         def _parse_last_name(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
@@ -176,6 +225,8 @@ class UpdateUserParams:
             first_name=first_name,
             is_alerts_enabled=is_alerts_enabled,
             is_subscribed_to_changelog=is_subscribed_to_changelog,
+            is_subscribed_to_marketing_emails=is_subscribed_to_marketing_emails,
+            is_subscribed_to_newsletter=is_subscribed_to_newsletter,
             last_name=last_name,
             password=password,
         )

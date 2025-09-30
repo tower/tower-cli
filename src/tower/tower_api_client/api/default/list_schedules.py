@@ -13,12 +13,15 @@ def _get_kwargs(
     *,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
     params["page"] = page
 
     params["page_size"] = page_size
+
+    params["environment"] = environment
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -60,6 +63,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListSchedulesResponse]:
     """List schedules
 
@@ -68,6 +72,8 @@ def sync_detailed(
     Args:
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -80,6 +86,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         page=page,
         page_size=page_size,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -94,6 +101,7 @@ def sync(
     client: AuthenticatedClient,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListSchedulesResponse]:
     """List schedules
 
@@ -102,6 +110,8 @@ def sync(
     Args:
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -115,6 +125,7 @@ def sync(
         client=client,
         page=page,
         page_size=page_size,
+        environment=environment,
     ).parsed
 
 
@@ -123,6 +134,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Response[ListSchedulesResponse]:
     """List schedules
 
@@ -131,6 +143,8 @@ async def asyncio_detailed(
     Args:
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,6 +157,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         page=page,
         page_size=page_size,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -155,6 +170,7 @@ async def asyncio(
     client: AuthenticatedClient,
     page: Union[Unset, int] = UNSET,
     page_size: Union[Unset, int] = UNSET,
+    environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListSchedulesResponse]:
     """List schedules
 
@@ -163,6 +179,8 @@ async def asyncio(
     Args:
         page (Union[Unset, int]): The page number to fetch.
         page_size (Union[Unset, int]): The number of records to fetch on each page.
+        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+            environments will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -177,5 +195,6 @@ async def asyncio(
             client=client,
             page=page,
             page_size=page_size,
+            environment=environment,
         )
     ).parsed

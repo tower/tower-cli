@@ -110,3 +110,6 @@ java -ea \
   -Xms512M \
   -Xmx1024M \
   -jar ${DIR}/${jar} ${ARGS}
+
+# Run cargo fmt to ensure consistent formatting with project settings
+cd ../crates/tower-api && cargo fmt

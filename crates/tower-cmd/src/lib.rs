@@ -1,16 +1,20 @@
 use clap::{value_parser, Arg, Command};
 use config::{Config, Session};
 
+pub mod api;
 mod apps;
 mod deploy;
-pub mod output;
-pub mod api;
+mod environments;
 pub mod error;
+mod mcp;
+pub mod output;
+mod package;
 mod run;
 mod schedules;
 mod secrets;
 mod session;
 mod teams;
+mod towerfile_gen;
 mod util;
 mod version;
 
@@ -32,7 +36,7 @@ impl App {
             Session::from_jwt(&token).ok()
         } else {
             Session::from_config_dir().ok()
-        }; 
+        };
 
         Self { cmd, session }
     }
@@ -119,6 +123,19 @@ impl App {
                     }
                 }
             }
+            Some(("environments", sub_matches)) => {
+                let environments_command = sub_matches.subcommand();
+
+                match environments_command {
+                    Some(("list", _)) => environments::do_list(sessionized_config).await,
+                    Some(("create", args)) => {
+                        environments::do_create(sessionized_config, args).await
+                    }
+                    _ => {
+                        environments::environments_cmd().print_help().unwrap();
+                    }
+                }
+            }
             Some(("schedules", sub_matches)) => {
                 let schedules_command = sub_matches.subcommand();
 
@@ -134,6 +151,7 @@ impl App {
                 }
             }
             Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
+            Some(("package", args)) => package::do_package(sessionized_config, args).await,
             Some(("run", args)) => run::do_run(sessionized_config, args, args.subcommand()).await,
             Some(("teams", sub_matches)) => {
                 let teams_command = sub_matches.subcommand();
@@ -147,6 +165,12 @@ impl App {
                     }
                 }
             }
+            Some(("mcp-server", args)) => mcp::do_mcp_server(sessionized_config, args)
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("MCP server error: {}", e);
+                    std::process::exit(1);
+                }),
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
@@ -179,8 +203,11 @@ fn root_cmd() -> Command {
         .subcommand(apps::apps_cmd())
         .subcommand(schedules::schedules_cmd())
         .subcommand(secrets::secrets_cmd())
+        .subcommand(environments::environments_cmd())
         .subcommand(deploy::deploy_cmd())
+        .subcommand(package::package_cmd())
         .subcommand(run::run_cmd())
         .subcommand(version::version_cmd())
         .subcommand(teams::teams_cmd())
+        .subcommand(mcp::mcp_cmd())
 }
