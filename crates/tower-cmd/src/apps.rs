@@ -173,16 +173,15 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     let description = args.get_one::<String>("description").unwrap();
 
+    let mut spinner = output::spinner("Creating app");
+
     match api::create_app(&config, name, description).await {
         Ok(app) => {
-            if output::is_json_mode_set() {
-                output::json(&app);
-                return;
-            }
-
-            output::success(&format!("App '{}' created", name));
+            spinner.success();
+            output::success_with_data(&format!("App '{}' created", name), Some(app));
         }
         Err(err) => {
+            spinner.failure();
             output::tower_error(err);
         }
     }

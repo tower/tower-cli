@@ -66,14 +66,27 @@ pub fn json<T: Serialize>(data: &T) {
 }
 
 pub fn success(msg: &str) {
-    let line = format!("{} {}\n", "Success!".green(), msg);
-    write(&line);
+    success_with_data(msg, None::<serde_json::Value>);
 }
 
-pub fn failure(msg: &str) {
-    let line = format!("{} {}\n", "Oh no!".red(), msg);
-    write(&line);
+pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
+    if is_json_mode_set() {
+        let mut response = serde_json::json!({
+            "result": "success",
+            "message": msg
+        });
+
+        if let Some(data) = data {
+            response["data"] = serde_json::to_value(data).unwrap();
+        }
+
+        json(&response);
+    } else {
+        let line = format!("{} {}\n", "Success!".green(), msg);
+        write(&line);
+    }
 }
+
 
 pub enum LogLineType {
     Remote,
@@ -179,8 +192,16 @@ pub fn write(msg: &str) {
 }
 
 pub fn error(msg: &str) {
-    let line = format!("{} {}\n", "Oh no!".red(), msg);
-    write(&line);
+    if is_json_mode_set() {
+        let response = serde_json::json!({
+            "result": "error",
+            "message": msg
+        });
+        json(&response);
+    } else {
+        let line = format!("{} {}\n", "Oh no!".red(), msg);
+        write(&line);
+    }
 }
 
 pub fn runtime_error(err: tower_runtime::errors::Error) {
@@ -339,7 +360,7 @@ pub struct Spinner {
 
 impl Spinner {
     pub fn new(msg: String) -> Spinner {
-        if is_capture_mode_set() {
+        if is_capture_mode_set() || is_json_mode_set() {
             Spinner { spinner: None, msg }
         } else {
             let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());

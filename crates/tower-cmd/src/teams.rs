@@ -118,7 +118,7 @@ pub async fn do_switch(config: Config, args: &ArgMatches) {
         }
         None => {
             // Team not found
-            output::failure(&format!(
+            output::error(&format!(
                 "Team '{}' not found. Use 'tower teams list' to see all your teams.",
                 name,
             ));
