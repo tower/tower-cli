@@ -771,6 +771,7 @@ pub async fn list_schedules(
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListSchedulesParams {
+        environment: None,
         page: None,
         page_size: None,
     };
