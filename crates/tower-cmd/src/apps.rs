@@ -1,5 +1,4 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
-use colored::Colorize;
 use config::Config;
 
 use tower_api::models::Run;
@@ -69,24 +68,17 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
                 let app = &app_response.app;
                 let runs = &app_response.runs;
 
-                let line = format!("{} {}\n", "Name:".bold().green(), app.name);
-                output::write(&line);
-
-                let line = format!("{}\n", "Description:".bold().green());
-                output::write(&line);
-
+                output::detail("Name", &app.name);
+                output::header("Description");
                 let line = output::paragraph(&app.short_description);
                 output::write(&line);
-
                 output::newline();
                 output::newline();
-
-                let line = format!("{}\n", "Recent runs:".bold().green());
-                output::write(&line);
+                output::header("Recent runs");
 
                 let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
                     .into_iter()
-                    .map(|h| h.yellow().to_string())
+                    .map(|h| h.to_string())
                     .collect();
 
                 let rows = runs
@@ -158,11 +150,11 @@ pub async fn do_list_apps(config: Config) {
                 .map(|app_summary| {
                     let app = &app_summary.app;
                     let desc = if app.short_description.is_empty() {
-                        "No description".white().dimmed().italic()
+                        output::placeholder("No description")
                     } else {
-                        app.short_description.normal().clear()
+                        app.short_description.to_string()
                     };
-                    format!("{}\n{}", app.name.bold().green(), desc)
+                    format!("{}\n{}", output::title(&app.name), desc)
                 })
                 .collect();
             output::list(items, Some(&resp.apps));

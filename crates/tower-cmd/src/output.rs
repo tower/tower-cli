@@ -5,6 +5,7 @@ use cli_table::{
 };
 use colored::{control, Colorize};
 use http::StatusCode;
+use serde::Serialize;
 use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
 use tokio::sync::mpsc::UnboundedSender;
@@ -13,7 +14,6 @@ use tower_api::{
     models::ErrorModel,
 };
 use tower_telemetry::debug;
-use serde::Serialize;
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
@@ -110,6 +110,24 @@ pub fn package_error(err: tower_package::Error) {
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
     write(&line);
+}
+
+pub fn header(text: &str) {
+    let line = format!("{}\n", text.bold().green());
+    write(&line);
+}
+
+pub fn detail(label: &str, value: &str) {
+    let line = format!("{} {}\n", format!("{}:", label).bold().green(), value);
+    write(&line);
+}
+
+pub fn title(text: &str) -> String {
+    text.bold().green().to_string()
+}
+
+pub fn placeholder(text: &str) -> String {
+    text.white().dimmed().italic().to_string()
 }
 
 pub fn paragraph(msg: &str) -> String {
@@ -268,8 +286,10 @@ pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_da
                 .map(|row| {
                     let mut obj = serde_json::Map::new();
                     for (i, value) in row.iter().enumerate() {
-                        let key = headers.get(i).unwrap_or(&i.to_string()).clone();
-                        obj.insert(key, serde_json::Value::String(value.clone()));
+                        let key = headers
+                            .get(i)
+                            .expect("header should have same number of columns as row");
+                        obj.insert(key.to_string(), serde_json::Value::String(value.clone()));
                     }
                     obj
                 })
@@ -285,7 +305,7 @@ pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_da
             .table()
             .border(Border::builder().build())
             .separator(separator)
-            .title(headers);
+            .title(headers.iter().map(|h| h.yellow().to_string()));
 
         print_stdout(table).unwrap();
     }
