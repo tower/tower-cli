@@ -67,8 +67,8 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
                 return;
             }
 
-            let app = app_response.app;
-            let runs = app_response.runs;
+            let app = &app_response.app;
+            let runs = &app_response.runs;
 
             output::detail("Name", &app.name);
             output::header("Description");
@@ -147,9 +147,9 @@ pub async fn do_list_apps(config: Config) {
         Ok(resp) => {
             let items = resp
                 .apps
-                .into_iter()
+                .iter()
                 .map(|app_summary| {
-                    let app = app_summary.app;
+                    let app = &app_summary.app;
                     let desc = if app.short_description.is_empty() {
                         output::placeholder("No description")
                     } else {
