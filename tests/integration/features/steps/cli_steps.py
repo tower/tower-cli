@@ -160,3 +160,139 @@ def step_both_spinners_should_complete(context):
     assert (
         found_completion
     ), f"Expected spinner completion indicators in output, got: {output[:500]}..."
+
+
+# App management specific steps
+@step("the output should contain app names in green bold text")
+def step_output_should_contain_green_app_names(context):
+    """Verify app names appear in green bold (ANSI codes)"""
+    output = context.cli_output
+    # Check for ANSI color codes indicating green and bold
+    green_bold_code = "\x1b[1;32m"  # Bold green
+    assert (
+        green_bold_code in output
+    ), f"Expected green bold text in output, got: {output}"
+
+
+@step('the output should show descriptions or "No description" placeholder')
+def step_output_should_show_descriptions_or_placeholder(context):
+    """Verify descriptions or placeholder text appears"""
+    output = context.cli_output
+    # Should have either descriptions or "No description" in dimmed italic
+    dimmed_code = "\x1b[2m"  # Dimmed text
+    italic_code = "\x1b[3m"  # Italic text
+    has_placeholder = "No description" in output and (
+        dimmed_code in output or italic_code in output
+    )
+    has_description = len(output.split("\n")) > 2  # Multiple lines suggest descriptions
+
+    assert (
+        has_placeholder or has_description
+    ), f"Expected descriptions or placeholder text, got: {output}"
+
+
+@step('the output should show "{label}" label in green bold')
+def step_output_should_show_label_in_green_bold(context, label):
+    """Verify specific label appears in green bold"""
+    output = context.cli_output
+    green_bold_code = "\x1b[1;32m"
+    assert label in output, f"Expected '{label}' in output, got: {output}"
+    assert (
+        green_bold_code in output
+    ), f"Expected green bold formatting in output, got: {output}"
+
+
+@step('the output should show "{header}" header in green bold')
+def step_output_should_show_header_in_green_bold(context, header):
+    """Verify specific header appears in green bold"""
+    output = context.cli_output
+    green_bold_code = "\x1b[1;32m"
+    assert header in output, f"Expected '{header}' in output, got: {output}"
+    assert (
+        green_bold_code in output
+    ), f"Expected green bold formatting in output, got: {output}"
+
+
+@step("the table headers should be yellow colored")
+def step_table_headers_should_be_yellow(context):
+    """Verify table headers appear in yellow"""
+    output = context.cli_output
+    yellow_code = "\x1b[33m"  # Yellow text
+    assert (
+        yellow_code in output
+    ), f"Expected yellow color codes in table headers, got: {output}"
+
+
+@step('the table should show columns "{column_list}"')
+def step_table_should_show_columns(context, column_list):
+    """Verify table contains specific columns"""
+    output = context.cli_output
+    columns = [col.strip().strip('"') for col in column_list.split(",")]
+    for column in columns:
+        assert column in output, f"Expected column '{column}' in table, got: {output}"
+
+
+@step("the output should be valid JSON")
+def step_output_should_be_valid_json(context):
+    """Verify output is valid JSON"""
+    import json
+
+    try:
+        json.loads(context.cli_output)
+    except json.JSONDecodeError as e:
+        raise AssertionError(
+            f"Output is not valid JSON: {e}\nOutput: {context.cli_output}"
+        )
+
+
+@step("the JSON should contain app information")
+def step_json_should_contain_app_info(context):
+    """Verify JSON contains app-related information"""
+    import json
+
+    data = json.loads(context.cli_output)
+    assert (
+        "app" in data or "name" in data
+    ), f"Expected app information in JSON, got: {data}"
+
+
+@step("the JSON should contain runs array")
+def step_json_should_contain_runs_array(context):
+    """Verify JSON contains runs array"""
+    import json
+
+    data = json.loads(context.cli_output)
+    assert "runs" in data and isinstance(
+        data["runs"], list
+    ), f"Expected runs array in JSON, got: {data}"
+
+
+@step("the JSON should contain the created app information")
+def step_json_should_contain_created_app_info(context):
+    """Verify JSON contains created app information"""
+    import json
+
+    data = json.loads(context.cli_output)
+    # Should have app data from create response
+    assert (
+        "app" in data or "name" in data
+    ), f"Expected created app information in JSON, got: {data}"
+
+
+@step('the app name should be "{expected_name}"')
+def step_app_name_should_be(context, expected_name):
+    """Verify app name matches expected value"""
+    import json
+
+    data = json.loads(context.cli_output)
+    # Extract app name from response structure
+    if "app" in data and "name" in data["app"]:
+        actual_name = data["app"]["name"]
+    elif "name" in data:
+        actual_name = data["name"]
+    else:
+        raise AssertionError(f"Could not find app name in JSON response: {data}")
+
+    assert (
+        actual_name == expected_name
+    ), f"Expected app name '{expected_name}', got '{actual_name}'"

@@ -10,7 +10,7 @@ from OpenAPI specs), this mock API must be updated to match. See README.md for
 debugging steps when integration tests fail with schema errors.
 """
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -19,12 +19,25 @@ import json
 import datetime
 import uuid
 import asyncio
+import sys
 
 app = FastAPI(
     title="Tower Mock API",
     description="A mock API server for Tower CLI testing.",
     version="1.0.0",
 )
+
+# Enable debug logging if --debug is passed
+DEBUG_MODE = "--debug" in sys.argv
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    if DEBUG_MODE:
+        print(f"DEBUG: {request.method} {request.url}")
+    response = await call_next(request)
+    if DEBUG_MODE:
+        print(f"DEBUG: Response status: {response.status_code}")
+    return response
 
 # In-memory data stores for mock responses
 mock_apps_db = {}
@@ -36,10 +49,10 @@ mock_deployed_apps = set()  # Track which apps have been deployed
 
 # Pre-populate with test-app for CLI validation/spinner tests
 mock_apps_db["predeployed-test-app"] = {
-    "name": "test-app",
+    "name": "predeployed-test-app",
     "owner": "mock_owner",
     "short_description": "Pre-existing test app for CLI tests",
-    "version": "1.0.0",
+    "version": None,
     "schedule": None,
     "created_at": datetime.datetime.now().isoformat(),
     "next_run_at": None,
@@ -88,8 +101,16 @@ async def read_root():
 # Placeholder for /v1/apps endpoints
 @app.get("/v1/apps")
 async def list_apps():
+    # Format apps as AppSummary objects
+    app_summaries = []
+    for app_data in mock_apps_db.values():
+        app_summaries.append({
+            "app": app_data,
+            "runs": []  # Empty runs for list view
+        })
+
     return {
-        "apps": list(mock_apps_db.values()),
+        "apps": app_summaries,
         "pages": {
             "page": 1,
             "total": len(mock_apps_db),
@@ -99,7 +120,7 @@ async def list_apps():
     }
 
 
-@app.post("/v1/apps")
+@app.post("/v1/apps", status_code=201)
 async def create_app(app_data: Dict[str, Any]):
     app_name = app_data.get("name")
     if not app_name:
@@ -114,7 +135,7 @@ async def create_app(app_data: Dict[str, Any]):
         "name": app_name,
         "owner": "mock_owner",
         "short_description": app_data.get("short_description", ""),
-        "version": "1.0.0",
+        "version": None,
         "schedule": None,
         "created_at": datetime.datetime.now().isoformat(),
         "next_run_at": None,
