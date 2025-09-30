@@ -134,7 +134,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                 })
                 .collect();
 
-            output::table(headers, rows);
+            output::table(headers, rows, Some(&response.schedules));
         }
         Err(err) => {
             output::tower_error(err);

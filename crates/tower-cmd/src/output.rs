@@ -13,10 +13,12 @@ use tower_api::{
     models::ErrorModel,
 };
 use tower_telemetry::debug;
+use serde::Serialize;
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
 static CAPTURE_MODE: OnceLock<bool> = OnceLock::new();
+static JSON_MODE: OnceLock<bool> = OnceLock::new();
 static CURRENT_SENDER: Mutex<Option<UnboundedSender<String>>> = Mutex::new(None);
 
 pub fn set_capture_mode() {
@@ -26,6 +28,14 @@ pub fn set_capture_mode() {
 
 pub fn is_capture_mode_set() -> bool {
     CAPTURE_MODE.get().is_some()
+}
+
+pub fn set_json_mode() {
+    JSON_MODE.set(true).ok();
+}
+
+pub fn is_json_mode_set() -> bool {
+    JSON_MODE.get().is_some()
 }
 
 pub fn set_current_sender(sender: UnboundedSender<String>) {
@@ -40,6 +50,17 @@ fn send_to_current_sender(msg: String) {
     if let Ok(sender_guard) = CURRENT_SENDER.lock() {
         if let Some(tx) = sender_guard.as_ref() {
             tx.send(msg).ok();
+        }
+    }
+}
+
+pub fn json<T: Serialize>(data: &T) {
+    match serde_json::to_string_pretty(data) {
+        Ok(json_str) => {
+            write(&format!("{}\n", json_str));
+        }
+        Err(e) => {
+            error(&format!("Failed to serialize to JSON: {}", e));
         }
     }
 }
@@ -236,26 +257,54 @@ pub fn tower_error<T>(err: ApiError<T>) {
     }
 }
 
-pub fn table(headers: Vec<String>, data: Vec<Vec<String>>) {
-    let separator = Separator::builder()
-        .title(Some(HorizontalLine::default()))
-        .build();
+pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_data: Option<&T>) {
+    if is_json_mode_set() {
+        if let Some(data) = json_data {
+            json(data);
+        } else {
+            // Fallback: convert table data to JSON structure
+            let json_output: Vec<serde_json::Map<String, serde_json::Value>> = data
+                .iter()
+                .map(|row| {
+                    let mut obj = serde_json::Map::new();
+                    for (i, value) in row.iter().enumerate() {
+                        let key = headers.get(i).unwrap_or(&i.to_string()).clone();
+                        obj.insert(key, serde_json::Value::String(value.clone()));
+                    }
+                    obj
+                })
+                .collect();
+            json(&json_output);
+        }
+    } else {
+        let separator = Separator::builder()
+            .title(Some(HorizontalLine::default()))
+            .build();
 
-    let table = data
-        .table()
-        .border(Border::builder().build())
-        .separator(separator)
-        .title(headers);
+        let table = data
+            .table()
+            .border(Border::builder().build())
+            .separator(separator)
+            .title(headers);
 
-    print_stdout(table).unwrap();
+        print_stdout(table).unwrap();
+    }
 }
 
-pub fn list(items: Vec<String>) {
-    for item in items {
-        let line = format!(" * {}\n", item);
-        let line = line.replace("\n", "\n   ");
-        let line = format!("{}\n", line);
-        write(&line);
+pub fn list<T: Serialize>(items: Vec<String>, json_data: Option<&T>) {
+    if is_json_mode_set() {
+        if let Some(data) = json_data {
+            json(data);
+        } else {
+            json(&items);
+        }
+    } else {
+        for item in items {
+            let line = format!(" * {}\n", item);
+            let line = line.replace("\n", "\n   ");
+            let line = format!("{}\n", line);
+            write(&line);
+        }
     }
 }
 

@@ -16,6 +16,7 @@ pub use session::{get_last_version_check_timestamp, set_last_version_check_times
 pub struct Config {
     pub debug: bool,
     pub tower_url: Url,
+    pub json: bool,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub session: Option<Session>,
@@ -26,6 +27,7 @@ impl Config {
         Self {
             debug: false,
             tower_url: default_tower_url(),
+            json: false,
             session: None,
         }
     }
@@ -41,6 +43,7 @@ impl Config {
         Self {
             debug,
             tower_url,
+            json: false,
             session: None,
         }
     }
@@ -50,6 +53,10 @@ impl Config {
 
         if matches.get_flag("debug") {
             config.debug = true;
+        }
+
+        if matches.get_flag("json") {
+            config.json = true;
         }
 
         if let Some(tower_url) = matches.get_one::<String>("tower_url") {
@@ -63,6 +70,7 @@ impl Config {
         Self {
             debug: self.debug,
             tower_url: sess.tower_url.clone(),
+            json: self.json,
             session: Some(sess),
         }
     }

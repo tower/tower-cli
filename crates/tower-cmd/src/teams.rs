@@ -86,7 +86,7 @@ pub async fn do_list(config: Config) {
 
     output::newline();
     // Display the table using the existing table function
-    output::table(headers, teams_data);
+    output::table(headers, teams_data, Some(&teams));
     output::newline();
 
     // Add a legend for the asterisk
