@@ -64,74 +64,75 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
         Ok(app_response) => {
             if output::is_json_mode_set() {
                 output::json(&app_response);
-            } else {
-                let app = &app_response.app;
-                let runs = &app_response.runs;
+                return;
+            }
 
-                output::detail("Name", &app.name);
-                output::header("Description");
-                let line = output::paragraph(&app.short_description);
-                output::write(&line);
-                output::newline();
-                output::newline();
-                output::header("Recent runs");
+            let app = app_response.app;
+            let runs = app_response.runs;
 
-                let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
-                    .into_iter()
-                    .map(|h| h.to_string())
-                    .collect();
+            output::detail("Name", &app.name);
+            output::header("Description");
+            let line = output::paragraph(&app.short_description);
+            output::write(&line);
+            output::newline();
+            output::newline();
+            output::header("Recent runs");
 
-                let rows = runs
-                    .iter()
-                    .map(|run: &Run| {
-                        let status = &run.status;
-                        let status_str = format!("{:?}", status);
+            let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
+                .into_iter()
+                .map(|h| h.to_string())
+                .collect();
 
-                        // Format start time
-                        let start_time = if let Some(started_at) = &run.started_at {
-                            if !started_at.is_empty() {
-                                started_at.to_string()
-                            } else {
-                                format!("Scheduled at {}", &run.scheduled_at)
-                            }
+            let rows = runs
+                .iter()
+                .map(|run: &Run| {
+                    let status = &run.status;
+                    let status_str = format!("{:?}", status);
+
+                    // Format start time
+                    let start_time = if let Some(started_at) = &run.started_at {
+                        if !started_at.is_empty() {
+                            started_at.to_string()
                         } else {
                             format!("Scheduled at {}", &run.scheduled_at)
-                        };
+                        }
+                    } else {
+                        format!("Scheduled at {}", &run.scheduled_at)
+                    };
 
-                        // Calculate elapsed time
-                        let elapsed_time = if let Some(ended_at) = &run.ended_at {
-                            if !ended_at.is_empty() {
-                                if let (Some(started_at), Some(ended_at)) =
-                                    (&run.started_at, &run.ended_at)
-                                {
-                                    let start =
-                                        started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                    let end = ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                    if let (Some(start), Some(end)) = (start, end) {
-                                        format!("{:.1}s", (end - start).num_seconds())
-                                    } else {
-                                        "Invalid time".into()
-                                    }
+                    // Calculate elapsed time
+                    let elapsed_time = if let Some(ended_at) = &run.ended_at {
+                        if !ended_at.is_empty() {
+                            if let (Some(started_at), Some(ended_at)) =
+                                (&run.started_at, &run.ended_at)
+                            {
+                                let start =
+                                    started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                let end = ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                                if let (Some(start), Some(end)) = (start, end) {
+                                    format!("{:.1}s", (end - start).num_seconds())
                                 } else {
                                     "Invalid time".into()
                                 }
-                            } else if run.started_at.is_some() {
-                                "Running".into()
                             } else {
-                                "Pending".into()
+                                "Invalid time".into()
                             }
                         } else if run.started_at.is_some() {
                             "Running".into()
                         } else {
                             "Pending".into()
-                        };
+                        }
+                    } else if run.started_at.is_some() {
+                        "Running".into()
+                    } else {
+                        "Pending".into()
+                    };
 
-                        vec![run.number.to_string(), status_str, start_time, elapsed_time]
-                    })
-                    .collect();
+                    vec![run.number.to_string(), status_str, start_time, elapsed_time]
+                })
+                .collect();
 
-                output::table(headers, rows, Some(&app_response));
-            }
+            output::table(headers, rows, Some(&app_response));
         }
         Err(err) => {
             output::tower_error(err);
@@ -146,9 +147,9 @@ pub async fn do_list_apps(config: Config) {
         Ok(resp) => {
             let items = resp
                 .apps
-                .iter()
+                .into_iter()
                 .map(|app_summary| {
-                    let app = &app_summary.app;
+                    let app = app_summary.app;
                     let desc = if app.short_description.is_empty() {
                         output::placeholder("No description")
                     } else {
@@ -176,9 +177,10 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
         Ok(app) => {
             if output::is_json_mode_set() {
                 output::json(&app);
-            } else {
-                output::success(&format!("App '{}' created", name));
+                return;
             }
+
+            output::success(&format!("App '{}' created", name));
         }
         Err(err) => {
             output::tower_error(err);
