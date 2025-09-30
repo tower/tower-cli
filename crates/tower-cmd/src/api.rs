@@ -763,7 +763,7 @@ pub async fn create_environment(
 pub async fn list_schedules(
     config: &Config,
     _app_name: Option<&str>,
-    _environment: Option<&str>,
+    environment: Option<&str>,
 ) -> Result<
     tower_api::models::ListSchedulesResponse,
     Error<tower_api::apis::default_api::ListSchedulesError>,
@@ -771,7 +771,7 @@ pub async fn list_schedules(
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListSchedulesParams {
-        environment: None,
+        environment: environment.map(String::from),
         page: None,
         page_size: None,
     };
