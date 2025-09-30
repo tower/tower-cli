@@ -4,6 +4,8 @@ import subprocess
 import os
 import tempfile
 import shutil
+import json
+import shlex
 from pathlib import Path
 from behave import given, when, then
 
@@ -17,7 +19,7 @@ def step_run_cli_command(context, command):
     # The MCP steps have already created the necessary files in the current directory
 
     # Run the CLI command
-    cmd_parts = command.split()
+    cmd_parts = shlex.split(command)
     full_command = [cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
 
     try:
@@ -27,6 +29,10 @@ def step_run_cli_command(context, command):
         test_env["CLICOLOR_FORCE"] = "1"  # Force colored output
         test_env["TOWER_URL"] = context.tower_url  # Use mock API
         test_env["TOWER_JWT"] = "mock_jwt_token"
+
+        # Override HOME to use test session
+        test_home = Path(__file__).parent.parent.parent / "test-home"
+        test_env["HOME"] = str(test_home.absolute())
 
         result = subprocess.run(
             full_command,
