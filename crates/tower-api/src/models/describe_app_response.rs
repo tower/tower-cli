@@ -9,8 +9,11 @@
  */
 
 use crate::models;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_with::{serde_as, DefaultOnNull};
 
+#[serde_as]
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DescribeAppResponse {
     /// A URL to the JSON Schema for this object.
@@ -18,6 +21,7 @@ pub struct DescribeAppResponse {
     pub schema: Option<String>,
     #[serde(rename = "app")]
     pub app: models::App,
+    #[serde_as(as = "DefaultOnNull")]
     #[serde(rename = "runs")]
     pub runs: Vec<models::Run>,
 }
