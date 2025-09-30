@@ -30,6 +30,7 @@ app = FastAPI(
 # Enable debug logging if --debug is passed
 DEBUG_MODE = "--debug" in sys.argv
 
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     if DEBUG_MODE:
@@ -38,6 +39,7 @@ async def log_requests(request: Request, call_next):
     if DEBUG_MODE:
         print(f"DEBUG: Response status: {response.status_code}")
     return response
+
 
 # In-memory data stores for mock responses
 mock_apps_db = {}
@@ -104,10 +106,7 @@ async def list_apps():
     # Format apps as AppSummary objects
     app_summaries = []
     for app_data in mock_apps_db.values():
-        app_summaries.append({
-            "app": app_data,
-            "runs": []  # Empty runs for list view
-        })
+        app_summaries.append({"app": app_data, "runs": []})  # Empty runs for list view
 
     return {
         "apps": app_summaries,

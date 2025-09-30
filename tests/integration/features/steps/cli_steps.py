@@ -271,12 +271,37 @@ def step_json_should_contain_runs_array(context):
 def step_json_should_contain_created_app_info(context):
     """Verify JSON contains created app information"""
     import json
+    from dirty_equals import IsStr, IsDict, IsInt
 
     data = json.loads(context.cli_output)
-    # Should have app data from create response
-    assert (
-        "app" in data or "name" in data
-    ), f"Expected created app information in JSON, got: {data}"
+
+    # Expected structure for apps create with --json
+    expected = {
+        "result": "success",
+        "message": IsStr(),
+        "data": {
+            "app": {
+                "name": IsStr(),
+                "short_description": IsStr(),
+                "owner": IsStr(),
+                "health_status": IsStr(),
+                "created_at": IsStr(),
+                "version": None,
+                "schedule": None,
+                "next_run_at": None,
+                "run_results": {
+                    "cancelled": IsInt(),
+                    "crashed": IsInt(),
+                    "errored": IsInt(),
+                    "exited": IsInt(),
+                    "pending": IsInt(),
+                    "running": IsInt(),
+                },
+            }
+        },
+    }
+
+    assert data == expected, f"Expected created app information structure, got: {data}"
 
 
 @step('the app name should be "{expected_name}"')
@@ -288,6 +313,8 @@ def step_app_name_should_be(context, expected_name):
     # Extract app name from response structure
     if "app" in data and "name" in data["app"]:
         actual_name = data["app"]["name"]
+    elif "data" in data and "app" in data["data"] and "name" in data["data"]["app"]:
+        actual_name = data["data"]["app"]["name"]
     elif "name" in data:
         actual_name = data["name"]
     else:
