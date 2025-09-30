@@ -549,7 +549,7 @@ async def delete_schedule(schedule_data: Dict[str, Any]):
     deleted_schedules = [
         mock_schedules_db.pop(id) for id in ids if id in mock_schedules_db
     ]
-    return {"the schedules successfully deleted": deleted_schedules}
+    return {"schedules": deleted_schedules}
 
 
 # Health check for testing
