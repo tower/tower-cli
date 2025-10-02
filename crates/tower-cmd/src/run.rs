@@ -121,6 +121,9 @@ where
     env_vars.extend(catalogs);
     env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
 
+    // Set PATH to try and be closer to what the remote envrionment would have
+    env_vars.insert("PATH".to_string(), "/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin".to_string());
+
     // There should always be a session, if there isn't one then I'm not sure how we got here?
     let session = config.session.ok_or(Error::NoSession)?;
 

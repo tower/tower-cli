@@ -71,9 +71,9 @@
           rustc = rustToolchain;
         };
 
-        tower = naersk-native.buildPackage {
+        tower-unwrapped = naersk-native.buildPackage {
           src = ./.;
-          
+
           cargoBuildOptions = x: x;
 
           nativeBuildInputs = commonNativeBuildInputs;
@@ -86,6 +86,45 @@
             mainProgram = "tower";
           };
         };
+
+        tower = if pkgs.stdenv.isLinux then pkgs.buildFHSEnv {
+          name = "tower";
+          targetPkgs = pkgs: with pkgs; [
+            # Core Python environment (matches python:3.11 base)
+            python312
+            python312Packages.pip
+
+            # Build tools
+            gcc
+            gnumake
+
+            # Version control
+            git
+
+            # Network tools
+            curl
+            wget
+
+            # Core system utilities
+            coreutils
+            findutils
+            gnugrep
+            gnused
+            gawk
+            which
+
+            # Compression tools
+            gzip
+            bzip2
+            xz
+
+            # Text processing
+            less
+            diffutils
+          ];
+
+          runScript = "${tower-unwrapped}/bin/tower";
+        } else tower-unwrapped;
 
         mkCrossTarget = target: let
           crossSystemConfig = {
