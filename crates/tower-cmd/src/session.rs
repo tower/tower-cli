@@ -23,7 +23,7 @@ pub async fn do_login(config: Config) {
         }
         Err(err) => {
             spinner.failure();
-            output::failure(&format!("Failed to create device login ticket: {}", err));
+            output::error(&format!("Failed to create device login ticket: {}", err));
         }
     }
 }
@@ -46,7 +46,7 @@ async fn handle_device_login(config: Config, claim: CreateDeviceLoginTicketRespo
 
     if !poll_for_login(&config, &claim, &mut spinner).await {
         spinner.failure();
-        output::failure("Login request expired. Please try again.");
+        output::error("Login request expired. Please try again.");
     }
 }
 
@@ -70,11 +70,11 @@ async fn poll_for_login(
             Err(err) => {
                 if let Some(api_err) = extract_api_error(&err) {
                     if api_err.status != 404 && !api_err.is_incomplete_device_login {
-                        output::failure(&format!("{}", api_err.content));
+                        output::error(&format!("{}", api_err.content));
                         return false;
                     }
                 } else {
-                    output::failure(&format!("An unexpected error happened! Error: {}", err));
+                    output::error(&format!("An unexpected error happened! Error: {}", err));
                     return false;
                 }
             }
@@ -98,7 +98,7 @@ fn finalize_session(
 
     if let Err(err) = session.save() {
         spinner.failure();
-        output::failure(&format!("Failed to save session: {}", err));
+        output::error(&format!("Failed to save session: {}", err));
     } else {
         spinner.success();
         let message = format!("Hello, {}!", session_response.session.user.email.clone());
