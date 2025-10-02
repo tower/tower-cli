@@ -380,6 +380,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dirty-equals"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/69/f8a63f97166565dbf01e6a3fdf4665313719a6781125f105e4ffde82c5cd/dirty_equals-0.10.0.tar.gz", hash = "sha256:623d7a07c5ba437f1a834c6246d1e3eb97238ca70331c61a499d9aabd757b899", size = 125778, upload-time = "2025-09-19T16:05:31.371Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/87/0fc6e51f9db3a3b3de88fb0c9cf6414d4572d565f4ba4d166023cbd4354d/dirty_equals-0.10.0-py3-none-any.whl", hash = "sha256:bbf4a4eaafd56e371dafe2edf2265315ebd71a441b142ed801511aa33e4c3438", size = 28014, upload-time = "2025-09-19T16:05:29.953Z" },
+]
+
+[[package]]
 name = "distlib"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2279,6 +2288,7 @@ dev = [
     { name = "aiohttp" },
     { name = "behave" },
     { name = "black" },
+    { name = "dirty-equals" },
     { name = "mcp", marker = "python_full_version >= '3.10'" },
     { name = "openapi-python-client" },
     { name = "pre-commit" },
@@ -2291,6 +2301,7 @@ dev = [
 test = [
     { name = "aiohttp" },
     { name = "behave" },
+    { name = "dirty-equals" },
     { name = "mcp", marker = "python_full_version >= '3.10'" },
     { name = "pytest" },
     { name = "pytest-env" },
@@ -2322,6 +2333,7 @@ dev = [
     { name = "aiohttp", specifier = "==3.10.11" },
     { name = "behave", specifier = "==1.3.3" },
     { name = "black", specifier = "==24.10.0" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
     { name = "mcp", marker = "python_full_version >= '3.10'", specifier = ">=1.1.0" },
     { name = "openapi-python-client", specifier = "==0.24.3" },
     { name = "pre-commit", specifier = "==4.0.1" },
@@ -2334,6 +2346,7 @@ dev = [
 test = [
     { name = "aiohttp", specifier = "==3.10.11" },
     { name = "behave", specifier = "==1.3.3" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
     { name = "mcp", marker = "python_full_version >= '3.10'", specifier = ">=1.1.0" },
     { name = "pytest", specifier = "==8.3.5" },
     { name = "pytest-env", specifier = ">=1.1.3" },

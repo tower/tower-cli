@@ -35,12 +35,12 @@ pub async fn do_list(config: Config) {
 
             let envs_data: Vec<Vec<String>> = resp
                 .environments
-                .into_iter()
-                .map(|env| vec![env.name])
+                .iter()
+                .map(|env| vec![env.name.clone()])
                 .collect();
 
             // Display the table using the existing table function
-            output::table(headers, envs_data);
+            output::table(headers, envs_data, Some(&resp.environments));
         }
         Err(err) => {
             output::tower_error(err);

@@ -1,0 +1,3 @@
+[app]
+name = "04-app-with-secret"
+script = "./main.py"

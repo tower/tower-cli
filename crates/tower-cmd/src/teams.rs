@@ -86,7 +86,7 @@ pub async fn do_list(config: Config) {
 
     output::newline();
     // Display the table using the existing table function
-    output::table(headers, teams_data);
+    output::table(headers, teams_data, Some(&teams));
     output::newline();
 
     // Add a legend for the asterisk
@@ -118,7 +118,7 @@ pub async fn do_switch(config: Config, args: &ArgMatches) {
         }
         None => {
             // Team not found
-            output::failure(&format!(
+            output::error(&format!(
                 "Team '{}' not found. Use 'tower teams list' to see all your teams.",
                 name,
             ));

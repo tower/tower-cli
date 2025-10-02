@@ -369,7 +369,7 @@ fn parse_parameters(args: &ArgMatches) -> HashMap<String, String> {
             match param.split_once('=') {
                 Some((key, value)) => {
                     if key.is_empty() {
-                        output::failure(&format!(
+                        output::error(&format!(
                             "Invalid parameter format: '{}'. Key cannot be empty.",
                             param
                         ));
@@ -378,7 +378,7 @@ fn parse_parameters(args: &ArgMatches) -> HashMap<String, String> {
                     param_map.insert(key.to_string(), value.to_string());
                 }
                 None => {
-                    output::failure(&format!(
+                    output::error(&format!(
                         "Invalid parameter format: '{}'. Expected 'key=value'.",
                         param
                     ));
@@ -527,7 +527,7 @@ async fn monitor_status(app: LocalApp) -> Status {
                     }
                     tower_runtime::Status::Crashed { .. } => {
                         debug!("App crashed, stopping status monitoring");
-                        output::failure("Your app crashed!");
+                        output::error("Your app crashed!");
                         return status;
                     }
                     _ => {
