@@ -169,6 +169,18 @@ impl Uv {
             &self.uv_path, program, cwd
         );
 
+        // If we are running on Windows, we need to retain the SYSTEMROOT env var because Python
+        // needs it to initialize it's random number generator. Fun fact!
+        #[cfg(windows)]
+        {
+            let systemroot = std::env::var("SYSTEMROOT").unwrap_or_default();
+
+            env_vars.insert(
+                "SYSTEMROOT".to_string(),
+                systemroot,
+            );
+        }
+
         let mut cmd = Command::new(&self.uv_path);
         cmd.kill_on_drop(true)
             .stdin(Stdio::null())
