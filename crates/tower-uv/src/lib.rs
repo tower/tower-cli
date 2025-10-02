@@ -175,10 +175,7 @@ impl Uv {
         {
             let systemroot = std::env::var("SYSTEMROOT").unwrap_or_default();
 
-            env_vars.insert(
-                "SYSTEMROOT".to_string(),
-                systemroot,
-            );
+            env_vars.insert("SYSTEMROOT".to_string(), systemroot);
         }
 
         let mut cmd = Command::new(&self.uv_path);
