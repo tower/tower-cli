@@ -111,7 +111,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                         ]
                     })
                     .collect();
-                output::table(headers, data);
+                output::table(headers, data, Some(&list_response.secrets));
             }
             Err(err) => output::tower_error(err),
         }
@@ -134,7 +134,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                         ]
                     })
                     .collect();
-                output::table(headers, data);
+                output::table(headers, data, Some(&list_response.secrets));
             }
             Err(err) => output::tower_error(err),
         }

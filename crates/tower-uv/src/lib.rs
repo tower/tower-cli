@@ -38,6 +38,27 @@ impl From<install::Error> for Error {
     }
 }
 
+fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, String> {
+    #[cfg(windows)]
+    {
+        // we copy this locally so we can mutate the results.
+        let mut env_vars = env_vars.clone();
+
+        // If we are running on Windows, we need to retain the SYSTEMROOT env var because Python
+        // needs it to initialize it's random number generator. Fun fact!
+        let systemroot = std::env::var("SYSTEMROOT").unwrap_or_default();
+        env_vars.insert("SYSTEMROOT".to_string(), systemroot);
+        return env_vars;
+    }
+
+    #[cfg(not(windows))]
+    {
+        // On non-Windows platforms, we can just return the env vars as-is. We have to do this
+        // clone thing to get rid fo the lifetime issues.
+        return env_vars.clone();
+    }
+}
+
 async fn test_uv_path(path: &PathBuf) -> Result<(), Error> {
     let res = Command::new(&path)
         .arg("--color")
@@ -169,6 +190,10 @@ impl Uv {
             &self.uv_path, program, cwd
         );
 
+        // Sometimes, we need to copy some env vars out of the current environment and into the new
+        // one!
+        let env_vars = normalize_env_vars(env_vars);
+
         let mut cmd = Command::new(&self.uv_path);
         cmd.kill_on_drop(true)
             .stdin(Stdio::null())
@@ -180,6 +205,7 @@ impl Uv {
             .arg("--no-progress")
             .arg("run")
             .arg(program)
+            .env_clear()
             .envs(env_vars);
 
         #[cfg(unix)]

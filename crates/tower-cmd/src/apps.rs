@@ -1,5 +1,4 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
-use colored::Colorize;
 use config::Config;
 
 use tower_api::models::Run;
@@ -63,27 +62,25 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 
     match api::describe_app(&config, &name).await {
         Ok(app_response) => {
-            let app = app_response.app;
-            let runs = app_response.runs;
+            if output::is_json_mode_set() {
+                output::json(&app_response);
+                return;
+            }
 
-            let line = format!("{} {}\n", "Name:".bold().green(), app.name);
-            output::write(&line);
+            let app = &app_response.app;
+            let runs = &app_response.runs;
 
-            let line = format!("{}\n", "Description:".bold().green());
-            output::write(&line);
-
+            output::detail("Name", &app.name);
+            output::header("Description");
             let line = output::paragraph(&app.short_description);
             output::write(&line);
-
             output::newline();
             output::newline();
-
-            let line = format!("{}\n", "Recent runs:".bold().green());
-            output::write(&line);
+            output::header("Recent runs");
 
             let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
                 .into_iter()
-                .map(|h| h.yellow().to_string())
+                .map(|h| h.to_string())
                 .collect();
 
             let rows = runs
@@ -135,7 +132,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
                 })
                 .collect();
 
-            output::table(headers, rows);
+            output::table(headers, rows, Some(&app_response));
         }
         Err(err) => {
             output::tower_error(err);
@@ -150,18 +147,18 @@ pub async fn do_list_apps(config: Config) {
         Ok(resp) => {
             let items = resp
                 .apps
-                .into_iter()
+                .iter()
                 .map(|app_summary| {
-                    let app = app_summary.app;
+                    let app = &app_summary.app;
                     let desc = if app.short_description.is_empty() {
-                        "No description".white().dimmed().italic()
+                        output::placeholder("No description")
                     } else {
-                        app.short_description.normal().clear()
+                        app.short_description.to_string()
                     };
-                    format!("{}\n{}", app.name.bold().green(), desc)
+                    format!("{}\n{}", output::title(&app.name), desc)
                 })
                 .collect();
-            output::list(items);
+            output::list(items, Some(&resp.apps));
         }
         Err(err) => {
             output::tower_error(err);
@@ -175,14 +172,18 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
     });
 
     let description = args.get_one::<String>("description").unwrap();
+
     let mut spinner = output::spinner("Creating app");
 
-    if let Err(err) = api::create_app(&config, name, description).await {
-        spinner.failure();
-        output::tower_error(err);
-    } else {
-        spinner.success();
-        output::success(&format!("App '{}' created", name));
+    match api::create_app(&config, name, description).await {
+        Ok(app) => {
+            spinner.success();
+            output::success_with_data(&format!("App '{}' created", name), Some(app));
+        }
+        Err(err) => {
+            spinner.failure();
+            output::tower_error(err);
+        }
     }
 }
 

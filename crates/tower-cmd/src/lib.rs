@@ -62,6 +62,10 @@ impl App {
             config.clone()
         };
 
+        if config.json {
+            output::set_json_mode();
+        }
+
         if config.debug {
             // Set log level to "DEBUG"
             tower_telemetry::enable_logging(
@@ -184,10 +188,18 @@ fn root_cmd() -> Command {
         .about("Tower is a compute platform for modern data projects")
         .arg(
             Arg::new("debug")
-                .short('d')
                 .long("debug")
                 .hide(true)
-                .action(clap::ArgAction::SetTrue),
+                .action(clap::ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("json")
+                .short('j')
+                .long("json")
+                .help("Output results in JSON format")
+                .action(clap::ArgAction::SetTrue)
+                .global(true),
         )
         .arg(
             Arg::new("tower_url")
