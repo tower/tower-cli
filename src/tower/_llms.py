@@ -510,11 +510,13 @@ class Llm:
                 ctx=self.context, model=self.model_name, messages=messages, **kwargs
             )
         elif self.inference_router == "hugging_face_hub":
+            # Set max_tokens in kwargs if not already present
+            if "max_tokens" not in kwargs:
+                kwargs["max_tokens"] = self.max_tokens
             response = complete_chat_with_hugging_face_hub(
                 ctx=self.context,
                 model=self.model_name,
                 messages=messages,
-                max_tokens=self.max_tokens,
                 **kwargs,
             )
 
