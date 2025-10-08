@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 from ollama import chat, pull
 from ollama import ChatResponse
@@ -467,7 +467,9 @@ class Llm:
 
         self.model_name = resolve_model_name(self.context, self.requested_model_name)
 
-    def complete_chat(self, messages: List, **kwargs):
+    def complete_chat(
+        self, messages: List, **kwargs
+    ) -> Union[str, ChatResponse, ChatCompletionOutput]:
         """
         Mimics the OpenAI Chat Completions API by sending a list of messages to the language model
         and returning the generated response.
@@ -594,7 +596,7 @@ def extract_hugging_face_hub_message(resp: ChatCompletionOutput) -> str:
 
 def complete_chat_with_ollama(
     ctx: TowerContext, model: str, messages: list, is_retry: bool = False, **kwargs
-):
+) -> Union[str, ChatResponse]:
 
     # TODO: remove the try/except and don't pull the model if it doesn't exist. sso 7/20/25
     # the except code is not reachable right now because we always call this function with a model that exists
@@ -621,7 +623,7 @@ def complete_chat_with_ollama(
 
 def complete_chat_with_hugging_face_hub(
     ctx: TowerContext, model: str, messages: List, **kwargs
-):
+) -> Union[str, ChatCompletionOutput]:
     """
     Uses the Hugging Face Hub API to perform inference. Will use configuration
     supplied by the environment to determine which client to connect to and all
