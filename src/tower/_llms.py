@@ -467,7 +467,7 @@ class Llm:
 
         self.model_name = resolve_model_name(self.context, self.requested_model_name)
 
-    def complete_chat(self, messages: List) -> str:
+    def complete_chat(self, messages: List, **kwargs):
         """
         Mimics the OpenAI Chat Completions API by sending a list of messages to the language model
         and returning the generated response.
@@ -479,9 +479,16 @@ class Llm:
         Args:
             messages: A list of message dictionaries, each containing 'role' and 'content' keys.
                      Follows the OpenAI Chat Completions API message format.
+            **kwargs: Additional parameters to pass to the underlying chat completion API.
+                     Common parameters include:
+                     - tools: List of tool definitions for function calling
+                     - tool_choice: Control which tool to use
+                     - temperature: Sampling temperature
+                     - top_p: Nucleus sampling parameter
 
         Returns:
-            str: The generated response from the language model.
+            Union[str, ChatResponse, ChatCompletionOutput]: The generated response from the language model.
+            Returns a string when no tools are used, or the full response object when tools are involved.
 
         Example:
             messages = [
@@ -489,12 +496,16 @@ class Llm:
                 {"role": "user", "content": "Hello, how are you?"}
             ]
             response = llm.complete_chat(messages)
+
+            # With tools
+            tools = [{"type": "function", "function": {...}}]
+            response = llm.complete_chat(messages, tools=tools)
         """
 
         if self.inference_router == "ollama":
             # Use Ollama for local inference
             response = complete_chat_with_ollama(
-                ctx=self.context, model=self.model_name, messages=messages
+                ctx=self.context, model=self.model_name, messages=messages, **kwargs
             )
         elif self.inference_router == "hugging_face_hub":
             response = complete_chat_with_hugging_face_hub(
@@ -502,6 +513,7 @@ class Llm:
                 model=self.model_name,
                 messages=messages,
                 max_tokens=self.max_tokens,
+                **kwargs,
             )
 
         return response
@@ -581,13 +593,16 @@ def extract_hugging_face_hub_message(resp: ChatCompletionOutput) -> str:
 
 
 def complete_chat_with_ollama(
-    ctx: TowerContext, model: str, messages: list, is_retry: bool = False
-) -> str:
+    ctx: TowerContext, model: str, messages: list, is_retry: bool = False, **kwargs
+):
 
     # TODO: remove the try/except and don't pull the model if it doesn't exist. sso 7/20/25
     # the except code is not reachable right now because we always call this function with a model that exists
     try:
-        response: ChatResponse = chat(model=model, messages=messages)
+        response: ChatResponse = chat(model=model, messages=messages, **kwargs)
+        # If tools were used, return the full response object so caller can access tool_calls
+        if kwargs.get("tools") is not None:
+            return response
         return extract_ollama_message(response)
     except ResponseError as e:
         if e.status_code == 404 and not is_retry:
@@ -596,7 +611,9 @@ def complete_chat_with_ollama(
             pull(model=model)
 
             # Retry the inference after the model has been pulled.
-            return complete_chat_with_ollama(ctx, model, messages, is_retry=True)
+            return complete_chat_with_ollama(
+                ctx, model, messages, is_retry=True, **kwargs
+            )
 
         # Couldn't figure out what the error was, so we'll just raise it accordingly.
         raise e
@@ -604,7 +621,7 @@ def complete_chat_with_ollama(
 
 def complete_chat_with_hugging_face_hub(
     ctx: TowerContext, model: str, messages: List, **kwargs
-) -> str:
+):
     """
     Uses the Hugging Face Hub API to perform inference. Will use configuration
     supplied by the environment to determine which client to connect to and all
@@ -614,12 +631,16 @@ def complete_chat_with_hugging_face_hub(
         provider=ctx.inference_provider, api_key=ctx.inference_router_api_key
     )
 
+    # Extract max_tokens separately since we set a default
+    max_tokens = kwargs.pop("max_tokens", 1000)
+
     completion = client.chat_completion(
-        messages,
-        model=model,
-        max_tokens=kwargs.get("max_tokens", 1000),
+        messages, model=model, max_tokens=max_tokens, **kwargs
     )
 
+    # If tools were used, return the full response object so caller can access tool_calls
+    if kwargs.get("tools") is not None:
+        return completion
     return extract_hugging_face_hub_message(completion)
 
 
