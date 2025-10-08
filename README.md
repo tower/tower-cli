@@ -151,6 +151,17 @@ print(tower.is_feature_enabled("ai"))
 
 Tower CLI includes an MCP (Model Context Protocol) server that allows AI assistants and editors to interact with your Tower account directly. The MCP server provides tools for managing apps, secrets, teams, and deployments.
 
+#### Prerequisites
+
+Before using the MCP server, ensure you're logged into Tower:
+
+```bash
+tower login
+```
+
+The MCP server will use your existing Tower CLI authentication and configuration.
+
+
 #### Available Tools
 
 The MCP server exposes the following tools:
@@ -186,7 +197,15 @@ The server will display a message showing the URL it's running on:
 SSE server running on http://127.0.0.1:34567
 ```
 
-#### Editor Configuration
+It's important to keep the terminal with the MCP server open until you're finished. Alternatively, you can launch it in the background with:
+
+``` bash
+tower mcp-server &
+```
+
+It's also important to be logged in. If you haven't already, you can open another terminal window and type `tower login` in order to open the login in a browser window.
+
+#### Client Configuration
 
 ##### Claude Code
 
@@ -213,48 +232,15 @@ For custom ports, adjust the URL accordingly (e.g., `http://127.0.0.1:8080/sse`)
 
 ##### Cursor
 
-Add this to your Cursor settings (`settings.json`):
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=tower&config=eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjM0NTY3L3NzZSJ9)
+
+Or manually, add this to your Cursor MCP settings (`mcp.json`):
 
 ```json
 {
-  "mcp.servers": {
+  "mcpServers": {
     "tower": {
-      "url": "http://127.0.0.1:34567/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
-
-##### Windsurf
-
-Configure in Windsurf settings:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "tower": {
-        "url": "http://127.0.0.1:34567/sse",
-        "transport": "sse"
-      }
-    }
-  }
-}
-```
-
-##### Zed
-
-Add to your Zed `settings.json`:
-
-```json
-{
-  "assistant": {
-    "mcp_servers": {
-      "tower": {
-        "url": "http://127.0.0.1:34567/sse",
-        "transport": "sse"
-      }
+      "url": "http://127.0.0.1:34567/sse"
     }
   }
 }
@@ -262,14 +248,32 @@ Add to your Zed `settings.json`:
 
 ##### VS Code
 
-For VS Code with MCP extensions, add to your `settings.json`:
+[https://img.shields.io/badge/VS_Code-Install_Tower_MCP-0098FF?logo=visualstudiocode&logoColor=ffffff](vscode:mcp/install?%7B%22name%22%3A%22tower%22%2C%22type%22%3A%22sse%22%2C%22url%22%3A%22http%3A%2F%2F127.0.0.1%3A34567%2Fsse%22%7D)
+
+In VS Code, first you should 
+
+For VS Code with MCP extensions, add to your `mcp.json`:
 
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "tower": {
-      "url": "http://127.0.0.1:34567/sse",
-      "transport": "sse"
+      "type": "sse",
+      "url": "http://127.0.0.1:34567/sse"
+    }
+  }
+}
+```
+
+##### Gemini CLI
+
+In your `settings.json`, add the following:
+
+``` json
+{
+  "mcpServers": {
+    "tower": {
+        "url": "http://127.0.0.1:34567/sse"
     }
   }
 }
@@ -277,13 +281,6 @@ For VS Code with MCP extensions, add to your `settings.json`:
 
 #### Prerequisites
 
-Before using the MCP server, ensure you're logged into Tower:
-
-```bash
-tower login
-```
-
-The MCP server will use your existing Tower CLI authentication and configuration.
 
 ### About the runtime environment
 
