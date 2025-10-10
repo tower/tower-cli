@@ -215,7 +215,7 @@ Add the Tower MCP server to Claude Code using SSE transport:
 claude mcp add tower http://127.0.0.1:34567/sse --transport sse
 ```
 
-Or using JSON configuration with SSE:
+Or with the JSON configuration directly:
 
 ```json
 {
@@ -232,7 +232,12 @@ For custom ports, adjust the URL accordingly (e.g., `http://127.0.0.1:8080/sse`)
 
 ##### Cursor
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=tower&config=eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjM0NTY3L3NzZSJ9)
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=tower&config=eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjM0NTY3L3NzZSJ9)
+
+If that doesn't work, try opening the following link in your browser or in your terminal with `open` on macOS, or `xdg-open` on Linux: 
+```
+cursor://anysphere.cursor-deeplink/mcp/install?name=tower&config=eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjM0NTY3L3NzZSJ9
+```
 
 Or manually, add this to your Cursor MCP settings (`mcp.json`):
 
@@ -248,11 +253,14 @@ Or manually, add this to your Cursor MCP settings (`mcp.json`):
 
 ##### VS Code
 
-[https://img.shields.io/badge/VS_Code-Install_Tower_MCP-0098FF?logo=visualstudiocode&logoColor=ffffff](vscode:mcp/install?%7B%22name%22%3A%22tower%22%2C%22type%22%3A%22sse%22%2C%22url%22%3A%22http%3A%2F%2F127.0.0.1%3A34567%2Fsse%22%7D)
+In VS Code, first you should enable MCP integrations by setting `Chat>MCP:Enabled` to true in your settings.
 
-In VS Code, first you should 
+For adding the server, you can try copying and pasting the following link into your URL bar:
+```
+vscode:mcp/install?%7B%22name%22%3A%22tower%22%2C%22type%22%3A%22sse%22%2C%22url%22%3A%22http%3A%2F%2F127.0.0.1%3A34567%2Fsse%22%7D
+```
 
-For VS Code with MCP extensions, add to your `mcp.json`:
+Alternatively, you can add the following to your `mcp.json`:
 
 ```json
 {
@@ -278,9 +286,6 @@ In your `settings.json`, add the following:
   }
 }
 ```
-
-#### Prerequisites
-
 
 ### About the runtime environment
 
