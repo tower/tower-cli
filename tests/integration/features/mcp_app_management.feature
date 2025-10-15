@@ -121,3 +121,18 @@ Feature: MCP App Management
     When I call tower_deploy via MCP
     Then I should receive a success response about deployment
     And the app "hello-world" should be visible in Tower
+
+  Scenario: MCP server works with SSE transport
+    Given I have a running Tower MCP server
+    When I call tower_workflow_help via SSE MCP
+    Then I should receive workflow help content via SSE
+
+  Scenario: MCP server works with HTTP transport
+    Given I have a running Tower MCP server with transport "http"
+    When I call tower_workflow_help via HTTP MCP
+    Then I should receive workflow help content via HTTP
+
+  Scenario: MCP server works with stdio transport
+    Given I have a running Tower MCP server with transport "stdio"
+    When I call tower_workflow_help via stdio MCP
+    Then I should receive workflow help content via stdio

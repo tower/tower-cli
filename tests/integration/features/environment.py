@@ -27,7 +27,7 @@ def before_all(context):
     # Start MCP server (maybe should somehow be limited to mcp features in the future?)
     mcp_port = _find_free_port()
     context.tower_mcpserver_process = subprocess.Popen(
-        [tower_binary, "mcp-server", "--port", str(mcp_port)],
+        [tower_binary, "mcp-server", "--transport", "sse", "--port", str(mcp_port)],
         env=test_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

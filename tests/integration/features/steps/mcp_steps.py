@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 
-import os
-from pathlib import Path
 from behave import given, when, then
 from behave.api.async_step import async_run_until_complete
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+from pathlib import Path
+import json
+import os
+import requests
+import select
+import socket
+import subprocess
+import time
 import uuid
 
 
@@ -641,3 +647,140 @@ def step_logs_should_have_correct_logger(context):
     assert any(
         log.logger == "tower-process" for log in logs
     ), "Missing tower-process logger"
+
+
+
+@given('I have a running Tower MCP server with transport "{transport}"')
+def step_given_mcp_server_with_transport(context, transport):
+    if transport == "http":
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            s.listen(1)
+            http_port = s.getsockname()[1]
+
+        context.http_mcp_process = subprocess.Popen(
+            [context.tower_binary, "mcp-server", "--transport", "http", "--port", str(http_port)],
+            env=os.environ.copy(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        time.sleep(1)
+        context.http_mcp_url = f"http://127.0.0.1:{http_port}"
+    elif transport == "stdio":
+        context.transport_mode = "stdio"
+
+
+@when('I call tower_workflow_help via HTTP MCP')
+def step_when_call_workflow_help_http(context):
+    init_request = {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        },
+        "id": 1
+    }
+
+    response = requests.post(
+        f"{context.http_mcp_url}/mcp",
+        json=init_request,
+        headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+    )
+
+    assert response.status_code == 200, f"HTTP request failed: {response.status_code}"
+    assert "text/event-stream" in response.headers.get("content-type", "")
+
+    for line in response.text.split('\n'):
+        if line.startswith('data: '):
+            data_line = line[6:]
+            break
+    else:
+        assert False, "No SSE data found"
+
+    init_response = json.loads(data_line)
+    assert init_response["jsonrpc"] == "2.0"
+    assert "result" in init_response
+    context.mcp_response = init_response
+
+
+def _stdio_message(process, msg):
+    process.stdin.write(json.dumps(msg) + '\n')
+    process.stdin.flush()
+
+    if select.select([process.stdout], [], [], 5.0)[0]:
+        response_line = process.stdout.readline().strip()
+        if response_line:
+            return json.loads(response_line)
+
+    raise TimeoutError("No response from stdio MCP server within 5 seconds")
+
+
+@when('I call tower_workflow_help via stdio MCP')
+def step_when_call_workflow_help_stdio(context):
+    process = subprocess.Popen(
+        [context.tower_binary, "mcp-server", "--transport", "stdio"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=os.environ.copy()
+    )
+
+    _stdio_message(process, {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        },
+        "id": 1
+    })
+
+    process.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + '\n')
+    process.stdin.flush()
+
+    tool_response = _stdio_message(process, {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {"name": "tower_workflow_help", "arguments": {}},
+        "id": 2
+    })
+
+    process.terminate()
+    process.wait()
+    context.mcp_response = tool_response
+
+
+@when('I call tower_workflow_help via SSE MCP')
+@async_run_until_complete
+async def step_when_call_workflow_help_sse(context):
+    await call_mcp_tool(context, "tower_workflow_help")
+
+
+@then('I should receive workflow help content via SSE')
+def step_then_receive_workflow_help_sse(context):
+    assert context.mcp_response.get("success", False), f"Expected success response, got: {context.mcp_response}"
+    assert "content" in context.mcp_response
+    content = context.mcp_response["content"][0].text
+    assert "Tower Application Development Workflow" in content
+
+
+@then('I should receive workflow help content via HTTP')
+def step_then_receive_workflow_help_http(context):
+    assert "result" in context.mcp_response
+    result = context.mcp_response["result"]
+    assert "serverInfo" in result
+    assert result["serverInfo"]["name"] == "tower-cli"
+
+
+@then('I should receive workflow help content via stdio')
+def step_then_receive_workflow_help_stdio(context):
+    assert "result" in context.mcp_response
+    result = context.mcp_response["result"]
+    assert "content" in result
+    content = result["content"][0]["text"]
+    assert "Tower Application Development Workflow" in content

@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use clap::Command;
+use axum::Router;
 use config::{Session, Towerfile};
 use crypto;
 use rmcp::{
@@ -12,8 +13,12 @@ use rmcp::{
     schemars::{self, JsonSchema},
     service::RequestContext,
     tool, tool_handler, tool_router,
-    transport::sse_server::SseServer,
-    ErrorData as McpError, RoleServer, ServerHandler,
+    transport::{
+        sse_server::SseServer,
+        streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager},
+        stdio,
+    },
+    ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
 };
 use rsa::pkcs1::DecodeRsaPublicKey;
 use serde::Deserialize;
@@ -120,22 +125,56 @@ struct RunRequest {
 
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
-        .about("Runs a local SSE MCP server for LLM interaction")
+        .about("Runs an MCP server for LLM interaction")
+        .arg(
+            clap::Arg::new("transport")
+                .long("transport")
+                .short('t')
+                .help("Transport mode")
+                .value_parser(["stdio", "sse", "http"])
+                .default_value("stdio"),
+        )
         .arg(
             clap::Arg::new("port")
                 .long("port")
                 .short('p')
-                .help("Port for SSE server (default: 34567)")
+                .help("Port for HTTP/SSE server (default: 34567)")
                 .default_value("34567")
                 .value_parser(clap::value_parser!(u16)),
         )
 }
 
 pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<(), Error> {
+    let transport = args.get_one::<String>("transport").unwrap();
     let port = *args.get_one::<u16>("port").unwrap();
-    let bind_addr = format!("127.0.0.1:{}", port);
 
-    eprintln!("SSE server running on http://{}", bind_addr);
+    match transport.as_str() {
+        "stdio" => run_stdio_server(config).await,
+        "sse" => run_sse_server(config, port).await,
+        "http" => run_http_server(config, port).await,
+        _ => Err(Error::from(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Unknown transport: {}", transport),
+        ))),
+    }
+}
+
+async fn run_stdio_server(config: Config) -> Result<(), Error> {
+    let (stdin, stdout) = stdio();
+    let service = TowerService::new(config);
+    let server = service.serve((stdin, stdout)).await.map_err(|e| {
+        Error::from(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to start stdio server: {}", e),
+        ))
+    })?;
+    let _ = server.waiting().await;
+    Ok(())
+}
+
+async fn run_sse_server(config: Config, port: u16) -> Result<(), Error> {
+    let bind_addr = format!("127.0.0.1:{}", port);
+    crate::output::write(&format!("SSE MCP server running on http://{}\n", bind_addr));
 
     let ct = SseServer::serve(bind_addr.parse()?)
         .await?
@@ -143,6 +182,26 @@ pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()
 
     tokio::signal::ctrl_c().await?;
     ct.cancel();
+    Ok(())
+}
+
+async fn run_http_server(config: Config, port: u16) -> Result<(), Error> {
+    let bind_addr = format!("127.0.0.1:{}", port);
+    crate::output::write(&format!("Streamable HTTP MCP server running on http://{}\n", bind_addr));
+
+    let service = StreamableHttpService::new(
+        move || Ok(TowerService::new(config.clone())),
+        LocalSessionManager::default().into(),
+        StreamableHttpServerConfig::default(),
+    );
+
+    let router = Router::new().nest_service("/mcp", service);
+    let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
+    axum::serve(listener, router)
+        .with_graceful_shutdown(async {
+            tokio::signal::ctrl_c().await.unwrap();
+        })
+        .await?;
     Ok(())
 }
 
