@@ -9,8 +9,8 @@ from pathlib import Path
 
 
 def before_all(context):
-    context.tower_url = os.environ.get("TOWER_API_URL", "http://127.0.0.1:8000")
-    print(f"TOWER_API_URL: {context.tower_url}")
+    context.tower_url = os.environ.get("TOWER_URL", "http://127.0.0.1:8000")
+    print(f"TOWER_URL: {context.tower_url}")
 
     tower_binary = _find_tower_binary()
     if not tower_binary:
