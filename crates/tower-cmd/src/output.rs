@@ -87,7 +87,6 @@ pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
     }
 }
 
-
 pub enum LogLineType {
     Remote,
     Local,
@@ -407,7 +406,9 @@ pub fn write_update_message(latest: &str, current: &str) {
         "To upgrade, run: pip install --upgrade tower".yellow()
     );
 
-    write(&line);
+    // Always write version check messages to stderr to avoid polluting stdout
+    use std::io::{self, Write};
+    io::stderr().write_all(line.as_bytes()).unwrap();
 }
 
 /// newline just outputs a newline. This is useful when you have a very specific formatting you

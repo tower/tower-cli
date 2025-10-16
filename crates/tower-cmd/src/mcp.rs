@@ -1,7 +1,7 @@
 use std::future::Future;
 
-use clap::Command;
 use axum::Router;
+use clap::Command;
 use config::{Session, Towerfile};
 use crypto;
 use rmcp::{
@@ -15,8 +15,10 @@ use rmcp::{
     tool, tool_handler, tool_router,
     transport::{
         sse_server::SseServer,
-        streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager},
         stdio,
+        streamable_http_server::{
+            session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
+        },
     },
     ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
 };
@@ -160,6 +162,8 @@ pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()
 }
 
 async fn run_stdio_server(config: Config) -> Result<(), Error> {
+    crate::output::set_capture_mode();
+
     let (stdin, stdout) = stdio();
     let service = TowerService::new(config);
     let server = service.serve((stdin, stdout)).await.map_err(|e| {
@@ -187,7 +191,10 @@ async fn run_sse_server(config: Config, port: u16) -> Result<(), Error> {
 
 async fn run_http_server(config: Config, port: u16) -> Result<(), Error> {
     let bind_addr = format!("127.0.0.1:{}", port);
-    crate::output::write(&format!("Streamable HTTP MCP server running on http://{}\n", bind_addr));
+    crate::output::write(&format!(
+        "Streamable HTTP MCP server running on http://{}\n",
+        bind_addr
+    ));
 
     let service = StreamableHttpService::new(
         move || Ok(TowerService::new(config.clone())),
@@ -296,38 +303,41 @@ impl TowerService {
             || (message.contains("API error occurred") && !message.contains("422"))
     }
 
-    fn setup_streaming_output(ctx: &RequestContext<RoleServer>) -> StreamingOutput {
+    fn setup_output_capture(
+        ctx: &RequestContext<RoleServer>,
+        send_notifications: bool,
+    ) -> StreamingOutput {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-        let peer = ctx.peer.clone();
-        let captured_output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let captured_output_clone = captured_output.clone();
+        let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let collected_clone = collected.clone();
 
-        let task = tokio::spawn(async move {
-            while let Some(message) = rx.recv().await {
-                // Store the message for final output
-                if let Ok(mut output) = captured_output_clone.lock() {
-                    output.push(message.clone());
+        let task = if send_notifications {
+            let peer = ctx.peer.clone();
+            tokio::spawn(async move {
+                while let Some(message) = rx.recv().await {
+                    if let Ok(mut output) = collected_clone.lock() {
+                        output.push(message.clone());
+                    }
+                    let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
+                        level: LoggingLevel::Info,
+                        data: serde_json::json!({"message": message, "timestamp": chrono::Utc::now().to_rfc3339()}),
+                        logger: Some("tower-process".to_string()),
+                    }).await;
                 }
-
-                let logging_param = LoggingMessageNotificationParam {
-                    level: LoggingLevel::Info,
-                    data: serde_json::json!({
-                        "message": message,
-                        "timestamp": chrono::Utc::now().to_rfc3339(),
-                    }),
-                    logger: Some("tower-process".to_string()),
-                };
-
-                if let Err(e) = peer.notify_logging_message(logging_param).await {
-                    eprintln!("Failed to send logging notification: {}", e);
-                    break;
+            })
+        } else {
+            tokio::spawn(async move {
+                while let Some(message) = rx.recv().await {
+                    if let Ok(mut output) = collected_clone.lock() {
+                        output.push(message);
+                    }
                 }
-            }
-        });
+            })
+        };
 
         StreamingOutput {
             sender: tx,
-            collected: captured_output,
+            collected,
             task,
         }
     }
@@ -340,8 +350,12 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let streaming = Self::setup_streaming_output(ctx);
-        crate::output::set_capture_mode();
+        let is_stdio = crate::output::is_capture_mode_set();
+        let streaming = Self::setup_output_capture(ctx, !is_stdio);
+
+        if !is_stdio {
+            crate::output::set_capture_mode();
+        }
         crate::output::set_current_sender(streaming.sender.clone());
 
         let result = operation().await;
@@ -350,7 +364,6 @@ impl TowerService {
         drop(streaming.sender);
         streaming.task.await.ok();
 
-        // Collect the captured output
         let output = streaming
             .collected
             .lock()
