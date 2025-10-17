@@ -22,13 +22,11 @@ def before_scenario(context, scenario):
     os.chdir(context.temp_dir)
 
 
-
-
 def after_scenario(context, scenario):
     import shutil
 
     # Clean up any MCP servers started by this scenario
-    for attr in ['http_mcp_process', 'sse_mcp_process']:
+    for attr in ["http_mcp_process", "sse_mcp_process"]:
         if hasattr(context, attr):
             process = getattr(context, attr)
             if process:
@@ -44,8 +42,6 @@ def after_scenario(context, scenario):
         os.chdir(context.original_cwd)
     if hasattr(context, "temp_dir"):
         shutil.rmtree(context.temp_dir, ignore_errors=True)
-
-
 
 
 def _find_tower_binary():
