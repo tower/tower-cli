@@ -162,7 +162,8 @@ pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()
 }
 
 async fn run_stdio_server(config: Config) -> Result<(), Error> {
-    crate::output::set_capture_mode();
+    // Set stdio MCP mode to prevent any non-JSON-RPC output from corrupting the protocol
+    crate::output::set_output_mode(crate::output::OutputMode::McpStdio);
 
     let (stdin, stdout) = stdio();
     let service = TowerService::new(config);
@@ -180,6 +181,9 @@ async fn run_sse_server(config: Config, port: u16) -> Result<(), Error> {
     let bind_addr = format!("127.0.0.1:{}", port);
     crate::output::write(&format!("SSE MCP server running on http://{}\n", bind_addr));
 
+    // Set streaming MCP mode to enable logging notifications
+    crate::output::set_output_mode(crate::output::OutputMode::McpStreaming);
+
     let ct = SseServer::serve(bind_addr.parse()?)
         .await?
         .with_service_directly(move || TowerService::new(config.clone()));
@@ -195,6 +199,9 @@ async fn run_http_server(config: Config, port: u16) -> Result<(), Error> {
         "Streamable HTTP MCP server running on http://{}\n",
         bind_addr
     ));
+
+    // Set streaming MCP mode to enable logging notifications
+    crate::output::set_output_mode(crate::output::OutputMode::McpStreaming);
 
     let service = StreamableHttpService::new(
         move || Ok(TowerService::new(config.clone())),
@@ -350,12 +357,12 @@ impl TowerService {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        let is_stdio = crate::output::is_capture_mode_set();
-        let streaming = Self::setup_output_capture(ctx, !is_stdio);
+        // Check if we're in streaming mode (SSE/HTTP) where we send notifications
+        // vs stdio mode where we don't
+        let mode = crate::output::get_output_mode();
+        let send_notifications = mode == crate::output::OutputMode::McpStreaming;
+        let streaming = Self::setup_output_capture(ctx, send_notifications);
 
-        if !is_stdio {
-            crate::output::set_capture_mode();
-        }
         crate::output::set_current_sender(streaming.sender.clone());
 
         let result = operation().await;

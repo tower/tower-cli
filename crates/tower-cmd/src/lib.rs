@@ -63,7 +63,7 @@ impl App {
         };
 
         if config.json {
-            output::set_json_mode();
+            output::set_output_mode(output::OutputMode::Json);
         }
 
         if config.debug {
