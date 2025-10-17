@@ -47,7 +47,7 @@ The mock API is returning JSON that doesn't match the Rust structs generated fro
 
 4. **Run a single test with debug output**:
    ```bash
-   TOWER_API_URL=http://127.0.0.1:8000 ./tests/integration/run_tests.py -n "Run simple application successfully locally"
+   TOWER_URL=http://127.0.0.1:8000 ./tests/integration/run_tests.py -n "Run simple application successfully locally"
    ```
 
 ### Updating the Mock API

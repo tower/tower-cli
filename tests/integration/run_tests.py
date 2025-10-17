@@ -74,14 +74,19 @@ def main():
 
     # Set up environment
     env = os.environ.copy()
-    if "TOWER_API_URL" not in env:
-        env["TOWER_API_URL"] = "http://127.0.0.1:8000"
+    if "TOWER_URL" not in env:
+        env["TOWER_URL"] = "http://127.0.0.1:8000"
 
-    log(f"Using API URL: \033[1m{env['TOWER_API_URL']}\033[0m")
+    # Set HOME to test-home directory to isolate session from user's real config
+    test_home = Path(__file__).parent / "test-home"
+    env["HOME"] = str(test_home.absolute())
+
+    log(f"Using API URL: \033[1m{env['TOWER_URL']}\033[0m")
+    log(f"Using test HOME: \033[1m{env['HOME']}\033[0m")
 
     # Ensure mock server is running
     mock_process = None
-    if not check_mock_server_health(env["TOWER_API_URL"]):
+    if not check_mock_server_health(env["TOWER_URL"]):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         port_in_use = sock.connect_ex(("127.0.0.1", 8000)) == 0
         sock.close()

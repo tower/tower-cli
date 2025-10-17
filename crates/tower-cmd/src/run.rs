@@ -244,7 +244,7 @@ pub async fn do_run_remote(
 }
 
 async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
-    let enable_ctrl_c = !output::is_capture_mode_set(); // Disable Ctrl+C in MCP mode
+    let enable_ctrl_c = !output::get_output_mode().is_mcp(); // Disable Ctrl+C in MCP mode
     let mut spinner = output::spinner("Waiting for run to start...");
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
