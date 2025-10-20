@@ -262,28 +262,36 @@ async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
-                Ok(mut output) => loop {
-                    let should_exit = tokio::select! {
-                        Some(event) = output.recv() => {
-                            if let api::LogStreamEvent::EventLog(log) = &event {
-                                let ts = dates::format_str(&log.reported_at);
-                                output::log_line(&ts, &log.content, output::LogLineType::Remote);
-                            }
-                            false
-                        },
-                        res = &mut run_complete => {
-                            handle_run_completion(res)?;
-                            true
-                        },
-                        _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                            output::write("Received Ctrl+C, stopping log streaming...\n");
-                            output::write("Note: The run will continue in Tower cloud\n");
-                            output::write(&format!("  See more: {}\n", run.dollar_link));
-                            true
-                        },
-                    };
-                    if should_exit {
-                        break;
+                Ok(mut output) => {
+                    let mut completion_result = None;
+                    let drain_timeout = tokio::time::sleep(tokio::time::Duration::from_secs(5));
+                    tokio::pin!(drain_timeout);
+
+                    loop {
+                        tokio::select! {
+                            event = output.recv() => match event {
+                                Some(api::LogStreamEvent::EventLog(log)) => {
+                                    let ts = dates::format_str(&log.reported_at);
+                                    output::log_line(&ts, &log.content, output::LogLineType::Remote);
+                                },
+                                None => break,
+                                _ => {},
+                            },
+                            res = &mut run_complete, if completion_result.is_none() => {
+                                completion_result = Some(res);
+                            },
+                            _ = &mut drain_timeout, if completion_result.is_some() => break,
+                            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
+                                output::write("Received Ctrl+C, stopping log streaming...\n");
+                                output::write("Note: The run will continue in Tower cloud\n");
+                                output::write(&format!("  See more: {}\n", run.dollar_link));
+                                break;
+                            },
+                        }
+                    }
+
+                    if let Some(res) = completion_result {
+                        handle_run_completion(res)?;
                     }
                 },
                 Err(err) => {
