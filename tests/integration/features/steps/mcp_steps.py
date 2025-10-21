@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 
-import os
-from pathlib import Path
 from behave import given, when, then
 from behave.api.async_step import async_run_until_complete
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+from mcp.client.stdio import stdio_client
+from pathlib import Path
+import json
+import os
+import requests
+import socket
+import subprocess
+import time
 import uuid
 
 
@@ -36,22 +42,76 @@ async def call_mcp_tool_raw(
             }
 
 
-async def call_mcp_tool(context, tool_name, arguments=None):
-    """Call MCP tool with standard error handling and context setting"""
+def call_mcp_tool_stdio(context, tool_name, arguments=None):
+    """Call MCP tool via stdio transport - uses raw subprocess like the working stdio test"""
     try:
-        result = await call_mcp_tool_raw(
-            context.mcp_server_url,
-            tool_name,
-            arguments or {},
-            working_directory=os.getcwd(),
+        args = arguments or {}
+        if "working_directory" not in args:
+            args["working_directory"] = os.getcwd()
+
+        process = subprocess.Popen(
+            [context.tower_binary, "mcp-server", "--transport", "stdio"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=os.environ.copy(),
         )
-        context.mcp_response = result
-        context.operation_success = result.get("success", False)
-        return result
+
+        # Initialize
+        _stdio_message(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
+                },
+                "id": 1,
+            },
+        )
+
+        # Send initialized notification (no response expected)
+        process.stdin.write(
+            json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
+        )
+        process.stdin.flush()
+
+        # Call the tool
+        tool_response = _stdio_message(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {"name": tool_name, "arguments": args},
+                "id": 2,
+            },
+        )
+
+        process.terminate()
+        process.wait()
+
+        result = tool_response.get("result", {})
+        response = {
+            "success": "result" in tool_response and not result.get("isError", False),
+            "content": result.get("content", []),
+            "result": result,
+        }
+        context.mcp_response = response
+        context.operation_success = response["success"]
+        return response
+
     except Exception as e:
         context.mcp_response = {"success": False, "error": str(e)}
         context.operation_success = False
         return context.mcp_response
+
+
+async def call_mcp_tool(context, tool_name, arguments=None):
+    """Call MCP tool with standard error handling and context setting - defaults to stdio"""
+    return call_mcp_tool_stdio(context, tool_name, arguments)
 
 
 def unique_app_name(context, name="hello-world", force_new=False):
@@ -92,9 +152,17 @@ def create_towerfile(
 def has_text_content(response, text_check):
     """Check if response contains text content matching the predicate"""
     for content_item in response.get("content", []):
-        if hasattr(content_item, "type") and content_item.type == "text":
-            if text_check(getattr(content_item, "text", "")):
-                return True
+        # Handle both object style (SSE) and dict style (stdio)
+        if hasattr(content_item, "type"):
+            # Object style (SSE)
+            if content_item.type == "text":
+                if text_check(getattr(content_item, "text", "")):
+                    return True
+        elif isinstance(content_item, dict):
+            # Dict style (stdio)
+            if content_item.get("type") == "text":
+                if text_check(content_item.get("text", "")):
+                    return True
     return False
 
 
@@ -112,16 +180,30 @@ def is_error_response(response):
 
 @given("I have a running Tower MCP server")
 def step_have_running_mcp_server(context):
-    # This step is handled by the before_scenario hook in environment.py
-    # Just verify the MCP server was set up properly
-    assert hasattr(
-        context, "tower_mcpserver_process"
-    ), "Tower MCP server process should be set up"
-    assert hasattr(context, "mcp_server_url"), "MCP server URL should be set up"
+    # For stdio tests, this is a no-op
+    # For SSE tests, start an SSE server
+    if not hasattr(context, "sse_mcp_process"):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            s.listen(1)
+            sse_port = s.getsockname()[1]
 
-    server_alive = context.tower_mcpserver_process.poll() is None
-    print(f"DEBUG: MCP server alive check: {server_alive}")
-    assert server_alive, "MCP server should be running"
+        context.sse_mcp_process = subprocess.Popen(
+            [
+                context.tower_binary,
+                "mcp-server",
+                "--transport",
+                "sse",
+                "--port",
+                str(sse_port),
+            ],
+            env=os.environ.copy(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        time.sleep(1)
+        context.mcp_server_url = f"http://127.0.0.1:{sse_port}"
 
 
 @given("I have a valid Towerfile in the current directory")
@@ -264,15 +346,11 @@ def step_check_valid_toml_towerfile(context):
     response_content = context.mcp_response.get("content", [])
     assert len(response_content) > 0, "Response should have content"
 
-    # Find the TOML content
-    found_toml = False
-    for content_item in response_content:
-        if hasattr(content_item, "type") and content_item.type == "text":
-            text = getattr(content_item, "text", "")
-            if "[app]" in text and "name =" in text and "script =" in text:
-                found_toml = True
-                break
-
+    # Use the same logic as has_text_content for consistency
+    found_toml = has_text_content(
+        context.mcp_response,
+        lambda text: "[app]" in text and "name =" in text and "script =" in text,
+    )
     assert (
         found_toml
     ), f"Response should contain valid TOML Towerfile, got: {response_content}"
@@ -283,22 +361,14 @@ def step_check_towerfile_metadata(context):
     """Verify the Towerfile contains expected project metadata."""
     assert hasattr(context, "mcp_response"), "No MCP response was recorded"
 
-    response_content = context.mcp_response.get("content", [])
-
-    found_metadata = False
-    for content_item in response_content:
-        if hasattr(content_item, "type") and content_item.type == "text":
-            text = getattr(content_item, "text", "")
-            if (
-                'name = "test-project"' in text
-                and 'description = "A test project for Towerfile generation"' in text
-            ):
-                found_metadata = True
-                break
-
+    found_metadata = has_text_content(
+        context.mcp_response,
+        lambda text: 'name = "test-project"' in text
+        and 'description = "A test project for Towerfile generation"' in text,
+    )
     assert (
         found_metadata
-    ), f"Towerfile should contain project name and description, got: {response_content}"
+    ), f"Towerfile should contain project name and description, got: {context.mcp_response.get('content', [])}"
 
 
 @step("the MCP server should remain responsive")
@@ -345,14 +415,22 @@ async def step_create_schedule_for_app(context):
     # Extract schedule ID from the response text
     if result.get("success") and "content" in result:
         content = result["content"]
-        if content and len(content) > 0 and hasattr(content[0], "text"):
-            response_text = content[0].text
-            # Extract schedule ID from text like "Created schedule 'SCHEDULE_ID' for app..."
-            import re
+        if content and len(content) > 0:
+            # Handle both dict and object style
+            content_item = content[0]
+            if hasattr(content_item, "text"):
+                response_text = content_item.text
+            elif isinstance(content_item, dict):
+                response_text = content_item.get("text", "")
+            else:
+                response_text = ""
 
-            match = re.search(r"Created schedule '([^']+)'", response_text)
-            if match:
-                context.created_schedule_id = match.group(1)
+            if response_text:
+                import re
+
+                match = re.search(r"Created schedule '([^']+)'", response_text)
+                if match:
+                    context.created_schedule_id = match.group(1)
 
 
 @step(
@@ -641,3 +719,182 @@ def step_logs_should_have_correct_logger(context):
     assert any(
         log.logger == "tower-process" for log in logs
     ), "Missing tower-process logger"
+
+
+@given('I have a running Tower MCP server with transport "{transport}"')
+def step_given_mcp_server_with_transport(context, transport):
+    if transport == "http":
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            s.listen(1)
+            http_port = s.getsockname()[1]
+
+        context.http_mcp_process = subprocess.Popen(
+            [
+                context.tower_binary,
+                "mcp-server",
+                "--transport",
+                "http",
+                "--port",
+                str(http_port),
+            ],
+            env=os.environ.copy(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        time.sleep(1)
+        context.http_mcp_url = f"http://127.0.0.1:{http_port}"
+    elif transport == "stdio":
+        context.transport_mode = "stdio"
+
+
+@when("I call tower_workflow_help via HTTP MCP")
+def step_when_call_workflow_help_http(context):
+    init_request = {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"},
+        },
+        "id": 1,
+    }
+
+    response = requests.post(
+        f"{context.http_mcp_url}/mcp",
+        json=init_request,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        },
+    )
+
+    assert response.status_code == 200, f"HTTP request failed: {response.status_code}"
+    assert "text/event-stream" in response.headers.get("content-type", "")
+
+    for line in response.text.split("\n"):
+        if line.startswith("data: "):
+            data_line = line[6:]
+            break
+    else:
+        assert False, "No SSE data found"
+
+    init_response = json.loads(data_line)
+    assert init_response["jsonrpc"] == "2.0"
+    assert "result" in init_response
+    context.mcp_response = init_response
+
+
+def _stdio_message(process, msg):
+    process.stdin.write(json.dumps(msg) + "\n")
+    process.stdin.flush()
+
+    response_line = process.stdout.readline().strip()
+    if response_line:
+        return json.loads(response_line)
+
+    raise RuntimeError("Empty response from stdio MCP server")
+
+
+@when("I call tower_workflow_help via stdio MCP")
+def step_when_call_workflow_help_stdio(context):
+    process = subprocess.Popen(
+        [context.tower_binary, "mcp-server", "--transport", "stdio"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=os.environ.copy(),
+    )
+
+    _stdio_message(
+        process,
+        {
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test-client", "version": "1.0.0"},
+            },
+            "id": 1,
+        },
+    )
+
+    process.stdin.write(
+        json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
+    )
+    process.stdin.flush()
+
+    tool_response = _stdio_message(
+        process,
+        {
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": "tower_workflow_help", "arguments": {}},
+            "id": 2,
+        },
+    )
+
+    process.terminate()
+    process.wait()
+    context.mcp_response = tool_response
+
+
+async def call_mcp_tool_sse(context, tool_name, arguments=None):
+    """Call MCP tool via SSE transport - for streaming tests"""
+    try:
+        result = await call_mcp_tool_raw(
+            context.mcp_server_url,
+            tool_name,
+            arguments or {},
+            working_directory=os.getcwd(),
+        )
+        context.mcp_response = result
+        context.operation_success = result.get("success", False)
+        return result
+    except Exception as e:
+        context.mcp_response = {"success": False, "error": str(e)}
+        context.operation_success = False
+        return context.mcp_response
+
+
+@when("I call tower_workflow_help via SSE MCP")
+@async_run_until_complete
+async def step_when_call_workflow_help_sse(context):
+    await call_mcp_tool_sse(context, "tower_workflow_help")
+
+
+@when("I call tower_run_local via SSE MCP for streaming")
+@async_run_until_complete
+async def step_when_call_tower_run_local_sse_streaming(context):
+    await call_mcp_tool_sse(context, "tower_run_local")
+
+
+@then("I should receive workflow help content via SSE")
+def step_then_receive_workflow_help_sse(context):
+    assert context.mcp_response.get(
+        "success", False
+    ), f"Expected success response, got: {context.mcp_response}"
+    assert "content" in context.mcp_response
+    content = context.mcp_response["content"][0].text
+    assert "Tower Application Development Workflow" in content
+
+
+@then("I should receive workflow help content via HTTP")
+def step_then_receive_workflow_help_http(context):
+    assert "result" in context.mcp_response
+    result = context.mcp_response["result"]
+    assert "serverInfo" in result
+    assert result["serverInfo"]["name"] == "tower-cli"
+
+
+@then("I should receive workflow help content via stdio")
+def step_then_receive_workflow_help_stdio(context):
+    assert "result" in context.mcp_response
+    result = context.mcp_response["result"]
+    assert "content" in result
+    content = result["content"][0]["text"]
+    assert "Tower Application Development Workflow" in content

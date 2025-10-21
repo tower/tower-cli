@@ -62,7 +62,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 
     match api::describe_app(&config, &name).await {
         Ok(app_response) => {
-            if output::is_json_mode_set() {
+            if output::get_output_mode().is_json() {
                 output::json(&app_response);
                 return;
             }
