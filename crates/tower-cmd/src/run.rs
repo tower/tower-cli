@@ -297,8 +297,12 @@ async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
             spinner.success();
             output::write("Run started, streaming logs...\n");
 
+            // We do this here, explicitly, to not double-monitor our API via the
+            // `wait_for_run_start` function above.
             let run_complete = monitor_run_completion(&config, run);
 
+            // Now we follow the logs from the run. We can stream them from the cloud to here using
+            // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
                 Ok(log_stream) => {
                     let completed_run = stream_logs_until_complete(
