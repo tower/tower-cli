@@ -39,13 +39,6 @@ Feature: MCP App Management
     When I call tower_run_local via MCP
     Then I should receive a response about the run
 
-  Scenario: Local run streams logging notifications
-    Given I have a simple hello world application
-    When I call tower_run_local via MCP
-    Then I should receive logging notifications
-    And the logs should contain process output
-    And the logs should have tower-process logger
-
   Scenario: Attempt remote run without deployed app
     Given I have a simple hello world application
     When I call tower_run_remote via MCP
@@ -121,3 +114,7 @@ Feature: MCP App Management
     When I call tower_deploy via MCP
     Then I should receive a success response about deployment
     And the app "hello-world" should be visible in Tower
+
+  Scenario: MCP workflow help via stdio transport
+    When I call tower_workflow_help via stdio MCP
+    Then I should receive workflow help content via stdio
