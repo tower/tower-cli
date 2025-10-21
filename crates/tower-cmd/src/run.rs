@@ -243,8 +243,50 @@ pub async fn do_run_remote(
     }
 }
 
+async fn stream_logs_until_complete(
+    mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
+    mut run_complete: tokio::sync::oneshot::Receiver<Run>,
+    enable_ctrl_c: bool,
+    run_link: &str,
+) -> Result<Option<Run>, Error> {
+    loop {
+        tokio::select! {
+            event = log_stream.recv() => match event {
+                Some(api::LogStreamEvent::EventLog(log)) => {
+                    output::remote_log_event(&log);
+                },
+                None => return Ok(None),
+                _ => {},
+            },
+            res = &mut run_complete => {
+                let completed_run = res?;
+                drain_remaining_logs(log_stream).await;
+                return Ok(Some(completed_run));
+            },
+            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
+                output::write("Received Ctrl+C, stopping log streaming...\n");
+                output::write("Note: The run will continue in Tower cloud\n");
+                output::write(&format!("  See more: {}\n", run_link));
+                return Ok(None);
+            },
+        }
+    }
+}
+
+async fn drain_remaining_logs(mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>) {
+    let drain_duration = tokio::time::Duration::from_secs(5);
+    let _ = tokio::time::timeout(drain_duration, async {
+        while let Some(event) = log_stream.recv().await {
+            if let api::LogStreamEvent::EventLog(log) = event {
+                output::remote_log_event(&log);
+            }
+        }
+    })
+    .await;
+}
+
 async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
-    let enable_ctrl_c = !output::get_output_mode().is_mcp(); // Disable Ctrl+C in MCP mode
+    let enable_ctrl_c = !output::get_output_mode().is_mcp();
     let mut spinner = output::spinner("Waiting for run to start...");
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
@@ -255,45 +297,22 @@ async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
             spinner.success();
             output::write("Run started, streaming logs...\n");
 
-            // We do this here, explicitly, to not double-monitor our API via the
-            // `wait_for_run_start` function above.
-            let mut run_complete = monitor_run_completion(&config, run);
+            let run_complete = monitor_run_completion(&config, run);
 
-            // Now we follow the logs from the run. We can stream them from the cloud to here using
-            // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
-                Ok(mut output) => {
-                    let mut completion_result = None;
-                    let drain_timeout = tokio::time::sleep(tokio::time::Duration::from_secs(5));
-                    tokio::pin!(drain_timeout);
+                Ok(log_stream) => {
+                    let completed_run = stream_logs_until_complete(
+                        log_stream,
+                        run_complete,
+                        enable_ctrl_c,
+                        &run.dollar_link,
+                    )
+                    .await?;
 
-                    loop {
-                        tokio::select! {
-                            event = output.recv() => match event {
-                                Some(api::LogStreamEvent::EventLog(log)) => {
-                                    let ts = dates::format_str(&log.reported_at);
-                                    output::log_line(&ts, &log.content, output::LogLineType::Remote);
-                                },
-                                None => break,
-                                _ => {},
-                            },
-                            res = &mut run_complete, if completion_result.is_none() => {
-                                completion_result = Some(res);
-                            },
-                            _ = &mut drain_timeout, if completion_result.is_some() => break,
-                            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                                output::write("Received Ctrl+C, stopping log streaming...\n");
-                                output::write("Note: The run will continue in Tower cloud\n");
-                                output::write(&format!("  See more: {}\n", run.dollar_link));
-                                break;
-                            },
-                        }
+                    if let Some(run) = completed_run {
+                        handle_run_completion(Ok(run))?;
                     }
-
-                    if let Some(res) = completion_result {
-                        handle_run_completion(res)?;
-                    }
-                },
+                }
                 Err(err) => {
                     output::error(&format!("Failed to stream run logs: {:?}", err));
                     return Err(Error::LogStreamFailed);
