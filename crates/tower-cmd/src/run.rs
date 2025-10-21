@@ -8,7 +8,11 @@ use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver, Status};
 use tower_telemetry::{debug, Context};
 
-use tokio::sync::{mpsc::unbounded_channel, oneshot};
+use tokio::sync::{
+    mpsc::{unbounded_channel, Receiver as MpscReceiver},
+    oneshot::{self, Receiver as OneshotReceiver},
+};
+use tokio::time::{sleep, timeout, Duration};
 
 use crate::{api, output, util::dates};
 
@@ -244,8 +248,8 @@ pub async fn do_run_remote(
 }
 
 async fn stream_logs_until_complete(
-    mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
-    mut run_complete: tokio::sync::oneshot::Receiver<Run>,
+    mut log_stream: MpscReceiver<api::LogStreamEvent>,
+    mut run_complete: OneshotReceiver<Run>,
     enable_ctrl_c: bool,
     run_link: &str,
 ) -> Result<Option<Run>, Error> {
@@ -273,9 +277,9 @@ async fn stream_logs_until_complete(
     }
 }
 
-async fn drain_remaining_logs(mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>) {
-    let drain_duration = tokio::time::Duration::from_secs(5);
-    let _ = tokio::time::timeout(drain_duration, async {
+async fn drain_remaining_logs(mut log_stream: MpscReceiver<api::LogStreamEvent>) {
+    let drain_duration = Duration::from_secs(5);
+    let _ = timeout(drain_duration, async {
         while let Some(event) = log_stream.recv().await {
             if let api::LogStreamEvent::EventLog(log) = event {
                 output::remote_log_event(&log);
@@ -328,9 +332,7 @@ async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
     Ok(())
 }
 
-fn handle_run_completion(
-    res: Result<Run, tokio::sync::oneshot::error::RecvError>,
-) -> Result<(), Error> {
+fn handle_run_completion(res: Result<Run, oneshot::error::RecvError>) -> Result<(), Error> {
     match res {
         Ok(completed_run) => match completed_run.status {
             tower_api::models::run::Status::Errored => {
@@ -571,7 +573,7 @@ async fn monitor_status(app: LocalApp) -> Status {
                             );
                             return tower_runtime::Status::Running; // Return a default status for timeout
                         }
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        sleep(Duration::from_millis(100)).await;
                         continue;
                     }
                 }
@@ -587,7 +589,7 @@ async fn monitor_status(app: LocalApp) -> Status {
                     output::error("Failed to get app status after timeout");
                     return tower_runtime::Status::Running; // Return a default status for timeout
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                sleep(Duration::from_millis(100)).await;
             }
         }
     }
@@ -616,7 +618,7 @@ async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
             break;
         } else {
             // Wait half a second to to try again.
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(500)).await;
         }
     }
 
@@ -633,7 +635,7 @@ async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<Run, Erro
             return Ok(res.run);
         } else {
             // Wait half a second to to try again.
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(500)).await;
         }
     }
 }
