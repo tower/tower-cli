@@ -110,10 +110,10 @@ async fn execute_local_app(
     let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
 
     // set for later on.
-    let working_dir = if package.manifest.version == Some(2) {
-        package_path.join(&package.manifest.app_dir_name)
-    } else {
+    let working_dir = if package.manifest.version == Some(1) {
         package_path.to_path_buf()
+    } else {
+        package_path.join(&package.manifest.app_dir_name)
     };
 
     debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
