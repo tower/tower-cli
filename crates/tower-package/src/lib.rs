@@ -3,7 +3,7 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
-use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf, Component};
 use std::pin::Pin;
 use tmpdir::TmpDir;
 use tokio::{
@@ -20,7 +20,14 @@ use tower_telemetry::debug;
 mod error;
 pub use error::Error;
 
-const CURRENT_PACKAGE_VERSION: i32 = 2;
+// current version of the package format. we keep a version history here just in case anyone has
+// questions. will probably promote this to proper docs at some point.
+// 
+// Version History:
+// 1 - Initial version
+// 2 - Add app_dir, modules_dir, and checksum
+// 3 - Change checksum algorithm to be cross-platform
+const CURRENT_PACKAGE_VERSION: i32 = 3;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Parameter {
@@ -539,8 +546,47 @@ fn should_ignore_file(p: &PathBuf) -> bool {
     return false;
 }
 
+// normalize_path converts a Path to a normalized string with forward slashes as separators.
+fn normalize_path(path: &Path) -> String {
+    let mut components = Vec::new();
+    
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => {
+                // Skip Windows prefixes (C:) and root markers
+                // You might want to keep root as "/" depending on needs
+            }
+            Component::CurDir => {
+                // Skip "." components
+            }
+            Component::ParentDir => {
+                // Handle ".." by popping the last component if possible
+                if !components.is_empty() {
+                    components.pop();
+                }
+            }
+            Component::Normal(os_str) => {
+                if let Some(s) = os_str.to_str() {
+                    components.push(s.to_string());
+                }
+            }
+        }
+    }
+
+    components.join("/")
+}
+
 fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<String, Error> {
-    let mut sorted_keys: Vec<&PathBuf> = path_hashes.keys().collect();
+    // We'll standardize all the paths into a set of strings with normalized path separators. This
+    // is in particular important on Windows.
+    let mut key_cache = HashMap::new();
+
+    for key in path_hashes.keys() {
+        let normalized = normalize_path(&key);
+        key_cache.insert(normalized, key.clone());
+    }
+
+    let mut sorted_keys: Vec<_> = key_cache.keys().collect();
     sorted_keys.sort();
 
     // hasher that we'll use for computing the overall SHA256 hash.
@@ -548,9 +594,10 @@ fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<Stri
 
     for key in sorted_keys {
         // We need to sort the keys so that we can compute a consistent hash.
-        let value = path_hashes.get(key).unwrap();
+        let path = key_cache.get(key).unwrap();
+        let value = path_hashes.get(path).unwrap();
 
-        let combined = format!("{}:{}", key.display(), value);
+        let combined = format!("{}:{}", key, value);
         hasher.update(combined.as_bytes());
     }
 
@@ -584,4 +631,18 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
 
     // Convert to hex string
     Ok(format!("{:x}", result))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    #[tokio::test]
+    async fn test_normalize_path() {
+        let path = PathBuf::from(".").join("some").join("nested").join("path").join("to").join("file.txt");
+        let normalized = normalize_path(&path);
+        assert_eq!(normalized, "some/nested/path/to/file.txt");
+    }
 }
