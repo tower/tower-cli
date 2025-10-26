@@ -8,7 +8,11 @@ use tower_package::{Package, PackageSpec};
 use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver, Status};
 use tower_telemetry::{debug, Context};
 
-use tokio::sync::{mpsc::unbounded_channel, oneshot};
+use tokio::sync::{
+    mpsc::{unbounded_channel, Receiver as MpscReceiver},
+    oneshot::{self, Receiver as OneshotReceiver},
+};
+use tokio::time::{sleep, timeout, Duration};
 
 use crate::{api, output, util::dates};
 
@@ -243,8 +247,50 @@ pub async fn do_run_remote(
     }
 }
 
+async fn stream_logs_until_complete(
+    mut log_stream: MpscReceiver<api::LogStreamEvent>,
+    mut run_complete: OneshotReceiver<Run>,
+    enable_ctrl_c: bool,
+    run_link: &str,
+) -> Result<Option<Run>, Error> {
+    loop {
+        tokio::select! {
+            event = log_stream.recv() => match event {
+                Some(api::LogStreamEvent::EventLog(log)) => {
+                    output::remote_log_event(&log);
+                },
+                None => return Ok(None),
+                _ => {},
+            },
+            res = &mut run_complete => {
+                let completed_run = res?;
+                drain_remaining_logs(log_stream).await;
+                return Ok(Some(completed_run));
+            },
+            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
+                output::write("Received Ctrl+C, stopping log streaming...\n");
+                output::write("Note: The run will continue in Tower cloud\n");
+                output::write(&format!("  See more: {}\n", run_link));
+                return Ok(None);
+            },
+        }
+    }
+}
+
+async fn drain_remaining_logs(mut log_stream: MpscReceiver<api::LogStreamEvent>) {
+    let drain_duration = Duration::from_secs(5);
+    let _ = timeout(drain_duration, async {
+        while let Some(event) = log_stream.recv().await {
+            if let api::LogStreamEvent::EventLog(log) = event {
+                output::remote_log_event(&log);
+            }
+        }
+    })
+    .await;
+}
+
 async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
-    let enable_ctrl_c = !output::get_output_mode().is_mcp(); // Disable Ctrl+C in MCP mode
+    let enable_ctrl_c = !output::get_output_mode().is_mcp();
     let mut spinner = output::spinner("Waiting for run to start...");
     match wait_for_run_start(&config, &run).await {
         Err(err) => {
@@ -257,35 +303,24 @@ async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
 
             // We do this here, explicitly, to not double-monitor our API via the
             // `wait_for_run_start` function above.
-            let mut run_complete = monitor_run_completion(&config, run);
+            let run_complete = monitor_run_completion(&config, run);
 
             // Now we follow the logs from the run. We can stream them from the cloud to here using
             // the stream_logs API endpoint.
             match api::stream_run_logs(&config, &run.app_name, run.number).await {
-                Ok(mut output) => loop {
-                    let should_exit = tokio::select! {
-                        Some(event) = output.recv() => {
-                            if let api::LogStreamEvent::EventLog(log) = &event {
-                                let ts = dates::format_str(&log.reported_at);
-                                output::log_line(&ts, &log.content, output::LogLineType::Remote);
-                            }
-                            false
-                        },
-                        res = &mut run_complete => {
-                            handle_run_completion(res)?;
-                            true
-                        },
-                        _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                            output::write("Received Ctrl+C, stopping log streaming...\n");
-                            output::write("Note: The run will continue in Tower cloud\n");
-                            output::write(&format!("  See more: {}\n", run.dollar_link));
-                            true
-                        },
-                    };
-                    if should_exit {
-                        break;
+                Ok(log_stream) => {
+                    let completed_run = stream_logs_until_complete(
+                        log_stream,
+                        run_complete,
+                        enable_ctrl_c,
+                        &run.dollar_link,
+                    )
+                    .await?;
+
+                    if let Some(run) = completed_run {
+                        handle_run_completion(Ok(run))?;
                     }
-                },
+                }
                 Err(err) => {
                     output::error(&format!("Failed to stream run logs: {:?}", err));
                     return Err(Error::LogStreamFailed);
@@ -297,9 +332,7 @@ async fn do_follow_run(config: Config, run: &Run) -> Result<(), Error> {
     Ok(())
 }
 
-fn handle_run_completion(
-    res: Result<Run, tokio::sync::oneshot::error::RecvError>,
-) -> Result<(), Error> {
+fn handle_run_completion(res: Result<Run, oneshot::error::RecvError>) -> Result<(), Error> {
     match res {
         Ok(completed_run) => match completed_run.status {
             tower_api::models::run::Status::Errored => {
@@ -540,7 +573,7 @@ async fn monitor_status(app: LocalApp) -> Status {
                             );
                             return tower_runtime::Status::Running; // Return a default status for timeout
                         }
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        sleep(Duration::from_millis(100)).await;
                         continue;
                     }
                 }
@@ -556,7 +589,7 @@ async fn monitor_status(app: LocalApp) -> Status {
                     output::error("Failed to get app status after timeout");
                     return tower_runtime::Status::Running; // Return a default status for timeout
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                sleep(Duration::from_millis(100)).await;
             }
         }
     }
@@ -585,7 +618,7 @@ async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
             break;
         } else {
             // Wait half a second to to try again.
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(500)).await;
         }
     }
 
@@ -602,7 +635,7 @@ async fn wait_for_run_completion(config: &Config, run: &Run) -> Result<Run, Erro
             return Ok(res.run);
         } else {
             // Wait half a second to to try again.
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(500)).await;
         }
     }
 }

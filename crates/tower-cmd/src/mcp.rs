@@ -25,6 +25,7 @@ use rmcp::{
 use rsa::pkcs1::DecodeRsaPublicKey;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tokio::net::TcpListener;
 use tower_api::apis::Error as ApiError;
 
 use crate::{api, deploy, run, towerfile_gen::TowerfileGenerator, Config, Error};
@@ -210,7 +211,7 @@ async fn run_http_server(config: Config, port: u16) -> Result<(), Error> {
     );
 
     let router = Router::new().nest_service("/mcp", service);
-    let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
+    let listener = TcpListener::bind(&bind_addr).await?;
     axum::serve(listener, router)
         .with_graceful_shutdown(async {
             tokio::signal::ctrl_c().await.unwrap();
