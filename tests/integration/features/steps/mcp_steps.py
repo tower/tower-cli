@@ -898,3 +898,8 @@ def step_then_receive_workflow_help_stdio(context):
     assert "content" in result
     content = result["content"][0]["text"]
     assert "Tower Application Development Workflow" in content
+
+
+@given('I have a simple hello world application named "{app_name}"')
+def step_create_hello_world_app_named(context, app_name):
+    create_towerfile(context, app_name=app_name)

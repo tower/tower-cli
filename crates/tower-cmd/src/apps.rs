@@ -3,7 +3,7 @@ use config::Config;
 
 use tower_api::models::Run;
 
-use crate::{api, output, util::dates};
+use crate::{api, output};
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
@@ -51,8 +51,7 @@ pub async fn do_logs(config: Config, cmd: &ArgMatches) {
 
     if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
         for line in resp.log_lines {
-            let ts = dates::format_str(&line.reported_at);
-            output::log_line(&ts, &line.content, output::LogLineType::Remote);
+            output::remote_log_event(&line);
         }
     }
 }

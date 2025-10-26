@@ -31,3 +31,10 @@ Feature: CLI Run Commands
     Then the output should show "Scheduling run..." spinner
     And the output should show "Waiting for run to start..." spinner
     And both spinners should complete successfully
+
+  Scenario: CLI run should show logs that arrive after run completes
+    Given I have a simple hello world application named "app-logs-after-completion"
+    When I run "tower deploy --create" via CLI
+    And I run "tower run" via CLI
+    Then the output should show "First log before run completes"
+    And the output should show "Second log after run completes"

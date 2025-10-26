@@ -127,6 +127,11 @@ pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
     write(&line);
 }
 
+pub fn remote_log_event(log: &tower_api::models::RunLogLine) {
+    let ts = crate::util::dates::format_str(&log.reported_at);
+    log_line(&ts, &log.content, LogLineType::Remote);
+}
+
 pub fn package_error(err: tower_package::Error) {
     let msg = match err {
         tower_package::Error::NoManifest => "No manifest was found".to_string(),
