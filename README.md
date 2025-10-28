@@ -132,27 +132,41 @@ Provides Apache Iceberg table support:
 pip install "tower[dbt]"
 ```
 
-Provides dbt Core integration for running dbt workflows. Access dbt functionality through the `tower.dbt` module:
+Provides dbt Core integration for running dbt workflows:
 
 ```python
 import tower
 
 # Configure and run a dbt workflow
-config = tower.dbt.DbtRunnerConfig(
+workflow = tower.dbt(
     project_path="path/to/dbt_project",
     profile_payload=tower.dbt.load_profile_from_env("DBT_PROFILE_YAML"),
-    commands=tower.dbt.parse_command_plan("deps,seed,build"),
+    commands="deps,seed,build",
 )
 
-results = tower.dbt.run_dbt_workflow(config)
+results = workflow.run()
 ```
 
-Available classes and functions:
-- `tower.dbt.DbtRunnerConfig`: Configure dbt workflow execution
-- `tower.dbt.run_dbt_workflow`: Execute a dbt workflow with the given configuration
+You can also save the workflow and run it later:
+
+```python
+dbt_config = tower.dbt(
+    project_path="path/to/dbt_project",
+    profile_payload=tower.dbt.load_profile_from_env(),
+    commands="deps,seed,build",
+    full_refresh=True,
+)
+
+# Run later
+results = dbt_config.run()
+```
+
+Available helper functions and classes:
+- `tower.dbt.load_profile_from_env()`: Load dbt profile from environment variables
+- `tower.dbt.parse_command_plan()`: Parse comma-separated commands into a command plan
 - `tower.dbt.DbtCommand`: Represents a dbt CLI command invocation
-- `tower.dbt.parse_command_plan`: Parse comma-separated commands into a command plan
-- `tower.dbt.load_profile_from_env`: Load dbt profile from environment variables
+- `tower.dbt.DbtRunnerConfig`: Low-level configuration class
+- `tower.dbt.run_dbt_workflow()`: Low-level execution function
 
 For a complete example, see the [dbt Core Ecommerce Analytics app](https://github.com/tower/tower-examples/tree/main/dbt-core-ecommerce-analytics).
 

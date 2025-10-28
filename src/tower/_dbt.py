@@ -129,6 +129,17 @@ def _has_flag(args: list[str], flag: str) -> bool:
     return False
 
 
+class DbtWorkflow:
+    """A configured dbt workflow that can be executed."""
+
+    def __init__(self, config: DbtRunnerConfig):
+        self.config = config
+
+    def run(self) -> list[object]:
+        """Execute the dbt workflow."""
+        return run_dbt_workflow(self.config)
+
+
 def run_dbt_workflow(config: DbtRunnerConfig) -> list[object]:
     project_dir = config.project_path.resolve()
     if not project_dir.exists():
@@ -216,3 +227,73 @@ def _log_run_results(log: logging.Logger, entries: Iterable[object] | None) -> N
         status = getattr(entry, "status", None)
         if node and hasattr(node, "name"):
             log.info("dbt result | %s -> %s", node.name, status)
+
+
+def dbt(
+    project_path: Path | str,
+    profile_payload: str,
+    commands: Sequence[DbtCommand] | str | None = None,
+    selector: str | None = None,
+    target: str | None = None,
+    threads: int | None = None,
+    vars_payload: Mapping[str, object] | str | None = None,
+    full_refresh: bool = False,
+    full_refresh_commands: Sequence[str] = ("seed", "run", "build"),
+    extra_env: Mapping[str, str] | None = None,
+    log_results: bool = True,
+) -> DbtWorkflow:
+    """
+    Create a dbt workflow that can be executed.
+
+    Args:
+        project_path: Path to the dbt project root
+        profile_payload: Full profiles.yml contents
+        commands: Sequence of DbtCommand objects or a comma-separated string
+        selector: Extra --select applied when commands don't already include one
+        target: Target name from the profile (blank uses the profile default)
+        threads: Number of threads to use
+        vars_payload: Variables to pass to dbt (dict or JSON string)
+        full_refresh: Whether to add --full-refresh flag
+        full_refresh_commands: Commands that should receive --full-refresh
+        extra_env: Additional environment variables
+        log_results: Whether to log results
+
+    Returns:
+        A DbtWorkflow that can be executed with .run()
+
+    Example:
+        >>> workflow = tower.dbt(
+        ...     project_path="path/to/dbt_project",
+        ...     profile_payload=tower.dbt.load_profile_from_env("DBT_PROFILE_YAML"),
+        ...     commands="deps,seed,build",
+        ... )
+        >>> results = workflow.run()
+    """
+    # Parse commands if provided as string
+    if isinstance(commands, str):
+        commands = parse_command_plan(commands)
+    elif commands is None:
+        commands = DEFAULT_COMMAND_PLAN
+
+    config = DbtRunnerConfig(
+        project_path=project_path,
+        profile_payload=profile_payload,
+        commands=commands,
+        selector=selector,
+        target=target,
+        threads=threads,
+        vars_payload=vars_payload,
+        full_refresh=full_refresh,
+        full_refresh_commands=full_refresh_commands,
+        extra_env=extra_env,
+        log_results=log_results,
+    )
+    return DbtWorkflow(config)
+
+
+# Attach helper functions as attributes to the dbt function
+dbt.load_profile_from_env = load_profile_from_env
+dbt.parse_command_plan = parse_command_plan
+dbt.DbtCommand = DbtCommand
+dbt.DbtRunnerConfig = DbtRunnerConfig
+dbt.run_dbt_workflow = run_dbt_workflow
