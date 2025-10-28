@@ -50,7 +50,6 @@ dependencies = [
   "huggingface-hub>=0.34.3",
   "mcp>=1.1.0; python_version>='3.10'",
   "ollama>=0.5.3",
-  "dbt-core>=1.9,<1.10",
   "pydantic>=2.11.0,<3.0.0",
   "pydantic-core>=2.27.0,<3.0.0",
   "pyiceberg==0.9.1",
@@ -60,7 +59,8 @@ dependencies = [
 [project.optional-dependencies]
 ai = ["huggingface-hub==0.34.3", "ollama==0.5.3"]
 iceberg = ["polars==1.27.1", "pyarrow==19.0.1", "pyiceberg==0.9.1"]
-all = ["tower[ai,iceberg]"]
+dbt = ["dbt-core>=1.9,<1.10"]
+all = ["tower[ai,iceberg,dbt]"]
 
 [tool.maturin]
 bindings = "bin"

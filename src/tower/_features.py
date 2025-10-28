@@ -31,6 +31,7 @@ def get_package_version(pkg_name: str) -> Optional[str]:
 _feature_dependencies: Dict[str, List[str]] = {
     "ai": ["ollama", "huggingface_hub"],
     "iceberg": ["pyiceberg", "pyarrow", "polars"],
+    "dbt": ["dbt"],
 }
 
 # Cache for imported modules
@@ -40,6 +41,7 @@ _module_cache: Dict[str, Any] = {}
 _feature_modules: Dict[str, tuple[str, List[str]]] = {
     "ai": ("_llms", ["llms"]),
     "iceberg": ("_tables", ["tables"]),
+    "dbt": ("_dbt", ["dbt"]),
 }
 
 
@@ -132,7 +134,11 @@ def override_get_attr(name: str) -> Any:
                     full_module_name, __package__
                 )
 
-            # Return the requested attribute from the cached module
-            return getattr(_module_cache[module_name], name)
+            # If the export name matches the module name, return the module itself
+            # Otherwise, return the requested attribute from the module
+            if name == module_name.lstrip("_"):
+                return _module_cache[module_name]
+            else:
+                return getattr(_module_cache[module_name], name)
 
     raise AttributeError(f"module 'tower' has no attribute '{name}'")
