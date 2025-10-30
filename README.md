@@ -147,20 +147,6 @@ workflow = tower.dbt(
 results = workflow.run()
 ```
 
-You can also save the workflow and run it later:
-
-```python
-dbt_config = tower.dbt(
-    project_path="path/to/dbt_project",
-    profile_payload=tower.dbt.load_profile_from_env(),
-    commands="deps,seed,build",
-    full_refresh=True,
-)
-
-# Run later
-results = dbt_config.run()
-```
-
 Available helper functions and classes:
 - `tower.dbt.load_profile_from_env()`: Load dbt profile from environment variables
 - `tower.dbt.parse_command_plan()`: Parse comma-separated commands into a command plan
@@ -168,7 +154,7 @@ Available helper functions and classes:
 - `tower.dbt.DbtRunnerConfig`: Low-level configuration class
 - `tower.dbt.run_dbt_workflow()`: Low-level execution function
 
-For a complete example, see the [dbt Core Ecommerce Analytics app](https://github.com/tower/tower-examples/tree/main/dbt-core-ecommerce-analytics).
+For a complete example, see the [dbt Core Ecommerce Analytics app](https://github.com/tower/tower-examples/tree/main/14-dbt-core-ecommerce-analytics).
 
 #### Install All Optional Features
 
