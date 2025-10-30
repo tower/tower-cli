@@ -122,9 +122,9 @@ pip install "tower[iceberg]"
 ```
 
 Provides Apache Iceberg table support:
-
+- `tower.create_table`: Create Iceberg tables
+- `tower.load_table`: Load data from Iceberg tables
 - `tower.tables`: Access Iceberg table functionality
-- Create and load data from Iceberg tables
 
 #### dbt Core Support
 
