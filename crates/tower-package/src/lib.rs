@@ -643,7 +643,7 @@ mod test {
     #[tokio::test]
     async fn test_normalize_path() {
         let path = PathBuf::from(".").join("some").join("nested").join("path").join("to").join("file.txt");
-        let normalized = normalize_path(&path);
+        let normalized = normalize_path(&path).unwrap();
         assert_eq!(normalized, "some/nested/path/to/file.txt");
     }
 }
