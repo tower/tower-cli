@@ -547,8 +547,8 @@ fn should_ignore_file(p: &PathBuf) -> bool {
 }
 
 // normalize_path converts a Path to a normalized string with forward slashes as separators.
-fn normalize_path(path: &Path) -> String {
-    let mut components = Vec::new();
+fn normalize_path(path: &Path) -> Result<String, Error> {
+    let mut next = Vec::new();
     
     for component in path.components() {
         match component {
@@ -560,20 +560,21 @@ fn normalize_path(path: &Path) -> String {
                 // Skip "." components
             }
             Component::ParentDir => {
-                // Handle ".." by popping the last component if possible
-                if !components.is_empty() {
-                    components.pop();
+                // If the user is trying to navigate up but that's not possible, we'll just return
+                // an error here.
+                if !next.is_empty() {
+                    return Err(Error::InvalidPath);
                 }
             }
             Component::Normal(os_str) => {
                 if let Some(s) = os_str.to_str() {
-                    components.push(s.to_string());
+                    next.push(s.to_string());
                 }
             }
         }
     }
 
-    components.join("/")
+    Ok(next.join("/"))
 }
 
 fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<String, Error> {
@@ -582,7 +583,7 @@ fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<Stri
     let mut key_cache = HashMap::new();
 
     for key in path_hashes.keys() {
-        let normalized = normalize_path(&key);
+        let normalized = normalize_path(&key)?;
         key_cache.insert(normalized, key.clone());
     }
 
