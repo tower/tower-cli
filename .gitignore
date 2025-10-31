@@ -19,3 +19,5 @@ pytest.ini
 /scripts/openapi-generator-cli-*.jar
 
 .idea
+
+.DS_Store

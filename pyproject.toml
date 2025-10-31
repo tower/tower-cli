@@ -59,7 +59,8 @@ dependencies = [
 [project.optional-dependencies]
 ai = ["huggingface-hub==0.34.3", "ollama==0.5.3"]
 iceberg = ["polars==1.27.1", "pyarrow==19.0.1", "pyiceberg==0.9.1"]
-all = ["tower[ai,iceberg]"]
+dbt = ["dbt-core>=1.9,<1.10"] # Can not use dbt 1.10+ due to dependency conflicts
+all = ["tower[ai,iceberg,dbt]"]
 
 [tool.maturin]
 bindings = "bin"

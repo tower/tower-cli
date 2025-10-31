@@ -7,6 +7,7 @@ including running apps locally or in the Tower cloud.
 Optional features:
 - AI/LLM support: Install with `pip install "tower[ai]"`
 - Apache Iceberg support: Install with `pip install "tower[iceberg]"`
+- dbt Core support: Install with `pip install "tower[dbt]"`
 - All features: Install with `pip install "tower[all]"`
 """
 

@@ -122,9 +122,39 @@ pip install "tower[iceberg]"
 ```
 
 Provides Apache Iceberg table support:
-
 - `tower.create_table`: Create Iceberg tables
 - `tower.load_table`: Load data from Iceberg tables
+- `tower.tables`: Access Iceberg table functionality
+
+#### dbt Core Support
+
+```bash
+pip install "tower[dbt]"
+```
+
+Provides dbt Core integration for running dbt workflows:
+
+```python
+import tower
+
+# Configure and run a dbt workflow
+workflow = tower.dbt(
+    project_path="path/to/dbt_project",
+    profile_payload=tower.dbt.load_profile_from_env("DBT_PROFILE_YAML"),
+    commands="deps,seed,build",
+)
+
+results = workflow.run()
+```
+
+Available helper functions and classes:
+- `tower.dbt.load_profile_from_env()`: Load dbt profile from environment variables
+- `tower.dbt.parse_command_plan()`: Parse comma-separated commands into a command plan
+- `tower.dbt.DbtCommand`: Represents a dbt CLI command invocation
+- `tower.dbt.DbtRunnerConfig`: Low-level configuration class
+- `tower.dbt.run_dbt_workflow()`: Low-level execution function
+
+For a complete example, see the [dbt Core Ecommerce Analytics app](https://github.com/tower/tower-examples/tree/main/14-dbt-core-ecommerce-analytics).
 
 #### Install All Optional Features
 
