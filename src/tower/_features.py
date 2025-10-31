@@ -31,15 +31,19 @@ def get_package_version(pkg_name: str) -> Optional[str]:
 _feature_dependencies: Dict[str, List[str]] = {
     "ai": ["ollama", "huggingface_hub"],
     "iceberg": ["pyiceberg", "pyarrow", "polars"],
+    "dbt": ["dbt"],
 }
 
 # Cache for imported modules
 _module_cache: Dict[str, Any] = {}
 
 # Define feature modules and their exports
-_feature_modules: Dict[str, tuple[str, List[str]]] = {
-    "ai": ("_llms", ["llms"]),
-    "iceberg": ("_tables", ["tables"]),
+# Format: feature_name: (module_name, [export_names], export_type)
+# export_type can be "function" (return specific function) or "module" (return entire module)
+_feature_modules: Dict[str, tuple[str, List[str], str]] = {
+    "ai": ("_llms", ["llms"], "function"),
+    "iceberg": ("_tables", ["tables"], "function"),
+    "dbt": ("_dbt", ["dbt"], "function"),
 }
 
 
@@ -65,7 +69,7 @@ def get_available_features() -> Dict[str, Dict[str, Any]]:
             if get_package_version(pkg) is not None
         }
 
-        _, exports = _feature_modules.get(feature, ("", []))
+        _, exports, _ = _feature_modules.get(feature, ("", [], "function"))
 
         result[feature] = {
             "enabled": len(missing) == 0,
@@ -110,7 +114,7 @@ def override_get_attr(name: str) -> Any:
         AttributeError: If the attribute doesn't exist
     """
     # Check all feature mappings
-    for feature, (module_name, exports) in _feature_modules.items():
+    for feature, (module_name, exports, export_type) in _feature_modules.items():
         if name in exports:
             # Check if all dependencies are installed
             deps = _feature_dependencies.get(feature, [])
@@ -132,7 +136,12 @@ def override_get_attr(name: str) -> Any:
                     full_module_name, __package__
                 )
 
-            # Return the requested attribute from the cached module
-            return getattr(_module_cache[module_name], name)
+            # Return based on export type
+            if export_type == "module":
+                # Return the entire module
+                return _module_cache[module_name]
+            else:
+                # Return the specific attribute (function/class) from the module
+                return getattr(_module_cache[module_name], name)
 
     raise AttributeError(f"module 'tower' has no attribute '{name}'")
