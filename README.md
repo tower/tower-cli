@@ -181,6 +181,17 @@ print(tower.is_feature_enabled("ai"))
 
 Tower CLI includes an MCP (Model Context Protocol) server that allows AI assistants and editors to interact with your Tower account directly. The MCP server provides tools for managing apps, secrets, teams, and deployments.
 
+#### Prerequisites
+
+Before using the MCP server, ensure you're logged into Tower:
+
+```bash
+tower login
+```
+
+The MCP server will use your existing Tower CLI authentication and configuration.
+
+
 #### Available Tools
 
 The MCP server exposes the following tools:
@@ -216,7 +227,15 @@ The server will display a message showing the URL it's running on:
 SSE server running on http://127.0.0.1:34567
 ```
 
-#### Editor Configuration
+It's important to keep the terminal with the MCP server open until you're finished. Alternatively, you can launch it in the background with:
+
+``` bash
+tower mcp-server &
+```
+
+It's also important to be logged in. If you haven't already, you can open another terminal window and type `tower login` in order to open the login in a browser window.
+
+#### Client Configuration
 
 ##### Claude Code
 
@@ -254,44 +273,9 @@ Or manually, add this to your Cursor MCP settings (`mcp.json`):
 
 ```json
 {
-  "mcp.servers": {
+  "mcpServers": {
     "tower": {
-      "url": "http://127.0.0.1:34567/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
-
-##### Windsurf
-
-Configure in Windsurf settings:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "tower": {
-        "url": "http://127.0.0.1:34567/sse",
-        "transport": "sse"
-      }
-    }
-  }
-}
-```
-
-##### Zed
-
-Add to your Zed `settings.json`:
-
-```json
-{
-  "assistant": {
-    "mcp_servers": {
-      "tower": {
-        "url": "http://127.0.0.1:34567/sse",
-        "transport": "sse"
-      }
+      "url": "http://127.0.0.1:34567/sse"
     }
   }
 }
@@ -310,10 +294,24 @@ Alternatively, you can add the following to your `mcp.json`:
 
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "tower": {
-      "url": "http://127.0.0.1:34567/sse",
-      "transport": "sse"
+      "type": "sse",
+      "url": "http://127.0.0.1:34567/sse"
+    }
+  }
+}
+```
+
+##### Gemini CLI
+
+In your `settings.json`, add the following:
+
+``` json
+{
+  "mcpServers": {
+    "tower": {
+        "url": "http://127.0.0.1:34567/sse"
     }
   }
 }
