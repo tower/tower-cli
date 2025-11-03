@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.11'",
@@ -2698,12 +2698,8 @@ source = { editable = "." }
 dependencies = [
     { name = "attrs" },
     { name = "httpx" },
-    { name = "huggingface-hub" },
-    { name = "mcp", marker = "python_full_version >= '3.10'" },
-    { name = "ollama" },
     { name = "pydantic" },
     { name = "pydantic-core" },
-    { name = "pyiceberg" },
     { name = "python-dateutil" },
 ]
 
@@ -2742,7 +2738,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-env" },
     { name = "pytest-httpx" },
-    { name = "tower", extra = ["iceberg"] },
+    { name = "tower", extra = ["all"] },
 ]
 test = [
     { name = "aiohttp" },
@@ -2759,16 +2755,12 @@ requires-dist = [
     { name = "attrs", specifier = "==24.2.0" },
     { name = "dbt-core", marker = "extra == 'dbt'", specifier = ">=1.9,<1.10" },
     { name = "httpx", specifier = "==0.28.1" },
-    { name = "huggingface-hub", specifier = ">=0.34.3" },
-    { name = "huggingface-hub", marker = "extra == 'ai'", specifier = "==0.34.3" },
-    { name = "mcp", marker = "python_full_version >= '3.10'", specifier = ">=1.1.0" },
-    { name = "ollama", specifier = ">=0.5.3" },
-    { name = "ollama", marker = "extra == 'ai'", specifier = "==0.5.3" },
+    { name = "huggingface-hub", marker = "extra == 'ai'", specifier = ">=0.34.3" },
+    { name = "ollama", marker = "extra == 'ai'", specifier = ">=0.5.3" },
     { name = "polars", marker = "extra == 'iceberg'", specifier = "==1.27.1" },
     { name = "pyarrow", marker = "extra == 'iceberg'", specifier = "==19.0.1" },
     { name = "pydantic", specifier = ">=2.11.0,<3.0.0" },
     { name = "pydantic-core", specifier = ">=2.27.0,<3.0.0" },
-    { name = "pyiceberg", specifier = "==0.9.1" },
     { name = "pyiceberg", marker = "extra == 'iceberg'", specifier = "==0.9.1" },
     { name = "python-dateutil", specifier = "==2.9.0.post0" },
     { name = "tower", extras = ["ai", "iceberg", "dbt"], marker = "extra == 'all'", editable = "." },
@@ -2788,7 +2780,7 @@ dev = [
     { name = "pytest", specifier = "==8.3.5" },
     { name = "pytest-env", specifier = ">=1.1.3" },
     { name = "pytest-httpx", specifier = "==0.35.0" },
-    { name = "tower", extras = ["iceberg"], editable = "." },
+    { name = "tower", extras = ["all"], editable = "." },
 ]
 test = [
     { name = "aiohttp", specifier = "==3.10.11" },
