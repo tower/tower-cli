@@ -21,3 +21,6 @@ pytest.ini
 .idea
 
 .DS_Store
+
+# from nix builds
+/result
