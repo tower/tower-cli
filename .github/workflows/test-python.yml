@@ -38,5 +38,8 @@ jobs:
       - name: Check Python formatting with Black
         run: uv run --group dev black --check --diff .
 
+      - name: Check types with mypy
+        run: uv run --group dev mypy src/tower/__init__.py --no-error-summary
+
       - name: Run tests
         run: uv run pytest tests
