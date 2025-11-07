@@ -122,9 +122,39 @@ pip install "tower[iceberg]"
 ```
 
 Provides Apache Iceberg table support:
-
 - `tower.create_table`: Create Iceberg tables
 - `tower.load_table`: Load data from Iceberg tables
+- `tower.tables`: Access Iceberg table functionality
+
+#### dbt Core Support
+
+```bash
+pip install "tower[dbt]"
+```
+
+Provides dbt Core integration for running dbt workflows:
+
+```python
+import tower
+
+# Configure and run a dbt workflow
+workflow = tower.dbt(
+    project_path="path/to/dbt_project",
+    profile_payload=tower.dbt.load_profile_from_env("DBT_PROFILE_YAML"),
+    commands="deps,seed,build",
+)
+
+results = workflow.run()
+```
+
+Available helper functions and classes:
+- `tower.dbt.load_profile_from_env()`: Load dbt profile from environment variables
+- `tower.dbt.parse_command_plan()`: Parse comma-separated commands into a command plan
+- `tower.dbt.DbtCommand`: Represents a dbt CLI command invocation
+- `tower.dbt.DbtRunnerConfig`: Low-level configuration class
+- `tower.dbt.run_dbt_workflow()`: Low-level execution function
+
+For a complete example, see the [dbt Core Ecommerce Analytics app](https://github.com/tower/tower-examples/tree/main/14-dbt-core-ecommerce-analytics).
 
 #### Install All Optional Features
 
@@ -150,6 +180,17 @@ print(tower.is_feature_enabled("ai"))
 ### MCP Server Integration
 
 Tower CLI includes an MCP (Model Context Protocol) server that allows AI assistants and editors to interact with your Tower account directly. The MCP server provides tools for managing apps, secrets, teams, and deployments.
+
+#### Prerequisites
+
+Before using the MCP server, ensure you're logged into Tower:
+
+```bash
+tower login
+```
+
+The MCP server will use your existing Tower CLI authentication and configuration.
+
 
 #### Available Tools
 
@@ -186,7 +227,15 @@ The server will display a message showing the URL it's running on:
 SSE server running on http://127.0.0.1:34567
 ```
 
-#### Editor Configuration
+It's important to keep the terminal with the MCP server open until you're finished. Alternatively, you can launch it in the background with:
+
+``` bash
+tower mcp-server &
+```
+
+It's also important to be logged in. If you haven't already, you can open another terminal window and type `tower login` in order to open the login in a browser window.
+
+#### Client Configuration
 
 ##### Claude Code
 
@@ -196,7 +245,7 @@ Add the Tower MCP server to Claude Code using SSE transport:
 claude mcp add tower http://127.0.0.1:34567/sse --transport sse
 ```
 
-Or using JSON configuration with SSE:
+Or with the JSON configuration directly:
 
 ```json
 {
@@ -213,48 +262,20 @@ For custom ports, adjust the URL accordingly (e.g., `http://127.0.0.1:8080/sse`)
 
 ##### Cursor
 
-Add this to your Cursor settings (`settings.json`):
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=tower&config=eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjM0NTY3L3NzZSJ9)
+
+If that doesn't work, try opening the following link in your browser or in your terminal with `open` on macOS, or `xdg-open` on Linux: 
+```
+cursor://anysphere.cursor-deeplink/mcp/install?name=tower&config=eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjM0NTY3L3NzZSJ9
+```
+
+Or manually, add this to your Cursor MCP settings (`mcp.json`):
 
 ```json
 {
-  "mcp.servers": {
+  "mcpServers": {
     "tower": {
-      "url": "http://127.0.0.1:34567/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
-
-##### Windsurf
-
-Configure in Windsurf settings:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "tower": {
-        "url": "http://127.0.0.1:34567/sse",
-        "transport": "sse"
-      }
-    }
-  }
-}
-```
-
-##### Zed
-
-Add to your Zed `settings.json`:
-
-```json
-{
-  "assistant": {
-    "mcp_servers": {
-      "tower": {
-        "url": "http://127.0.0.1:34567/sse",
-        "transport": "sse"
-      }
+      "url": "http://127.0.0.1:34567/sse"
     }
   }
 }
@@ -262,28 +283,39 @@ Add to your Zed `settings.json`:
 
 ##### VS Code
 
-For VS Code with MCP extensions, add to your `settings.json`:
+In VS Code, first you should enable MCP integrations by setting `Chat>MCP:Enabled` to true in your settings.
+
+For adding the server, you can try copying and pasting the following link into your URL bar:
+```
+vscode:mcp/install?%7B%22name%22%3A%22tower%22%2C%22type%22%3A%22sse%22%2C%22url%22%3A%22http%3A%2F%2F127.0.0.1%3A34567%2Fsse%22%7D
+```
+
+Alternatively, you can add the following to your `mcp.json`:
 
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "tower": {
-      "url": "http://127.0.0.1:34567/sse",
-      "transport": "sse"
+      "type": "sse",
+      "url": "http://127.0.0.1:34567/sse"
     }
   }
 }
 ```
 
-#### Prerequisites
+##### Gemini CLI
 
-Before using the MCP server, ensure you're logged into Tower:
+In your `settings.json`, add the following:
 
-```bash
-tower login
+``` json
+{
+  "mcpServers": {
+    "tower": {
+        "url": "http://127.0.0.1:34567/sse"
+    }
+  }
+}
 ```
-
-The MCP server will use your existing Tower CLI authentication and configuration.
 
 ### About the runtime environment
 

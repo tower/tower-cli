@@ -7,8 +7,11 @@ including running apps locally or in the Tower cloud.
 Optional features:
 - AI/LLM support: Install with `pip install "tower[ai]"`
 - Apache Iceberg support: Install with `pip install "tower[iceberg]"`
+- dbt Core support: Install with `pip install "tower[dbt]"`
 - All features: Install with `pip install "tower[all]"`
 """
+
+from typing import TYPE_CHECKING
 
 from ._client import (
     run_app,
@@ -18,8 +21,13 @@ from ._client import (
 
 from ._features import override_get_attr, get_available_features, is_feature_enabled
 
+if TYPE_CHECKING:
+    from ._tables import tables as tables
+    from ._llms import llms as llms
+    from ._dbt import dbt as dbt
 
-def __getattr__(name: str) -> any:
+
+def __getattr__(name: str):
     """
     Dynamic attribute lookup for optional features.
 

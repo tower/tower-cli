@@ -19,3 +19,8 @@ pytest.ini
 /scripts/openapi-generator-cli-*.jar
 
 .idea
+
+.DS_Store
+
+# from nix builds
+/result

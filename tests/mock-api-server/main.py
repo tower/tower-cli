@@ -260,7 +260,11 @@ async def describe_run(name: str, seq: int):
             now_time = datetime.datetime.now()
             elapsed = (now_time - created_time).total_seconds()
 
-            if elapsed > 5:  # After 5 seconds, mark as completed
+            # For logs-after-completion test apps, complete quickly to test log draining
+            # Use 1 second so CLI has time to start streaming before completion
+            completion_threshold = 1.0 if "logs-after-completion" in name else 5.0
+
+            if elapsed > completion_threshold:
                 run_data["status"] = "exited"
                 run_data["status_group"] = "successful"
                 run_data["exit_code"] = 0
@@ -449,23 +453,60 @@ async def refresh_session(refresh_params: Dict[str, Any] = None):
     }
 
 
+NORMAL_LOG_ENTRIES = [
+    (1, "Starting application...", "2025-08-22T12:00:00Z"),
+    (2, "Hello, World!", "2025-08-22T12:00:01Z"),
+    (3, "Application completed successfully", "2025-08-22T12:00:02Z"),
+]
+
+
+def make_log_data(seq: int, line_num: int, content: str, timestamp: str):
+    return {
+        "channel": "program",
+        "content": content,
+        "line_num": line_num,
+        "reported_at": timestamp,
+        "run_id": f"mock-run-{seq}",
+    }
+
+
+def make_log_event(seq: int, line_num: int, content: str, timestamp: str):
+    return f"event: log\ndata: {json.dumps(make_log_data(seq, line_num, content, timestamp))}\n\n"
+
+
 @app.get("/v1/apps/{name}/runs/{seq}/logs")
 async def describe_run_logs(name: str, seq: int):
     """Mock endpoint for getting run logs."""
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
-    # Return mock log entries
     return {
         "log_lines": [
-            {"timestamp": "2025-08-22T12:00:00Z", "message": "Starting application..."},
-            {"timestamp": "2025-08-22T12:00:01Z", "message": "Hello, World!"},
-            {
-                "timestamp": "2025-08-22T12:00:02Z",
-                "message": "Application completed successfully",
-            },
+            make_log_data(seq, line_num, content, timestamp)
+            for line_num, content, timestamp in NORMAL_LOG_ENTRIES
         ]
     }
+
+
+async def generate_logs_after_completion_test_stream(seq: int):
+    """Log before run completion, then log after.
+
+    Timeline: Run completes at 1 second, second log sent at 1.5 seconds.
+    """
+    yield make_log_event(
+        seq, 1, "First log before run completes", "2025-08-22T12:00:00Z"
+    )
+    await asyncio.sleep(1.5)
+    yield make_log_event(
+        seq, 2, "Second log after run completes", "2025-08-22T12:00:01Z"
+    )
+
+
+async def generate_normal_log_stream(seq: int):
+    """Normal log stream for regular tests."""
+    for line_num, content, timestamp in NORMAL_LOG_ENTRIES:
+        yield make_log_event(seq, line_num, content, timestamp)
+        await asyncio.sleep(0.1)
 
 
 @app.get("/v1/apps/{name}/runs/{seq}/logs/stream")
@@ -475,32 +516,13 @@ async def stream_run_logs(name: str, seq: int):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
-    async def generate_log_stream():
-        # Simulate streaming logs with proper SSE format for Tower CLI
-        mock_logs = [
-            {"timestamp": "2025-08-22T12:00:00Z", "content": "Starting application..."},
-            {"timestamp": "2025-08-22T12:00:01Z", "content": "Hello, World!"},
-            {
-                "timestamp": "2025-08-22T12:00:02Z",
-                "content": "Application completed successfully",
-            },
-        ]
-
-        for i, log_entry in enumerate(mock_logs):
-            # Format as RunLogLine structure expected by CLI
-            log_data = {
-                "channel": "program",
-                "content": log_entry["content"],
-                "line_num": i + 1,
-                "reported_at": log_entry["timestamp"],
-                "run_id": f"mock-run-{seq}",
-            }
-            # Proper SSE format with event type and data
-            yield f"event: log\ndata: {json.dumps(log_data)}\n\n"
-            await asyncio.sleep(0.1)  # Small delay between logs
+    if "logs-after-completion" in name:
+        stream = generate_logs_after_completion_test_stream(seq)
+    else:
+        stream = generate_normal_log_stream(seq)
 
     return StreamingResponse(
-        generate_log_stream(),
+        stream,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )

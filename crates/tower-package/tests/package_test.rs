@@ -53,7 +53,7 @@ async fn it_creates_package() {
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, Some(2));
+    assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
 
     let package_file_path = package.package_file_path.clone().unwrap();
@@ -95,7 +95,7 @@ async fn it_respects_complex_file_globs() {
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, Some(2));
+    assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
     assert_eq!(
         package.manifest.schedule,
@@ -257,7 +257,7 @@ async fn it_packages_import_paths() {
 
     let package = Package::build(spec).await.expect("Failed to build package");
 
-    assert_eq!(package.manifest.version, Some(2));
+    assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
     assert_eq!(package.manifest.schedule, None);
 

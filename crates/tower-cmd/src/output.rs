@@ -17,25 +17,44 @@ use tower_telemetry::debug;
 
 const BANNER_TEXT: &str = include_str!("./banner.txt");
 
-static CAPTURE_MODE: OnceLock<bool> = OnceLock::new();
-static JSON_MODE: OnceLock<bool> = OnceLock::new();
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputMode {
+    /// Normal CLI output with colors and formatting
+    Normal,
+    /// JSON output mode
+    Json,
+    /// MCP server with stdio transport (no notifications, capture output)
+    McpStdio,
+    /// MCP server with streaming transport like SSE/HTTP (send notifications)
+    McpStreaming,
+}
+
+impl OutputMode {
+    pub fn is_mcp(self) -> bool {
+        matches!(self, Self::McpStdio | Self::McpStreaming)
+    }
+
+    pub fn is_json(self) -> bool {
+        matches!(self, Self::Json)
+    }
+
+    pub fn is_normal(self) -> bool {
+        matches!(self, Self::Normal)
+    }
+}
+
+static OUTPUT_MODE: OnceLock<OutputMode> = OnceLock::new();
 static CURRENT_SENDER: Mutex<Option<UnboundedSender<String>>> = Mutex::new(None);
 
-pub fn set_capture_mode() {
-    CAPTURE_MODE.set(true).ok();
-    control::set_override(false);
+pub fn set_output_mode(mode: OutputMode) {
+    OUTPUT_MODE.set(mode).ok();
+    if mode.is_mcp() {
+        control::set_override(false);
+    }
 }
 
-pub fn is_capture_mode_set() -> bool {
-    CAPTURE_MODE.get().is_some()
-}
-
-pub fn set_json_mode() {
-    JSON_MODE.set(true).ok();
-}
-
-pub fn is_json_mode_set() -> bool {
-    JSON_MODE.get().is_some()
+pub fn get_output_mode() -> OutputMode {
+    OUTPUT_MODE.get().copied().unwrap_or(OutputMode::Normal)
 }
 
 pub fn set_current_sender(sender: UnboundedSender<String>) {
@@ -70,7 +89,7 @@ pub fn success(msg: &str) {
 }
 
 pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
-    if is_json_mode_set() {
+    if get_output_mode().is_json() {
         let mut response = serde_json::json!({
             "result": "success",
             "message": msg
@@ -86,7 +105,6 @@ pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
         write(&line);
     }
 }
-
 
 pub enum LogLineType {
     Remote,
@@ -107,6 +125,11 @@ fn format_timestamp(timestamp: &str, t: LogLineType) -> String {
 pub fn log_line(timestamp: &str, message: &str, t: LogLineType) {
     let line = format!("{} {}\n", format_timestamp(timestamp, t), message);
     write(&line);
+}
+
+pub fn remote_log_event(log: &tower_api::models::RunLogLine) {
+    let ts = crate::util::dates::format_str(&log.reported_at);
+    log_line(&ts, &log.content, LogLineType::Remote);
 }
 
 pub fn package_error(err: tower_package::Error) {
@@ -183,7 +206,7 @@ pub fn config_error(err: config::Error) {
 }
 
 pub fn write(msg: &str) {
-    if is_capture_mode_set() {
+    if get_output_mode().is_mcp() {
         let clean_msg = msg.trim_end().to_string();
         send_to_current_sender(clean_msg);
     } else {
@@ -192,7 +215,7 @@ pub fn write(msg: &str) {
 }
 
 pub fn error(msg: &str) {
-    if is_json_mode_set() {
+    if get_output_mode().is_json() {
         let response = serde_json::json!({
             "result": "error",
             "message": msg
@@ -297,7 +320,7 @@ pub fn tower_error<T>(err: ApiError<T>) {
 }
 
 pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_data: Option<&T>) {
-    if is_json_mode_set() {
+    if get_output_mode().is_json() {
         if let Some(data) = json_data {
             json(data);
         } else {
@@ -333,7 +356,7 @@ pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_da
 }
 
 pub fn list<T: Serialize>(items: Vec<String>, json_data: Option<&T>) {
-    if is_json_mode_set() {
+    if get_output_mode().is_json() {
         if let Some(data) = json_data {
             json(data);
         } else {
@@ -360,14 +383,14 @@ pub struct Spinner {
 
 impl Spinner {
     pub fn new(msg: String) -> Spinner {
-        if is_capture_mode_set() || is_json_mode_set() {
-            Spinner { spinner: None, msg }
-        } else {
+        if get_output_mode().is_normal() {
             let spinner = spinners::Spinner::new(spinners::Spinners::Dots, msg.clone());
             Spinner {
                 spinner: Some(spinner),
                 msg,
             }
+        } else {
+            Spinner { spinner: None, msg }
         }
     }
 
@@ -375,7 +398,7 @@ impl Spinner {
         if let Some(ref mut spinner) = self.spinner {
             let sym = "✔".bold().green().to_string();
             spinner.stop_and_persist(&sym, format!("{} Done!", self.msg));
-        } else if is_capture_mode_set() {
+        } else if get_output_mode().is_mcp() {
             send_to_current_sender(format!("{} Done!", self.msg));
         }
     }
@@ -384,7 +407,7 @@ impl Spinner {
         if let Some(ref mut spinner) = self.spinner {
             let sym = "✘".bold().red().to_string();
             spinner.stop_and_persist(&sym, format!("{} Failed!", self.msg));
-        } else if is_capture_mode_set() {
+        } else if get_output_mode().is_mcp() {
             send_to_current_sender(format!("{} Failed!", self.msg));
         }
     }
@@ -407,7 +430,9 @@ pub fn write_update_message(latest: &str, current: &str) {
         "To upgrade, run: pip install --upgrade tower".yellow()
     );
 
-    write(&line);
+    // Always write version check messages to stderr to avoid polluting stdout
+    use std::io::{self, Write};
+    io::stderr().write_all(line.as_bytes()).unwrap();
 }
 
 /// newline just outputs a newline. This is useful when you have a very specific formatting you

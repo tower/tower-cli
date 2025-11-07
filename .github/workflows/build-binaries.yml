@@ -254,7 +254,7 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip python3-venv python3-dev cargo
+            apt-get install -y --no-install-recommends python3 python3-pip python3-venv python3-dev cargo libffi-dev
             pip3 install -U pip
           # Create and use a virtual environment to avoid the externally-managed-environment error
           run: |
