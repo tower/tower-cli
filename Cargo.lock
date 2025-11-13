@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "chrono",
  "clap",
@@ -586,7 +586,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypto"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -3214,7 +3214,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "pem",
  "rsa",
@@ -3484,7 +3484,7 @@ checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "tower"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "tokio",
  "tower-api",
@@ -3509,7 +3509,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "reqwest",
  "serde",
@@ -3521,7 +3521,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "axum",
  "bytes",
@@ -3591,7 +3591,7 @@ checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
 
 [[package]]
 name = "tower-package"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "async-compression",
  "config",
@@ -3610,7 +3610,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "chrono",
  "config",
@@ -3631,7 +3631,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tower-telemetry"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "tracing",
  "tracing-appender",
@@ -3640,7 +3640,7 @@ dependencies = [
 
 [[package]]
 name = "tower-uv"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "async-compression",
  "async_zip",
@@ -3654,7 +3654,7 @@ dependencies = [
 
 [[package]]
 name = "tower-version"
-version = "0.3.33"
+version = "0.3.34"
 dependencies = [
  "anyhow",
  "chrono",
