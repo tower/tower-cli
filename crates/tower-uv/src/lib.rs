@@ -48,6 +48,17 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         // needs it to initialize it's random number generator. Fun fact!
         let systemroot = std::env::var("SYSTEMROOT").unwrap_or_default();
         env_vars.insert("SYSTEMROOT".to_string(), systemroot);
+
+        // We also need to bring along the TEMP environment variable because Python needs it for
+        // things like creating temporary files, etc.
+        let temp = std::env::var("TEMP").unwrap_or_default();
+        env_vars.insert("TEMP".to_string(), temp);
+
+        // Apparently, according to some random person on Stack Overflow, sometimes the var can be
+        // TEMP and sometimes it can be TMP. So uh...let's just grab both just in case.
+        let tmp = std::env::var("TMP").unwrap_or_default();
+        env_vars.insert("TMP".to_string(), tmp);
+
         return env_vars;
     }
 
