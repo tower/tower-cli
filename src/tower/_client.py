@@ -74,6 +74,7 @@ def run_app(
     ctx = TowerContext.build()
     client = _env_client(ctx)
     run_params = RunAppParamsParameters()
+    parent_run_id = ctx.run_id
 
     if not environment:
         environment = ctx.environment
@@ -84,6 +85,7 @@ def run_app(
     input_body = RunAppParams(
         environment=environment,
         parameters=run_params,
+        parent_run_id=parent_run_id,
     )
 
     try:
