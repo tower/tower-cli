@@ -166,15 +166,24 @@ where
 
     // Monitor app output and status concurrently
     let app = launcher.app.unwrap();
-    let status_task = tokio::spawn(monitor_status(app));
+    let status_task = tokio::spawn(monitor_local_status(app));
 
     // Wait for both tasks to complete
     let final_result = output_task.await.unwrap();
-    let status_result = status_task.await;
+    let status_result = status_task.await.unwrap();
 
     // And if we crashed, err out
-    if let Ok(Status::Crashed { .. }) = status_result {
-        return Err(Error::AppCrashed);
+    match status_result {
+        Status::Exited => output::success("Your local run exited cleanly."),
+        Status::Crashed { .. } => {
+            output::error("Your local run crashed!");
+            return Err(Error::AppCrashed);
+        }
+        _ => {
+            debug!("Unexpected status after monitoring: {:?}", status_result);
+            output::error("An unexpected error occurred while monitoring your local run status!");
+            return Err(Error::AppCrashed);
+        }
     }
 
     Ok(final_result)
@@ -536,14 +545,16 @@ async fn monitor_output(mut output: OutputReceiver) {
     }
 }
 
-/// monitor_status is a helper function that will monitor the status of a given app and waits for
+/// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_status(app: LocalApp) -> Status {
+async fn monitor_local_status(app: LocalApp) -> Status {
     debug!("Starting status monitoring for LocalApp");
     let mut check_count = 0;
-    let max_checks = 600; // 60 seconds with 100ms intervals
+    let mut err_count = 0;
 
     loop {
+        check_count += 1;
+
         debug!(
             "Status check #{}, attempting to get app status",
             check_count
@@ -551,44 +562,37 @@ async fn monitor_status(app: LocalApp) -> Status {
 
         match app.status().await {
             Ok(status) => {
-                debug!("Got app status (some status)");
                 match status {
                     tower_runtime::Status::Exited => {
-                        debug!("App exited cleanly, stopping status monitoring");
-                        output::success("Your app exited cleanly.");
+                        debug!("Run exited cleanly, stopping status monitoring");
+
+                        // We're done. Exit this loop and function.
                         return status;
                     }
                     tower_runtime::Status::Crashed { .. } => {
-                        debug!("App crashed, stopping status monitoring");
-                        output::error("Your app crashed!");
+                        debug!("Run crashed, stopping status monitoring");
+
+                        // We're done. Exit this loop and function.
                         return status;
                     }
                     _ => {
                         debug!("App status: other, continuing to monitor");
-                        check_count += 1;
-                        if check_count >= max_checks {
-                            debug!("Status monitoring timed out after {} checks", max_checks);
-                            output::error(
-                                "App status monitoring timed out, but app may still be running",
-                            );
-                            return tower_runtime::Status::Running; // Return a default status for timeout
-                        }
                         sleep(Duration::from_millis(100)).await;
-                        continue;
                     }
                 }
             }
             Err(e) => {
                 debug!("Failed to get app status: {:?}", e);
-                check_count += 1;
-                if check_count >= max_checks {
-                    debug!(
-                        "Failed to get app status after {} attempts, giving up",
-                        max_checks
-                    );
-                    output::error("Failed to get app status after timeout");
-                    return tower_runtime::Status::Running; // Return a default status for timeout
+                err_count += 1;
+
+                // If we get five errors in a row, we abandon monitoring.
+                if err_count >= 5{
+                    debug!("Failed to get app status after 5 attempts, giving up");
+                    output::error("An error occured while monitoring your local run status!");
+                    return tower_runtime::Status::Crashed { code: -1 }
                 }
+
+                // Otherwise, keep on keepin' on.
                 sleep(Duration::from_millis(100)).await;
             }
         }
