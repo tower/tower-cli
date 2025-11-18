@@ -562,6 +562,9 @@ async fn monitor_local_status(app: LocalApp) -> Status {
 
         match app.status().await {
             Ok(status) => {
+                // We reset the error count to indicate that we can intermittently get statuses.
+                err_count = 0;
+
                 match status {
                     tower_runtime::Status::Exited => {
                         debug!("Run exited cleanly, stopping status monitoring");
