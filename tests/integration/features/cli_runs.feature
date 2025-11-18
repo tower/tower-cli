@@ -13,7 +13,7 @@ Feature: CLI Run Commands
     When I run "tower run --local" via CLI
     Then timestamps should be green colored
     And each log line should be on a separate line
-    And the final status should show "Your app crashed!" in red
+    And the final status should show "Your local run crashed!" in red
 
   Scenario: CLI remote run should show detailed validation errors
     Given I have a valid Towerfile in the current directory
