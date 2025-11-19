@@ -140,8 +140,6 @@ impl Uv {
 
         let child = cmd.spawn()?;
 
-        
-
         Ok(child)
     }
 
@@ -242,9 +240,7 @@ impl Uv {
             .arg("never")
             .arg("--no-progress")
             .arg("run")
-            .arg(program)
-            .envs(env_vars);
-
+            .arg(program);
             
         #[cfg(unix)]
         {
@@ -254,6 +250,9 @@ impl Uv {
         if self.protected_mode {
             cmd.env_clear();
         }
+
+        // Need to do this after env_clear intentionally.
+        cmd.envs(env_vars);
 
         if let Some(dir) = &self.cache_dir {
             cmd.arg("--cache-dir").arg(dir);
