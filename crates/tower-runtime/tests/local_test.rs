@@ -56,6 +56,7 @@ async fn test_running_hello_world() {
         secrets: HashMap::new(),
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir())
     };
 
     // Start the app using the LocalApp runtime
@@ -100,6 +101,7 @@ async fn test_running_use_faker() {
         secrets: HashMap::new(),
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir()),
     };
 
     // Start the app using the LocalApp runtime
@@ -151,6 +153,7 @@ async fn test_running_legacy_app() {
         secrets: HashMap::new(),
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir())
     };
 
     // Start the app using the LocalApp runtime
@@ -210,6 +213,9 @@ async fn test_running_app_with_secret() {
         secrets: secrets,
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
+
+        // NOTE: No cache dir indicates that we want to run in protected mode.
+        cache_dir: None,
     };
 
     // Start the app using the LocalApp runtime
