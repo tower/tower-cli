@@ -97,14 +97,19 @@ pub struct Uv {
 
     // cache_dir is the directory that dependencies should be cached in.
     cache_dir: Option<PathBuf>,
+
+    // protected_mode is a flag that indicates whether the UV instance is in protected mode.
+    // In protected mode, the UV instance do things like clear the environment variables before
+    // use, etc.
+    protected_mode: bool,
 }
 
 impl Uv {
-    pub async fn new(cache_dir: Option<PathBuf>) -> Result<Self, Error> {
+    pub async fn new(cache_dir: Option<PathBuf>, protected_mode: bool) -> Result<Self, Error> {
         match install::find_or_setup_uv().await {
             Ok(uv_path) => {
                 test_uv_path(&uv_path).await?;
-                Ok(Uv { uv_path, cache_dir })
+                Ok(Uv { uv_path, cache_dir, protected_mode })
             }
             Err(e) => {
                 debug!("Error setting up UV: {:?}", e);
@@ -238,12 +243,16 @@ impl Uv {
             .arg("--no-progress")
             .arg("run")
             .arg(program)
-            .env_clear()
             .envs(env_vars);
 
+            
         #[cfg(unix)]
         {
             cmd.process_group(0);
+        }
+
+        if self.protected_mode {
+            cmd.env_clear();
         }
 
         if let Some(dir) = &self.cache_dir {

@@ -178,7 +178,10 @@ async fn execute_local_app(
 
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     } else {
-        let uv = Uv::new(opts.cache_dir).await?;
+        // we put Uv in to protected mode when there's no caching configured/enabled.
+        let protected_mode = opts.cache_dir.is_none();
+
+        let uv = Uv::new(opts.cache_dir, protected_mode).await?;
         let env_vars = make_env_vars(
             &ctx,
             &environment,
