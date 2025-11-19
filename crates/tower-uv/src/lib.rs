@@ -39,11 +39,22 @@ impl From<install::Error> for Error {
 }
 
 fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, String> {
+    // we copy this locally so we can mutate the results.
+    let mut env_vars = env_vars.clone();
+
+    // Copy the PATH across so that the child process can find tools/binaries already installed
+    // on the host system.
+    let path = std::env::var("PATH").unwrap_or_default();
+    env_vars.insert("PATH".to_string(), path);
+
+    // This special hack helps us support Sling. The user needs to specify exactly where the Sling
+    // binary is installed using the SLING_BINARY environment variable such that we don't have to
+    // download the Sling binary every single time.
+    let sling_binary = std::env::var("SLING_BINARY").unwrap_or_default();
+    env_vars.insert("SLING_BINARY".to_string(), sling_binary);
+
     #[cfg(windows)]
     {
-        // we copy this locally so we can mutate the results.
-        let mut env_vars = env_vars.clone();
-
         // If we are running on Windows, we need to retain the SYSTEMROOT env var because Python
         // needs it to initialize it's random number generator. Fun fact!
         let systemroot = std::env::var("SYSTEMROOT").unwrap_or_default();
@@ -57,17 +68,10 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         // Apparently, according to some random person on Stack Overflow, sometimes the var can be
         // TEMP and sometimes it can be TMP. So uh...let's just grab both just in case.
         let tmp = std::env::var("TMP").unwrap_or_default();
-        env_vars.insert("TMP".to_string(), tmp);
-
-        return env_vars;
+        env_vars.insert("TMP".to_string(), tmp);        
     }
 
-    #[cfg(not(windows))]
-    {
-        // On non-Windows platforms, we can just return the env vars as-is. We have to do this
-        // clone thing to get rid fo the lifetime issues.
-        return env_vars.clone();
-    }
+    env_vars
 }
 
 async fn test_uv_path(path: &PathBuf) -> Result<(), Error> {

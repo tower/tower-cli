@@ -107,16 +107,16 @@ def step_final_crash_status_should_show_error(context):
     assert "Error:" in output, f"Expected 'Error:' in crash message, got: {output}"
 
 
-@step('the final status should show "Your app crashed!" in red')
+@step('the final status should show "Your local run crashed!" in red')
 def step_final_status_should_show_crashed_in_red(context):
-    """Verify local run shows 'Your app crashed!' in red"""
+    """Verify local run shows 'Your local run crashed!' in red"""
     output = context.cli_output
     assert (
         red_color_code in output
     ), f"Expected red color codes in output, got: {output}"
     assert (
-        "Your app crashed!" in output
-    ), f"Expected 'Your app crashed!' message, got: {output}"
+        "Your local run crashed!" in output
+    ), f"Expected 'Your local run crashed!' message, got: {output}"
 
 
 @step('the output should show "{expected_text}"')

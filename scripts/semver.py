@@ -166,14 +166,14 @@ def replace_line_with_regex(file_path, pattern, replace_text):
 
 
 def update_cargo_file(version):
-    pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
+    pattern = re.compile(r'^\s*version\s*=\s*".*"\n*', re.MULTILINE)
     replace_line_with_regex(
         "Cargo.toml", pattern, f'version = "{version.to_tag_string()}"'
     )
 
 
 def update_pyproject_file(version):
-    pattern = re.compile(r'^\s*version\s*=\s*".*"$', re.MULTILINE)
+    pattern = re.compile(r'^\s*version\s*=\s*".*"\n*', re.MULTILINE)
     replace_line_with_regex(
         "pyproject.toml", pattern, f'version = "{version.to_python_string()}"'
     )
