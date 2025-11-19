@@ -94,14 +94,22 @@ async fn test_uv_path(path: &PathBuf) -> Result<(), Error> {
 
 pub struct Uv {
     pub uv_path: PathBuf,
+
+    // cache_dir is the directory that dependencies should be cached in.
+    cache_dir: Option<PathBuf>,
+
+    // protected_mode is a flag that indicates whether the UV instance is in protected mode.
+    // In protected mode, the UV instance do things like clear the environment variables before
+    // use, etc.
+    protected_mode: bool,
 }
 
 impl Uv {
-    pub async fn new() -> Result<Self, Error> {
+    pub async fn new(cache_dir: Option<PathBuf>, protected_mode: bool) -> Result<Self, Error> {
         match install::find_or_setup_uv().await {
             Ok(uv_path) => {
                 test_uv_path(&uv_path).await?;
-                Ok(Uv { uv_path })
+                Ok(Uv { uv_path, cache_dir, protected_mode })
             }
             Err(e) => {
                 debug!("Error setting up UV: {:?}", e);
@@ -117,15 +125,20 @@ impl Uv {
     ) -> Result<Child, Error> {
         debug!("Executing UV ({:?}) venv in {:?}", &self.uv_path, cwd);
 
-        let child = Command::new(&self.uv_path)
-            .kill_on_drop(true)
+        let mut cmd = Command::new(&self.uv_path);
+        cmd.kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .current_dir(cwd)
             .arg("venv")
-            .envs(env_vars)
-            .spawn()?;
+            .envs(env_vars);
+
+        if let Some(dir) = &self.cache_dir {
+            cmd.arg("--cache-dir").arg(dir);
+        }
+
+        let child = cmd.spawn()?;
 
         Ok(child)
     }
@@ -156,6 +169,10 @@ impl Uv {
                 cmd.process_group(0);
             }
 
+            if let Some(dir) = &self.cache_dir {
+                cmd.arg("--cache-dir").arg(dir);
+            }
+
             let child = cmd.spawn()?;
 
             Ok(child)
@@ -183,6 +200,10 @@ impl Uv {
             #[cfg(unix)]
             {
                 cmd.process_group(0);
+            }
+
+            if let Some(dir) = &self.cache_dir {
+                cmd.arg("--cache-dir").arg(dir);
             }
 
             let child = cmd.spawn()?;
@@ -219,13 +240,22 @@ impl Uv {
             .arg("never")
             .arg("--no-progress")
             .arg("run")
-            .arg(program)
-            .env_clear()
-            .envs(env_vars);
-
+            .arg(program);
+            
         #[cfg(unix)]
         {
             cmd.process_group(0);
+        }
+
+        if self.protected_mode {
+            cmd.env_clear();
+        }
+
+        // Need to do this after env_clear intentionally.
+        cmd.envs(env_vars);
+
+        if let Some(dir) = &self.cache_dir {
+            cmd.arg("--cache-dir").arg(dir);
         }
 
         let child = cmd.spawn()?;
