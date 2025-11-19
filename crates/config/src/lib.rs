@@ -23,7 +23,7 @@ pub struct Config {
     pub session: Option<Session>,
 
     // cache_dir is the directory that we should cache uv artifacts within.
-    pub cache_dir: PathBuf,
+    pub cache_dir: Option<PathBuf>,
 }
 
 impl Config {
@@ -33,7 +33,7 @@ impl Config {
             tower_url: default_tower_url(),
             json: false,
             session: None,
-            cache_dir: default_cache_dir(),
+            cache_dir: Some(default_cache_dir()),
         }
     }
 
@@ -50,7 +50,7 @@ impl Config {
             tower_url,
             json: false,
             session: None,
-            cache_dir: default_cache_dir(),
+            cache_dir: Some(default_cache_dir()),
         }
     }
 
@@ -78,7 +78,7 @@ impl Config {
             tower_url: sess.tower_url.clone(),
             json: self.json,
             session: Some(sess),
-            cache_dir: default_cache_dir(),
+            cache_dir: Some(default_cache_dir()),
         }
     }
 
@@ -208,9 +208,9 @@ impl From<&Config> for Configuration {
     }
 }
 
+// default_cache_dir gets the path the default cache location for dependencies, etc. Note 
+// that you don't have to create underlying directory, uv will do that automagically for us.
 pub fn default_cache_dir() -> PathBuf {
     let dir = dirs::data_local_dir().unwrap();
-    let path = dir.join("tower").join("cache");
-    std::fs::create_dir_all(&path).unwrap();
-    path
+    dir.join("tower").join("cache")
 }
