@@ -161,6 +161,7 @@ where
             secrets,
             params,
             env_vars,
+            Some(config.cache_dir),
         )
         .await?;
 

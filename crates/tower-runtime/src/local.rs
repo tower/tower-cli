@@ -178,7 +178,7 @@ async fn execute_local_app(
 
         let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     } else {
-        let uv = Uv::new().await?;
+        let uv = Uv::new(opts.cache_dir).await?;
         let env_vars = make_env_vars(
             &ctx,
             &environment,

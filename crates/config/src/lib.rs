@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tower_api::apis::configuration::Configuration;
 use url::Url;
@@ -20,6 +21,9 @@ pub struct Config {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub session: Option<Session>,
+
+    // cache_dir is the directory that we should cache uv artifacts within.
+    pub cache_dir: PathBuf,
 }
 
 impl Config {
@@ -29,6 +33,7 @@ impl Config {
             tower_url: default_tower_url(),
             json: false,
             session: None,
+            cache_dir: default_cache_dir(),
         }
     }
 
@@ -45,6 +50,7 @@ impl Config {
             tower_url,
             json: false,
             session: None,
+            cache_dir: default_cache_dir(),
         }
     }
 
@@ -72,6 +78,7 @@ impl Config {
             tower_url: sess.tower_url.clone(),
             json: self.json,
             session: Some(sess),
+            cache_dir: default_cache_dir(),
         }
     }
 
@@ -199,4 +206,11 @@ impl From<&Config> for Configuration {
     fn from(config: &Config) -> Configuration {
         config.make_api_configuration()
     }
+}
+
+pub fn default_cache_dir() -> PathBuf {
+    let dir = dirs::data_local_dir().unwrap();
+    let path = dir.join("tower").join("cache");
+    std::fs::create_dir_all(&path).unwrap();
+    path
 }
