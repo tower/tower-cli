@@ -7,6 +7,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.api_key import APIKey
+    from ..models.pagination import Pagination
 
 
 T = TypeVar("T", bound="ListAPIKeysResponse")
@@ -17,11 +18,13 @@ class ListAPIKeysResponse:
     """
     Attributes:
         api_keys (list['APIKey']): List of API keys
+        pages (Pagination):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListAPIKeysResponse.json.
     """
 
     api_keys: list["APIKey"]
+    pages: "Pagination"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -30,12 +33,15 @@ class ListAPIKeysResponse:
             api_keys_item = api_keys_item_data.to_dict()
             api_keys.append(api_keys_item)
 
+        pages = self.pages.to_dict()
+
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "api_keys": api_keys,
+                "pages": pages,
             }
         )
         if schema is not UNSET:
@@ -46,6 +52,7 @@ class ListAPIKeysResponse:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.api_key import APIKey
+        from ..models.pagination import Pagination
 
         d = dict(src_dict)
         api_keys = []
@@ -55,10 +62,13 @@ class ListAPIKeysResponse:
 
             api_keys.append(api_keys_item)
 
+        pages = Pagination.from_dict(d.pop("pages"))
+
         schema = d.pop("$schema", UNSET)
 
         list_api_keys_response = cls(
             api_keys=api_keys,
+            pages=pages,
             schema=schema,
         )
 

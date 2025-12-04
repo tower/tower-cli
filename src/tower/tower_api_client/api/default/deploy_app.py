@@ -5,21 +5,22 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.deploy_app_json_body import DeployAppJsonBody
 from ...models.deploy_app_response import DeployAppResponse
 from ...models.error_model import ErrorModel
-from ...types import UNSET, Response, Unset
+from ...types import UNSET, File, Response, Unset
 
 
 def _get_kwargs(
     name: str,
     *,
-    content_encoding: Union[Unset, str] = UNSET,
+    body: Union[
+        DeployAppJsonBody,
+        File,
+    ],
     x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
-    if not isinstance(content_encoding, Unset):
-        headers["Content-Encoding"] = content_encoding
-
     if not isinstance(x_tower_checksum_sha256, Unset):
         headers["X-Tower-Checksum-SHA256"] = x_tower_checksum_sha256
 
@@ -29,6 +30,17 @@ def _get_kwargs(
             name=name,
         ),
     }
+
+    if isinstance(body, DeployAppJsonBody):
+        _json_body = body.to_dict()
+
+        _kwargs["json"] = _json_body
+        headers["Content-Type"] = "application/json"
+    if isinstance(body, File):
+        _content_body = body.payload
+
+        _kwargs["content"] = _content_body
+        headers["Content-Type"] = "application/octet-stream"
 
     _kwargs["headers"] = headers
     return _kwargs
@@ -74,19 +86,25 @@ def sync_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-    content_encoding: Union[Unset, str] = UNSET,
+    body: Union[
+        DeployAppJsonBody,
+        File,
+    ],
     x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Response[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
-     Deploy a new version of an app. Reads the request body, which is a TAR file (or a GZipped TAR file)
-    and creates a new deployment for an app based on that file.
+     Deploy a new version of an app. Accepts either a TAR file upload (application/tar) or a JSON body
+    with source_uri (application/json) for deploying from a GitHub repository.
 
     Args:
         name (str): The name of the app to deploy.
-        content_encoding (Union[Unset, str]): The encoding of the content.
         x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
             verify integrity.
+        body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
+            examples/tree/main/01-hello-world'}.
+        body (File): A .tar or .tar.gz file containing the code to deploy and MANIFEST Example:
+            <binary tar file stream>.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,7 +116,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         name=name,
-        content_encoding=content_encoding,
+        body=body,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
     )
 
@@ -113,19 +131,25 @@ def sync(
     name: str,
     *,
     client: AuthenticatedClient,
-    content_encoding: Union[Unset, str] = UNSET,
+    body: Union[
+        DeployAppJsonBody,
+        File,
+    ],
     x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Optional[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
-     Deploy a new version of an app. Reads the request body, which is a TAR file (or a GZipped TAR file)
-    and creates a new deployment for an app based on that file.
+     Deploy a new version of an app. Accepts either a TAR file upload (application/tar) or a JSON body
+    with source_uri (application/json) for deploying from a GitHub repository.
 
     Args:
         name (str): The name of the app to deploy.
-        content_encoding (Union[Unset, str]): The encoding of the content.
         x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
             verify integrity.
+        body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
+            examples/tree/main/01-hello-world'}.
+        body (File): A .tar or .tar.gz file containing the code to deploy and MANIFEST Example:
+            <binary tar file stream>.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,7 +162,7 @@ def sync(
     return sync_detailed(
         name=name,
         client=client,
-        content_encoding=content_encoding,
+        body=body,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
     ).parsed
 
@@ -147,19 +171,25 @@ async def asyncio_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-    content_encoding: Union[Unset, str] = UNSET,
+    body: Union[
+        DeployAppJsonBody,
+        File,
+    ],
     x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Response[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
-     Deploy a new version of an app. Reads the request body, which is a TAR file (or a GZipped TAR file)
-    and creates a new deployment for an app based on that file.
+     Deploy a new version of an app. Accepts either a TAR file upload (application/tar) or a JSON body
+    with source_uri (application/json) for deploying from a GitHub repository.
 
     Args:
         name (str): The name of the app to deploy.
-        content_encoding (Union[Unset, str]): The encoding of the content.
         x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
             verify integrity.
+        body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
+            examples/tree/main/01-hello-world'}.
+        body (File): A .tar or .tar.gz file containing the code to deploy and MANIFEST Example:
+            <binary tar file stream>.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -171,7 +201,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         name=name,
-        content_encoding=content_encoding,
+        body=body,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
     )
 
@@ -184,19 +214,25 @@ async def asyncio(
     name: str,
     *,
     client: AuthenticatedClient,
-    content_encoding: Union[Unset, str] = UNSET,
+    body: Union[
+        DeployAppJsonBody,
+        File,
+    ],
     x_tower_checksum_sha256: Union[Unset, str] = UNSET,
 ) -> Optional[Union[DeployAppResponse, ErrorModel]]:
     """Deploy app
 
-     Deploy a new version of an app. Reads the request body, which is a TAR file (or a GZipped TAR file)
-    and creates a new deployment for an app based on that file.
+     Deploy a new version of an app. Accepts either a TAR file upload (application/tar) or a JSON body
+    with source_uri (application/json) for deploying from a GitHub repository.
 
     Args:
         name (str): The name of the app to deploy.
-        content_encoding (Union[Unset, str]): The encoding of the content.
         x_tower_checksum_sha256 (Union[Unset, str]): The SHA256 hash of the content, used to
             verify integrity.
+        body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
+            examples/tree/main/01-hello-world'}.
+        body (File): A .tar or .tar.gz file containing the code to deploy and MANIFEST Example:
+            <binary tar file stream>.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -210,7 +246,7 @@ async def asyncio(
         await asyncio_detailed(
             name=name,
             client=client,
-            content_encoding=content_encoding,
+            body=body,
             x_tower_checksum_sha256=x_tower_checksum_sha256,
         )
     ).parsed

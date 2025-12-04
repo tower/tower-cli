@@ -5,10 +5,8 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.stream_alerts_event_alert import StreamAlertsEventAlert
 from ...models.stream_alerts_event_error import StreamAlertsEventError
-from ...models.stream_alerts_event_run_failure_alert import (
-    StreamAlertsEventRunFailureAlert,
-)
 from ...types import Response
 
 
@@ -23,9 +21,7 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[
-    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
-]:
+) -> Optional[list[Union["StreamAlertsEventAlert", "StreamAlertsEventError"]]]:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.text
@@ -33,20 +29,18 @@ def _parse_response(
 
             def _parse_response_200_item(
                 data: object,
-            ) -> Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]:
+            ) -> Union["StreamAlertsEventAlert", "StreamAlertsEventError"]:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    response_200_item_type_0 = StreamAlertsEventError.from_dict(data)
+                    response_200_item_type_0 = StreamAlertsEventAlert.from_dict(data)
 
                     return response_200_item_type_0
                 except:  # noqa: E722
                     pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                response_200_item_type_1 = StreamAlertsEventRunFailureAlert.from_dict(
-                    data
-                )
+                response_200_item_type_1 = StreamAlertsEventError.from_dict(data)
 
                 return response_200_item_type_1
 
@@ -63,9 +57,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[
-    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
-]:
+) -> Response[list[Union["StreamAlertsEventAlert", "StreamAlertsEventError"]]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -77,9 +69,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
-]:
+) -> Response[list[Union["StreamAlertsEventAlert", "StreamAlertsEventError"]]]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -89,7 +79,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]]
+        Response[list[Union['StreamAlertsEventAlert', 'StreamAlertsEventError']]]
     """
 
     kwargs = _get_kwargs()
@@ -104,9 +94,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> Optional[
-    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
-]:
+) -> Optional[list[Union["StreamAlertsEventAlert", "StreamAlertsEventError"]]]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -116,7 +104,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]
+        list[Union['StreamAlertsEventAlert', 'StreamAlertsEventError']]
     """
 
     return sync_detailed(
@@ -127,9 +115,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
-]:
+) -> Response[list[Union["StreamAlertsEventAlert", "StreamAlertsEventError"]]]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -139,7 +125,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]]
+        Response[list[Union['StreamAlertsEventAlert', 'StreamAlertsEventError']]]
     """
 
     kwargs = _get_kwargs()
@@ -152,9 +138,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> Optional[
-    list[Union["StreamAlertsEventError", "StreamAlertsEventRunFailureAlert"]]
-]:
+) -> Optional[list[Union["StreamAlertsEventAlert", "StreamAlertsEventError"]]]:
     """Stream alert notifications
 
      Streams alert notifications in real-time
@@ -164,7 +148,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['StreamAlertsEventError', 'StreamAlertsEventRunFailureAlert']]
+        list[Union['StreamAlertsEventAlert', 'StreamAlertsEventError']]
     """
 
     return (

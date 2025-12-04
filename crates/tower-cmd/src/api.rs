@@ -76,6 +76,7 @@ pub async fn create_app(
             short_description: Some(description.to_string()),
             slug: None,
             is_externally_accessible: None,
+            subdomain: None,
         },
     };
 
@@ -130,6 +131,7 @@ pub async fn describe_run_logs(
     let params = tower_api::apis::default_api::DescribeRunLogsParams {
         name: name.to_string(),
         seq,
+        start_at: None
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_run_logs(
@@ -153,6 +155,7 @@ pub async fn run_app(
             environment: env.to_string(),
             parameters: params,
             parent_run_id: None,
+            initiator: None,
         },
     };
 
@@ -735,7 +738,12 @@ pub async fn list_environments(
     Error<tower_api::apis::default_api::ListEnvironmentsError>,
 > {
     let api_config = &config.into();
-    unwrap_api_response(tower_api::apis::default_api::list_environments(api_config)).await
+    let params = tower_api::apis::default_api::ListEnvironmentsParams {
+        page: Some(0),
+        page_size: Some(1000),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_environments(api_config, params)).await
 }
 
 pub async fn create_environment(

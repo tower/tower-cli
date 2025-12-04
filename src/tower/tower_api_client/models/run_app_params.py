@@ -6,6 +6,7 @@ from attrs import define as _attrs_define
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.run_app_initiator_data import RunAppInitiatorData
     from ..models.run_app_params_parameters import RunAppParamsParameters
 
 
@@ -20,6 +21,7 @@ class RunAppParams:
         parameters (RunAppParamsParameters): The parameters to pass into this app.
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/RunAppParams.json.
+        initiator (Union[Unset, RunAppInitiatorData]):
         parent_run_id (Union[None, Unset, str]): The ID of the run that invoked this run, if relevant. Should be null,
             if none.
     """
@@ -27,6 +29,7 @@ class RunAppParams:
     environment: str
     parameters: "RunAppParamsParameters"
     schema: Union[Unset, str] = UNSET
+    initiator: Union[Unset, "RunAppInitiatorData"] = UNSET
     parent_run_id: Union[None, Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,6 +38,10 @@ class RunAppParams:
         parameters = self.parameters.to_dict()
 
         schema = self.schema
+
+        initiator: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.initiator, Unset):
+            initiator = self.initiator.to_dict()
 
         parent_run_id: Union[None, Unset, str]
         if isinstance(self.parent_run_id, Unset):
@@ -51,6 +58,8 @@ class RunAppParams:
         )
         if schema is not UNSET:
             field_dict["$schema"] = schema
+        if initiator is not UNSET:
+            field_dict["initiator"] = initiator
         if parent_run_id is not UNSET:
             field_dict["parent_run_id"] = parent_run_id
 
@@ -58,6 +67,7 @@ class RunAppParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.run_app_initiator_data import RunAppInitiatorData
         from ..models.run_app_params_parameters import RunAppParamsParameters
 
         d = dict(src_dict)
@@ -66,6 +76,13 @@ class RunAppParams:
         parameters = RunAppParamsParameters.from_dict(d.pop("parameters"))
 
         schema = d.pop("$schema", UNSET)
+
+        _initiator = d.pop("initiator", UNSET)
+        initiator: Union[Unset, RunAppInitiatorData]
+        if isinstance(_initiator, Unset):
+            initiator = UNSET
+        else:
+            initiator = RunAppInitiatorData.from_dict(_initiator)
 
         def _parse_parent_run_id(data: object) -> Union[None, Unset, str]:
             if data is None:
@@ -80,6 +97,7 @@ class RunAppParams:
             environment=environment,
             parameters=parameters,
             schema=schema,
+            initiator=initiator,
             parent_run_id=parent_run_id,
         )
 

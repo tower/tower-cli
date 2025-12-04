@@ -23,6 +23,7 @@ class App:
     Attributes:
         created_at (datetime.datetime): The date and time this app was created.
         health_status (AppHealthStatus): This property is deprecated. It will always be 'healthy'.
+        is_externally_accessible (bool):
         name (str): The name of the app.
         next_run_at (Union[None, datetime.datetime]): The next time this app will run as part of it's schedule, null if
             none.
@@ -34,10 +35,13 @@ class App:
         run_results (Union[Unset, RunResults]):
         slug (Union[Unset, str]): This property is deprecated. Please use name instead.
         status (Union[Unset, AppStatus]): The status of the app.
+        subdomain (Union[Unset, str]): The subdomain that this app is accessible via. Must be externally accessible
+            first.
     """
 
     created_at: datetime.datetime
     health_status: AppHealthStatus
+    is_externally_accessible: bool
     name: str
     next_run_at: Union[None, datetime.datetime]
     owner: str
@@ -48,11 +52,14 @@ class App:
     run_results: Union[Unset, "RunResults"] = UNSET
     slug: Union[Unset, str] = UNSET
     status: Union[Unset, AppStatus] = UNSET
+    subdomain: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
 
         health_status = self.health_status.value
+
+        is_externally_accessible = self.is_externally_accessible
 
         name = self.name
 
@@ -86,11 +93,14 @@ class App:
         if not isinstance(self.status, Unset):
             status = self.status.value
 
+        subdomain = self.subdomain
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "created_at": created_at,
                 "health_status": health_status,
+                "is_externally_accessible": is_externally_accessible,
                 "name": name,
                 "next_run_at": next_run_at,
                 "owner": owner,
@@ -107,6 +117,8 @@ class App:
             field_dict["slug"] = slug
         if status is not UNSET:
             field_dict["status"] = status
+        if subdomain is not UNSET:
+            field_dict["subdomain"] = subdomain
 
         return field_dict
 
@@ -119,6 +131,8 @@ class App:
         created_at = isoparse(d.pop("created_at"))
 
         health_status = AppHealthStatus(d.pop("health_status"))
+
+        is_externally_accessible = d.pop("is_externally_accessible")
 
         name = d.pop("name")
 
@@ -178,9 +192,12 @@ class App:
         else:
             status = AppStatus(_status)
 
+        subdomain = d.pop("subdomain", UNSET)
+
         app = cls(
             created_at=created_at,
             health_status=health_status,
+            is_externally_accessible=is_externally_accessible,
             name=name,
             next_run_at=next_run_at,
             owner=owner,
@@ -191,6 +208,7 @@ class App:
             run_results=run_results,
             slug=slug,
             status=status,
+            subdomain=subdomain,
         )
 
         return app

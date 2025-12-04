@@ -105,8 +105,8 @@ def sync_detailed(
         name (str): The name of the app to fetch runs for.
         page (Union[Unset, int]): The page number to fetch. Default: 1.
         page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
-            separated for multiple).
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
+            multiple with a comma-separated list. Supplying none will return all statuses.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
@@ -159,8 +159,8 @@ def sync(
         name (str): The name of the app to fetch runs for.
         page (Union[Unset, int]): The page number to fetch. Default: 1.
         page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
-            separated for multiple).
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
+            multiple with a comma-separated list. Supplying none will return all statuses.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
@@ -208,8 +208,8 @@ async def asyncio_detailed(
         name (str): The name of the app to fetch runs for.
         page (Union[Unset, int]): The page number to fetch. Default: 1.
         page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
-            separated for multiple).
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
+            multiple with a comma-separated list. Supplying none will return all statuses.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
@@ -260,8 +260,8 @@ async def asyncio(
         name (str): The name of the app to fetch runs for.
         page (Union[Unset, int]): The page number to fetch. Default: 1.
         page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es) (comma
-            separated for multiple).
+        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
+            multiple with a comma-separated list. Supplying none will return all statuses.
         start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime

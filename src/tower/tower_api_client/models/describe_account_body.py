@@ -1,34 +1,38 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="UpdateAccountNameParams")
+if TYPE_CHECKING:
+    from ..models.account import Account
+
+
+T = TypeVar("T", bound="DescribeAccountBody")
 
 
 @_attrs_define
-class UpdateAccountNameParams:
+class DescribeAccountBody:
     """
     Attributes:
-        name (str): The new name for the account
+        account (Account):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/UpdateAccountNameParams.json.
+            https://api.tower.dev/v1/schemas/DescribeAccountBody.json.
     """
 
-    name: str
+    account: "Account"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        name = self.name
+        account = self.account.to_dict()
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
-                "name": name,
+                "account": account,
             }
         )
         if schema is not UNSET:
@@ -38,14 +42,16 @@ class UpdateAccountNameParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.account import Account
+
         d = dict(src_dict)
-        name = d.pop("name")
+        account = Account.from_dict(d.pop("account"))
 
         schema = d.pop("$schema", UNSET)
 
-        update_account_name_params = cls(
-            name=name,
+        describe_account_body = cls(
+            account=account,
             schema=schema,
         )
 
-        return update_account_name_params
+        return describe_account_body

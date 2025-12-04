@@ -7,6 +7,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.environment import Environment
+    from ..models.pagination import Pagination
 
 
 T = TypeVar("T", bound="ListEnvironmentsResponse")
@@ -17,11 +18,13 @@ class ListEnvironmentsResponse:
     """
     Attributes:
         environments (list['Environment']):
+        pages (Pagination):
         schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListEnvironmentsResponse.json.
     """
 
     environments: list["Environment"]
+    pages: "Pagination"
     schema: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -30,12 +33,15 @@ class ListEnvironmentsResponse:
             environments_item = environments_item_data.to_dict()
             environments.append(environments_item)
 
+        pages = self.pages.to_dict()
+
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
                 "environments": environments,
+                "pages": pages,
             }
         )
         if schema is not UNSET:
@@ -46,6 +52,7 @@ class ListEnvironmentsResponse:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.environment import Environment
+        from ..models.pagination import Pagination
 
         d = dict(src_dict)
         environments = []
@@ -55,10 +62,13 @@ class ListEnvironmentsResponse:
 
             environments.append(environments_item)
 
+        pages = Pagination.from_dict(d.pop("pages"))
+
         schema = d.pop("$schema", UNSET)
 
         list_environments_response = cls(
             environments=environments,
+            pages=pages,
             schema=schema,
         )
 
