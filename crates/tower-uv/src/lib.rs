@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::process::{Child, Command};
 use tower_telemetry::debug;
@@ -59,20 +59,6 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
 
 /// Find the uv-wrapper binary that was built alongside tower-cli
 fn find_uv_wrapper() -> Result<PathBuf, Error> {
-    // Allow override via environment variable (useful for tests)
-    if let Ok(path) = std::env::var("UV_WRAPPER_PATH") {
-        let uv_wrapper = PathBuf::from(path);
-        if uv_wrapper.exists() {
-            return Ok(uv_wrapper);
-        } else {
-            return Err(Error::NotFound(format!(
-                "UV_WRAPPER_PATH points to non-existent binary: {:?}",
-                uv_wrapper
-            )));
-        }
-    }
-
-    // The uv-wrapper binary should be in the same directory as the current executable
     let current_exe = std::env::current_exe()
         .map_err(|e| Error::Other(format!("Failed to get current executable path: {}", e)))?;
 
@@ -80,20 +66,19 @@ fn find_uv_wrapper() -> Result<PathBuf, Error> {
         .parent()
         .ok_or_else(|| Error::Other("Failed to get executable directory".to_string()))?;
 
-    let uv_wrapper = if cfg!(windows) {
-        exe_dir.join("uv-wrapper.exe")
-    } else {
-        exe_dir.join("uv-wrapper")
-    };
+    let binary_name = if cfg!(windows) { "uv-wrapper.exe" } else { "uv-wrapper" };
 
-    if uv_wrapper.exists() {
-        Ok(uv_wrapper)
-    } else {
-        Err(Error::NotFound(format!(
-            "uv-wrapper binary not found at {:?}",
-            uv_wrapper
-        )))
-    }
+    // Check exe dir (production) and parent dir (tests run from target/debug/deps/)
+    let dirs: Vec<PathBuf> = [Some(exe_dir), exe_dir.parent()]
+        .into_iter()
+        .flatten()
+        .map(Path::to_path_buf)
+        .collect();
+
+    dirs.iter()
+        .map(|dir| dir.join(binary_name))
+        .find(|p| p.exists())
+        .ok_or_else(|| Error::NotFound(format!("uv-wrapper binary not found near {:?}", exe_dir)))
 }
 
 pub struct Uv {
