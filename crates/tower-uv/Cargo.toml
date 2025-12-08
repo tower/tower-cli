@@ -7,11 +7,10 @@ rust-version = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-async-compression = { workspace = true }
-async_zip = { workspace = true }
-dirs = { workspace = true }
-futures-lite = { workspace = true }
-reqwest = { workspace = true }
 tokio = { workspace = true }
-tokio-tar = { workspace = true }
 tower-telemetry = { workspace = true }
+uv = "=0.9.15"
+
+[[bin]]
+name = "uv-wrapper"
+path = "src/bin/uv-wrapper.rs"

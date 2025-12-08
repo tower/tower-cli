@@ -4,11 +4,6 @@ use std::process::Stdio;
 use tokio::process::{Child, Command};
 use tower_telemetry::debug;
 
-pub mod install;
-
-// UV_VERSION is the version of UV to download and install when setting up a local UV deployment.
-pub const UV_VERSION: &str = "0.7.13";
-
 #[derive(Debug)]
 pub enum Error {
     IoError(std::io::Error),
@@ -22,19 +17,7 @@ pub enum Error {
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        // Convert std::fs::Error to your custom Error type
         Error::IoError(err)
-    }
-}
-
-impl From<install::Error> for Error {
-    fn from(err: install::Error) -> Self {
-        match err {
-            install::Error::NotFound(msg) => Error::NotFound(msg),
-            install::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
-            install::Error::IoError(e) => Error::IoError(e),
-            install::Error::Other(msg) => Error::Other(msg),
-        }
     }
 }
 
@@ -68,27 +51,48 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         // Apparently, according to some random person on Stack Overflow, sometimes the var can be
         // TEMP and sometimes it can be TMP. So uh...let's just grab both just in case.
         let tmp = std::env::var("TMP").unwrap_or_default();
-        env_vars.insert("TMP".to_string(), tmp);        
+        env_vars.insert("TMP".to_string(), tmp);
     }
 
     env_vars
 }
 
-async fn test_uv_path(path: &PathBuf) -> Result<(), Error> {
-    let res = Command::new(&path)
-        .arg("--color")
-        .arg("never")
-        .arg("--no-progress")
-        .arg("--help")
-        .output()
-        .await;
-
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            debug!("Testing UV failed: {:?}", e);
-            Err(Error::InvalidUv)
+/// Find the uv-wrapper binary that was built alongside tower-cli
+fn find_uv_wrapper() -> Result<PathBuf, Error> {
+    // Allow override via environment variable (useful for tests)
+    if let Ok(path) = std::env::var("UV_WRAPPER_PATH") {
+        let uv_wrapper = PathBuf::from(path);
+        if uv_wrapper.exists() {
+            return Ok(uv_wrapper);
+        } else {
+            return Err(Error::NotFound(format!(
+                "UV_WRAPPER_PATH points to non-existent binary: {:?}",
+                uv_wrapper
+            )));
         }
+    }
+
+    // The uv-wrapper binary should be in the same directory as the current executable
+    let current_exe = std::env::current_exe()
+        .map_err(|e| Error::Other(format!("Failed to get current executable path: {}", e)))?;
+
+    let exe_dir = current_exe
+        .parent()
+        .ok_or_else(|| Error::Other("Failed to get executable directory".to_string()))?;
+
+    let uv_wrapper = if cfg!(windows) {
+        exe_dir.join("uv-wrapper.exe")
+    } else {
+        exe_dir.join("uv-wrapper")
+    };
+
+    if uv_wrapper.exists() {
+        Ok(uv_wrapper)
+    } else {
+        Err(Error::NotFound(format!(
+            "uv-wrapper binary not found at {:?}",
+            uv_wrapper
+        )))
     }
 }
 
@@ -106,16 +110,13 @@ pub struct Uv {
 
 impl Uv {
     pub async fn new(cache_dir: Option<PathBuf>, protected_mode: bool) -> Result<Self, Error> {
-        match install::find_or_setup_uv().await {
-            Ok(uv_path) => {
-                test_uv_path(&uv_path).await?;
-                Ok(Uv { uv_path, cache_dir, protected_mode })
-            }
-            Err(e) => {
-                debug!("Error setting up UV: {:?}", e);
-                Err(e.into())
-            }
-        }
+        let uv_path = find_uv_wrapper()?;
+        debug!("Using uv-wrapper at: {:?}", uv_path);
+        Ok(Uv {
+            uv_path,
+            cache_dir,
+            protected_mode,
+        })
     }
 
     pub async fn venv(
@@ -241,7 +242,7 @@ impl Uv {
             .arg("--no-progress")
             .arg("run")
             .arg(program);
-            
+
         #[cfg(unix)]
         {
             cmd.process_group(0);
@@ -263,6 +264,6 @@ impl Uv {
     }
 
     pub async fn is_valid(&self) -> bool {
-        test_uv_path(&self.uv_path).await.is_ok()
+        self.uv_path.exists()
     }
 }

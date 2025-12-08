@@ -31,7 +31,9 @@ tower-api = { workspace = true }
 tower-package = { workspace = true }
 tower-runtime = { workspace = true }
 tower-telemetry = { workspace = true }
+tower-uv = { workspace = true }
 tower-version = { path = "../tower-version" }
+dirs = { workspace = true }
 webbrowser = { workspace = true }
 rmcp = { version = "0.5.0", features = ["server", "transport-io", "schemars", "transport-sse-server", "transport-streamable-http-server"] }
 schemars = "1.0"

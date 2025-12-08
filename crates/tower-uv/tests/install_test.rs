@@ -1,12 +1,16 @@
-use tower_uv::{install::get_default_uv_bin_dir, Uv};
+use tower_uv::Uv;
 
 #[tokio::test]
-async fn test_installing_uv() {
-    // Ensure there is no `uv` in the directory that we will install it to by default.
-    let default_uv_bin_dir = get_default_uv_bin_dir().unwrap();
-    let _ = tokio::fs::remove_dir_all(&default_uv_bin_dir).await;
+async fn test_uv_wrapper_exists() {
+    // Set the UV_WRAPPER_PATH to point to the binary built by cargo
+    std::env::set_var("UV_WRAPPER_PATH", env!("CARGO_BIN_EXE_uv-wrapper"));
 
-    // Now if we instantiate a Uv instance, it should install the `uv` binary.
-    let uv = Uv::new(None, false).await.expect("Failed to create a Uv instance");
+    // Test that the uv-wrapper binary is available and valid
+    let uv = Uv::new(None, false)
+        .await
+        .expect("Failed to create a Uv instance");
     assert!(uv.is_valid().await);
+
+    // Verify we can get the path
+    assert!(uv.uv_path.exists(), "uv-wrapper binary should exist at {:?}", uv.uv_path);
 }
