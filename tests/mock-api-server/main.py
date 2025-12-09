@@ -67,6 +67,8 @@ mock_apps_db["predeployed-test-app"] = {
         "pending": 0,
         "running": 0,
     },
+    "subdomain": None,
+    "is_externally_accessible": False,
 }
 # Pre-deploy the test-app so it can be used for validation tests
 mock_deployed_apps.add("predeployed-test-app")
@@ -131,14 +133,12 @@ async def create_app(app_data: Dict[str, Any]):
         return {"app": mock_apps_db[app_name]}
 
     new_app = {
-        "name": app_name,
-        "owner": "mock_owner",
-        "short_description": app_data.get("short_description", ""),
-        "version": None,
-        "schedule": None,
         "created_at": datetime.datetime.now().isoformat(),
-        "next_run_at": None,
         "health_status": "healthy",
+        "is_externally_accessible": True,
+        "name": app_name,
+        "next_run_at": None,
+        "owner": "mock_owner",
         "run_results": {
             "cancelled": 0,
             "crashed": 0,
@@ -147,6 +147,11 @@ async def create_app(app_data: Dict[str, Any]):
             "pending": 0,
             "running": 0,
         },
+        "schedule" : None,
+        "short_description": app_data.get("short_description", ""),
+        "status": "active",
+        "subdomain": "",
+        "version": None,
     }
     mock_apps_db[app_name] = new_app
     return {"app": new_app}
@@ -239,6 +244,11 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         "started_at": datetime.datetime.now().isoformat(),
         "ended_at": None,
         "app_version": mock_apps_db[name].get("version", "1.0.0"),
+        "subdomain": None,
+        "is_scheduled": True,
+        "initiator": {
+            "type": "tower_cli",
+        },
     }
     mock_runs_db[run_id] = new_run
     return {"run": new_run}
@@ -270,7 +280,14 @@ async def describe_run(name: str, seq: int):
                 run_data["exit_code"] = 0
                 run_data["ended_at"] = now_time.isoformat()
 
-            return {"run": run_data}
+            return {
+                "run": run_data,
+                "$links": {
+                    "next": None,
+                    "prev": None,
+                    "self": run_data.get("$link"),
+                },
+            }
 
     raise HTTPException(
         status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
