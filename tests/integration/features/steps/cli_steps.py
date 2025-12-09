@@ -21,7 +21,7 @@ def step_run_cli_command(context, command):
 
     # Run the CLI command
     cmd_parts = shlex.split(command)
-    full_command = [cli_path] + cmd_parts[1:] # Skip 'tower' prefix
+    full_command = [cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
 
     try:
         # Force colored output by setting environment variables

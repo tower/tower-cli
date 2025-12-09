@@ -55,15 +55,13 @@ def mock_run_response_factory():
                 "exit_code": None,
                 "status_group": status_group,
                 "parameters": parameters,
-                "initiator": {
-                    "type": "tower_cli"
-                },
+                "initiator": {"type": "tower_cli"},
                 "is_scheduled": False,
             },
             "$links": {
                 "next": None,
                 "prev": None,
-                "self": f"https://api.example.com/v1/apps/my-app/runs/{number}"
+                "self": f"https://api.example.com/v1/apps/my-app/runs/{number}",
             },
         }
 
@@ -102,9 +100,11 @@ def create_run_object():
             status=status,
             status_group=status_group,
             parameters=parameters,
-            initiator=RunInitiator.from_dict({
-                "type": "tower_cli",
-            }),
+            initiator=RunInitiator.from_dict(
+                {
+                    "type": "tower_cli",
+                }
+            ),
             is_scheduled=False,
         )
 

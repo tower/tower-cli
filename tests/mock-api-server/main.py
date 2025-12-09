@@ -147,7 +147,7 @@ async def create_app(app_data: Dict[str, Any]):
             "pending": 0,
             "running": 0,
         },
-        "schedule" : None,
+        "schedule": None,
         "short_description": app_data.get("short_description", ""),
         "status": "active",
         "subdomain": "",
