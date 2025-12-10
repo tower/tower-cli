@@ -19,7 +19,12 @@ eula = false
 tokio = { workspace = true }
 tower-cmd = { workspace = true }
 tower-api = { workspace = true }
+uv = "=0.9.15"
 
 [[bin]]
 name = "tower"
 path = "src/main.rs"
+
+[[bin]]
+name = "uv-wrapper"
+path = "src/uv-wrapper.rs"

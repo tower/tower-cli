@@ -9,8 +9,3 @@ license = { workspace = true }
 [dependencies]
 tokio = { workspace = true }
 tower-telemetry = { workspace = true }
-uv = "=0.9.15"
-
-[[bin]]
-name = "uv-wrapper"
-path = "src/bin/uv-wrapper.rs"

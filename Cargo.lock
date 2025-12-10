@@ -5395,6 +5395,7 @@ dependencies = [
  "tokio",
  "tower-api",
  "tower-cmd",
+ "uv",
 ]
 
 [[package]]
@@ -5552,7 +5553,6 @@ version = "0.3.37"
 dependencies = [
  "tokio",
  "tower-telemetry",
- "uv",
 ]
 
 [[package]]
