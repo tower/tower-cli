@@ -11,20 +11,20 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
     all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
-
-    params["environment"] = environment
-
-    params["all"] = all_
 
     params["page"] = page
 
     params["page_size"] = page_size
+
+    params["environment"] = environment
+
+    params["all"] = all_
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -64,21 +64,21 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
     all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
 ) -> Response[ListSecretsResponse]:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): The environment to filter by.
         all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
             marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -89,10 +89,10 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        environment=environment,
-        all_=all_,
         page=page,
         page_size=page_size,
+        environment=environment,
+        all_=all_,
     )
 
     response = client.get_httpx_client().request(
@@ -105,21 +105,21 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
     all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
 ) -> Optional[ListSecretsResponse]:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): The environment to filter by.
         all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
             marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,31 +131,31 @@ def sync(
 
     return sync_detailed(
         client=client,
-        environment=environment,
-        all_=all_,
         page=page,
         page_size=page_size,
+        environment=environment,
+        all_=all_,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
     all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
 ) -> Response[ListSecretsResponse]:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): The environment to filter by.
         all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
             marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -166,10 +166,10 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        environment=environment,
-        all_=all_,
         page=page,
         page_size=page_size,
+        environment=environment,
+        all_=all_,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -180,21 +180,21 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
     all_: Union[Unset, bool] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
 ) -> Optional[ListSecretsResponse]:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): The environment to filter by.
         all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
             marked as deleted.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -207,9 +207,9 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
-            environment=environment,
-            all_=all_,
             page=page,
             page_size=page_size,
+            environment=environment,
+            all_=all_,
         )
     ).parsed

@@ -14,24 +14,24 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.run_failure_alert import RunFailureAlert
+    from ..models.alert import Alert
 
 
-T = TypeVar("T", bound="StreamAlertsEventRunFailureAlert")
+T = TypeVar("T", bound="StreamAlertsEventAlert")
 
 
 @_attrs_define
-class StreamAlertsEventRunFailureAlert:
+class StreamAlertsEventAlert:
     """
     Attributes:
-        data (RunFailureAlert):
-        event (Literal['run_failure_alert']): The event name.
+        data (Alert):
+        event (Literal['alert']): The event name.
         id (Union[Unset, int]): The event ID.
         retry (Union[Unset, int]): The retry time in milliseconds.
     """
 
-    data: "RunFailureAlert"
-    event: Literal["run_failure_alert"]
+    data: "Alert"
+    event: Literal["alert"]
     id: Union[Unset, int] = UNSET
     retry: Union[Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -62,30 +62,28 @@ class StreamAlertsEventRunFailureAlert:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.run_failure_alert import RunFailureAlert
+        from ..models.alert import Alert
 
         d = dict(src_dict)
-        data = RunFailureAlert.from_dict(d.pop("data"))
+        data = Alert.from_dict(d.pop("data"))
 
-        event = cast(Literal["run_failure_alert"], d.pop("event"))
-        if event != "run_failure_alert":
-            raise ValueError(
-                f"event must match const 'run_failure_alert', got '{event}'"
-            )
+        event = cast(Literal["alert"], d.pop("event"))
+        if event != "alert":
+            raise ValueError(f"event must match const 'alert', got '{event}'")
 
         id = d.pop("id", UNSET)
 
         retry = d.pop("retry", UNSET)
 
-        stream_alerts_event_run_failure_alert = cls(
+        stream_alerts_event_alert = cls(
             data=data,
             event=event,
             id=id,
             retry=retry,
         )
 
-        stream_alerts_event_run_failure_alert.additional_properties = d
-        return stream_alerts_event_run_failure_alert
+        stream_alerts_event_alert.additional_properties = d
+        return stream_alerts_event_alert
 
     @property
     def additional_keys(self) -> list[str]:
