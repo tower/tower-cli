@@ -161,6 +161,7 @@ impl Uv {
                 .arg("--color")
                 .arg("never")
                 .arg("--no-progress")
+                .arg("--quiet")
                 .arg("sync")
                 .envs(env_vars);
 
@@ -191,6 +192,7 @@ impl Uv {
                 .current_dir(cwd)
                 .arg("--color")
                 .arg("never")
+                .arg("--quiet")
                 .arg("pip")
                 .arg("install")
                 .arg("-r")
