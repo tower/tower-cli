@@ -637,7 +637,6 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::HashMap;
     use std::path::PathBuf;
 
     #[tokio::test]

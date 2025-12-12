@@ -4,6 +4,7 @@ use config::{Config, Session};
 pub mod api;
 mod apps;
 mod deploy;
+mod doctor;
 mod environments;
 pub mod error;
 mod mcp;
@@ -175,6 +176,7 @@ impl App {
                     eprintln!("MCP server error: {}", e);
                     std::process::exit(1);
                 }),
+            Some(("doctor", _)) => doctor::do_doctor(config).await,
             _ => {
                 cmd_clone.print_help().unwrap();
                 std::process::exit(2);
@@ -222,4 +224,5 @@ fn root_cmd() -> Command {
         .subcommand(version::version_cmd())
         .subcommand(teams::teams_cmd())
         .subcommand(mcp::mcp_cmd())
+        .subcommand(doctor::doctor_cmd())
 }
