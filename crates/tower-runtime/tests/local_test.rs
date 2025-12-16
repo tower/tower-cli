@@ -56,7 +56,7 @@ async fn test_running_hello_world() {
         secrets: HashMap::new(),
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
-        cache_dir: Some(config::default_cache_dir())
+        cache_dir: Some(config::default_cache_dir()),
     };
 
     // Start the app using the LocalApp runtime
@@ -153,7 +153,7 @@ async fn test_running_legacy_app() {
         secrets: HashMap::new(),
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
-        cache_dir: Some(config::default_cache_dir())
+        cache_dir: Some(config::default_cache_dir()),
     };
 
     // Start the app using the LocalApp runtime
@@ -189,10 +189,13 @@ async fn test_running_legacy_app() {
 #[tokio::test]
 async fn test_running_app_with_secret() {
     debug!("Running 04-app-with-secret");
-    
+
     // We set a few environment variables that will be used to test the inherritance and override
     // behavior of child apps
-    std::env::set_var("PARENT_ENVIRONMENT_VARIABLE", "Something that should not get sent to the child");
+    std::env::set_var(
+        "PARENT_ENVIRONMENT_VARIABLE",
+        "Something that should not get sent to the child",
+    );
     std::env::set_var("OVERRIDDEN_ENVIRONMENT_VARIABLE", "The initial value");
 
     let app_dir = get_example_app_dir("04-app-with-secret");
@@ -201,7 +204,10 @@ async fn test_running_app_with_secret() {
 
     let mut secrets = HashMap::new();
     secrets.insert("MY_SECRET".to_string(), "It's in the sauce!".to_string());
-    secrets.insert("OVERRIDDEN_ENVIRONMENT_VARIABLE".to_string(), "I reset it!".to_string());
+    secrets.insert(
+        "OVERRIDDEN_ENVIRONMENT_VARIABLE".to_string(),
+        "I reset it!".to_string(),
+    );
 
     // We need to create the package, which will load the app
     let opts = StartOptions {
@@ -241,13 +247,19 @@ async fn test_running_app_with_secret() {
                     assert!(output.line.ends_with("It's in the sauce!"));
                 }
 
-                if output.line.starts_with("The parent environment variable is:") {
+                if output
+                    .line
+                    .starts_with("The parent environment variable is:")
+                {
                     // Indicate that we found this line too.
                     count_stdout += 1;
                     assert!(output.line.ends_with("default_value"));
                 }
 
-                if output.line.starts_with("The overridden environment variable is:") {
+                if output
+                    .line
+                    .starts_with("The overridden environment variable is:")
+                {
                     // Indicate that we found the last line.
                     count_stdout += 1;
                     assert!(output.line.ends_with("I reset it!"));
@@ -257,7 +269,11 @@ async fn test_running_app_with_secret() {
     }
 
     assert!(count_setup > 0, "There should be some setup output");
-    assert!(count_stdout == 3, "should be three output lines from the program, there were {}", count_stdout);
+    assert!(
+        count_stdout == 3,
+        "should be three output lines from the program, there were {}",
+        count_stdout
+    );
 
     // check the status once more, should be done.
     let status = app.status().await.expect("Failed to get app status");

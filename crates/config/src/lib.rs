@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tower_api::apis::configuration::Configuration;
 use url::Url;
 
@@ -208,7 +208,7 @@ impl From<&Config> for Configuration {
     }
 }
 
-// default_cache_dir gets the path the default cache location for dependencies, etc. Note 
+// default_cache_dir gets the path the default cache location for dependencies, etc. Note
 // that you don't have to create underlying directory, uv will do that automagically for us.
 pub fn default_cache_dir() -> PathBuf {
     let dir = dirs::data_local_dir().unwrap();
