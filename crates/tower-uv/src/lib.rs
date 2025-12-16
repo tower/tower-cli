@@ -68,7 +68,7 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         // Apparently, according to some random person on Stack Overflow, sometimes the var can be
         // TEMP and sometimes it can be TMP. So uh...let's just grab both just in case.
         let tmp = std::env::var("TMP").unwrap_or_default();
-        env_vars.insert("TMP".to_string(), tmp);        
+        env_vars.insert("TMP".to_string(), tmp);
     }
 
     env_vars
@@ -109,7 +109,11 @@ impl Uv {
         match install::find_or_setup_uv().await {
             Ok(uv_path) => {
                 test_uv_path(&uv_path).await?;
-                Ok(Uv { uv_path, cache_dir, protected_mode })
+                Ok(Uv {
+                    uv_path,
+                    cache_dir,
+                    protected_mode,
+                })
             }
             Err(e) => {
                 debug!("Error setting up UV: {:?}", e);
@@ -241,7 +245,7 @@ impl Uv {
             .arg("--no-progress")
             .arg("run")
             .arg(program);
-            
+
         #[cfg(unix)]
         {
             cmd.process_group(0);

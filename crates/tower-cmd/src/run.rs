@@ -599,10 +599,10 @@ async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
                 err_count += 1;
 
                 // If we get five errors in a row, we abandon monitoring.
-                if err_count >= 5{
+                if err_count >= 5 {
                     debug!("Failed to get app status after 5 attempts, giving up");
                     output::error("An error occured while monitoring your local run status!");
-                    return tower_runtime::Status::Crashed { code: -1 }
+                    return tower_runtime::Status::Crashed { code: -1 };
                 }
 
                 // Otherwise, keep on keepin' on.

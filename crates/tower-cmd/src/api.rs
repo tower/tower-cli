@@ -131,7 +131,7 @@ pub async fn describe_run_logs(
     let params = tower_api::apis::default_api::DescribeRunLogsParams {
         name: name.to_string(),
         seq,
-        start_at: None
+        start_at: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_run_logs(
@@ -743,7 +743,10 @@ pub async fn list_environments(
         page_size: Some(1000),
     };
 
-    unwrap_api_response(tower_api::apis::default_api::list_environments(api_config, params)).await
+    unwrap_api_response(tower_api::apis::default_api::list_environments(
+        api_config, params,
+    ))
+    .await
 }
 
 pub async fn create_environment(
