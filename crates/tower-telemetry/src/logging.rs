@@ -167,20 +167,20 @@ type BoxedFmtLayer = Box<dyn Layer<Registry> + Send + Sync>;
 fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtLayer {
     match destination {
         LogDestination::Stdout => match format {
-            LogFormat::Plain => Box::new(fmt::layer().event_format(fmt::format().pretty())),
-            LogFormat::Json => Box::new(fmt::layer().event_format(fmt::format().json())),
+            LogFormat::Plain => Box::new(fmt::layer().event_format(fmt::format().pretty().with_target(false).with_file(false).with_line_number(false))),
+            LogFormat::Json => Box::new(fmt::layer().event_format(fmt::format().json().with_target(false).with_file(false).with_line_number(false))),
         },
         LogDestination::File(path) => {
             let file_appender = tracing_appender::rolling::daily(".", path);
             match format {
                 LogFormat::Plain => Box::new(
                     fmt::layer()
-                        .event_format(fmt::format().pretty())
+                        .event_format(fmt::format().pretty().with_target(false).with_file(false).with_line_number(false))
                         .with_writer(file_appender),
                 ),
                 LogFormat::Json => Box::new(
                     fmt::layer()
-                        .event_format(fmt::format().json())
+                        .event_format(fmt::format().json().with_target(false).with_file(false).with_line_number(false))
                         .with_writer(file_appender),
                 ),
             }

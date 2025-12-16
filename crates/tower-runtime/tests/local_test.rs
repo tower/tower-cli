@@ -34,6 +34,55 @@ async fn build_package_from_dir(dir: &PathBuf) -> Package {
 }
 
 #[tokio::test]
+async fn test_running_hello_world_json_logs() {
+    tower_telemetry::enable_logging(
+        tower_telemetry::LogLevel::Debug,
+        tower_telemetry::LogFormat::Json,
+        tower_telemetry::LogDestination::Stdout,
+    );
+
+    debug!("Running 01-hello-world with JSON logs");
+    let hello_world_dir = get_example_app_dir("01-hello-world");
+    let package = build_package_from_dir(&hello_world_dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    // We need to create the package, which will load the app
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new(),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir())
+    };
+
+    // Start the app using the LocalApp runtime
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    // The status should be running
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(status == Status::Running, "App should be running");
+
+    let mut outputs = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        outputs.push(output.line);
+    }
+
+    let found_hello = outputs.iter().any(|line| line.contains("Hello, world!"));
+    assert!(
+        found_hello,
+        "Should have received 'Hello, world!' output from the application"
+    );
+
+    // check the status once more, should be done.
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(status == Status::Exited, "App should be running");
+}
+
+#[tokio::test]
 async fn test_running_hello_world() {
     tower_telemetry::enable_logging(
         tower_telemetry::LogLevel::Debug,
