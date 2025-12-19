@@ -43,17 +43,17 @@ DEFAULT_COMMAND_PLAN: tuple[DbtCommand, ...] = (
 # See: https://docs.getdbt.com/reference/node-selection/syntax
 COMMANDS_WITH_SELECT: frozenset[str] = frozenset(
     {
-        "run",         # Execute models
-        "test",        # Run tests
-        "build",       # Run models and tests
-        "compile",     # Compile models
-        "seed",        # Load seed files
-        "snapshot",    # Execute snapshots
-        "docs",        # Generate documentation (docs generate)
-        "list",        # List resources (also: ls)
-        "ls",          # Alias for list
-        "show",        # Show compiled SQL
-        "source",      # Source freshness (source freshness)
+        "run",
+        "test",
+        "build",
+        "compile",
+        "seed",
+        "snapshot",
+        "docs",
+        "list",
+        "ls",
+        "show",
+        "source",
     }
 )
 
@@ -201,7 +201,6 @@ def run_dbt_workflow(config: DbtRunnerConfig) -> list[object]:
             for command in config.commands:
                 args = command.to_arg_list()
 
-                # Add --select flag if command supports it and it's not already present
                 if (
                     config.selector
                     and command.name in COMMANDS_WITH_SELECT
@@ -247,8 +246,7 @@ def _log_run_results(log: logging.Logger, entries: Iterable[object] | None) -> N
     Based on dbt-core's return types (see dbt.cli.main.dbtRunnerResult):
 
     Commands returning RunExecutionResult (iterable, has node-level results):
-    - run, test, build, seed, snapshot, compile, clone, retry, run-operation,
-      source freshness, show
+    - build, compile, run, seed, snapshot, test, run-operation
 
     Commands returning non-iterable results:
     - docs generate → CatalogArtifact
@@ -263,9 +261,7 @@ def _log_run_results(log: logging.Logger, entries: Iterable[object] | None) -> N
     if not entries:
         return
 
-    # Check if entries is actually iterable (not str/bytes which are also iterable)
     if not isinstance(entries, IterableABC) or isinstance(entries, (str, bytes)):
-        # Non-iterable results (e.g., CatalogArtifact from docs generate)
         result_type = type(entries).__name__
         log.debug(
             "Command returned %s (not iterable node results), skipping detailed logging",
@@ -273,7 +269,6 @@ def _log_run_results(log: logging.Logger, entries: Iterable[object] | None) -> N
         )
         return
 
-    # Log each node result (for run/build/test commands)
     for entry in entries:
         node = getattr(entry, "node", None)
         status = getattr(entry, "status", None)
