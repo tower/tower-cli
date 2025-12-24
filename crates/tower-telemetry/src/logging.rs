@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{filter::EnvFilter, fmt, layer::Layer, registry::Registry};
 
@@ -164,23 +165,66 @@ pub enum LogFormat {
 
 type BoxedFmtLayer = Box<dyn Layer<Registry> + Send + Sync>;
 
+fn should_use_color(destination: &LogDestination) -> bool {
+    match destination {
+        LogDestination::Stdout => {
+            // Check if stdout is a TTY
+            std::io::stdout().is_terminal()
+        }
+        LogDestination::File(_) => {
+            // Never use color for file output
+            false
+        }
+    }
+}
+
 fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtLayer {
+    let use_color = should_use_color(&destination);
+
     match destination {
         LogDestination::Stdout => match format {
-            LogFormat::Plain => Box::new(fmt::layer().event_format(fmt::format().pretty())),
-            LogFormat::Json => Box::new(fmt::layer().event_format(fmt::format().json())),
+            LogFormat::Plain => Box::new(fmt::layer().event_format(
+                fmt::format()
+                    .pretty()
+                    .with_target(false)
+                    .with_file(false)
+                    .with_line_number(false)
+                    .with_ansi(use_color)
+            )),
+            LogFormat::Json => Box::new(fmt::layer().event_format(
+                fmt::format()
+                    .json()
+                    .with_target(false)
+                    .with_file(false)
+                    .with_line_number(false)
+                    .with_ansi(use_color)
+            )),
         },
         LogDestination::File(path) => {
             let file_appender = tracing_appender::rolling::daily(".", path);
             match format {
                 LogFormat::Plain => Box::new(
                     fmt::layer()
-                        .event_format(fmt::format().pretty())
+                        .event_format(
+                            fmt::format()
+                                .pretty()
+                                .with_target(false)
+                                .with_file(false)
+                                .with_line_number(false)
+                                .with_ansi(use_color)
+                        )
                         .with_writer(file_appender),
                 ),
                 LogFormat::Json => Box::new(
                     fmt::layer()
-                        .event_format(fmt::format().json())
+                        .event_format(
+                            fmt::format()
+                                .json()
+                                .with_target(false)
+                                .with_file(false)
+                                .with_line_number(false)
+                                .with_ansi(use_color)
+                        )
                         .with_writer(file_appender),
                 ),
             }

@@ -13,9 +13,9 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     query: Union[Unset, str] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
@@ -23,11 +23,11 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
-    params["query"] = query
-
     params["page"] = page
 
     params["page_size"] = page_size
+
+    params["query"] = query
 
     params["num_runs"] = num_runs
 
@@ -83,9 +83,9 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     query: Union[Unset, str] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
@@ -96,9 +96,9 @@ def sync_detailed(
      Get all the apps for the current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         query (Union[Unset, str]): The search query to filter apps by.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
@@ -116,9 +116,9 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        query=query,
         page=page,
         page_size=page_size,
+        query=query,
         num_runs=num_runs,
         sort=sort,
         filter_=filter_,
@@ -135,9 +135,9 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     query: Union[Unset, str] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
@@ -148,9 +148,9 @@ def sync(
      Get all the apps for the current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         query (Union[Unset, str]): The search query to filter apps by.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
@@ -169,9 +169,9 @@ def sync(
 
     return sync_detailed(
         client=client,
-        query=query,
         page=page,
         page_size=page_size,
+        query=query,
         num_runs=num_runs,
         sort=sort,
         filter_=filter_,
@@ -182,9 +182,9 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     query: Union[Unset, str] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
@@ -195,9 +195,9 @@ async def asyncio_detailed(
      Get all the apps for the current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         query (Union[Unset, str]): The search query to filter apps by.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
@@ -215,9 +215,9 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        query=query,
         page=page,
         page_size=page_size,
+        query=query,
         num_runs=num_runs,
         sort=sort,
         filter_=filter_,
@@ -232,9 +232,9 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     query: Union[Unset, str] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     num_runs: Union[Unset, int] = 20,
     sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
     filter_: Union[Unset, ListAppsFilter] = UNSET,
@@ -245,9 +245,9 @@ async def asyncio(
      Get all the apps for the current account.
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         query (Union[Unset, str]): The search query to filter apps by.
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
             20) Default: 20.
         sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
@@ -267,9 +267,9 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
-            query=query,
             page=page,
             page_size=page_size,
+            query=query,
             num_runs=num_runs,
             sort=sort,
             filter_=filter_,

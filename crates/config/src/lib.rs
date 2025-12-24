@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tower_api::apis::configuration::Configuration;
 use url::Url;
 
@@ -181,17 +181,15 @@ impl Config {
 
         configuration.base_path = base_path.to_string();
 
-        if let Some(session) = &self.session {
+        // Always read from disk to pick up team switches
+        if let Ok(session) = Session::from_config_dir() {
             if let Some(active_team) = &session.active_team {
-                // Use the active team's JWT token
                 configuration.bearer_access_token = Some(active_team.token.jwt.clone());
             } else {
-                // Fall back to session token if no active team
                 configuration.bearer_access_token = Some(session.token.jwt.clone());
             }
         }
 
-        // Store the configuration in self
         configuration
     }
 }
@@ -208,7 +206,7 @@ impl From<&Config> for Configuration {
     }
 }
 
-// default_cache_dir gets the path the default cache location for dependencies, etc. Note 
+// default_cache_dir gets the path the default cache location for dependencies, etc. Note
 // that you don't have to create underlying directory, uv will do that automagically for us.
 pub fn default_cache_dir() -> PathBuf {
     let dir = dirs::data_local_dir().unwrap();

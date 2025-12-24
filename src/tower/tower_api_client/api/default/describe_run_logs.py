@@ -1,3 +1,4 @@
+import datetime
 from http import HTTPStatus
 from typing import Any, Optional, Union
 
@@ -6,19 +7,31 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.describe_run_logs_response import DescribeRunLogsResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     name: str,
     seq: int,
+    *,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+
+    json_start_at: Union[Unset, str] = UNSET
+    if not isinstance(start_at, Unset):
+        json_start_at = start_at.isoformat()
+    params["start_at"] = json_start_at
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/apps/{name}/runs/{seq}/logs".format(
             name=name,
             seq=seq,
         ),
+        "params": params,
     }
 
     return _kwargs
@@ -53,6 +66,7 @@ def sync_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[DescribeRunLogsResponse]:
     """Describe run logs
 
@@ -61,6 +75,8 @@ def sync_detailed(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
+        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
+            (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -73,6 +89,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         name=name,
         seq=seq,
+        start_at=start_at,
     )
 
     response = client.get_httpx_client().request(
@@ -87,6 +104,7 @@ def sync(
     seq: int,
     *,
     client: AuthenticatedClient,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[DescribeRunLogsResponse]:
     """Describe run logs
 
@@ -95,6 +113,8 @@ def sync(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
+        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
+            (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -108,6 +128,7 @@ def sync(
         name=name,
         seq=seq,
         client=client,
+        start_at=start_at,
     ).parsed
 
 
@@ -116,6 +137,7 @@ async def asyncio_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[DescribeRunLogsResponse]:
     """Describe run logs
 
@@ -124,6 +146,8 @@ async def asyncio_detailed(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
+        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
+            (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -136,6 +160,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         name=name,
         seq=seq,
+        start_at=start_at,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -148,6 +173,7 @@ async def asyncio(
     seq: int,
     *,
     client: AuthenticatedClient,
+    start_at: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[DescribeRunLogsResponse]:
     """Describe run logs
 
@@ -156,6 +182,8 @@ async def asyncio(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
+        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
+            (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -170,5 +198,6 @@ async def asyncio(
             name=name,
             seq=seq,
             client=client,
+            start_at=start_at,
         )
     ).parsed

@@ -5,15 +5,15 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.update_account_name_params import UpdateAccountNameParams
-from ...models.update_account_name_response import UpdateAccountNameResponse
+from ...models.update_account_params import UpdateAccountParams
+from ...models.update_account_response import UpdateAccountResponse
 from ...types import Response
 
 
 def _get_kwargs(
     name: str,
     *,
-    body: UpdateAccountNameParams,
+    body: UpdateAccountParams,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -35,9 +35,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdateAccountNameResponse]:
+) -> Optional[UpdateAccountResponse]:
     if response.status_code == 200:
-        response_200 = UpdateAccountNameResponse.from_dict(response.json())
+        response_200 = UpdateAccountResponse.from_dict(response.json())
 
         return response_200
     if client.raise_on_unexpected_status:
@@ -48,7 +48,7 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdateAccountNameResponse]:
+) -> Response[UpdateAccountResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -61,22 +61,22 @@ def sync_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountNameParams,
-) -> Response[UpdateAccountNameResponse]:
-    """Update account name
+    body: UpdateAccountParams,
+) -> Response[UpdateAccountResponse]:
+    """Update account
 
-     Update the name for an account
+     Update the properties of an account
 
     Args:
         name (str): The name of the account to update
-        body (UpdateAccountNameParams):
+        body (UpdateAccountParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAccountNameResponse]
+        Response[UpdateAccountResponse]
     """
 
     kwargs = _get_kwargs(
@@ -95,22 +95,22 @@ def sync(
     name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountNameParams,
-) -> Optional[UpdateAccountNameResponse]:
-    """Update account name
+    body: UpdateAccountParams,
+) -> Optional[UpdateAccountResponse]:
+    """Update account
 
-     Update the name for an account
+     Update the properties of an account
 
     Args:
         name (str): The name of the account to update
-        body (UpdateAccountNameParams):
+        body (UpdateAccountParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAccountNameResponse
+        UpdateAccountResponse
     """
 
     return sync_detailed(
@@ -124,22 +124,22 @@ async def asyncio_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountNameParams,
-) -> Response[UpdateAccountNameResponse]:
-    """Update account name
+    body: UpdateAccountParams,
+) -> Response[UpdateAccountResponse]:
+    """Update account
 
-     Update the name for an account
+     Update the properties of an account
 
     Args:
         name (str): The name of the account to update
-        body (UpdateAccountNameParams):
+        body (UpdateAccountParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAccountNameResponse]
+        Response[UpdateAccountResponse]
     """
 
     kwargs = _get_kwargs(
@@ -156,22 +156,22 @@ async def asyncio(
     name: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAccountNameParams,
-) -> Optional[UpdateAccountNameResponse]:
-    """Update account name
+    body: UpdateAccountParams,
+) -> Optional[UpdateAccountResponse]:
+    """Update account
 
-     Update the name for an account
+     Update the properties of an account
 
     Args:
         name (str): The name of the account to update
-        body (UpdateAccountNameParams):
+        body (UpdateAccountParams):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAccountNameResponse
+        UpdateAccountResponse
     """
 
     return (

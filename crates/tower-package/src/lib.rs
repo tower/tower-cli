@@ -3,7 +3,7 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
-use std::path::{Path, PathBuf, Component};
+use std::path::{Component, Path, PathBuf};
 use std::pin::Pin;
 use tmpdir::TmpDir;
 use tokio::{
@@ -22,7 +22,7 @@ pub use error::Error;
 
 // current version of the package format. we keep a version history here just in case anyone has
 // questions. will probably promote this to proper docs at some point.
-// 
+//
 // Version History:
 // 1 - Initial version
 // 2 - Add app_dir, modules_dir, and checksum
@@ -549,7 +549,7 @@ fn should_ignore_file(p: &PathBuf) -> bool {
 // normalize_path converts a Path to a normalized string with forward slashes as separators.
 fn normalize_path(path: &Path) -> Result<String, Error> {
     let mut next = Vec::new();
-    
+
     for component in path.components() {
         match component {
             Component::Prefix(_) | Component::RootDir => {
@@ -642,7 +642,12 @@ mod test {
 
     #[tokio::test]
     async fn test_normalize_path() {
-        let path = PathBuf::from(".").join("some").join("nested").join("path").join("to").join("file.txt");
+        let path = PathBuf::from(".")
+            .join("some")
+            .join("nested")
+            .join("path")
+            .join("to")
+            .join("file.txt");
         let normalized = normalize_path(&path).unwrap();
         assert_eq!(normalized, "some/nested/path/to/file.txt");
     }

@@ -12,15 +12,19 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     alert_type: Union[Unset, str] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
     environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
+
+    params["page"] = page
+
+    params["page_size"] = page_size
 
     params["alert_type"] = alert_type
 
@@ -33,10 +37,6 @@ def _get_kwargs(
     if not isinstance(end_at, Unset):
         json_end_at = end_at.isoformat()
     params["end_at"] = json_end_at
-
-    params["page"] = page
-
-    params["page_size"] = page_size
 
     params["acked"] = acked
 
@@ -80,11 +80,11 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     alert_type: Union[Unset, str] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
     environment: Union[Unset, str] = UNSET,
 ) -> Response[ListAlertsResponse]:
@@ -93,13 +93,13 @@ def sync_detailed(
      List alerts for the current account with optional filtering
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         alert_type (Union[Unset, str]): Filter alerts by alert type
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
         environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
@@ -112,11 +112,11 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
+        page=page,
+        page_size=page_size,
         alert_type=alert_type,
         start_at=start_at,
         end_at=end_at,
-        page=page,
-        page_size=page_size,
         acked=acked,
         environment=environment,
     )
@@ -131,11 +131,11 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     alert_type: Union[Unset, str] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
     environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListAlertsResponse]:
@@ -144,13 +144,13 @@ def sync(
      List alerts for the current account with optional filtering
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         alert_type (Union[Unset, str]): Filter alerts by alert type
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
         environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
@@ -164,11 +164,11 @@ def sync(
 
     return sync_detailed(
         client=client,
+        page=page,
+        page_size=page_size,
         alert_type=alert_type,
         start_at=start_at,
         end_at=end_at,
-        page=page,
-        page_size=page_size,
         acked=acked,
         environment=environment,
     ).parsed
@@ -177,11 +177,11 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     alert_type: Union[Unset, str] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
     environment: Union[Unset, str] = UNSET,
 ) -> Response[ListAlertsResponse]:
@@ -190,13 +190,13 @@ async def asyncio_detailed(
      List alerts for the current account with optional filtering
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         alert_type (Union[Unset, str]): Filter alerts by alert type
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
         environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
@@ -209,11 +209,11 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
+        page=page,
+        page_size=page_size,
         alert_type=alert_type,
         start_at=start_at,
         end_at=end_at,
-        page=page,
-        page_size=page_size,
         acked=acked,
         environment=environment,
     )
@@ -226,11 +226,11 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     alert_type: Union[Unset, str] = UNSET,
     start_at: Union[Unset, datetime.datetime] = UNSET,
     end_at: Union[Unset, datetime.datetime] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
     acked: Union[Unset, str] = UNSET,
     environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListAlertsResponse]:
@@ -239,13 +239,13 @@ async def asyncio(
      List alerts for the current account with optional filtering
 
     Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         alert_type (Union[Unset, str]): Filter alerts by alert type
         start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
             datetime (inclusive)
         end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
             (inclusive)
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
         acked (Union[Unset, str]): Filter alerts by acknowledged status.
         environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
 
@@ -260,11 +260,11 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            page=page,
+            page_size=page_size,
             alert_type=alert_type,
             start_at=start_at,
             end_at=end_at,
-            page=page,
-            page_size=page_size,
             acked=acked,
             environment=environment,
         )

@@ -12,7 +12,7 @@ from ...types import Response
 def _get_kwargs() -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/accounts/authenticator/generate",
+        "url": "/authenticators/generate",
     }
 
     return _kwargs
