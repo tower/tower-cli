@@ -10,6 +10,7 @@ from ..models.run_status_group import RunStatusGroup
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.run_initiator import RunInitiator
     from ..models.run_parameter import RunParameter
 
 
@@ -20,7 +21,7 @@ T = TypeVar("T", bound="Run")
 class Run:
     """
     Attributes:
-        link (str): Link to the run in the Tower UI
+        link (str): $link is deprecated. Individual responses include links.
         app_name (str):
         app_version (str):
         cancelled_at (Union[None, datetime.datetime]):
@@ -28,6 +29,9 @@ class Run:
         ended_at (Union[None, datetime.datetime]):
         environment (str):
         exit_code (Union[None, int]): Exit code of the run, if the run is completed. Null if there is no exit code
+        initiator (RunInitiator):
+        is_scheduled (bool): Whether this run was triggered by a schedule (true) or on-demand (false). Historical
+            records default to false.
         number (int):
         parameters (list['RunParameter']): Parameters used to invoke this run.
         run_id (str):
@@ -36,7 +40,9 @@ class Run:
         status (RunStatus):
         status_group (RunStatusGroup):
         app_slug (Union[Unset, str]): This property is deprecated. Please use app_name instead.
-        hostname (Union[Unset, str]): If app is externally accessible, then you can access this run with this hostname
+        hostname (Union[Unset, str]): hostname is deprecated, use subdomain
+        subdomain (Union[None, Unset, str]): If app is externally accessible, then you can access this run with this
+            hostname.
     """
 
     link: str
@@ -47,6 +53,8 @@ class Run:
     ended_at: Union[None, datetime.datetime]
     environment: str
     exit_code: Union[None, int]
+    initiator: "RunInitiator"
+    is_scheduled: bool
     number: int
     parameters: list["RunParameter"]
     run_id: str
@@ -56,6 +64,7 @@ class Run:
     status_group: RunStatusGroup
     app_slug: Union[Unset, str] = UNSET
     hostname: Union[Unset, str] = UNSET
+    subdomain: Union[None, Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         link = self.link
@@ -83,6 +92,10 @@ class Run:
         exit_code: Union[None, int]
         exit_code = self.exit_code
 
+        initiator = self.initiator.to_dict()
+
+        is_scheduled = self.is_scheduled
+
         number = self.number
 
         parameters = []
@@ -108,6 +121,12 @@ class Run:
 
         hostname = self.hostname
 
+        subdomain: Union[None, Unset, str]
+        if isinstance(self.subdomain, Unset):
+            subdomain = UNSET
+        else:
+            subdomain = self.subdomain
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
@@ -119,6 +138,8 @@ class Run:
                 "ended_at": ended_at,
                 "environment": environment,
                 "exit_code": exit_code,
+                "initiator": initiator,
+                "is_scheduled": is_scheduled,
                 "number": number,
                 "parameters": parameters,
                 "run_id": run_id,
@@ -132,11 +153,14 @@ class Run:
             field_dict["app_slug"] = app_slug
         if hostname is not UNSET:
             field_dict["hostname"] = hostname
+        if subdomain is not UNSET:
+            field_dict["subdomain"] = subdomain
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.run_initiator import RunInitiator
         from ..models.run_parameter import RunParameter
 
         d = dict(src_dict)
@@ -187,6 +211,10 @@ class Run:
 
         exit_code = _parse_exit_code(d.pop("exit_code"))
 
+        initiator = RunInitiator.from_dict(d.pop("initiator"))
+
+        is_scheduled = d.pop("is_scheduled")
+
         number = d.pop("number")
 
         parameters = []
@@ -223,6 +251,15 @@ class Run:
 
         hostname = d.pop("hostname", UNSET)
 
+        def _parse_subdomain(data: object) -> Union[None, Unset, str]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, str], data)
+
+        subdomain = _parse_subdomain(d.pop("subdomain", UNSET))
+
         run = cls(
             link=link,
             app_name=app_name,
@@ -232,6 +269,8 @@ class Run:
             ended_at=ended_at,
             environment=environment,
             exit_code=exit_code,
+            initiator=initiator,
+            is_scheduled=is_scheduled,
             number=number,
             parameters=parameters,
             run_id=run_id,
@@ -241,6 +280,7 @@ class Run:
             status_group=status_group,
             app_slug=app_slug,
             hostname=hostname,
+            subdomain=subdomain,
         )
 
         return run

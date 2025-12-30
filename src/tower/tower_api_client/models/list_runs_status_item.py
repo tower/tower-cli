@@ -8,7 +8,6 @@ class ListRunsStatusItem(str, Enum):
     EXITED = "exited"
     PENDING = "pending"
     RUNNING = "running"
-    SCHEDULED = "scheduled"
 
     def __str__(self) -> str:
         return str(self.value)

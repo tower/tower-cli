@@ -145,6 +145,8 @@ Updating, improving and correcting the documentation
 
 -->
 
+
+
 ## Styleguides
 ### Commit Messages
 <!-- TODO
@@ -157,3 +159,6 @@ Updating, improving and correcting the documentation
 <!-- omit in toc -->
 ## Attribution
 This guide is based on the [contributing.md](https://contributing.md/generator)!
+
+## License for Contributions
+By submitting a pull request, issue, or any other contribution to this repository, you agree that your contributions will be licensed under the same license that governs this project (as found in the [LICENSE](./LICENSE) file in the repository root). This means your contributions will be included under the project’s existing open source terms and conditions.

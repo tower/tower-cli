@@ -6,6 +6,7 @@ class CreateCatalogParamsType(str, Enum):
     CLOUDFLARE_R2_CATALOG = "cloudflare-r2-catalog"
     LAKEKEEPER = "lakekeeper"
     SNOWFLAKE_OPEN_CATALOG = "snowflake-open-catalog"
+    TOWER_CATALOG = "tower-catalog"
 
     def __str__(self) -> str:
         return str(self.value)

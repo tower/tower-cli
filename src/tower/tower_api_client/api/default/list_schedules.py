@@ -11,8 +11,8 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -61,8 +61,8 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
 ) -> Response[ListSchedulesResponse]:
     """List schedules
@@ -70,8 +70,8 @@ def sync_detailed(
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
             environments will be included.
 
@@ -99,8 +99,8 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListSchedulesResponse]:
     """List schedules
@@ -108,8 +108,8 @@ def sync(
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
             environments will be included.
 
@@ -132,8 +132,8 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
 ) -> Response[ListSchedulesResponse]:
     """List schedules
@@ -141,8 +141,8 @@ async def asyncio_detailed(
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
             environments will be included.
 
@@ -168,8 +168,8 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
     environment: Union[Unset, str] = UNSET,
 ) -> Optional[ListSchedulesResponse]:
     """List schedules
@@ -177,8 +177,8 @@ async def asyncio(
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch.
-        page_size (Union[Unset, int]): The number of records to fetch on each page.
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
         environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
             environments will be included.
 

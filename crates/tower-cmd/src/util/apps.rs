@@ -74,7 +74,8 @@ pub async fn ensure_app_exists(
                 name: app_name.to_string(),
                 short_description: Some(description.to_string()),
                 slug: None,
-                is_externally_accessible: None, // Add the missing field
+                is_externally_accessible: None,
+                subdomain: None,
             },
         },
     )

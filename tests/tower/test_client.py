@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from tower.tower_api_client.models import Run
+from tower.tower_api_client.models import Run, RunInitiator
 from tower.exceptions import RunFailedError
 
 
@@ -55,7 +55,14 @@ def mock_run_response_factory():
                 "exit_code": None,
                 "status_group": status_group,
                 "parameters": parameters,
-            }
+                "initiator": {"type": "tower_cli"},
+                "is_scheduled": False,
+            },
+            "$links": {
+                "next": None,
+                "prev": None,
+                "self": f"https://api.example.com/v1/apps/my-app/runs/{number}",
+            },
         }
 
     return _create_run_response
@@ -93,6 +100,12 @@ def create_run_object():
             status=status,
             status_group=status_group,
             parameters=parameters,
+            initiator=RunInitiator.from_dict(
+                {
+                    "type": "tower_cli",
+                }
+            ),
+            is_scheduled=False,
         )
 
     return _create_run

@@ -6,13 +6,26 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.list_environments_response import ListEnvironmentsResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+
+    params["page"] = page
+
+    params["page_size"] = page_size
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/environments",
+        "params": params,
     }
 
     return _kwargs
@@ -45,10 +58,16 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
 ) -> Response[ListEnvironmentsResponse]:
     """List environments
 
      List all environments in your account.
+
+    Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -58,7 +77,10 @@ def sync_detailed(
         Response[ListEnvironmentsResponse]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        page=page,
+        page_size=page_size,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -70,10 +92,16 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
 ) -> Optional[ListEnvironmentsResponse]:
     """List environments
 
      List all environments in your account.
+
+    Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -85,16 +113,24 @@ def sync(
 
     return sync_detailed(
         client=client,
+        page=page,
+        page_size=page_size,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
 ) -> Response[ListEnvironmentsResponse]:
     """List environments
 
      List all environments in your account.
+
+    Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -104,7 +140,10 @@ async def asyncio_detailed(
         Response[ListEnvironmentsResponse]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        page=page,
+        page_size=page_size,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -114,10 +153,16 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    page: Union[Unset, int] = 1,
+    page_size: Union[Unset, int] = 20,
 ) -> Optional[ListEnvironmentsResponse]:
     """List environments
 
      List all environments in your account.
+
+    Args:
+        page (Union[Unset, int]): The page number to fetch. Default: 1.
+        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -130,5 +175,7 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            page=page,
+            page_size=page_size,
         )
     ).parsed

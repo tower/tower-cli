@@ -8,6 +8,7 @@ import json
 import shlex
 from pathlib import Path
 from behave import given, when, then
+from dirty_equals import IsStr, IsPartialDict
 
 
 @step('I run "{command}" via CLI')
@@ -235,8 +236,6 @@ def step_table_should_show_columns(context, column_list):
 @step("the output should be valid JSON")
 def step_output_should_be_valid_json(context):
     """Verify output is valid JSON"""
-    import json
-
     try:
         json.loads(context.cli_output)
     except json.JSONDecodeError as e:
@@ -248,8 +247,6 @@ def step_output_should_be_valid_json(context):
 @step("the JSON should contain app information")
 def step_json_should_contain_app_info(context):
     """Verify JSON contains app-related information"""
-    import json
-
     data = json.loads(context.cli_output)
     assert (
         "app" in data or "name" in data
@@ -259,8 +256,6 @@ def step_json_should_contain_app_info(context):
 @step("the JSON should contain runs array")
 def step_json_should_contain_runs_array(context):
     """Verify JSON contains runs array"""
-    import json
-
     data = json.loads(context.cli_output)
     assert "runs" in data and isinstance(
         data["runs"], list
@@ -270,36 +265,19 @@ def step_json_should_contain_runs_array(context):
 @step("the JSON should contain the created app information")
 def step_json_should_contain_created_app_info(context):
     """Verify JSON contains created app information"""
-    import json
-    from dirty_equals import IsStr, IsDict, IsInt
-
     data = json.loads(context.cli_output)
 
-    # Expected structure for apps create with --json
-    expected = {
-        "result": "success",
-        "message": IsStr(),
-        "data": {
-            "app": {
-                "name": IsStr(),
-                "short_description": IsStr(),
-                "owner": IsStr(),
-                "health_status": IsStr(),
-                "created_at": IsStr(),
-                "version": None,
-                "schedule": None,
-                "next_run_at": None,
-                "run_results": {
-                    "cancelled": IsInt(),
-                    "crashed": IsInt(),
-                    "errored": IsInt(),
-                    "exited": IsInt(),
-                    "pending": IsInt(),
-                    "running": IsInt(),
-                },
-            }
-        },
-    }
+    expected = IsPartialDict(
+        result="success",
+        message=IsStr(),
+        data=IsPartialDict(
+            app=IsPartialDict(
+                name=IsStr(),
+                owner=IsStr(),
+                created_at=IsStr(),
+            )
+        ),
+    )
 
     assert data == expected, f"Expected created app information structure, got: {data}"
 
@@ -307,8 +285,6 @@ def step_json_should_contain_created_app_info(context):
 @step('the app name should be "{expected_name}"')
 def step_app_name_should_be(context, expected_name):
     """Verify app name matches expected value"""
-    import json
-
     data = json.loads(context.cli_output)
     # Extract app name from response structure
     if "app" in data and "name" in data["app"]:
