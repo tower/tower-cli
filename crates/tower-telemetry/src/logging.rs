@@ -183,22 +183,26 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
 
     match destination {
         LogDestination::Stdout => match format {
-            LogFormat::Plain => Box::new(fmt::layer().event_format(
-                fmt::format()
-                    .pretty()
-                    .with_target(false)
-                    .with_file(false)
-                    .with_line_number(false)
-                    .with_ansi(use_color)
-            )),
-            LogFormat::Json => Box::new(fmt::layer().event_format(
-                fmt::format()
-                    .json()
-                    .with_target(false)
-                    .with_file(false)
-                    .with_line_number(false)
-                    .with_ansi(use_color)
-            )),
+            LogFormat::Plain => Box::new(
+                fmt::layer().event_format(
+                    fmt::format()
+                        .pretty()
+                        .with_target(false)
+                        .with_file(false)
+                        .with_line_number(false)
+                        .with_ansi(use_color),
+                ),
+            ),
+            LogFormat::Json => Box::new(
+                fmt::layer().event_format(
+                    fmt::format()
+                        .json()
+                        .with_target(false)
+                        .with_file(false)
+                        .with_line_number(false)
+                        .with_ansi(use_color),
+                ),
+            ),
         },
         LogDestination::File(path) => {
             let file_appender = tracing_appender::rolling::daily(".", path);
@@ -211,7 +215,7 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
                                 .with_target(false)
                                 .with_file(false)
                                 .with_line_number(false)
-                                .with_ansi(use_color)
+                                .with_ansi(use_color),
                         )
                         .with_writer(file_appender),
                 ),
@@ -223,7 +227,7 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
                                 .with_target(false)
                                 .with_file(false)
                                 .with_line_number(false)
-                                .with_ansi(use_color)
+                                .with_ansi(use_color),
                         )
                         .with_writer(file_appender),
                 ),

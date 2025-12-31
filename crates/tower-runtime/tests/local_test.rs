@@ -56,7 +56,7 @@ async fn test_running_hello_world_json_logs() {
         secrets: HashMap::new(),
         parameters: HashMap::new(),
         env_vars: HashMap::new(),
-        cache_dir: Some(config::default_cache_dir())
+        cache_dir: Some(config::default_cache_dir()),
     };
 
     // Start the app using the LocalApp runtime
