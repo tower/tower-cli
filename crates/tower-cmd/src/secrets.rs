@@ -159,6 +159,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
         Err(err) => {
             debug!("Failed to create secrets: {}", err);
             spinner.failure();
+            std::process::exit(1);
         }
     }
 }
@@ -169,11 +170,15 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
 
     let mut spinner = output::spinner("Deleting secret...");
 
-    if let Ok(_) = api::delete_secret(&config, &name, &environment).await {
-        spinner.success();
-    } else {
-        spinner.failure();
-        output::die("There was a problem with the Tower API! Please try again later.");
+    match api::delete_secret(&config, &name, &environment).await {
+        Ok(_) => {
+            spinner.success();
+        }
+        Err(err) => {
+            spinner.failure();
+            output::tower_error(err);
+            std::process::exit(1);
+        }
     }
 }
 
@@ -209,8 +214,8 @@ async fn encrypt_and_create_secret(
             api::create_secret(&config, name, environment, &encrypted_value, &preview).await
         }
         Err(err) => {
-            debug!("failed to talk to tower api: {}", err);
-            output::die("There was a problem with the Tower API! Please try again later.");
+            output::tower_error(err);
+            std::process::exit(1);
         }
     }
 }

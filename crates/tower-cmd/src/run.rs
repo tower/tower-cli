@@ -467,7 +467,7 @@ async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, Strin
     let res = api::export_secrets(&config, env, false, public_key)
         .await
         .map_err(|err| {
-            debug!("API error fetching secrets: {:?}", err);
+            output::tower_error(err);
             Error::FetchingSecretsFailed
         })?;
     let mut secrets = HashMap::new();
@@ -490,7 +490,7 @@ async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, Stri
     let res = api::export_catalogs(&config, env, false, public_key)
         .await
         .map_err(|err| {
-            debug!("API error fetching catalogs: {:?}", err);
+            output::tower_error(err);
             Error::FetchingCatalogsFailed
         })?;
     let mut vals = HashMap::new();
