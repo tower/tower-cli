@@ -255,8 +255,7 @@ pub async fn do_run_remote(
     };
 
     let res = output::try_with_spinner(
-        "Scheduling run...",
-        "Scheduling run failed",
+        "Scheduling run",
         api::run_app(&config, &app_slug, env, params),
     )
     .await

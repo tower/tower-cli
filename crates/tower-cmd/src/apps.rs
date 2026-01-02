@@ -138,12 +138,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    let resp = output::with_spinner(
-        "Listing apps...",
-        "Listing apps failed",
-        api::list_apps(&config),
-    )
-    .await;
+    let resp = output::with_spinner("Listing apps", api::list_apps(&config)).await;
 
     let items = resp
         .apps
@@ -168,12 +163,8 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     let description = args.get_one::<String>("description").unwrap();
 
-    let app = output::with_spinner(
-        "Creating app",
-        "Creating app failed",
-        api::create_app(&config, name, description),
-    )
-    .await;
+    let app =
+        output::with_spinner("Creating app", api::create_app(&config, name, description)).await;
 
     output::success_with_data(&format!("App '{}' created", name), Some(app));
 }
@@ -181,12 +172,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 pub async fn do_delete(config: Config, cmd: &ArgMatches) {
     let name = extract_app_name("delete", cmd.subcommand());
 
-    output::with_spinner(
-        "Deleting app",
-        "Deleting app failed",
-        api::delete_app(&config, &name),
-    )
-    .await;
+    output::with_spinner("Deleting app", api::delete_app(&config, &name)).await;
 }
 
 /// Extract app name and run number from command

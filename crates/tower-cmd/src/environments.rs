@@ -24,12 +24,7 @@ pub fn environments_cmd() -> Command {
 }
 
 pub async fn do_list(config: Config) {
-    let resp = output::with_spinner(
-        "Listing environments...",
-        "Listing environments failed",
-        api::list_environments(&config),
-    )
-    .await;
+    let resp = output::with_spinner("Listing environments", api::list_environments(&config)).await;
 
     let headers = vec!["Name"]
         .into_iter()
@@ -53,7 +48,6 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     output::with_spinner(
         "Creating environment",
-        "Creating environment failed",
         api::create_environment(&config, name),
     )
     .await;

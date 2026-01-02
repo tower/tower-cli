@@ -27,12 +27,7 @@ async fn refresh_session(config: &Config) -> config::Session {
         }
     };
 
-    let resp = output::with_spinner(
-        "Refreshing session...",
-        "Refreshing session failed",
-        api::refresh_session(&config),
-    )
-    .await;
+    let resp = output::with_spinner("Refreshing session", api::refresh_session(&config)).await;
 
     // Create a mutable copy of the session to update
     let mut session = current_session;

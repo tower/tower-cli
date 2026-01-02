@@ -86,8 +86,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         let (private_key, public_key) = crypto::generate_key_pair();
 
         let list_response = output::with_spinner(
-            "Listing secrets...",
-            "Listing secrets failed",
+            "Listing secrets",
             api::export_secrets(&config, &env, all, public_key),
         )
         .await;
@@ -114,12 +113,8 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
             .collect();
         output::table(headers, data, Some(&list_response.secrets));
     } else {
-        let list_response = output::with_spinner(
-            "Listing secrets...",
-            "Listing secrets failed",
-            api::list_secrets(&config, &env, all),
-        )
-        .await;
+        let list_response =
+            output::with_spinner("Listing secrets", api::list_secrets(&config, &env, all)).await;
 
         let headers = vec![
             "Secret".bold().yellow().to_string(),
@@ -175,8 +170,7 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
     debug!("deleting secret, environment={} name={}", environment, name);
 
     output::with_spinner(
-        "Deleting secret...",
-        "Deleting secret failed",
+        "Deleting secret",
         api::delete_secret(&config, &name, &environment),
     )
     .await;

@@ -101,8 +101,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let environment = args.get_one::<String>("environment").map(|s| s.as_str());
 
     let response = output::with_spinner(
-        "Listing schedules...",
-        "Listing schedules failed",
+        "Listing schedules",
         api::list_schedules(&config, app, environment),
     )
     .await;
@@ -150,7 +149,6 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     let response = output::with_spinner(
         "Creating schedule",
-        "Creating schedule failed",
         api::create_schedule(&config, app_name, environment, cron, parameters),
     )
     .await;
@@ -168,7 +166,6 @@ pub async fn do_update(config: Config, args: &ArgMatches) {
 
     output::with_spinner(
         "Updating schedule",
-        "Updating schedule failed",
         api::update_schedule(&config, &schedule_id, cron, parameters),
     )
     .await;
@@ -181,7 +178,6 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
 
     output::with_spinner(
         "Deleting schedule",
-        "Deleting schedule failed",
         api::delete_schedule(&config, &schedule_id),
     )
     .await;

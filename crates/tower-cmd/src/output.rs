@@ -343,7 +343,7 @@ pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
 /// Runs an async operation with a spinner and proper error handling.
 ///
 /// This helper provides consistent spinner behavior across all commands:
-/// - Shows a spinner with the given message while the operation runs
+/// - Shows a spinner with "{operation}..." while the operation runs
 /// - On success: stops the spinner with success indicator and returns the result
 /// - On error: stops the spinner with failure indicator and shows auth-aware error message
 ///
@@ -351,16 +351,16 @@ pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
 ///
 /// ```ignore
 /// let envs = output::with_spinner(
-///     "Listing environments...",
-///     "Listing environments failed",
+///     "Listing environments",
 ///     api::list_environments(&config)
 /// ).await;
 /// ```
-pub async fn with_spinner<F, T, E>(spinner_msg: &str, error_operation: &str, future: F) -> T
+pub async fn with_spinner<F, T, E>(operation: &str, future: F) -> T
 where
     F: std::future::Future<Output = Result<T, ApiError<E>>>,
 {
-    let mut spinner = self::spinner(spinner_msg);
+    let spinner_msg = format!("{}...", operation);
+    let mut spinner = self::spinner(&spinner_msg);
     match future.await {
         Ok(result) => {
             spinner.success();
@@ -368,7 +368,8 @@ where
         }
         Err(err) => {
             spinner.failure();
-            tower_error_and_die(err, error_operation);
+            let error_msg = format!("{} failed", operation);
+            tower_error_and_die(err, &error_msg);
         }
     }
 }
@@ -379,15 +380,14 @@ where
 /// Use this for operations that may be called from MCP or other contexts where
 /// process exit is not acceptable. Returns the error without displaying it, allowing
 /// the caller to decide how to handle and display the error.
-pub async fn try_with_spinner<F, T, E>(
-    spinner_msg: &str,
-    _error_operation: &str,
-    future: F,
-) -> Result<T, ApiError<E>>
+///
+/// Shows "{operation}..." during execution and stops the spinner on completion.
+pub async fn try_with_spinner<F, T, E>(operation: &str, future: F) -> Result<T, ApiError<E>>
 where
     F: std::future::Future<Output = Result<T, ApiError<E>>>,
 {
-    let mut spinner = self::spinner(spinner_msg);
+    let spinner_msg = format!("{}...", operation);
+    let mut spinner = self::spinner(&spinner_msg);
     match future.await {
         Ok(result) => {
             spinner.success();
