@@ -125,10 +125,7 @@ where
     let mut spinner = output::spinner("Setting up runtime environment...");
 
     let secrets = match get_secrets(&config, &env).await {
-        Ok(s) => {
-            spinner.success();
-            s
-        }
+        Ok(s) => s,
         Err(err) => {
             spinner.failure();
             output::tower_error_and_die(err, "Fetching secrets failed");
@@ -136,15 +133,14 @@ where
     };
 
     let catalogs = match get_catalogs(&config, &env).await {
-        Ok(s) => {
-            spinner.success();
-            s
-        }
+        Ok(c) => c,
         Err(err) => {
             spinner.failure();
-            output::tower_error_and_die(err, "Fetching secrets failed");
+            output::tower_error_and_die(err, "Fetching catalogs failed");
         }
     };
+
+    spinner.success();
 
     // We prepare all the other misc environment variables that we need to inject
     let mut env_vars = HashMap::new();
