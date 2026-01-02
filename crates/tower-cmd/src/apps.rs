@@ -133,17 +133,17 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 
             output::table(headers, rows, Some(&app_response));
         }
-        Err(err) => {
-            output::tower_error(err);
-        }
+        Err(err) => output::tower_error_and_die(err, "Fetching app details failed"),
     }
 }
 
 pub async fn do_list_apps(config: Config) {
+    let mut spinner = output::spinner("Listing apps...");
     let resp = api::list_apps(&config).await;
 
     match resp {
         Ok(resp) => {
+            spinner.success();
             let items = resp
                 .apps
                 .iter()
@@ -160,7 +160,8 @@ pub async fn do_list_apps(config: Config) {
             output::list(items, Some(&resp.apps));
         }
         Err(err) => {
-            output::tower_error(err);
+            spinner.failure();
+            output::tower_error_and_die(err, "Listing apps failed");
         }
     }
 }
@@ -181,7 +182,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
         }
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            output::tower_error_and_die(err, "Creating app failed");
         }
     }
 }
@@ -192,7 +193,7 @@ pub async fn do_delete(config: Config, cmd: &ArgMatches) {
 
     if let Err(err) = api::delete_app(&config, &name).await {
         spinner.failure();
-        output::tower_error(err);
+        output::tower_error_and_die(err, "Deleting app failed");
     } else {
         spinner.success();
     }

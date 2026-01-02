@@ -240,8 +240,7 @@ pub async fn do_run_remote(
         Err(err) => {
             spinner.failure();
             debug!("Failed to schedule run: {}", err);
-            output::tower_error(err);
-            Err(Error::RunFailed)
+            output::tower_error_and_die(err, "Scheduling run failed");
         }
         Ok(res) => {
             spinner.success();
@@ -466,10 +465,9 @@ async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, Strin
 
     let res = api::export_secrets(&config, env, false, public_key)
         .await
-        .map_err(|err| {
-            output::tower_error(err);
-            Error::FetchingSecretsFailed
-        })?;
+        .unwrap_or_else(|err| {
+            output::tower_error_and_die(err, "Fetching secrets failed");
+        });
     let mut secrets = HashMap::new();
 
     for secret in res.secrets {
@@ -489,10 +487,9 @@ async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, Stri
 
     let res = api::export_catalogs(&config, env, false, public_key)
         .await
-        .map_err(|err| {
-            output::tower_error(err);
-            Error::FetchingCatalogsFailed
-        })?;
+        .unwrap_or_else(|err| {
+            output::tower_error_and_die(err, "Fetching catalogs failed");
+        });
     let mut vals = HashMap::new();
 
     for catalog in res.catalogs {

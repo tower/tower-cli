@@ -100,8 +100,10 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let app = args.get_one::<String>("app").map(|s| s.as_str());
     let environment = args.get_one::<String>("environment").map(|s| s.as_str());
 
+    let mut spinner = output::spinner("Listing schedules...");
     match api::list_schedules(&config, app, environment).await {
         Ok(response) => {
+            spinner.success();
             if response.schedules.is_empty() {
                 output::write("No schedules found.\n");
                 return;
@@ -137,7 +139,8 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
             output::table(headers, rows, Some(&response.schedules));
         }
         Err(err) => {
-            output::tower_error(err);
+            spinner.failure();
+            output::tower_error_and_die(err, "Listing schedules failed");
         }
     }
 }
@@ -160,7 +163,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
         }
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            output::tower_error_and_die(err, "Creating schedule failed");
         }
     }
 }
@@ -178,7 +181,7 @@ pub async fn do_update(config: Config, args: &ArgMatches) {
         }
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            output::tower_error_and_die(err, "Updating schedule failed");
         }
     }
 }
@@ -194,7 +197,7 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
         }
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
+            output::tower_error_and_die(err, "Deleting schedule failed");
         }
     }
 }

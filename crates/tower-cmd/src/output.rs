@@ -319,6 +319,27 @@ pub fn tower_error<T>(err: ApiError<T>) {
     }
 }
 
+/// Handles Tower API errors with context-specific authentication messages.
+/// If the error is a 401 Unauthorized, provides a helpful message mentioning
+/// the operation that failed and suggests running 'tower login'.
+/// Otherwise, delegates to tower_error() for standard error handling.
+/// Always exits the process with error code 1.
+pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
+    // Check if this is an authentication error
+    if let ApiError::ResponseError(ref resp) = err {
+        if resp.status == StatusCode::UNAUTHORIZED {
+            die(&format!(
+                "{} because you are not logged into Tower. Please run 'tower login' first.",
+                operation
+            ));
+        }
+    }
+
+    // For other errors, use standard error handling
+    tower_error(err);
+    std::process::exit(1);
+}
+
 pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_data: Option<&T>) {
     if get_output_mode().is_json() {
         if let Some(data) = json_data {

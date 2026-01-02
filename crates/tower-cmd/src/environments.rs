@@ -24,10 +24,12 @@ pub fn environments_cmd() -> Command {
 }
 
 pub async fn do_list(config: Config) {
+    let mut spinner = output::spinner("Listing environments...");
     let resp = api::list_environments(&config).await;
 
     match resp {
         Ok(resp) => {
+            spinner.success();
             let headers = vec!["Name"]
                 .into_iter()
                 .map(|h| h.yellow().to_string())
@@ -43,7 +45,8 @@ pub async fn do_list(config: Config) {
             output::table(headers, envs_data, Some(&resp.environments));
         }
         Err(err) => {
-            output::tower_error(err);
+            spinner.failure();
+            output::tower_error_and_die(err, "Listing environments failed");
         }
     }
 }
@@ -57,7 +60,7 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     if let Err(err) = api::create_environment(&config, name).await {
         spinner.failure();
-        output::tower_error(err);
+        output::tower_error_and_die(err, "Creating environment failed");
     } else {
         spinner.success();
         output::success(&format!("Environment '{}' created", name));

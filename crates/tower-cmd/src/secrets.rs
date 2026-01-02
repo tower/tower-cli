@@ -4,10 +4,7 @@ use config::Config;
 use crypto::encrypt;
 use rsa::pkcs1::DecodeRsaPublicKey;
 
-use tower_api::{
-    apis::{default_api::CreateSecretError, Error},
-    models::CreateSecretResponse,
-};
+use tower_api::models::CreateSecretResponse;
 use tower_telemetry::debug;
 
 use crate::{api, output, util::cmd};
@@ -88,8 +85,10 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     if show {
         let (private_key, public_key) = crypto::generate_key_pair();
 
+        let mut spinner = output::spinner("Listing secrets...");
         match api::export_secrets(&config, &env, all, public_key).await {
             Ok(list_response) => {
+                spinner.success();
                 let headers = vec![
                     "Secret".bold().yellow().to_string(),
                     "Environment".bold().yellow().to_string(),
@@ -113,11 +112,16 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                     .collect();
                 output::table(headers, data, Some(&list_response.secrets));
             }
-            Err(err) => output::tower_error(err),
+            Err(err) => {
+                spinner.failure();
+                output::tower_error_and_die(err, "Listing secrets failed");
+            }
         }
     } else {
+        let mut spinner = output::spinner("Listing secrets...");
         match api::list_secrets(&config, &env, all).await {
             Ok(list_response) => {
+                spinner.success();
                 let headers = vec![
                     "Secret".bold().yellow().to_string(),
                     "Environment".bold().yellow().to_string(),
@@ -136,7 +140,10 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                     .collect();
                 output::table(headers, data, Some(&list_response.secrets));
             }
-            Err(err) => output::tower_error(err),
+            Err(err) => {
+                spinner.failure();
+                output::tower_error_and_die(err, "Listing secrets failed");
+            }
         }
     }
 }
@@ -157,9 +164,15 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
             output::success(&line);
         }
         Err(err) => {
-            debug!("Failed to create secrets: {}", err);
             spinner.failure();
-            std::process::exit(1);
+            match err {
+                SecretCreationError::FetchKeyFailed(e) => {
+                    output::tower_error_and_die(e, "Fetching secrets key failed");
+                }
+                SecretCreationError::CreateFailed(e) => {
+                    output::tower_error_and_die(e, "Creating secret failed");
+                }
+            }
         }
     }
 }
@@ -176,8 +189,7 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
         }
         Err(err) => {
             spinner.failure();
-            output::tower_error(err);
-            std::process::exit(1);
+            output::tower_error_and_die(err, "Deleting secret failed");
         }
     }
 }
@@ -195,29 +207,31 @@ fn create_preview(value: &str) -> String {
     }
 }
 
+enum SecretCreationError {
+    FetchKeyFailed(tower_api::apis::Error<tower_api::apis::default_api::DescribeSecretsKeyError>),
+    CreateFailed(tower_api::apis::Error<tower_api::apis::default_api::CreateSecretError>),
+}
+
 async fn encrypt_and_create_secret(
     config: &Config,
     name: &str,
     value: &str,
     environment: &str,
-) -> Result<CreateSecretResponse, Error<CreateSecretError>> {
-    match api::describe_secrets_key(config).await {
-        Ok(res) => {
-            let public_key =
-                rsa::RsaPublicKey::from_pkcs1_pem(&res.public_key).unwrap_or_else(|_| {
-                    output::die("Failed to parse public key");
-                });
+) -> Result<CreateSecretResponse, SecretCreationError> {
+    let res = api::describe_secrets_key(config)
+        .await
+        .map_err(SecretCreationError::FetchKeyFailed)?;
 
-            let encrypted_value = encrypt(public_key, value.to_string()).unwrap();
-            let preview = create_preview(value);
+    let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&res.public_key).unwrap_or_else(|_| {
+        output::die("Failed to parse public key");
+    });
 
-            api::create_secret(&config, name, environment, &encrypted_value, &preview).await
-        }
-        Err(err) => {
-            output::tower_error(err);
-            std::process::exit(1);
-        }
-    }
+    let encrypted_value = encrypt(public_key, value.to_string()).unwrap();
+    let preview = create_preview(value);
+
+    api::create_secret(&config, name, environment, &encrypted_value, &preview)
+        .await
+        .map_err(SecretCreationError::CreateFailed)
 }
 
 fn extract_secret_environment_and_name(
