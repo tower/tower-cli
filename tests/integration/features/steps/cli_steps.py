@@ -6,6 +6,7 @@ import tempfile
 import shutil
 import json
 import shlex
+from datetime import datetime
 from pathlib import Path
 from behave import given, when, then
 from dirty_equals import IsStr, IsPartialDict
@@ -84,10 +85,11 @@ def step_log_lines_should_be_separate(context):
     assert len(lines) > 3, f"Expected multiple lines of output, got: {len(lines)} lines"
 
     # Lines with timestamps should not be concatenated
+    current_year = str(datetime.now().year)
     timestamp_lines = [
         line
         for line in lines
-        if "2025-" in line and ("Hello" in line or "Creating" in line)
+        if current_year in line and ("Hello" in line or "Creating" in line)
     ]
     assert (
         len(timestamp_lines) > 1
