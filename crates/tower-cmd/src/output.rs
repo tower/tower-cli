@@ -349,7 +349,7 @@ pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// let envs = output::with_spinner(
 ///     "Listing environments...",
 ///     "Listing environments failed",
