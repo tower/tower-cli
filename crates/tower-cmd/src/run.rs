@@ -60,7 +60,14 @@ pub fn run_cmd() -> Command {
 
 pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
     if let Err(e) = do_run_inner(config, args, cmd).await {
-        output::die(&e.to_string());
+        match e {
+            Error::ApiRunError { source } => {
+                output::tower_error_and_die(source, "Scheduling run failed");
+            }
+            _ => {
+                output::die(&e.to_string());
+            }
+        }
     }
 }
 
@@ -114,13 +121,30 @@ where
     Fut: std::future::Future<Output = T> + Send + 'static,
     T: Send + 'static,
 {
+    // Load all the secrets and catalogs from the server
     let mut spinner = output::spinner("Setting up runtime environment...");
 
-    // Load all the secrets and catalogs from the server
-    let secrets = get_secrets(&config, &env).await?;
-    let catalogs = get_catalogs(&config, &env).await?;
+    let secrets = match get_secrets(&config, &env).await {
+        Ok(s) => {
+            spinner.success();
+            s
+        }
+        Err(err) => {
+            spinner.failure();
+            output::tower_error_and_die(err, "Fetching secrets failed");
+        }
+    };
 
-    spinner.success();
+    let catalogs = match get_catalogs(&config, &env).await {
+        Ok(s) => {
+            spinner.success();
+            s
+        }
+        Err(err) => {
+            spinner.failure();
+            output::tower_error_and_die(err, "Fetching secrets failed");
+        }
+    };
 
     // We prepare all the other misc environment variables that we need to inject
     let mut env_vars = HashMap::new();
@@ -234,12 +258,13 @@ pub async fn do_run_remote(
         towerfile.app.name
     };
 
-    let res = output::with_spinner(
+    let res = output::try_with_spinner(
         "Scheduling run...",
         "Scheduling run failed",
         api::run_app(&config, &app_slug, env, params),
     )
-    .await;
+    .await
+    .map_err(|source| Error::ApiRunError { source })?;
 
     let run = res.run;
 
@@ -452,45 +477,69 @@ fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
     }
 }
 
-/// get_secrets manages the process of getting secrets from the Tower server in a way that can be
-/// used by the local runtime during local app execution.
-async fn get_secrets(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
+/// get_secrets_inner manages the process of getting secrets from the Tower server in a way that can be
+/// used by the local runtime during local app execution. Returns API errors for spinner handling.
+async fn get_secrets(
+    config: &Config,
+    env: &str,
+) -> Result<
+    HashMap<String, String>,
+    tower_api::apis::Error<tower_api::apis::default_api::ExportSecretsError>,
+> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
-    let res = api::export_secrets(&config, env, false, public_key)
-        .await
-        .unwrap_or_else(|err| {
-            output::tower_error_and_die(err, "Fetching secrets failed");
-        });
+    let res = api::export_secrets(&config, env, false, public_key).await?;
     let mut secrets = HashMap::new();
 
     for secret in res.secrets {
         // we will decrypt each property and inject it into the vals map.
         let decrypted_value =
-            crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string())?;
+            crypto::decrypt(private_key.clone(), secret.encrypted_value.to_string()).map_err(
+                |_| {
+                    tower_api::apis::Error::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Failed to decrypt secret",
+                    ))
+                },
+            )?;
         secrets.insert(secret.name, decrypted_value);
     }
 
     Ok(secrets)
 }
 
-/// get_catalogs manages the process of exporting catalogs, decrypting their properties, and
-/// preparting them for injection into the environment during app execution
-async fn get_catalogs(config: &Config, env: &str) -> Result<HashMap<String, String>, Error> {
+/// get_catalogs_inner manages the process of exporting catalogs, decrypting their properties, and
+/// preparting them for injection into the environment during app execution. Returns plain Error for direct use.
+async fn get_catalogs(
+    config: &Config,
+    env: &str,
+) -> Result<
+    HashMap<String, String>,
+    tower_api::apis::Error<tower_api::apis::default_api::ExportCatalogsError>,
+> {
     let (private_key, public_key) = crypto::generate_key_pair();
 
     let res = api::export_catalogs(&config, env, false, public_key)
         .await
-        .unwrap_or_else(|err| {
-            output::tower_error_and_die(err, "Fetching catalogs failed");
-        });
+        .map_err(|_| {
+            tower_api::apis::Error::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed to export catalogs",
+            ))
+        })?;
     let mut vals = HashMap::new();
 
     for catalog in res.catalogs {
         // we will decrypt each property and inject it into the vals map.
         for property in catalog.properties {
             let decrypted_value =
-                crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())?;
+                crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())
+                    .map_err(|_| {
+                        tower_api::apis::Error::Io(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "Failed to decrypt catalog property",
+                        ))
+                    })?;
             let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
             vals.insert(name, decrypted_value);
         }

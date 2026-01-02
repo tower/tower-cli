@@ -211,6 +211,7 @@ pub fn write(msg: &str) {
         send_to_current_sender(clean_msg);
     } else {
         io::stdout().write_all(msg.as_bytes()).unwrap();
+        io::stdout().flush().ok();
     }
 }
 
@@ -322,7 +323,6 @@ pub fn tower_error<T>(err: ApiError<T>) {
 /// Handles Tower API errors with context-specific authentication messages.
 /// If the error is a 401 Unauthorized, provides a helpful message mentioning
 /// the operation that failed and suggests running 'tower login'.
-/// Otherwise, delegates to tower_error() for standard error handling.
 /// Always exits the process with error code 1.
 pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
     // Check if this is an authentication error
@@ -335,9 +335,9 @@ pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
         }
     }
 
-    // For other errors, use standard error handling
+    // Show the detailed error first
     tower_error(err);
-    std::process::exit(1);
+    die(operation);
 }
 
 /// Runs an async operation with a spinner and proper error handling.
@@ -369,6 +369,34 @@ where
         Err(err) => {
             spinner.failure();
             tower_error_and_die(err, error_operation);
+        }
+    }
+}
+
+/// Runs an async operation with a spinner, returning Result instead of exiting.
+///
+/// This is the MCP-safe version of with_spinner that returns errors instead of exiting.
+/// Use this for operations that may be called from MCP or other contexts where
+/// process exit is not acceptable. Returns the error without displaying it, allowing
+/// the caller to decide how to handle and display the error.
+pub async fn try_with_spinner<F, T, E>(
+    spinner_msg: &str,
+    _error_operation: &str,
+    future: F,
+) -> Result<T, ApiError<E>>
+where
+    F: std::future::Future<Output = Result<T, ApiError<E>>>,
+{
+    let mut spinner = self::spinner(spinner_msg);
+    match future.await {
+        Ok(result) => {
+            spinner.success();
+            Ok(result)
+        }
+        Err(err) => {
+            spinner.failure();
+            // Just return the error - let the caller decide how to handle it
+            Err(err)
         }
     }
 }
@@ -496,8 +524,13 @@ pub fn newline() {
 }
 
 pub fn die(msg: &str) -> ! {
+    io::stdout().flush().ok();
+    io::stderr().flush().ok();
     let line = format!("{} {}\n", "Error:".red(), msg);
     write(&line);
+    // Flush output before exit to ensure "Error:" message is displayed
+    io::stdout().flush().ok();
+    io::stderr().flush().ok();
     std::process::exit(1);
 }
 
