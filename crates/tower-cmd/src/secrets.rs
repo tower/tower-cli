@@ -85,66 +85,59 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     if show {
         let (private_key, public_key) = crypto::generate_key_pair();
 
-        let mut spinner = output::spinner("Listing secrets...");
-        match api::export_secrets(&config, &env, all, public_key).await {
-            Ok(list_response) => {
-                spinner.success();
-                let headers = vec![
-                    "Secret".bold().yellow().to_string(),
-                    "Environment".bold().yellow().to_string(),
-                    "Value".bold().yellow().to_string(),
-                ];
-                let data = list_response
-                    .secrets
-                    .iter()
-                    .map(|secret| {
-                        // now we decrypt the value and show it.
-                        let decrypted_value =
-                            crypto::decrypt(private_key.clone(), secret.encrypted_value.clone())
-                                .unwrap();
+        let list_response = output::with_spinner(
+            "Listing secrets...",
+            "Listing secrets failed",
+            api::export_secrets(&config, &env, all, public_key),
+        )
+        .await;
 
-                        vec![
-                            secret.name.clone(),
-                            secret.environment.clone(),
-                            decrypted_value,
-                        ]
-                    })
-                    .collect();
-                output::table(headers, data, Some(&list_response.secrets));
-            }
-            Err(err) => {
-                spinner.failure();
-                output::tower_error_and_die(err, "Listing secrets failed");
-            }
-        }
+        let headers = vec![
+            "Secret".bold().yellow().to_string(),
+            "Environment".bold().yellow().to_string(),
+            "Value".bold().yellow().to_string(),
+        ];
+        let data = list_response
+            .secrets
+            .iter()
+            .map(|secret| {
+                // now we decrypt the value and show it.
+                let decrypted_value =
+                    crypto::decrypt(private_key.clone(), secret.encrypted_value.clone()).unwrap();
+
+                vec![
+                    secret.name.clone(),
+                    secret.environment.clone(),
+                    decrypted_value,
+                ]
+            })
+            .collect();
+        output::table(headers, data, Some(&list_response.secrets));
     } else {
-        let mut spinner = output::spinner("Listing secrets...");
-        match api::list_secrets(&config, &env, all).await {
-            Ok(list_response) => {
-                spinner.success();
-                let headers = vec![
-                    "Secret".bold().yellow().to_string(),
-                    "Environment".bold().yellow().to_string(),
-                    "Preview".bold().yellow().to_string(),
-                ];
-                let data = list_response
-                    .secrets
-                    .iter()
-                    .map(|secret| {
-                        vec![
-                            secret.name.clone(),
-                            secret.environment.clone(),
-                            secret.preview.dimmed().to_string(),
-                        ]
-                    })
-                    .collect();
-                output::table(headers, data, Some(&list_response.secrets));
-            }
-            Err(err) => {
-                spinner.failure();
-                output::tower_error_and_die(err, "Listing secrets failed");
-            }
-        }
+        let list_response = output::with_spinner(
+            "Listing secrets...",
+            "Listing secrets failed",
+            api::list_secrets(&config, &env, all),
+        )
+        .await;
+
+        let headers = vec![
+            "Secret".bold().yellow().to_string(),
+            "Environment".bold().yellow().to_string(),
+            "Preview".bold().yellow().to_string(),
+        ];
+        let data = list_response
+            .secrets
+            .iter()
+            .map(|secret| {
+                vec![
+                    secret.name.clone(),
+                    secret.environment.clone(),
+                    secret.preview.dimmed().to_string(),
+                ]
+            })
+            .collect();
+        output::table(headers, data, Some(&list_response.secrets));
     }
 }
 
@@ -181,17 +174,12 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
     let (environment, name) = extract_secret_environment_and_name("delete", args.subcommand());
     debug!("deleting secret, environment={} name={}", environment, name);
 
-    let mut spinner = output::spinner("Deleting secret...");
-
-    match api::delete_secret(&config, &name, &environment).await {
-        Ok(_) => {
-            spinner.success();
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Deleting secret failed");
-        }
-    }
+    output::with_spinner(
+        "Deleting secret...",
+        "Deleting secret failed",
+        api::delete_secret(&config, &name, &environment),
+    )
+    .await;
 }
 
 fn create_preview(value: &str) -> String {

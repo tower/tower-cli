@@ -100,49 +100,46 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let app = args.get_one::<String>("app").map(|s| s.as_str());
     let environment = args.get_one::<String>("environment").map(|s| s.as_str());
 
-    let mut spinner = output::spinner("Listing schedules...");
-    match api::list_schedules(&config, app, environment).await {
-        Ok(response) => {
-            spinner.success();
-            if response.schedules.is_empty() {
-                output::write("No schedules found.\n");
-                return;
-            }
+    let response = output::with_spinner(
+        "Listing schedules...",
+        "Listing schedules failed",
+        api::list_schedules(&config, app, environment),
+    )
+    .await;
 
-            let headers = vec![
-                "ID".yellow().to_string(),
-                "App".yellow().to_string(),
-                "Environment".yellow().to_string(),
-                "Cron".yellow().to_string(),
-                "Status".yellow().to_string(),
-            ];
-
-            let rows: Vec<Vec<String>> = response
-                .schedules
-                .iter()
-                .map(|schedule| {
-                    let status = match schedule.status {
-                        Status::Active => "active".green(),
-                        Status::Disabled => "disabled".red(),
-                    };
-
-                    vec![
-                        schedule.id.clone(),
-                        schedule.app_name.clone(),
-                        schedule.environment.clone(),
-                        schedule.cron.clone(),
-                        status.to_string(),
-                    ]
-                })
-                .collect();
-
-            output::table(headers, rows, Some(&response.schedules));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Listing schedules failed");
-        }
+    if response.schedules.is_empty() {
+        output::write("No schedules found.\n");
+        return;
     }
+
+    let headers = vec![
+        "ID".yellow().to_string(),
+        "App".yellow().to_string(),
+        "Environment".yellow().to_string(),
+        "Cron".yellow().to_string(),
+        "Status".yellow().to_string(),
+    ];
+
+    let rows: Vec<Vec<String>> = response
+        .schedules
+        .iter()
+        .map(|schedule| {
+            let status = match schedule.status {
+                Status::Active => "active".green(),
+                Status::Disabled => "disabled".red(),
+            };
+
+            vec![
+                schedule.id.clone(),
+                schedule.app_name.clone(),
+                schedule.environment.clone(),
+                schedule.cron.clone(),
+                status.to_string(),
+            ]
+        })
+        .collect();
+
+    output::table(headers, rows, Some(&response.schedules));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {
@@ -151,55 +148,45 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
     let cron = args.get_one::<String>("cron").unwrap();
     let parameters = parse_parameters(args);
 
-    let mut spinner = output::spinner("Creating schedule");
+    let response = output::with_spinner(
+        "Creating schedule",
+        "Creating schedule failed",
+        api::create_schedule(&config, app_name, environment, cron, parameters),
+    )
+    .await;
 
-    match api::create_schedule(&config, app_name, environment, cron, parameters).await {
-        Ok(response) => {
-            spinner.success();
-            output::success(&format!(
-                "Schedule created with ID: {}",
-                response.schedule.id
-            ));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Creating schedule failed");
-        }
-    }
+    output::success(&format!(
+        "Schedule created with ID: {}",
+        response.schedule.id
+    ));
 }
 
 pub async fn do_update(config: Config, args: &ArgMatches) {
     let schedule_id = extract_schedule_id("update", args.subcommand());
     let cron = args.get_one::<String>("cron");
     let parameters = parse_parameters(args);
-    let mut spinner = output::spinner("Updating schedule");
 
-    match api::update_schedule(&config, &schedule_id, cron, parameters).await {
-        Ok(_) => {
-            spinner.success();
-            output::success(&format!("Schedule {} updated", schedule_id));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Updating schedule failed");
-        }
-    }
+    output::with_spinner(
+        "Updating schedule",
+        "Updating schedule failed",
+        api::update_schedule(&config, &schedule_id, cron, parameters),
+    )
+    .await;
+
+    output::success(&format!("Schedule {} updated", schedule_id));
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
     let schedule_id = extract_schedule_id("delete", args.subcommand());
-    let mut spinner = output::spinner("Deleting schedule");
 
-    match api::delete_schedule(&config, &schedule_id).await {
-        Ok(_) => {
-            spinner.success();
-            output::success(&format!("Schedule {} deleted", schedule_id));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Deleting schedule failed");
-        }
-    }
+    output::with_spinner(
+        "Deleting schedule",
+        "Deleting schedule failed",
+        api::delete_schedule(&config, &schedule_id),
+    )
+    .await;
+
+    output::success(&format!("Schedule {} deleted", schedule_id));
 }
 
 fn extract_schedule_id(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {

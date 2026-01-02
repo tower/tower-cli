@@ -138,32 +138,27 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    let mut spinner = output::spinner("Listing apps...");
-    let resp = api::list_apps(&config).await;
+    let resp = output::with_spinner(
+        "Listing apps...",
+        "Listing apps failed",
+        api::list_apps(&config),
+    )
+    .await;
 
-    match resp {
-        Ok(resp) => {
-            spinner.success();
-            let items = resp
-                .apps
-                .iter()
-                .map(|app_summary| {
-                    let app = &app_summary.app;
-                    let desc = if app.short_description.is_empty() {
-                        output::placeholder("No description")
-                    } else {
-                        app.short_description.to_string()
-                    };
-                    format!("{}\n{}", output::title(&app.name), desc)
-                })
-                .collect();
-            output::list(items, Some(&resp.apps));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Listing apps failed");
-        }
-    }
+    let items = resp
+        .apps
+        .iter()
+        .map(|app_summary| {
+            let app = &app_summary.app;
+            let desc = if app.short_description.is_empty() {
+                output::placeholder("No description")
+            } else {
+                app.short_description.to_string()
+            };
+            format!("{}\n{}", output::title(&app.name), desc)
+        })
+        .collect();
+    output::list(items, Some(&resp.apps));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {
@@ -173,30 +168,25 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     let description = args.get_one::<String>("description").unwrap();
 
-    let mut spinner = output::spinner("Creating app");
+    let app = output::with_spinner(
+        "Creating app",
+        "Creating app failed",
+        api::create_app(&config, name, description),
+    )
+    .await;
 
-    match api::create_app(&config, name, description).await {
-        Ok(app) => {
-            spinner.success();
-            output::success_with_data(&format!("App '{}' created", name), Some(app));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Creating app failed");
-        }
-    }
+    output::success_with_data(&format!("App '{}' created", name), Some(app));
 }
 
 pub async fn do_delete(config: Config, cmd: &ArgMatches) {
     let name = extract_app_name("delete", cmd.subcommand());
-    let mut spinner = output::spinner("Deleting app");
 
-    if let Err(err) = api::delete_app(&config, &name).await {
-        spinner.failure();
-        output::tower_error_and_die(err, "Deleting app failed");
-    } else {
-        spinner.success();
-    }
+    output::with_spinner(
+        "Deleting app",
+        "Deleting app failed",
+        api::delete_app(&config, &name),
+    )
+    .await;
 }
 
 /// Extract app name and run number from command

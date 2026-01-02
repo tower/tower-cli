@@ -72,8 +72,7 @@ pub async fn deploy_from_dir(
     let api_config = config.into();
 
     // Add app existence check before proceeding
-    let mut spinner = output::spinner("Checking app...");
-    match util::apps::ensure_app_exists(
+    if let Err(err) = util::apps::ensure_app_exists(
         &api_config,
         &towerfile.app.name,
         &towerfile.app.description,
@@ -81,11 +80,7 @@ pub async fn deploy_from_dir(
     )
     .await
     {
-        Ok(_) => spinner.success(),
-        Err(err) => {
-            spinner.failure();
-            return Err(crate::Error::ApiDescribeAppError { source: err });
-        }
+        return Err(crate::Error::ApiDescribeAppError { source: err });
     }
 
     let spec = PackageSpec::from_towerfile(&towerfile);
@@ -109,20 +104,15 @@ async fn do_deploy_package(
     package: Package,
     towerfile: &Towerfile,
 ) -> Result<(), crate::Error> {
-    let mut spinner = output::spinner("Deploying to Tower...");
     let res = util::deploy::deploy_app_package(&api_config, &towerfile.app.name, package).await;
 
     match res {
         Ok(resp) => {
-            spinner.success();
             let version = resp.version;
             let line = format!("Version `{}` has been deployed to Tower!", version.version);
             output::success(&line);
             Ok(())
         }
-        Err(err) => {
-            spinner.failure();
-            Err(crate::Error::ApiDeployError { source: err })
-        }
+        Err(err) => Err(crate::Error::ApiDeployError { source: err }),
     }
 }

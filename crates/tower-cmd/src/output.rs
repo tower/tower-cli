@@ -340,6 +340,39 @@ pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
     std::process::exit(1);
 }
 
+/// Runs an async operation with a spinner and proper error handling.
+///
+/// This helper provides consistent spinner behavior across all commands:
+/// - Shows a spinner with the given message while the operation runs
+/// - On success: stops the spinner with success indicator and returns the result
+/// - On error: stops the spinner with failure indicator and shows auth-aware error message
+///
+/// # Examples
+///
+/// ```rust
+/// let envs = output::with_spinner(
+///     "Listing environments...",
+///     "Listing environments failed",
+///     api::list_environments(&config)
+/// ).await;
+/// ```
+pub async fn with_spinner<F, T, E>(spinner_msg: &str, error_operation: &str, future: F) -> T
+where
+    F: std::future::Future<Output = Result<T, ApiError<E>>>,
+{
+    let mut spinner = self::spinner(spinner_msg);
+    match future.await {
+        Ok(result) => {
+            spinner.success();
+            result
+        }
+        Err(err) => {
+            spinner.failure();
+            tower_error_and_die(err, error_operation);
+        }
+    }
+}
+
 pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_data: Option<&T>) {
     if get_output_mode().is_json() {
         if let Some(data) = json_data {

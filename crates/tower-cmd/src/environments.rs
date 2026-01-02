@@ -24,31 +24,26 @@ pub fn environments_cmd() -> Command {
 }
 
 pub async fn do_list(config: Config) {
-    let mut spinner = output::spinner("Listing environments...");
-    let resp = api::list_environments(&config).await;
+    let resp = output::with_spinner(
+        "Listing environments...",
+        "Listing environments failed",
+        api::list_environments(&config),
+    )
+    .await;
 
-    match resp {
-        Ok(resp) => {
-            spinner.success();
-            let headers = vec!["Name"]
-                .into_iter()
-                .map(|h| h.yellow().to_string())
-                .collect();
+    let headers = vec!["Name"]
+        .into_iter()
+        .map(|h| h.yellow().to_string())
+        .collect();
 
-            let envs_data: Vec<Vec<String>> = resp
-                .environments
-                .iter()
-                .map(|env| vec![env.name.clone()])
-                .collect();
+    let envs_data: Vec<Vec<String>> = resp
+        .environments
+        .iter()
+        .map(|env| vec![env.name.clone()])
+        .collect();
 
-            // Display the table using the existing table function
-            output::table(headers, envs_data, Some(&resp.environments));
-        }
-        Err(err) => {
-            spinner.failure();
-            output::tower_error_and_die(err, "Listing environments failed");
-        }
-    }
+    // Display the table using the existing table function
+    output::table(headers, envs_data, Some(&resp.environments));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {
@@ -56,13 +51,12 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
         output::die("Environment name (--name) is required");
     });
 
-    let mut spinner = output::spinner("Creating environment");
+    output::with_spinner(
+        "Creating environment",
+        "Creating environment failed",
+        api::create_environment(&config, name),
+    )
+    .await;
 
-    if let Err(err) = api::create_environment(&config, name).await {
-        spinner.failure();
-        output::tower_error_and_die(err, "Creating environment failed");
-    } else {
-        spinner.success();
-        output::success(&format!("Environment '{}' created", name));
-    }
+    output::success(&format!("Environment '{}' created", name));
 }

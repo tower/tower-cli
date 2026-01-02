@@ -234,35 +234,29 @@ pub async fn do_run_remote(
         towerfile.app.name
     };
 
-    let mut spinner = output::spinner("Scheduling run...");
+    let res = output::with_spinner(
+        "Scheduling run...",
+        "Scheduling run failed",
+        api::run_app(&config, &app_slug, env, params),
+    )
+    .await;
 
-    match api::run_app(&config, &app_slug, env, params).await {
-        Err(err) => {
-            spinner.failure();
-            debug!("Failed to schedule run: {}", err);
-            output::tower_error_and_die(err, "Scheduling run failed");
-        }
-        Ok(res) => {
-            spinner.success();
+    let run = res.run;
 
-            let run = res.run;
+    if should_follow_run {
+        do_follow_run(config, &run).await?;
+    } else {
+        let line = format!(
+            "Run #{} for app `{}` has been scheduled",
+            run.number, app_slug
+        );
+        output::success(&line);
 
-            if should_follow_run {
-                do_follow_run(config, &run).await?;
-            } else {
-                let line = format!(
-                    "Run #{} for app `{}` has been scheduled",
-                    run.number, app_slug
-                );
-                output::success(&line);
-
-                let link_line = format!("  See more: {}", run.dollar_link);
-                output::write(&link_line);
-                output::newline();
-            }
-            Ok(())
-        }
+        let link_line = format!("  See more: {}", run.dollar_link);
+        output::write(&link_line);
+        output::newline();
     }
+    Ok(())
 }
 
 async fn stream_logs_until_complete(
