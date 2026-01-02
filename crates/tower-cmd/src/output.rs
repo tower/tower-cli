@@ -211,6 +211,7 @@ pub fn write(msg: &str) {
         send_to_current_sender(clean_msg);
     } else {
         io::stdout().write_all(msg.as_bytes()).unwrap();
+        io::stdout().flush().ok();
     }
 }
 
@@ -315,6 +316,87 @@ pub fn tower_error<T>(err: ApiError<T>) {
         ApiError::Io(e) => {
             debug!("Io error: {:?}", e);
             error("An error happened while talking to the Tower API. You can try that again in a bit.");
+        }
+    }
+}
+
+/// Handles Tower API errors with context-specific authentication messages.
+/// If the error is a 401 Unauthorized, provides a helpful message mentioning
+/// the operation that failed and suggests running 'tower login'.
+/// Always exits the process with error code 1.
+pub fn tower_error_and_die<T>(err: ApiError<T>, operation: &str) -> ! {
+    // Check if this is an authentication error
+    if let ApiError::ResponseError(ref resp) = err {
+        if resp.status == StatusCode::UNAUTHORIZED {
+            die(&format!(
+                "{} because you are not logged into Tower. Please run 'tower login' first.",
+                operation
+            ));
+        }
+    }
+
+    // Show the detailed error first
+    tower_error(err);
+    die(operation);
+}
+
+/// Runs an async operation with a spinner and proper error handling.
+///
+/// This helper provides consistent spinner behavior across all commands:
+/// - Shows a spinner with "{operation}..." while the operation runs
+/// - On success: stops the spinner with success indicator and returns the result
+/// - On error: stops the spinner with failure indicator and shows auth-aware error message
+///
+/// # Examples
+///
+/// ```ignore
+/// let envs = output::with_spinner(
+///     "Listing environments",
+///     api::list_environments(&config)
+/// ).await;
+/// ```
+pub async fn with_spinner<F, T, E>(operation: &str, future: F) -> T
+where
+    F: std::future::Future<Output = Result<T, ApiError<E>>>,
+{
+    let spinner_msg = format!("{}...", operation);
+    let mut spinner = self::spinner(&spinner_msg);
+    match future.await {
+        Ok(result) => {
+            spinner.success();
+            result
+        }
+        Err(err) => {
+            spinner.failure();
+            let error_msg = format!("{} failed", operation);
+            tower_error_and_die(err, &error_msg);
+        }
+    }
+}
+
+/// Runs an async operation with a spinner, returning Result instead of exiting.
+///
+/// This is the MCP-safe version of with_spinner that returns errors instead of exiting.
+/// Use this for operations that may be called from MCP or other contexts where
+/// process exit is not acceptable. Returns the error without displaying it, allowing
+/// the caller to decide how to handle and display the error.
+///
+/// Shows "{operation}..." during execution and stops the spinner on completion.
+pub async fn try_with_spinner<F, T, E>(operation: &str, future: F) -> Result<T, ApiError<E>>
+where
+    F: std::future::Future<Output = Result<T, ApiError<E>>>,
+{
+    let spinner_msg = format!("{}...", operation);
+    let mut spinner = self::spinner(&spinner_msg);
+    match future.await {
+        Ok(result) => {
+            spinner.success();
+            Ok(result)
+        }
+        Err(err) => {
+            spinner.failure();
+            // Just return the error - let the caller decide how to handle it
+            Err(err)
         }
     }
 }
@@ -442,8 +524,13 @@ pub fn newline() {
 }
 
 pub fn die(msg: &str) -> ! {
+    io::stdout().flush().ok();
+    io::stderr().flush().ok();
     let line = format!("{} {}\n", "Error:".red(), msg);
     write(&line);
+    // Flush output before exit to ensure "Error:" message is displayed
+    io::stdout().flush().ok();
+    io::stderr().flush().ok();
     std::process::exit(1);
 }
 

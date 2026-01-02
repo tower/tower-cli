@@ -4,10 +4,7 @@ use config::Config;
 use crypto::encrypt;
 use rsa::pkcs1::DecodeRsaPublicKey;
 
-use tower_api::{
-    apis::{default_api::CreateSecretError, Error},
-    models::CreateSecretResponse,
-};
+use tower_api::models::CreateSecretResponse;
 use tower_telemetry::debug;
 
 use crate::{api, output, util::cmd};
@@ -88,56 +85,54 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     if show {
         let (private_key, public_key) = crypto::generate_key_pair();
 
-        match api::export_secrets(&config, &env, all, public_key).await {
-            Ok(list_response) => {
-                let headers = vec![
-                    "Secret".bold().yellow().to_string(),
-                    "Environment".bold().yellow().to_string(),
-                    "Value".bold().yellow().to_string(),
-                ];
-                let data = list_response
-                    .secrets
-                    .iter()
-                    .map(|secret| {
-                        // now we decrypt the value and show it.
-                        let decrypted_value =
-                            crypto::decrypt(private_key.clone(), secret.encrypted_value.clone())
-                                .unwrap();
+        let list_response = output::with_spinner(
+            "Listing secrets",
+            api::export_secrets(&config, &env, all, public_key),
+        )
+        .await;
 
-                        vec![
-                            secret.name.clone(),
-                            secret.environment.clone(),
-                            decrypted_value,
-                        ]
-                    })
-                    .collect();
-                output::table(headers, data, Some(&list_response.secrets));
-            }
-            Err(err) => output::tower_error(err),
-        }
+        let headers = vec![
+            "Secret".bold().yellow().to_string(),
+            "Environment".bold().yellow().to_string(),
+            "Value".bold().yellow().to_string(),
+        ];
+        let data = list_response
+            .secrets
+            .iter()
+            .map(|secret| {
+                // now we decrypt the value and show it.
+                let decrypted_value =
+                    crypto::decrypt(private_key.clone(), secret.encrypted_value.clone()).unwrap();
+
+                vec![
+                    secret.name.clone(),
+                    secret.environment.clone(),
+                    decrypted_value,
+                ]
+            })
+            .collect();
+        output::table(headers, data, Some(&list_response.secrets));
     } else {
-        match api::list_secrets(&config, &env, all).await {
-            Ok(list_response) => {
-                let headers = vec![
-                    "Secret".bold().yellow().to_string(),
-                    "Environment".bold().yellow().to_string(),
-                    "Preview".bold().yellow().to_string(),
-                ];
-                let data = list_response
-                    .secrets
-                    .iter()
-                    .map(|secret| {
-                        vec![
-                            secret.name.clone(),
-                            secret.environment.clone(),
-                            secret.preview.dimmed().to_string(),
-                        ]
-                    })
-                    .collect();
-                output::table(headers, data, Some(&list_response.secrets));
-            }
-            Err(err) => output::tower_error(err),
-        }
+        let list_response =
+            output::with_spinner("Listing secrets", api::list_secrets(&config, &env, all)).await;
+
+        let headers = vec![
+            "Secret".bold().yellow().to_string(),
+            "Environment".bold().yellow().to_string(),
+            "Preview".bold().yellow().to_string(),
+        ];
+        let data = list_response
+            .secrets
+            .iter()
+            .map(|secret| {
+                vec![
+                    secret.name.clone(),
+                    secret.environment.clone(),
+                    secret.preview.dimmed().to_string(),
+                ]
+            })
+            .collect();
+        output::table(headers, data, Some(&list_response.secrets));
     }
 }
 
@@ -157,8 +152,15 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
             output::success(&line);
         }
         Err(err) => {
-            debug!("Failed to create secrets: {}", err);
             spinner.failure();
+            match err {
+                SecretCreationError::FetchKeyFailed(e) => {
+                    output::tower_error_and_die(e, "Fetching secrets key failed");
+                }
+                SecretCreationError::CreateFailed(e) => {
+                    output::tower_error_and_die(e, "Creating secret failed");
+                }
+            }
         }
     }
 }
@@ -167,14 +169,11 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
     let (environment, name) = extract_secret_environment_and_name("delete", args.subcommand());
     debug!("deleting secret, environment={} name={}", environment, name);
 
-    let mut spinner = output::spinner("Deleting secret...");
-
-    if let Ok(_) = api::delete_secret(&config, &name, &environment).await {
-        spinner.success();
-    } else {
-        spinner.failure();
-        output::die("There was a problem with the Tower API! Please try again later.");
-    }
+    output::with_spinner(
+        "Deleting secret",
+        api::delete_secret(&config, &name, &environment),
+    )
+    .await;
 }
 
 fn create_preview(value: &str) -> String {
@@ -190,29 +189,31 @@ fn create_preview(value: &str) -> String {
     }
 }
 
+enum SecretCreationError {
+    FetchKeyFailed(tower_api::apis::Error<tower_api::apis::default_api::DescribeSecretsKeyError>),
+    CreateFailed(tower_api::apis::Error<tower_api::apis::default_api::CreateSecretError>),
+}
+
 async fn encrypt_and_create_secret(
     config: &Config,
     name: &str,
     value: &str,
     environment: &str,
-) -> Result<CreateSecretResponse, Error<CreateSecretError>> {
-    match api::describe_secrets_key(config).await {
-        Ok(res) => {
-            let public_key =
-                rsa::RsaPublicKey::from_pkcs1_pem(&res.public_key).unwrap_or_else(|_| {
-                    output::die("Failed to parse public key");
-                });
+) -> Result<CreateSecretResponse, SecretCreationError> {
+    let res = api::describe_secrets_key(config)
+        .await
+        .map_err(SecretCreationError::FetchKeyFailed)?;
 
-            let encrypted_value = encrypt(public_key, value.to_string()).unwrap();
-            let preview = create_preview(value);
+    let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&res.public_key).unwrap_or_else(|_| {
+        output::die("Failed to parse public key");
+    });
 
-            api::create_secret(&config, name, environment, &encrypted_value, &preview).await
-        }
-        Err(err) => {
-            debug!("failed to talk to tower api: {}", err);
-            output::die("There was a problem with the Tower API! Please try again later.");
-        }
-    }
+    let encrypted_value = encrypt(public_key, value.to_string()).unwrap();
+    let preview = create_preview(value);
+
+    api::create_secret(&config, name, environment, &encrypted_value, &preview)
+        .await
+        .map_err(SecretCreationError::CreateFailed)
 }
 
 fn extract_secret_environment_and_name(

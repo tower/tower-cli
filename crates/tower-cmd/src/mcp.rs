@@ -687,18 +687,15 @@ impl TowerService {
                 }
             }
             Err(e) => {
-                let error_text = if output.trim().is_empty() {
-                    let api_error = Self::extract_api_error_message(&e);
-                    if Self::is_deployment_error(&api_error) {
-                        format!(
-                            "App '{}' not deployed. Try running tower_deploy first.",
-                            app_name
-                        )
-                    } else {
-                        api_error
-                    }
+                // Always extract the detailed API error message
+                let api_error = Self::extract_api_error_message(&e);
+                let error_text = if Self::is_deployment_error(&api_error) {
+                    format!(
+                        "App '{}' not deployed. Try running tower_deploy first.",
+                        app_name
+                    )
                 } else {
-                    output
+                    api_error
                 };
                 Self::error_result("Remote run failed", error_text)
             }
