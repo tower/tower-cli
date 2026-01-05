@@ -66,7 +66,7 @@ jobs:
 
   macos-x86_64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -89,7 +89,7 @@ jobs:
 
   macos-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4.2.2
         with:
