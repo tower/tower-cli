@@ -29,6 +29,10 @@ pub use error::Error;
 // 3 - Change checksum algorithm to be cross-platform
 const CURRENT_PACKAGE_VERSION: i32 = 3;
 
+// Maximum allowed size for a bundle package in bytes (50MB)
+// This limit ensures bundles remain manageable for deployment and storage.
+pub const MAX_BUNDLE_SIZE: u64 = 50 * 1024 * 1024;
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Parameter {
     pub name: String,

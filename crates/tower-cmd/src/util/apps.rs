@@ -13,7 +13,8 @@ pub async fn ensure_app_exists(
     description: &str,
     create_app: bool,
 ) -> Result<(), tower_api::apis::Error<default_api::DescribeAppError>> {
-    // Try to describe the app first
+    // Try to describe the app first (with spinner)
+    let mut spinner = output::spinner("Checking app...");
     let describe_result = default_api::describe_app(
         api_config,
         DescribeAppParams {
@@ -28,6 +29,7 @@ pub async fn ensure_app_exists(
 
     // If the app exists, return Ok
     if describe_result.is_ok() {
+        spinner.success();
         return Ok(());
     }
 
@@ -44,10 +46,14 @@ pub async fn ensure_app_exists(
         _ => false,
     };
 
-    // If it's not a 404 error, return the original error
+    // If it's not a 404 error, fail the spinner and return the error
     if !is_not_found {
+        spinner.failure();
         return Err(err);
     }
+
+    // App not found - stop spinner before prompting user
+    drop(spinner);
 
     // Decide whether to create the app
     let create_app = create_app
@@ -65,7 +71,8 @@ pub async fn ensure_app_exists(
         return Err(err);
     }
 
-    // Try to create the app
+    // Try to create the app (with a new spinner)
+    let mut spinner = output::spinner("Creating app...");
     let create_result = default_api::create_app(
         api_config,
         CreateAppParams {
@@ -83,10 +90,12 @@ pub async fn ensure_app_exists(
 
     match create_result {
         Ok(_) => {
+            spinner.success();
             output::success(&format!("Created app '{}'", app_name));
             Ok(())
         }
         Err(create_err) => {
+            spinner.failure();
             // Convert any creation error to a response error
             Err(tower_api::apis::Error::ResponseError(
                 tower_api::apis::ResponseContent {

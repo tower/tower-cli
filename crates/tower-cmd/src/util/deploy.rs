@@ -33,7 +33,16 @@ pub async fn upload_file_with_progress(
     let metadata = file.metadata().await?;
     let file_size = metadata.len();
 
-    // Create a stream with progress tracking
+    // Check if bundle size exceeds the maximum allowed size
+    if file_size > tower_package::MAX_BUNDLE_SIZE {
+        let size_mb = file_size as f64 / (1024.0 * 1024.0);
+        let max_mb = tower_package::MAX_BUNDLE_SIZE as f64 / (1024.0 * 1024.0);
+        output::die(&format!(
+            "Your App is too big! ({:.2} MB) exceeds maximum allowed size ({:.0} MB). Please consider reducing app size by removing unnecessary files or import_paths in the Towerfile.",
+            size_mb, max_mb
+        ));
+    }
+
     let reader_stream = ReaderStream::new(file);
     let progress_stream =
         util::progress::ProgressStream::new(reader_stream, file_size, progress_cb).await?;

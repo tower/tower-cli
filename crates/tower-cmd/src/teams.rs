@@ -1,7 +1,6 @@
 use clap::{ArgMatches, Command};
 use colored::*;
 use config::Config;
-use tower_telemetry::debug;
 
 use crate::{api, output};
 
@@ -28,30 +27,18 @@ async fn refresh_session(config: &Config) -> config::Session {
         }
     };
 
-    let mut spinner = output::spinner("Refreshing session...");
+    let resp = output::with_spinner("Refreshing session", api::refresh_session(&config)).await;
 
-    match api::refresh_session(&config).await {
-        Ok(resp) => {
-            spinner.success();
+    // Create a mutable copy of the session to update
+    let mut session = current_session;
 
-            // Create a mutable copy of the session to update
-            let mut session = current_session;
-
-            // Update it with the API response
-            if let Err(e) = session.update_from_api_response(&resp) {
-                output::config_error(e);
-                std::process::exit(1);
-            }
-
-            session
-        }
-        Err(err) => {
-            debug!("Failed to refresh session: {}", err);
-
-            spinner.failure();
-            output::die("There was a problem talking to the Tower API. Try again later!");
-        }
+    // Update it with the API response
+    if let Err(e) = session.update_from_api_response(&resp) {
+        output::config_error(e);
+        std::process::exit(1);
     }
+
+    session
 }
 
 pub async fn do_list(config: Config) {
