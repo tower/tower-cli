@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -8,6 +9,20 @@ use url::Url;
 use crate::error::Error;
 use tower_api::apis::default_api::describe_session;
 use tower_telemetry::debug;
+
+/// Extracts the account ID (aid) from a Tower JWT token.
+/// Returns None if the JWT is malformed or doesn't contain an aid.
+fn extract_aid_from_jwt(jwt: &str) -> Option<String> {
+    let parts: Vec<&str> = jwt.split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+
+    let payload = parts[1];
+    let decoded = URL_SAFE_NO_PAD.decode(payload).ok()?;
+    let json: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
+    json.get("https://tower.dev/aid")?.as_str().map(String::from)
+}
 
 const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
 
@@ -163,6 +178,22 @@ impl Session {
         }
     }
 
+    /// Sets the active team based on an account ID (aid) extracted from a JWT.
+    /// Returns true if a matching team was found and set as active, false otherwise.
+    pub fn set_active_team_by_aid(&mut self, aid: &str) -> bool {
+        // Find the team whose JWT contains the matching aid
+        if let Some(team) = self
+            .teams
+            .iter()
+            .find(|team| extract_aid_from_jwt(&team.token.jwt).as_deref() == Some(aid))
+        {
+            self.active_team = Some(team.clone());
+            true
+        } else {
+            false
+        }
+    }
+
     /// Updates the session with data from the API response
     pub fn update_from_api_response(
         &mut self,
@@ -263,36 +294,30 @@ impl Session {
     }
 
     pub fn from_jwt(jwt: &str) -> Result<Self, Error> {
-        // We need to instantiate our own configuration object here, instead of the typical thing
-        // that we do which is turn a Config into a Configuration.
+        let jwt_aid = extract_aid_from_jwt(jwt);
+
         let mut config = tower_api::apis::configuration::Configuration::new();
         config.bearer_access_token = Some(jwt.to_string());
 
-        // We only pull TOWER_URL out of the environment here because we only ever use the JWT and
-        // all that in programmatic contexts (when TOWER_URL is set).
-        let tower_url = if let Ok(val) = std::env::var("TOWER_URL") {
-            val
-        } else {
-            DEFAULT_TOWER_URL.to_string()
-        };
-
-        // Setup the base path to point to the /v1 API endpoint as expected.
+        let tower_url = std::env::var("TOWER_URL").unwrap_or(DEFAULT_TOWER_URL.to_string());
         let mut base_path = Url::parse(&tower_url).unwrap();
         base_path.set_path("/v1");
-
         config.base_path = base_path.to_string();
 
-        // This is a bit of a hairy thing: I didn't want to pull in too much from the Tower API
-        // client, so we're using the raw bindings here.
         match run_future_sync(describe_session(&config)) {
             Ok(resp) => {
-                // Now we need to extract the session from the response.
                 let entity = resp.entity.unwrap();
 
                 match entity {
                     tower_api::apis::default_api::DescribeSessionSuccess::Status200(resp) => {
                         let mut session = Session::from_api_session(&resp.session);
                         session.tower_url = base_path;
+
+                        if let Some(aid) = jwt_aid {
+                            session.set_active_team_by_aid(&aid);
+                        }
+
+                        session.save()?;
                         Ok(session)
                     }
                     tower_api::apis::default_api::DescribeSessionSuccess::UnknownValue(val) => {
