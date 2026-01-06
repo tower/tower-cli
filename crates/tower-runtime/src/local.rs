@@ -441,19 +441,19 @@ fn make_env_vars(
     debug!(ctx: &ctx, "converting {} env variables", (params.len() + secs.len()));
 
     for (key, value) in secs.into_iter() {
-        debug!(ctx: &ctx, "adding key {}", make_env_var_key(&key));
         res.insert(make_env_var_key(&key), value.to_string());
     }
 
     for (key, value) in params.into_iter() {
-        debug!(ctx: &ctx, "adding key {}", make_env_var_key(&key));
         res.insert(key.to_string(), value.to_string());
     }
 
     for (key, value) in other_env_vars.into_iter() {
-        debug!(ctx: &ctx, "adding key {}", &key);
         res.insert(key.to_string(), value.to_string());
     }
+
+    let added_keys = res.keys().map(|s| &**s).collect::<Vec<&str>>().join(", ");
+    debug!(ctx: &ctx, "added keys {}", &added_keys);
 
     // We also need a PYTHONPATH that is set to the current working directory to help with the
     // dependency resolution problem at runtime.
