@@ -536,16 +536,25 @@ async fn wait_for_process(
 
         if let Ok(res) = timeout {
             if let Ok(status) = res {
-                break status.code().expect("no status code");
+                let exit_code = status.code().expect("no status code");
+                if exit_code != 0 {
+                    debug!(ctx: &ctx, "process completed with non-zero exit code: {}", exit_code);
+                }
+                break exit_code;
             } else {
                 // something went wrong.
-                debug!(ctx: &ctx, "failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
+                let err = res.err().expect("no error somehow");
+                debug!(ctx: &ctx, "failed to get status due to some kind of IO error: {}", err);
                 break -1;
             }
         }
     };
 
-    debug!(ctx: &ctx, "process exited with code {}", code);
+    if code == 0 {
+        debug!(ctx: &ctx, "process exited cleanly with code 0");
+    } else {
+        debug!(ctx: &ctx, "process exited with error code {}", code);
+    }
 
     // this just shuts up the compiler about ignoring the results.
     code

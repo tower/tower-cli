@@ -193,7 +193,10 @@ where
 
     // Wait for app to complete or SIGTERM
     let status_result = tokio::select! {
-        status = status_task => status.unwrap(),
+        status = status_task => {
+            debug!("Status task completed, result: {:?}", status);
+            status.unwrap()
+        },
         _ = tokio::signal::ctrl_c(), if !output::get_output_mode().is_mcp() => {
             output::write("\nReceived Ctrl+C, stopping local run...\n");
             app.lock().await.terminate().await.ok();
@@ -205,8 +208,8 @@ where
     // And if we crashed, err out
     match status_result {
         Status::Exited => output::success("Your local run exited cleanly."),
-        Status::Crashed { .. } => {
-            output::error("Your local run crashed!");
+        Status::Crashed { code } => {
+            output::error(&format!("Your local run crashed with exit code: {}", code));
             return Err(Error::AppCrashed);
         }
         _ => {
@@ -611,20 +614,19 @@ async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
                 err_count = 0;
 
                 match status {
-                    tower_runtime::Status::Exited => {
+                    Status::Exited => {
                         debug!("Run exited cleanly, stopping status monitoring");
 
                         // We're done. Exit this loop and function.
                         return status;
                     }
-                    tower_runtime::Status::Crashed { .. } => {
+                    Status::Crashed { .. } => {
                         debug!("Run crashed, stopping status monitoring");
 
                         // We're done. Exit this loop and function.
                         return status;
                     }
                     _ => {
-                        debug!("App status: other, continuing to monitor");
                         sleep(Duration::from_millis(100)).await;
                     }
                 }
