@@ -85,8 +85,8 @@ impl App {
         if let Some(latest) = Self::check_latest_version().await {
             let current = tower_version::current_version();
 
-            if current != latest {
-                output::write_update_message(&latest, &current);
+            if tower_version::is_older_version(current, &latest) {
+                output::write_update_available_message(&latest, current);
             }
         }
 

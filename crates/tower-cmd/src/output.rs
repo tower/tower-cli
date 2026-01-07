@@ -501,7 +501,7 @@ pub fn spinner(msg: &str) -> Spinner {
     Spinner::new(msg.into())
 }
 
-pub fn write_update_message(latest: &str, current: &str) {
+pub fn write_update_available_message(latest: &str, current: &str) {
     let line = format!(
         "{}\n{}\n",
         format!(
