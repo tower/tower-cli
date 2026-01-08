@@ -118,7 +118,7 @@ def step_final_status_should_show_crashed_in_red(context):
         red_color_code in output
     ), f"Expected red color codes in output, got: {output}"
     assert (
-        "Your local run crashed!" in output
+        "Your local run crashed with exit code:" in output
     ), f"Expected 'Your local run crashed!' message, got: {output}"
 
 
