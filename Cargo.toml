@@ -15,6 +15,7 @@ repository = "https://github.com/tower/tower-cli"
 aes-gcm = "0.10"
 anyhow = "1.0.95"
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
+async-trait = "0.1.83"
 async_zip = { version = "0.0.16", features = ["tokio", "tokio-fs", "deflate"] }
 axum = "0.8.4"
 base64 = "0.22"
@@ -33,6 +34,8 @@ futures-lite = "2.6"
 glob = "0.3"
 http = "1.1"
 indicatif = "0.17"
+k8s-openapi = { version = "0.23", features = ["v1_31"] }
+kube = { version = "0.95", features = ["runtime", "client", "derive"] }
 nix = { version = "0.30", features = ["signal"] }
 pem = "3"
 promptly = "0.3"
@@ -65,6 +68,7 @@ tracing = { version = "0.1" }
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["serde"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
 webbrowser = "1"
 
 # The profile that 'dist' will build with

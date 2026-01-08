@@ -64,6 +64,15 @@ pub enum Error {
 
     #[snafu(display("cancelled"))]
     Cancelled,
+
+    #[snafu(display("app not started"))]
+    AppNotStarted,
+
+    #[snafu(display("no execution handle"))]
+    NoHandle,
+
+    #[snafu(display("invalid package"))]
+    InvalidPackage,
 }
 
 impl From<std::io::Error> for Error {
