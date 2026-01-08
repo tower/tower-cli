@@ -517,6 +517,20 @@ pub fn write_update_available_message(latest: &str, current: &str) {
     io::stderr().write_all(line.as_bytes()).unwrap();
 }
 
+pub fn write_dev_version_message(current: &str, latest: &str) {
+    let line = format!(
+        "{}\n",
+        format!(
+            "Running dev version {} (latest published: {})",
+            current, latest
+        )
+        .dimmed()
+    );
+
+    use std::io::{self, Write};
+    io::stderr().write_all(line.as_bytes()).unwrap();
+}
+
 /// newline just outputs a newline. This is useful when you have a very specific formatting you
 /// want to maintain and you don't want to use println!.
 pub fn newline() {

@@ -43,11 +43,15 @@ pub async fn check_latest_version() -> Result<Option<String>> {
     Ok(None)
 }
 
-pub fn is_older_version(current: &str, latest: &str) -> bool {
-    let parse = |v: &str| {
-        let parts: Vec<_> = v.split('.').filter_map(|p| p.parse::<u32>().ok()).collect();
-        (parts.len() == 3).then(|| (parts[0], parts[1], parts[2]))
-    };
+fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<_> = v.split('.').filter_map(|p| p.parse::<u32>().ok()).collect();
+    (parts.len() == 3).then(|| (parts[0], parts[1], parts[2]))
+}
 
-    matches!((parse(current), parse(latest)), (Some(c), Some(l)) if c < l)
+pub fn is_older_version(current: &str, latest: &str) -> bool {
+    matches!((parse_version(current), parse_version(latest)), (Some(c), Some(l)) if c < l)
+}
+
+pub fn is_newer_version(current: &str, latest: &str) -> bool {
+    matches!((parse_version(current), parse_version(latest)), (Some(c), Some(l)) if c > l)
 }

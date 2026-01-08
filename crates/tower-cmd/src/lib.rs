@@ -87,6 +87,8 @@ impl App {
 
             if tower_version::is_older_version(current, &latest) {
                 output::write_update_available_message(&latest, current);
+            } else if tower_version::is_newer_version(current, &latest) {
+                output::write_dev_version_message(current, &latest);
             }
         }
 
