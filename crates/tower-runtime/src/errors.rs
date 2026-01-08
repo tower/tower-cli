@@ -65,6 +65,15 @@ pub enum Error {
     #[snafu(display("cancelled"))]
     Cancelled,
 
+    #[snafu(display("app not started"))]
+    AppNotStarted,
+
+    #[snafu(display("no execution handle"))]
+    NoHandle,
+
+    #[snafu(display("invalid package"))]
+    InvalidPackage,
+
     #[snafu(display("dependency installation failed"))]
     DependencyInstallationFailed,
 }
