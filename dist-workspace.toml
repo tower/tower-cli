@@ -36,3 +36,9 @@ runner = "ubuntu-latest"
 
 [dist.github-custom-runners.aarch64-unknown-linux-gnu]
 runner = "ubuntu-latest"
+
+[dist.github-custom-runners.x86_64-apple-darwin]
+runner = "macos-15"
+
+[dist.github-custom-runners.aarch64-apple-darwin]
+runner = "macos-15"
