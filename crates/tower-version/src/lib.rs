@@ -55,3 +55,26 @@ pub fn is_older_version(current: &str, latest: &str) -> bool {
 pub fn is_newer_version(current: &str, latest: &str) -> bool {
     matches!((parse_version(current), parse_version(latest)), (Some(c), Some(l)) if c > l)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_current_version_equal() {
+        assert!(!is_older_version("0.3.39", "0.3.39"));
+        assert!(!is_newer_version("0.3.39", "0.3.39"));
+    }
+
+    #[test]
+    fn test_older_version() {
+        assert!(is_older_version("0.3.38", "0.3.39"));
+        assert!(!is_newer_version("0.3.38", "0.3.39"));
+    }
+
+    #[test]
+    fn test_newer_version() {
+        assert!(!is_older_version("0.3.40", "0.3.39"));
+        assert!(is_newer_version("0.3.40", "0.3.39"));
+    }
+}
