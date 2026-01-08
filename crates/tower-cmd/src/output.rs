@@ -501,7 +501,7 @@ pub fn spinner(msg: &str) -> Spinner {
     Spinner::new(msg.into())
 }
 
-pub fn write_update_message(latest: &str, current: &str) {
+pub fn write_update_available_message(latest: &str, current: &str) {
     let line = format!(
         "{}\n{}\n",
         format!(
@@ -513,6 +513,20 @@ pub fn write_update_message(latest: &str, current: &str) {
     );
 
     // Always write version check messages to stderr to avoid polluting stdout
+    use std::io::{self, Write};
+    io::stderr().write_all(line.as_bytes()).unwrap();
+}
+
+pub fn write_dev_version_message(current: &str, latest: &str) {
+    let line = format!(
+        "{}\n",
+        format!(
+            "Running dev version {} (latest published: {})",
+            current, latest
+        )
+        .dimmed()
+    );
+
     use std::io::{self, Write};
     io::stderr().write_all(line.as_bytes()).unwrap();
 }
