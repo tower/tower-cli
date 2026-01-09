@@ -215,8 +215,11 @@ impl Session {
             jwt: session_response.token.jwt.clone(),
         };
 
-        // Remember the current active team's JWT if there is one
-        let active_team_jwt = self.active_team.as_ref().map(|team| team.token.jwt.clone());
+        // Remember current active team after refresh
+        let active_team_aid = self
+            .active_team
+            .as_ref()
+            .and_then(|team| extract_aid_from_jwt(&team.token.jwt));
 
         // Update teams
         self.teams = session_response
@@ -238,15 +241,14 @@ impl Session {
             })
             .collect();
 
-        // Try to restore the active team based on the JWT
-        let jwt_match_found = if let Some(jwt) = active_team_jwt {
-            self.set_active_team_by_jwt(&jwt)
-        } else {
-            false
-        };
+        // Try to restore the active team by account ID (JWT changes after refresh)
+        let found_active_team = active_team_aid
+            .as_ref()
+            .map(|aid| self.set_active_team_by_aid(aid))
+            .unwrap_or(false);
 
-        // If no active team was set by JWT, fall back to a personal team
-        if !jwt_match_found && self.active_team.is_none() {
+        // Fall back to personal team if previous active team not found
+        if !found_active_team {
             // Find a team with team_type="personal"
             if let Some(personal_team) = self.teams.iter().find(|team| team.team_type == "personal")
             {
