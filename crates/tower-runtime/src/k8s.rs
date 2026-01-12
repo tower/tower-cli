@@ -10,19 +10,19 @@
 
 use crate::errors::Error;
 use crate::execution::{
-    BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
+    BackendCapabilities, BundleRef, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
     ExecutionStatus, LogChannel, LogLine, LogReceiver, LogStream, NetworkingSpec, ServiceEndpoint,
 };
 
 use async_trait::async_trait;
 use chrono::Utc;
 use k8s_openapi::api::core::v1::{
-    Container, Pod, PodSpec, ResourceRequirements, Service, ServicePort, ServiceSpec, Volume,
-    VolumeMount,
+    ConfigMap, Container, Pod, PodSpec, ResourceRequirements, Service, ServicePort, ServiceSpec,
+    Volume, VolumeMount,
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, LogParams, PostParams},
-    runtime::wait::{await_condition, conditions},
+    api::{Api, DeleteParams, LogParams, PostParams},
+    runtime::wait::await_condition,
     Client,
 };
 use std::collections::BTreeMap;
@@ -53,7 +53,11 @@ impl K8sBackend {
     }
 
     /// Build pod spec from execution spec
-    fn build_pod_spec(&self, spec: &ExecutionSpec) -> Result<Pod, Error> {
+    fn build_pod_spec(
+        &self,
+        spec: &ExecutionSpec,
+        path_mapping: &BTreeMap<String, String>,
+    ) -> Result<Pod, Error> {
         let mut labels = BTreeMap::new();
         labels.insert("app".to_string(), "tower-app".to_string());
         labels.insert("execution-id".to_string(), spec.id.clone());
@@ -151,17 +155,54 @@ impl K8sBackend {
             ..Default::default()
         };
 
+        // Add bundle volume mount
+        volume_mounts.push(VolumeMount {
+            name: "bundle".to_string(),
+            mount_path: "/app".to_string(),
+            read_only: Some(true),
+            ..Default::default()
+        });
+
+        // Build items array to map ConfigMap keys to their original paths
+        // e.g., "app__task.py" -> "app/task.py"
+        let items: Vec<k8s_openapi::api::core::v1::KeyToPath> = path_mapping
+            .iter()
+            .map(
+                |(sanitized_key, original_path)| k8s_openapi::api::core::v1::KeyToPath {
+                    key: sanitized_key.clone(),
+                    path: original_path.clone(),
+                    mode: Some(0o755),
+                },
+            )
+            .collect();
+
+        // Bundle will be provided as a ConfigMap (created separately)
+        volumes.push(Volume {
+            name: "bundle".to_string(),
+            config_map: Some(k8s_openapi::api::core::v1::ConfigMapVolumeSource {
+                name: format!("bundle-{}", spec.id),
+                default_mode: Some(0o755),
+                items: Some(items),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
         // Build container spec
+        // Note: In K8s, 'command' = entrypoint, 'args' = command
         let container = Container {
             name: "app".to_string(),
             image: Some(spec.runtime.image.clone()),
             env: Some(env_vars),
+            command: spec.runtime.entrypoint.clone(), // K8s command = entrypoint
+            args: spec.runtime.command.clone(),       // K8s args = command
             volume_mounts: if volume_mounts.is_empty() {
                 None
             } else {
                 Some(volume_mounts)
             },
             resources: Some(resources),
+            working_dir: Some("/app".to_string()),
             ..Default::default()
         };
 
@@ -187,6 +228,134 @@ impl K8sBackend {
             spec: Some(pod_spec),
             ..Default::default()
         })
+    }
+
+    /// Create ConfigMap with bundle contents
+    /// Returns a mapping of sanitized keys to original paths for volume mounting
+    async fn create_bundle_configmap(
+        &self,
+        spec: &ExecutionSpec,
+    ) -> Result<BTreeMap<String, String>, Error> {
+        use k8s_openapi::api::core::v1::ConfigMap;
+        use std::collections::BTreeMap;
+
+        let configmaps: Api<ConfigMap> = Api::namespaced(self.client.clone(), &self.namespace);
+
+        // Get bundle path
+        let bundle_path = match &spec.bundle {
+            BundleRef::Local { path } => path,
+            _ => return Err(Error::NotImplemented), // Only Local bundles supported for now
+        };
+
+        // Recursively read ALL files from the bundle directory
+        let mut data = BTreeMap::new();
+        let mut binary_data = BTreeMap::new();
+        let mut path_mapping = BTreeMap::new(); // sanitized_key -> original_path
+
+        Self::walk_directory(
+            &bundle_path,
+            &bundle_path,
+            &mut data,
+            &mut binary_data,
+            &mut path_mapping,
+        )
+        .await?;
+
+        if data.is_empty() && binary_data.is_empty() {
+            return Err(Error::RuntimeStartFailed); // No files found
+        }
+
+        let configmap = ConfigMap {
+            metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                name: Some(format!("bundle-{}", spec.id)),
+                namespace: Some(self.namespace.clone()),
+                ..Default::default()
+            },
+            data: if !data.is_empty() { Some(data) } else { None },
+            binary_data: if !binary_data.is_empty() {
+                Some(binary_data)
+            } else {
+                None
+            },
+            ..Default::default()
+        };
+
+        configmaps
+            .create(&PostParams::default(), &configmap)
+            .await
+            .map_err(|_| Error::RuntimeStartFailed)?;
+
+        Ok(path_mapping)
+    }
+
+    /// Sanitize a file path to be a valid ConfigMap key
+    /// Replaces '/' with '__' to comply with K8s key restrictions: [-._a-zA-Z0-9]+
+    fn sanitize_configmap_key(path: &str) -> String {
+        path.replace('/', "__")
+    }
+
+    /// Recursively walk directory and collect all files
+    async fn walk_directory(
+        current_path: &std::path::Path,
+        base_path: &std::path::Path,
+        text_data: &mut BTreeMap<String, String>,
+        binary_data: &mut BTreeMap<String, k8s_openapi::ByteString>,
+        path_mapping: &mut BTreeMap<String, String>,
+    ) -> Result<(), Error> {
+        use tokio::fs;
+
+        let mut entries = fs::read_dir(current_path)
+            .await
+            .map_err(|_| Error::RuntimeStartFailed)?;
+
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|_| Error::RuntimeStartFailed)?
+        {
+            let path = entry.path();
+
+            if path.is_dir() {
+                // Recursively process subdirectories
+                Box::pin(Self::walk_directory(
+                    &path,
+                    base_path,
+                    text_data,
+                    binary_data,
+                    path_mapping,
+                ))
+                .await?;
+            } else if path.is_file() {
+                // Get relative path from base (e.g., "app/task.py")
+                let relative_path = path
+                    .strip_prefix(base_path)
+                    .map_err(|_| Error::RuntimeStartFailed)?
+                    .to_str()
+                    .ok_or(Error::RuntimeStartFailed)?
+                    .to_string();
+
+                // Sanitize the key for ConfigMap (e.g., "app/task.py" -> "app__task.py")
+                let sanitized_key = Self::sanitize_configmap_key(&relative_path);
+
+                // Store mapping for volume mount reconstruction
+                path_mapping.insert(sanitized_key.clone(), relative_path.clone());
+
+                // Try reading as text first
+                match fs::read_to_string(&path).await {
+                    Ok(contents) => {
+                        text_data.insert(sanitized_key, contents);
+                    }
+                    Err(_) => {
+                        // If not text, read as binary
+                        if let Ok(contents) = fs::read(&path).await {
+                            binary_data.insert(sanitized_key, k8s_openapi::ByteString(contents));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Build service spec for networking
@@ -242,8 +411,11 @@ impl ExecutionBackend for K8sBackend {
     async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error> {
         let pods: Api<Pod> = Api::namespaced(self.client.clone(), &self.namespace);
 
-        // Build and create pod
-        let pod = self.build_pod_spec(&spec)?;
+        // Create ConfigMap with bundle contents and get path mapping
+        let path_mapping = self.create_bundle_configmap(&spec).await?;
+
+        // Build and create pod with path mapping for volume items
+        let pod = self.build_pod_spec(&spec, &path_mapping)?;
         let pod_name = pod.metadata.name.clone().ok_or(Error::RuntimeStartFailed)?;
 
         pods.create(&PostParams::default(), &pod)
@@ -355,9 +527,19 @@ impl ExecutionHandle for K8sHandle {
         let pods_clone = pods.clone();
 
         tokio::spawn(async move {
-            // Wait for pod to be running before streaming logs
-            if let Ok(_) =
-                await_condition(pods_clone.clone(), &pod_name, conditions::is_pod_running()).await
+            // Wait for pod to have containers created (Running, Succeeded, or Failed)
+            // This ensures we can stream logs even if the pod crashes
+            let condition = await_condition(pods_clone.clone(), &pod_name, |obj: Option<&Pod>| {
+                obj.and_then(|pod| pod.status.as_ref())
+                    .and_then(|status| status.phase.as_ref())
+                    .map(|phase| phase == "Running" || phase == "Succeeded" || phase == "Failed")
+                    .unwrap_or(false)
+            });
+
+            // Wait with a timeout
+            if tokio::time::timeout(std::time::Duration::from_secs(60), condition)
+                .await
+                .is_ok()
             {
                 let log_params = LogParams {
                     follow: true,
@@ -425,6 +607,13 @@ impl ExecutionHandle for K8sHandle {
     async fn cleanup(&mut self) -> Result<(), Error> {
         // Delete pod
         self.terminate().await?;
+
+        // Delete ConfigMap with bundle
+        let configmaps: Api<ConfigMap> = Api::namespaced(self.client.clone(), &self.namespace);
+        let configmap_name = format!("bundle-{}", self.id);
+        let _ = configmaps
+            .delete(&configmap_name, &DeleteParams::default())
+            .await;
 
         // Delete service if it exists
         if let Some(endpoint) = self.service_endpoint.lock().await.as_ref() {
