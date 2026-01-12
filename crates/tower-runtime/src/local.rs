@@ -626,7 +626,6 @@ impl ExecutionBackend for LocalBackend {
             ctx: spec.telemetry_ctx,
             package: match spec.bundle {
                 BundleRef::Local { path } => Package::from_unpacked_path(path).await,
-                _ => return Err(Error::NotImplemented), // Remote bundles not yet supported
             },
             cwd: None, // LocalApp determines cwd from package
             environment: spec.environment,
