@@ -1,59 +1,8 @@
-//! Generic execution backend abstraction for Tower
+//! Execution backend abstraction for Tower
 //!
 //! This module provides traits and types for abstracting execution backends,
 //! allowing Tower to support multiple compute substrates (local processes,
-//! Kubernetes pods, microVMs, gVisor, etc.) through a uniform interface.
-//!
-//! # Key Design Principles
-//!
-//! - **No language/runtime assumptions** - Python, Node.js, etc. are backend details
-//! - **Cache is container filesystem-based** - Image layers, bundle mounts, not language-specific
-//! - **Backends handle runtime setup** - Dependency installation, environment prep
-//! - **Lifecycle operations are backend-agnostic** - Start/stop/status work everywhere
-//!
-//! # Security Model for Shared Caches
-//!
-//! Tower uses a **tiered cache isolation strategy** to balance performance and security:
-//!
-//! ## Safe for Global Sharing (Read-Only)
-//!
-//! These caches are **content-addressable** and **cryptographically verified**, making them
-//! safe to share across all tenants:
-//!
-//! - **Bundle cache**: Keyed by SHA256 checksum, always read-only
-//! - **Container layer cache**: Keyed by digest, always read-only
-//!
-//! **Attack surface**: Minimal - content is verified before use, mounted read-only
-//!
-//! ## Require Isolation (Read-Write)
-//!
-//! These caches are **mutable** and **writable**, requiring isolation:
-//!
-//! - **Dependency caches** (pip, npm, cargo, etc.): Writable by apps during installation
-//!
-//! **Attack vectors if shared globally**:
-//! - **Cache poisoning**: Malicious app writes bad dependencies to shared cache
-//! - **Information disclosure**: App reads another tenant's private packages
-//! - **Timing attacks**: Infer what dependencies other tenants use
-//!
-//! **Mitigation**: Use `CacheIsolation::PerAccount` or `CacheIsolation::PerApp`
-//!
-//! ## Recommended Configuration
-//!
-//! ```rust,ignore
-//! // For Tower's multi-tenant SaaS:
-//! CacheConfig {
-//!     enable_bundle_cache: true,
-//!     enable_runtime_cache: true,
-//!     enable_dependency_cache: true,
-//!     isolation: CacheIsolation::PerAccount { account_id: "acct-123" },
-//! }
-//! ```
-//!
-//! This gives:
-//! - ✅ Bundle/layer sharing across all tenants (fast)
-//! - ✅ Dependency cache sharing within an account (reasonable hit rate)
-//! - ✅ Isolation between different accounts (secure)
+//! Kubernetes pods, etc.) through a uniform interface.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -165,27 +114,16 @@ pub struct CacheConfig {
 /// CacheIsolation defines security boundaries for caches
 #[derive(Debug, Clone)]
 pub enum CacheIsolation {
-    /// Global sharing (safe for content-addressable immutable content only)
-    ///
-    /// Use for: bundles (by checksum), container layers (by digest)
-    /// Security: Read-only mounts, content is cryptographically verified
+    /// Global sharing (safe for immutable content-addressable caches)
     Global,
 
-    /// Per-account isolation (share within account, isolate between accounts)
-    ///
-    /// Use for: dependency caches when you trust apps within same account
-    /// Security: Apps in account A cannot access account B's cache
+    /// Per-account isolation
     PerAccount { account_id: String },
 
-    /// Per-app isolation (completely isolated, no sharing)
-    ///
-    /// Use for: maximum security, mutable caches in multi-tenant environments
-    /// Security: Each app has its own cache namespace
+    /// Per-app isolation
     PerApp { app_id: String },
 
-    /// No isolation (single-tenant environments only)
-    ///
-    /// WARNING: Only use in trusted single-tenant environments
+    /// No isolation
     None,
 }
 
@@ -217,14 +155,13 @@ pub struct ResourceLimits {
     /// Ephemeral storage limit in megabytes
     pub storage_mb: Option<u32>,
 
-    /// Maximum number of processes (prevents fork bombs)
+    /// Maximum number of processes
     pub max_pids: Option<u32>,
 
-    /// GPU count (0 = no GPU)
+    /// GPU count
     pub gpu_count: u32,
 
-    /// Execution timeout in seconds (0 = no timeout)
-    /// Control plane sets policy, runner may apply local ceiling
+    /// Execution timeout in seconds
     pub timeout_seconds: u32,
 }
 
@@ -245,51 +182,45 @@ pub struct NetworkingSpec {
 // Execution Backend Trait
 // ============================================================================
 
-/// ExecutionBackend abstracts the compute substrate (K8s, microVM, gVisor, etc.)
+/// ExecutionBackend abstracts the compute substrate
 #[async_trait]
 pub trait ExecutionBackend: Send + Sync {
     /// The handle type this backend returns
     type Handle: ExecutionHandle;
 
     /// Create a new execution environment
-    ///
-    /// This method is responsible for:
-    /// - Acquiring/downloading the bundle
-    /// - Setting up the runtime environment (using cache if available)
-    /// - Starting the application
-    /// - Returning a handle for lifecycle management
     async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error>;
 
-    /// Get backend capabilities (for optimization hints)
+    /// Get backend capabilities
     fn capabilities(&self) -> BackendCapabilities;
 
-    /// Cleanup backend resources (called on shutdown)
+    /// Cleanup backend resources
     async fn cleanup(&self) -> Result<(), Error>;
 }
 
 /// BackendCapabilities describes what a backend supports
 #[derive(Debug, Clone)]
 pub struct BackendCapabilities {
-    /// Backend name (for debugging/logging)
+    /// Backend name
     pub name: String,
 
-    /// Does backend support persistent volumes for caching?
+    /// Supports persistent volumes for caching
     pub supports_persistent_cache: bool,
 
-    /// Does backend support pre-warmed environments?
+    /// Supports pre-warmed environments
     pub supports_prewarming: bool,
 
-    /// Does backend support network isolation?
+    /// Supports network isolation
     pub supports_network_isolation: bool,
 
-    /// Does backend support service endpoints?
+    /// Supports service endpoints
     pub supports_service_endpoints: bool,
 
-    /// Typical startup latency characteristics (milliseconds)
+    /// Typical startup latency in milliseconds
     pub typical_cold_start_ms: u64,
     pub typical_warm_start_ms: u64,
 
-    /// Maximum concurrent executions this backend can handle
+    /// Maximum concurrent executions
     pub max_concurrent_executions: Option<u32>,
 }
 
@@ -297,7 +228,7 @@ pub struct BackendCapabilities {
 // Execution Handle Trait
 // ============================================================================
 
-/// ExecutionHandle represents a running execution (Pod, microVM, process, etc.)
+/// ExecutionHandle represents a running execution
 #[async_trait]
 pub trait ExecutionHandle: Send + Sync {
     /// Get unique identifier for this execution
@@ -306,30 +237,22 @@ pub trait ExecutionHandle: Send + Sync {
     /// Get current execution status
     async fn status(&self) -> Result<ExecutionStatus, Error>;
 
-    /// Subscribe to log stream (returns receiver for log lines)
-    ///
-    /// Note: Multiple calls may return the same stream or separate streams
-    /// depending on backend implementation
+    /// Subscribe to log stream
     async fn logs(&self) -> Result<LogReceiver, Error>;
 
-    /// Terminate execution gracefully (SIGTERM equivalent)
-    ///
-    /// Returns when termination is initiated, not necessarily complete.
-    /// Use `wait_for_completion()` to wait for actual termination.
+    /// Terminate execution gracefully
     async fn terminate(&mut self) -> Result<(), Error>;
 
-    /// Force kill execution (SIGKILL equivalent)
+    /// Force kill execution
     async fn kill(&mut self) -> Result<(), Error>;
 
-    /// Wait for execution to complete (blocking)
+    /// Wait for execution to complete
     async fn wait_for_completion(&self) -> Result<ExecutionStatus, Error>;
 
-    /// Get service endpoint (if this execution exposes a service)
+    /// Get service endpoint
     async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error>;
 
-    /// Cleanup resources (delete pod, cleanup filesystem, etc.)
-    ///
-    /// Should be called after execution completes to free resources.
+    /// Cleanup resources
     async fn cleanup(&mut self) -> Result<(), Error>;
 }
 
@@ -415,21 +338,16 @@ pub enum LogChannel {
 }
 
 // ============================================================================
-// App Trait Integration (High-Level Interface)
+// App Trait Integration
 // ============================================================================
 
 /// App trait provides high-level lifecycle management
-///
-/// This trait is the user-facing interface used by AppLauncher and CLI code.
-/// Implementations use ExecutionBackend internally to provide isolation.
 #[async_trait]
 pub trait App: Send + Sync {
-    /// The backend type this App uses for execution
+    /// The backend type this App uses
     type Backend: ExecutionBackend;
 
     /// Start a new execution
-    ///
-    /// The backend is passed explicitly to avoid static method limitations.
     async fn start(backend: Arc<Self::Backend>, opts: StartOptions) -> Result<Self, Error>
     where
         Self: Sized;
@@ -437,18 +355,16 @@ pub trait App: Send + Sync {
     /// Get current execution status
     async fn status(&self) -> Result<ExecutionStatus, Error>;
 
-    /// Terminate execution gracefully
+    /// Terminate execution
     async fn terminate(&mut self) -> Result<(), Error>;
 
-    /// Get service endpoint (if applicable)
+    /// Get service endpoint
     async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error> {
         Ok(None)
     }
 }
 
 /// StartOptions contains all parameters needed to start an execution
-///
-/// This is the same structure used by existing CLI/runner code, kept for compatibility.
 pub struct StartOptions {
     pub ctx: tower_telemetry::Context,
     pub package: tower_package::Package,
@@ -462,8 +378,6 @@ pub struct StartOptions {
 }
 
 /// AppLauncher orchestrates App lifecycle
-///
-/// Generic over App type, which determines the backend via associated type.
 pub struct AppLauncher<A: App> {
     backend: Arc<A::Backend>,
     app: Option<A>,
@@ -514,9 +428,7 @@ impl<A: App> AppLauncher<A> {
     }
 }
 
-/// ManagedApp is the primary implementation of App that uses ExecutionBackend
-///
-/// This is the bridge between the high-level App trait and low-level ExecutionBackend.
+/// ManagedApp implements App using ExecutionBackend
 pub struct ManagedApp<B: ExecutionBackend> {
     backend: Arc<B>,
     handle: Option<B::Handle>,
@@ -648,10 +560,7 @@ fn convert_start_options_to_spec(opts: StartOptions) -> Result<ExecutionSpec, Er
 /// CacheManager abstracts caching across execution backends
 #[async_trait]
 pub trait CacheManager: Send + Sync {
-    /// Get cached bundle, return handle if hit
-    ///
-    /// Bundles are content-addressable by checksum, safe for global sharing.
-    /// Always returns read-only handle.
+    /// Get cached bundle
     async fn get_bundle(
         &self,
         bundle_id: &str,
@@ -659,8 +568,6 @@ pub trait CacheManager: Send + Sync {
     ) -> Result<Option<CacheHandle>, Error>;
 
     /// Store bundle in cache
-    ///
-    /// Bundles are stored globally with CacheIsolation::Global
     async fn put_bundle(
         &self,
         bundle_id: &str,
@@ -668,10 +575,7 @@ pub trait CacheManager: Send + Sync {
         source: CacheSource,
     ) -> Result<CacheHandle, Error>;
 
-    /// Get cached runtime layer, return handle if hit
-    ///
-    /// Runtime layers are content-addressable by digest, safe for global sharing.
-    /// Always returns read-only handle.
+    /// Get cached runtime layer
     async fn get_runtime_layer(
         &self,
         image: &str,
@@ -679,8 +583,6 @@ pub trait CacheManager: Send + Sync {
     ) -> Result<Option<CacheHandle>, Error>;
 
     /// Store runtime layer in cache
-    ///
-    /// Layers are stored globally with CacheIsolation::Global
     async fn put_runtime_layer(
         &self,
         image: &str,
@@ -688,22 +590,14 @@ pub trait CacheManager: Send + Sync {
         source: CacheSource,
     ) -> Result<CacheHandle, Error>;
 
-    /// Get cache directory for language-specific dependencies
-    ///
-    /// Returns a handle to a cache directory that can be mounted into
-    /// the execution environment (e.g., for pip cache, npm cache, etc.)
-    ///
-    /// SECURITY: This returns a read-write handle isolated by the provided isolation strategy.
-    /// - CacheIsolation::Global: NOT RECOMMENDED (writable by all apps)
-    /// - CacheIsolation::PerAccount: Shared within account (recommended for Tower)
-    /// - CacheIsolation::PerApp: Fully isolated per app (maximum security)
+    /// Get cache directory for dependencies
     async fn get_dependency_cache(
         &self,
         language: &str,
         isolation: CacheIsolation,
     ) -> Result<CacheHandle, Error>;
 
-    /// Cleanup old cache entries (LRU eviction, TTL expiration, etc.)
+    /// Cleanup old cache entries
     async fn cleanup(&self, max_age_seconds: u64) -> Result<CleanupStats, Error>;
 }
 
@@ -746,10 +640,10 @@ pub enum CacheLocation {
 /// CachePermissions defines what operations are allowed on cached data
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CachePermissions {
-    /// Read-only access (for immutable content like bundles, layers)
+    /// Read-only access
     ReadOnly,
 
-    /// Read-write access (for mutable caches like dependency caches)
+    /// Read-write access
     ReadWrite,
 }
 
@@ -777,5 +671,4 @@ pub struct CleanupStats {
 // Concrete Backend Implementations
 // ============================================================================
 
-// LocalBackend and K8sBackend will be implemented in separate modules
-// See local.rs and k8s.rs (feature-gated)
+// LocalBackend implemented in local.rs
