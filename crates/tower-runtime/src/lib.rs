@@ -11,9 +11,6 @@ pub mod errors;
 pub mod execution;
 pub mod local;
 
-#[cfg(feature = "k8s")]
-pub mod k8s;
-
 use errors::Error;
 
 #[derive(Copy, Clone)]

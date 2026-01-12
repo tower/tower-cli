@@ -18,12 +18,5 @@ tower-telemetry = { workspace = true }
 tower-uv = { workspace = true }
 uuid = { workspace = true }
 
-# Optional dependencies for K8s backend
-kube = { workspace = true, optional = true }
-k8s-openapi = { workspace = true, optional = true } 
-
-[features]
-k8s = ["kube", "k8s-openapi"]
-
 [dev-dependencies]
 config = { workspace = true }
