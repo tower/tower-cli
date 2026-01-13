@@ -51,7 +51,7 @@ pub type OutputReceiver = UnboundedReceiver<Output>;
 pub type OutputSender = UnboundedSender<Output>;
 
 pub trait App: Send + Sync {
-    type Backend: execution::ExecutionBackend;
+    type Backend: ExecutionBackend;
 
     // start will start the process
     fn start(opts: StartOptions) -> impl Future<Output = Result<Self, Error>> + Send
@@ -66,7 +66,7 @@ pub trait App: Send + Sync {
 }
 
 pub struct AppLauncher<A: App> {
-    pub handle: Option<<A::Backend as execution::ExecutionBackend>::Handle>,
+    pub handle: Option<<A::Backend as ExecutionBackend>::Handle>,
 }
 
 impl<A: App> std::default::Default for AppLauncher<A> {
@@ -77,7 +77,7 @@ impl<A: App> std::default::Default for AppLauncher<A> {
 
 impl<A: App> AppLauncher<A>
 where
-    A::Backend: execution::ExecutionBackend,
+    A::Backend: ExecutionBackend,
 {
     pub async fn launch(
         &mut self,
