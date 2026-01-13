@@ -5,9 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{
-    execution::ExecutionHandle, local::LocalApp, AppLauncher, OutputReceiver, Status,
-};
+use tower_runtime::{execution::ExecutionHandle, AppLauncher, OutputReceiver, Status};
 use tower_telemetry::{debug, Context};
 
 use std::sync::Arc;
@@ -175,7 +173,7 @@ where
     // Create backend and launcher
     use tower_runtime::backends::local::LocalBackend;
     let backend = LocalBackend::new(config.cache_dir);
-    let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
+    let mut launcher: AppLauncher<LocalBackend> = AppLauncher::default();
 
     launcher
         .launch(

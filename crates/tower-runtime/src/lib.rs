@@ -51,8 +51,6 @@ pub type OutputReceiver = UnboundedReceiver<Output>;
 pub type OutputSender = UnboundedSender<Output>;
 
 pub trait App: Send + Sync {
-    type Backend: ExecutionBackend;
-
     // start will start the process
     fn start(opts: StartOptions) -> impl Future<Output = Result<Self, Error>> + Send
     where
@@ -65,23 +63,20 @@ pub trait App: Send + Sync {
     fn status(&self) -> impl Future<Output = Result<Status, Error>> + Send;
 }
 
-pub struct AppLauncher<A: App> {
-    pub handle: Option<<A::Backend as ExecutionBackend>::Handle>,
+pub struct AppLauncher<B: ExecutionBackend> {
+    pub handle: Option<B::Handle>,
 }
 
-impl<A: App> std::default::Default for AppLauncher<A> {
+impl<B: ExecutionBackend> Default for AppLauncher<B> {
     fn default() -> Self {
         Self { handle: None }
     }
 }
 
-impl<A: App> AppLauncher<A>
-where
-    A::Backend: ExecutionBackend,
-{
+impl<B: ExecutionBackend> AppLauncher<B> {
     pub async fn launch(
         &mut self,
-        backend: A::Backend,
+        backend: B,
         ctx: tower_telemetry::Context,
         package: Package,
         environment: String,
