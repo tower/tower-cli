@@ -12,6 +12,7 @@ pub mod execution;
 pub mod local;
 
 use errors::Error;
+use execution::{ExecutionBackend, ExecutionHandle};
 
 #[derive(Copy, Clone)]
 pub enum FD {
@@ -48,7 +49,9 @@ pub type OutputReceiver = UnboundedReceiver<Output>;
 
 pub type OutputSender = UnboundedSender<Output>;
 
-pub trait App {
+pub trait App: Send + Sync {
+    type Backend: execution::ExecutionBackend;
+
     // start will start the process
     fn start(opts: StartOptions) -> impl Future<Output = Result<Self, Error>> + Send
     where
@@ -62,68 +65,105 @@ pub trait App {
 }
 
 pub struct AppLauncher<A: App> {
-    pub app: Option<A>,
+    pub handle: Option<<A::Backend as execution::ExecutionBackend>::Handle>,
 }
 
 impl<A: App> std::default::Default for AppLauncher<A> {
     fn default() -> Self {
-        Self { app: None }
+        Self { handle: None }
     }
 }
 
-impl<A: App> AppLauncher<A> {
+impl<A: App> AppLauncher<A>
+where
+    A::Backend: execution::ExecutionBackend,
+{
     pub async fn launch(
         &mut self,
+        backend: A::Backend,
         ctx: tower_telemetry::Context,
-        output_sender: OutputSender,
         package: Package,
         environment: String,
         secrets: HashMap<String, String>,
         parameters: HashMap<String, String>,
         env_vars: HashMap<String, String>,
-        cache_dir: Option<PathBuf>,
     ) -> Result<(), Error> {
-        let cwd = package.unpacked_path.clone().unwrap().to_path_buf();
+        let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
 
-        let opts = StartOptions {
-            ctx,
-            output_sender,
-            cwd: Some(cwd),
+        // Build ExecutionSpec from parameters
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let id = format!(
+            "run-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+
+        let spec = execution::ExecutionSpec {
+            id,
+            bundle: execution::BundleRef::Local {
+                path: package_path.clone(),
+            },
+            runtime: execution::RuntimeConfig {
+                image: "local".to_string(),
+                version: None,
+                cache: execution::CacheConfig {
+                    enable_bundle_cache: true,
+                    enable_runtime_cache: true,
+                    enable_dependency_cache: true,
+                    backend: execution::CacheBackend::None,
+                    isolation: execution::CacheIsolation::None,
+                },
+                entrypoint: None,
+                command: None,
+            },
             environment,
             secrets,
             parameters,
-            package,
             env_vars,
-            cache_dir,
+            resources: execution::ResourceLimits {
+                cpu_millicores: None,
+                memory_mb: None,
+                storage_mb: None,
+                max_pids: None,
+                gpu_count: 0,
+                timeout_seconds: 3600,
+            },
+            networking: None,
+            telemetry_ctx: ctx,
         };
 
-        // NOTE: This is a really awful hack to force any existing app to drop itself. Not certain
-        // this is exactly what we want to do...
-        self.app = None;
+        // Drop any existing handle
+        self.handle = None;
 
-        let res = A::start(opts).await;
+        // Create execution using backend
+        let handle = backend.create(spec).await?;
+        self.handle = Some(handle);
 
-        if let Ok(app) = res {
-            self.app = Some(app);
-            Ok(())
-        } else {
-            self.app = None;
-            Err(res.err().unwrap())
-        }
+        Ok(())
     }
 
     pub async fn terminate(&mut self) -> Result<(), Error> {
-        if let Some(app) = &mut self.app {
-            if let Err(err) = app.terminate().await {
+        if let Some(handle) = &mut self.handle {
+            if let Err(err) = handle.terminate().await {
                 debug!("failed to terminate app: {}", err);
                 Err(err)
             } else {
-                self.app = None;
+                self.handle = None;
                 Ok(())
             }
         } else {
-            // There's no app, so nothing to terminate.
+            // There's no handle, so nothing to terminate.
             Ok(())
+        }
+    }
+
+    pub async fn status(&self) -> Result<Status, Error> {
+        if let Some(handle) = &self.handle {
+            handle.status().await
+        } else {
+            Ok(Status::None)
         }
     }
 }

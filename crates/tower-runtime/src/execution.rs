@@ -5,13 +5,11 @@
 //! Kubernetes pods, etc.) through a uniform interface.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::errors::Error;
+use crate::{OutputReceiver, Status};
 
 // ============================================================================
 // Core Execution Types
@@ -214,10 +212,10 @@ pub trait ExecutionHandle: Send + Sync {
     fn id(&self) -> &str;
 
     /// Get current execution status
-    async fn status(&self) -> Result<ExecutionStatus, Error>;
+    async fn status(&self) -> Result<Status, Error>;
 
     /// Subscribe to log stream
-    async fn logs(&self) -> Result<LogReceiver, Error>;
+    async fn logs(&self) -> Result<OutputReceiver, Error>;
 
     /// Terminate execution gracefully
     async fn terminate(&mut self) -> Result<(), Error>;
@@ -226,38 +224,13 @@ pub trait ExecutionHandle: Send + Sync {
     async fn kill(&mut self) -> Result<(), Error>;
 
     /// Wait for execution to complete
-    async fn wait_for_completion(&self) -> Result<ExecutionStatus, Error>;
+    async fn wait_for_completion(&self) -> Result<Status, Error>;
 
     /// Get service endpoint
     async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error>;
 
     /// Cleanup resources
     async fn cleanup(&mut self) -> Result<(), Error>;
-}
-
-/// ExecutionStatus represents the current state of an execution
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExecutionStatus {
-    /// Execution is being prepared (downloading bundle, setting up environment)
-    Preparing,
-
-    /// Execution is currently running
-    Running,
-
-    /// Execution completed successfully (exit code 0)
-    Succeeded,
-
-    /// Execution failed with non-zero exit code
-    Failed { exit_code: i32 },
-
-    /// Execution crashed (segfault, OOM kill, etc.)
-    Crashed { reason: String },
-
-    /// Execution was terminated by user/system
-    Terminated,
-
-    /// Unknown status (shouldn't happen in normal operation)
-    Unknown,
 }
 
 /// ServiceEndpoint describes how to reach a running service
@@ -275,140 +248,5 @@ pub struct ServiceEndpoint {
     /// Full URL if applicable (e.g., "http://app-run-123.default.svc.cluster.local:8080")
     pub url: Option<String>,
 }
-
-// ============================================================================
-// Log Streaming Types
-// ============================================================================
-
-/// LogReceiver is a stream of log lines from the execution
-pub type LogReceiver = UnboundedReceiver<LogLine>;
-
-/// LogLine represents a single line of output
-#[derive(Debug, Clone)]
-pub struct LogLine {
-    /// When this line was emitted
-    pub timestamp: DateTime<Utc>,
-
-    /// Which stream (stdout/stderr)
-    pub stream: LogStream,
-
-    /// Which phase (setup vs program)
-    pub channel: LogChannel,
-
-    /// The actual log content
-    pub content: String,
-}
-
-/// LogStream identifies stdout vs stderr
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LogStream {
-    Stdout,
-    Stderr,
-}
-
-/// LogChannel identifies setup vs program output
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LogChannel {
-    /// Setup phase (dependency installation, environment prep)
-    Setup,
-
-    /// Program phase (actual application output)
-    Program,
-}
-
-// ============================================================================
-// App Trait Integration
-// ============================================================================
-
-/// App trait provides high-level lifecycle management
-#[async_trait]
-pub trait App: Send + Sync {
-    /// The backend type this App uses
-    type Backend: ExecutionBackend;
-
-    /// Start a new execution
-    async fn start(backend: Arc<Self::Backend>, opts: StartOptions) -> Result<Self, Error>
-    where
-        Self: Sized;
-
-    /// Get current execution status
-    async fn status(&self) -> Result<ExecutionStatus, Error>;
-
-    /// Terminate execution
-    async fn terminate(&mut self) -> Result<(), Error>;
-
-    /// Get service endpoint
-    async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error> {
-        Ok(None)
-    }
-}
-
-/// StartOptions contains all parameters needed to start an execution
-pub struct StartOptions {
-    pub ctx: tower_telemetry::Context,
-    pub package: tower_package::Package,
-    pub cwd: Option<PathBuf>,
-    pub environment: String,
-    pub secrets: HashMap<String, String>,
-    pub parameters: HashMap<String, String>,
-    pub env_vars: HashMap<String, String>,
-    pub output_sender: tokio::sync::mpsc::UnboundedSender<crate::Output>,
-    pub cache_dir: Option<PathBuf>,
-}
-
-/// AppLauncher orchestrates App lifecycle
-pub struct AppLauncher<A: App> {
-    backend: Arc<A::Backend>,
-    app: Option<A>,
-}
-
-impl<A: App> AppLauncher<A> {
-    /// Create a new launcher with the specified backend
-    pub fn new(backend: Arc<A::Backend>) -> Self {
-        Self { backend, app: None }
-    }
-
-    /// Launch an app with the given options
-    pub async fn launch(&mut self, opts: StartOptions) -> Result<(), Error> {
-        // Drop any existing app
-        self.app = None;
-
-        // Start new app using backend
-        let app = A::start(self.backend.clone(), opts).await?;
-        self.app = Some(app);
-
-        Ok(())
-    }
-
-    /// Get current app status
-    pub async fn status(&self) -> Result<ExecutionStatus, Error> {
-        self.app
-            .as_ref()
-            .ok_or(Error::AppNotStarted)?
-            .status()
-            .await
-    }
-
-    /// Terminate the running app
-    pub async fn terminate(&mut self) -> Result<(), Error> {
-        if let Some(app) = &mut self.app {
-            app.terminate().await?;
-            self.app = None;
-        }
-        Ok(())
-    }
-
-    /// Get service endpoint (if app exposes one)
-    pub async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error> {
-        match &self.app {
-            Some(app) => app.service_endpoint().await,
-            None => Ok(None),
-        }
-    }
-}
-
-// ============================================================================
-// Concrete Backend Implementations
-// ============================================================================
 
 // LocalBackend implemented in local.rs

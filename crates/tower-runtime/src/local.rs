@@ -6,7 +6,7 @@ use std::process::Stdio;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::{errors::Error, OutputSender, StartOptions, Status};
+use crate::{errors::Error, OutputReceiver, OutputSender, StartOptions, Status};
 
 use tokio::{
     fs,
@@ -336,6 +336,8 @@ impl Drop for LocalApp {
 }
 
 impl App for LocalApp {
+    type Backend = LocalBackend;
+
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         let terminator = CancellationToken::new();
 
@@ -591,7 +593,7 @@ fn is_bash_package(package: &Package) -> bool {
 
 use crate::execution::{
     BackendCapabilities, BundleRef, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    ExecutionStatus, LogChannel, LogLine, LogReceiver, LogStream, ServiceEndpoint,
+    ServiceEndpoint,
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -678,46 +680,21 @@ impl ExecutionHandle for LocalHandle {
         &self.id
     }
 
-    async fn status(&self) -> Result<ExecutionStatus, Error> {
+    async fn status(&self) -> Result<Status, Error> {
         let app = self.app.lock().await;
-        let status = app.status().await?;
-
-        Ok(match status {
-            Status::None => ExecutionStatus::Preparing,
-            Status::Running => ExecutionStatus::Running,
-            Status::Exited => ExecutionStatus::Succeeded,
-            Status::Crashed { code } => {
-                if code == -1 {
-                    ExecutionStatus::Terminated
-                } else {
-                    ExecutionStatus::Failed { exit_code: code }
-                }
-            }
-        })
+        app.status().await
     }
 
-    async fn logs(&self) -> Result<LogReceiver, Error> {
+    async fn logs(&self) -> Result<OutputReceiver, Error> {
         // Create a new channel for log streaming
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
-        // Spawn a task to convert Output to LogLine
+        // Spawn a task to forward Output from the internal receiver
         let output_receiver = self.output_receiver.clone();
         tokio::spawn(async move {
             let mut receiver = output_receiver.lock().await;
             while let Some(output) = receiver.recv().await {
-                let log_line = LogLine {
-                    timestamp: output.time,
-                    stream: match output.fd {
-                        FD::Stdout => LogStream::Stdout,
-                        FD::Stderr => LogStream::Stderr,
-                    },
-                    channel: match output.channel {
-                        Channel::Setup => LogChannel::Setup,
-                        Channel::Program => LogChannel::Program,
-                    },
-                    content: output.line,
-                };
-                if tx.send(log_line).is_err() {
+                if tx.send(output).is_err() {
                     break; // Receiver dropped
                 }
             }
@@ -736,11 +713,11 @@ impl ExecutionHandle for LocalHandle {
         self.terminate().await
     }
 
-    async fn wait_for_completion(&self) -> Result<ExecutionStatus, Error> {
+    async fn wait_for_completion(&self) -> Result<Status, Error> {
         loop {
             let status = self.status().await?;
             match status {
-                ExecutionStatus::Preparing | ExecutionStatus::Running => {
+                Status::None | Status::Running => {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                 }
                 _ => return Ok(status),

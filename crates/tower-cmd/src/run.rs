@@ -5,12 +5,14 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver, Status};
+use tower_runtime::{
+    execution::ExecutionHandle, local::LocalApp, AppLauncher, OutputReceiver, Status,
+};
 use tower_telemetry::{debug, Context};
 
 use std::sync::Arc;
 use tokio::sync::{
-    mpsc::{unbounded_channel, Receiver as MpscReceiver},
+    mpsc::Receiver as MpscReceiver,
     oneshot::{self, Receiver as OneshotReceiver},
     Mutex,
 };
@@ -168,28 +170,32 @@ where
     // Unpack the package
     package.unpack().await?;
 
-    let (sender, receiver) = unbounded_channel();
-
     output::success(&format!("Launching app `{}`", towerfile.app.name));
-    let output_task = tokio::spawn(output_handler(receiver));
 
+    // Create backend and launcher
+    use tower_runtime::local::LocalBackend;
+    let backend = LocalBackend::new(config.cache_dir);
     let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
+
     launcher
         .launch(
+            backend,
             Context::new(),
-            sender,
             package,
             env.to_string(),
             secrets,
             params,
             env_vars,
-            config.cache_dir,
         )
         .await?;
 
-    // Monitor app output and status concurrently
-    let app = Arc::new(Mutex::new(launcher.app.unwrap()));
-    let status_task = tokio::spawn(monitor_local_status(Arc::clone(&app)));
+    // Get logs from handle and spawn output handler
+    let logs_receiver = launcher.handle.as_ref().unwrap().logs().await?;
+    let output_task = tokio::spawn(output_handler(logs_receiver));
+
+    // Monitor app status concurrently
+    let handle = Arc::new(Mutex::new(launcher.handle.take().unwrap()));
+    let status_task = tokio::spawn(monitor_handle_status(Arc::clone(&handle)));
 
     // Wait for app to complete or SIGTERM
     let status_result = tokio::select! {
@@ -199,7 +205,7 @@ where
         },
         _ = tokio::signal::ctrl_c(), if !output::get_output_mode().is_mcp() => {
             output::write("\nReceived Ctrl+C, stopping local run...\n");
-            app.lock().await.terminate().await.ok();
+            handle.lock().await.terminate().await.ok();
             return Ok(output_task.await.unwrap());
         }
     };
@@ -595,8 +601,8 @@ async fn monitor_output(mut output: OutputReceiver) {
 
 /// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
-    debug!("Starting status monitoring for LocalApp");
+async fn monitor_handle_status(handle: Arc<Mutex<tower_runtime::local::LocalHandle>>) -> Status {
+    debug!("Starting status monitoring for execution handle");
     let mut check_count = 0;
     let mut err_count = 0;
 
@@ -604,11 +610,11 @@ async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
         check_count += 1;
 
         debug!(
-            "Status check #{}, attempting to get app status",
+            "Status check #{}, attempting to get handle status",
             check_count
         );
 
-        match app.lock().await.status().await {
+        match tower_runtime::execution::ExecutionHandle::status(&*handle.lock().await).await {
             Ok(status) => {
                 // We reset the error count to indicate that we can intermittently get statuses.
                 err_count = 0;
@@ -627,17 +633,18 @@ async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
                         return status;
                     }
                     _ => {
+                        debug!("Handle status: other, continuing to monitor");
                         sleep(Duration::from_millis(100)).await;
                     }
                 }
             }
             Err(e) => {
-                debug!("Failed to get app status: {:?}", e);
+                debug!("Failed to get handle status: {:?}", e);
                 err_count += 1;
 
                 // If we get five errors in a row, we abandon monitoring.
                 if err_count >= 5 {
-                    debug!("Failed to get app status after 5 attempts, giving up");
+                    debug!("Failed to get handle status after 5 attempts, giving up");
                     output::error("An error occured while monitoring your local run status!");
                     return tower_runtime::Status::Crashed { code: -1 };
                 }
