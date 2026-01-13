@@ -71,6 +71,38 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         env_vars.insert("TMP".to_string(), tmp);
     }
 
+    #[cfg(not(windows))]
+    {
+        // Some downstream dependencies require a HOME environment variable to be set.
+        let home = std::env::var("HOME").unwrap_or_default();
+        env_vars.insert("HOME".to_string(), home);
+
+        // We also need a PATH environment variable often times, we really want the most basic
+        // thing we can get here but for now we'll pass in the currently-configured one.
+        let path = std::env::var("PATH").unwrap_or_default();
+        env_vars.insert("PATH".to_string(), path);
+
+        // On Unix systems, we also want to bring along the TMPDIR environment variable for temp
+        // files.
+        let tmpdir = std::env::var("TMPDIR").unwrap_or_default();
+        env_vars.insert("TMPDIR".to_string(), tmpdir);
+
+        // Also other potentially-set temp vars. These may not be set.
+        let temp = std::env::var("TEMP").unwrap_or_default();
+        env_vars.insert("TEMP".to_string(), temp);
+
+        let tmp = std::env::var("TMP").unwrap_or_default();
+        env_vars.insert("TMP".to_string(), tmp);
+
+        // Let's pass in TZ as well to propagate that to child processes.
+        let tz = std::env::var("TZ").unwrap_or_default();
+        env_vars.insert("TZ".to_string(), tz);
+
+        // And finally locale info, some peeps might need that.
+        let lang = std::env::var("LANG").unwrap_or_default();
+        env_vars.insert("LANG".to_string(), lang);
+    }
+
     env_vars
 }
 
