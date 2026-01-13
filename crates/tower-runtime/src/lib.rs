@@ -7,6 +7,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tower_package::Package;
 use tower_telemetry::debug;
 
+pub mod backends;
 pub mod errors;
 pub mod execution;
 pub mod local;
