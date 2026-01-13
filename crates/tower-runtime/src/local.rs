@@ -336,8 +336,6 @@ impl Drop for LocalApp {
 }
 
 impl App for LocalApp {
-    type Backend = crate::backends::local::LocalBackend;
-
     async fn start(opts: StartOptions) -> Result<Self, Error> {
         let terminator = CancellationToken::new();
 
