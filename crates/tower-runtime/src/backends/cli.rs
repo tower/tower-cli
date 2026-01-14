@@ -4,7 +4,7 @@
 //! - The caller creates the output channel and passes the sender
 //! - The caller keeps the receiver for direct consumption
 //! - No need for complex handle.logs() method
-//! - Single consumer model (perfect for CLI)
+//! - Single consumer model (better for CLI)
 
 use crate::errors::Error;
 use crate::local::LocalApp;
