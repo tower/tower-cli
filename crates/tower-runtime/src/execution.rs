@@ -21,8 +21,8 @@ pub struct ExecutionSpec {
     /// Unique identifier for this execution (e.g., run_id)
     pub id: String,
 
-    /// Bundle reference (how to get the application code)
-    pub bundle: BundleRef,
+    /// Package reference (how to get the application code)
+    pub package: PackageRef,
 
     /// Runtime configuration (image, version, etc.)
     pub runtime: RuntimeConfig,
@@ -49,9 +49,9 @@ pub struct ExecutionSpec {
     pub telemetry_ctx: tower_telemetry::Context,
 }
 
-/// BundleRef describes where to get the application bundle
+/// PackageRef describes where to get the application bundle
 #[derive(Debug, Clone)]
-pub enum BundleRef {
+pub enum PackageRef {
     /// Local filesystem path
     Local { path: PathBuf },
 }

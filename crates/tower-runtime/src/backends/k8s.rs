@@ -10,8 +10,8 @@
 
 use crate::errors::Error;
 use crate::execution::{
-    BackendCapabilities, BundleRef, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    NetworkingSpec, ServiceEndpoint,
+    BackendCapabilities, ExecutionBackend, ExecutionHandle, ExecutionSpec, NetworkingSpec,
+    PackageRef, ServiceEndpoint,
 };
 use crate::{Channel, Output, OutputReceiver, Status, FD};
 
@@ -220,8 +220,8 @@ impl K8sBackend {
         let configmaps: Api<ConfigMap> = Api::namespaced(self.client.clone(), &self.namespace);
 
         // Get bundle path
-        let bundle_path = match &spec.bundle {
-            BundleRef::Local { path } => path,
+        let bundle_path = match &spec.package {
+            PackageRef::Local { path } => path,
         };
 
         // Recursively read ALL files from the bundle directory
