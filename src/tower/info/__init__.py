@@ -37,6 +37,16 @@ def run_id() -> Optional[str]:
     """
     return _get_runtime_env_variable("RUN_ID", None)
 
+def run_number() -> Optional[int]:
+    """
+    Retrieve the number of the current run from the runtime environment.
+
+    Returns:
+        Optional[int]: The run number if set, otherwise None.
+    """
+    run_number_str = _get_runtime_env_variable("RUN_NUMBER", None)
+    return int(run_number_str) if run_number_str is not None else None
+
 def hostname() -> Optional[str]:
     """
     Retrieve the hostname of the current run assigned by the runtime
