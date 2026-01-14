@@ -2,8 +2,8 @@
 
 use crate::errors::Error;
 use crate::execution::{
-    BackendCapabilities, BundleRef, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    ServiceEndpoint,
+    BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
+    PackageRef, ServiceEndpoint,
 };
 use crate::local::LocalApp;
 use crate::{App, OutputReceiver, StartOptions, Status};
@@ -43,8 +43,8 @@ impl ExecutionBackend for SubprocessBackend {
 
         let opts = StartOptions {
             ctx: spec.telemetry_ctx,
-            package: match spec.bundle {
-                BundleRef::Local { path } => Package::from_unpacked_path(path).await,
+            package: match spec.package {
+                PackageRef::Local { path } => Package::from_unpacked_path(path).await,
             },
             cwd: None, // LocalApp determines cwd from package
             environment: spec.environment,
