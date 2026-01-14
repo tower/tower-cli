@@ -1,1 +1,28 @@
-{"tower_url":"http://127.0.0.1:8000/v1","user":{"email":"test@example.com","first_name":"Test","last_name":"User","created_at":"2023-01-01T00:00:00Z"},"token":{"jwt":"mock_jwt_token"},"active_team":{"name":"default","token":{"jwt":"mock_jwt_token"},"team_type":"user"},"teams":[{"name":"default","token":{"jwt":"mock_jwt_token"},"team_type":"user"}]}
+{
+  "tower_url": "http://127.0.0.1:8000/v1",
+  "user": {
+    "email": "test@example.com",
+    "first_name": "Test",
+    "last_name": "User",
+    "created_at": "2023-01-01T00:00:00Z"
+  },
+  "token": {
+    "jwt": "mock_jwt_token"
+  },
+  "active_team": {
+    "name": "default",
+    "token": {
+      "jwt": "mock_jwt_token"
+    },
+    "team_type": "user"
+  },
+  "teams": [
+    {
+      "name": "default",
+      "token": {
+        "jwt": "mock_jwt_token"
+      },
+      "team_type": "user"
+    }
+  ]
+}
