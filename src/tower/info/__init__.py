@@ -106,14 +106,14 @@ def app_name() -> str:
     """
     return _get_runtime_env_variable("APP_NAME")
 
-def account_name() -> str:
+def team_name() -> str:
     """
-    Retrieve the name of the account associated with this run from the runtime.
+    Retrieve the name of the team associated with this run from the runtime.
 
     Returns:
-        str: The name of the account or an empty string if unknown.
+        str: The name of the team or an empty string if unknown.
     """
-    return _get_runtime_env_variable("ACCOUNT_NAME", "")
+    return _get_runtime_env_variable("TEAM_NAME", "")
 
 def environment() -> str:
     """
