@@ -19,12 +19,24 @@ from ._client import (
     wait_for_runs,
 )
 
+from ._utils import (
+    param,
+    parameter,
+    secret,
+)
+
+
 from ._features import override_get_attr, get_available_features, is_feature_enabled
 
 if TYPE_CHECKING:
     from ._tables import tables as tables
     from ._llms import llms as llms
     from ._dbt import dbt as dbt
+
+#
+# Sub-packages to expose
+#
+from . import info
 
 
 def __getattr__(name: str):
