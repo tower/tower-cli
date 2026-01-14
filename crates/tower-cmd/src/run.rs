@@ -5,11 +5,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{execution::ExecutionHandle, AppLauncher, OutputReceiver, Status};
+use tower_runtime::{OutputReceiver, Status};
 use tower_telemetry::{debug, Context};
 
 use std::sync::Arc;
 use tokio::sync::{
+    mpsc::unbounded_channel,
     mpsc::Receiver as MpscReceiver,
     oneshot::{self, Receiver as OneshotReceiver},
     Mutex,
@@ -168,17 +169,19 @@ where
     // Unpack the package
     package.unpack().await?;
 
+    // Create output channel - simple pattern for CLI
+    let (sender, receiver) = unbounded_channel();
+
     output::success(&format!("Launching app `{}`", towerfile.app.name));
+    let output_task = tokio::spawn(output_handler(receiver));
 
-    // Create backend and launcher
-    use tower_runtime::backends::subprocess::SubprocessBackend;
-    let backend = SubprocessBackend::new(config.cache_dir);
-    let mut launcher: AppLauncher<SubprocessBackend> = AppLauncher::default();
-
-    launcher
+    // Create backend and launch app
+    use tower_runtime::backends::cli::CliBackend;
+    let backend = CliBackend::new(config.cache_dir);
+    let handle = backend
         .launch(
-            backend,
             Context::new(),
+            sender,
             package,
             env.to_string(),
             secrets,
@@ -187,13 +190,9 @@ where
         )
         .await?;
 
-    // Get logs from handle and spawn output handler
-    let logs_receiver = launcher.handle.as_ref().unwrap().logs().await?;
-    let output_task = tokio::spawn(output_handler(logs_receiver));
-
     // Monitor app status concurrently
-    let handle = Arc::new(Mutex::new(launcher.handle.take().unwrap()));
-    let status_task = tokio::spawn(monitor_handle_status(Arc::clone(&handle)));
+    let handle = Arc::new(Mutex::new(handle));
+    let status_task = tokio::spawn(monitor_cli_status(Arc::clone(&handle)));
 
     // Wait for app to complete or SIGTERM
     let status_result = tokio::select! {
@@ -599,10 +598,8 @@ async fn monitor_output(mut output: OutputReceiver) {
 
 /// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_handle_status(
-    handle: Arc<Mutex<tower_runtime::backends::subprocess::SubprocessHandle>>,
-) -> Status {
-    debug!("Starting status monitoring for execution handle");
+async fn monitor_cli_status(handle: Arc<Mutex<tower_runtime::backends::cli::CliHandle>>) -> Status {
+    debug!("Starting status monitoring for CLI execution");
     let mut check_count = 0;
     let mut err_count = 0;
 
@@ -610,11 +607,11 @@ async fn monitor_handle_status(
         check_count += 1;
 
         debug!(
-            "Status check #{}, attempting to get handle status",
+            "Status check #{}, attempting to get CLI handle status",
             check_count
         );
 
-        match tower_runtime::execution::ExecutionHandle::status(&*handle.lock().await).await {
+        match handle.lock().await.status().await {
             Ok(status) => {
                 // We reset the error count to indicate that we can intermittently get statuses.
                 err_count = 0;
@@ -622,14 +619,10 @@ async fn monitor_handle_status(
                 match status {
                     Status::Exited => {
                         debug!("Run exited cleanly, stopping status monitoring");
-
-                        // We're done. Exit this loop and function.
                         return status;
                     }
                     Status::Crashed { .. } => {
                         debug!("Run crashed, stopping status monitoring");
-
-                        // We're done. Exit this loop and function.
                         return status;
                     }
                     _ => {
@@ -646,7 +639,7 @@ async fn monitor_handle_status(
                 if err_count >= 5 {
                     debug!("Failed to get handle status after 5 attempts, giving up");
                     output::error("An error occured while monitoring your local run status!");
-                    return tower_runtime::Status::Crashed { code: -1 };
+                    return Status::Crashed { code: -1 };
                 }
 
                 // Otherwise, keep on keepin' on.
