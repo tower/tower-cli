@@ -16,7 +16,6 @@ tokio-util = { workspace = true }
 tower-package = { workspace = true }
 tower-telemetry = { workspace = true }
 tower-uv = { workspace = true }
-uuid = { workspace = true }
 
 # K8s dependencies (optional)
 k8s-openapi = { version = "0.23", features = ["v1_31"], optional = true }
