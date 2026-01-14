@@ -171,9 +171,9 @@ where
     output::success(&format!("Launching app `{}`", towerfile.app.name));
 
     // Create backend and launcher
-    use tower_runtime::backends::local::LocalBackend;
-    let backend = LocalBackend::new(config.cache_dir);
-    let mut launcher: AppLauncher<LocalBackend> = AppLauncher::default();
+    use tower_runtime::backends::subprocess::SubprocessBackend;
+    let backend = SubprocessBackend::new(config.cache_dir);
+    let mut launcher: AppLauncher<SubprocessBackend> = AppLauncher::default();
 
     launcher
         .launch(
@@ -600,7 +600,7 @@ async fn monitor_output(mut output: OutputReceiver) {
 /// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
 async fn monitor_handle_status(
-    handle: Arc<Mutex<tower_runtime::backends::local::LocalHandle>>,
+    handle: Arc<Mutex<tower_runtime::backends::subprocess::SubprocessHandle>>,
 ) -> Status {
     debug!("Starting status monitoring for execution handle");
     let mut check_count = 0;

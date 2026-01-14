@@ -1,4 +1,4 @@
-//! Local subprocess execution backend
+//! Subprocess execution backend
 
 use crate::errors::Error;
 use crate::execution::{
@@ -15,21 +15,21 @@ use tokio::sync::Mutex;
 use tokio::time::Duration;
 use tower_package::Package;
 
-/// LocalBackend executes apps as local subprocesses
-pub struct LocalBackend {
+/// SubprocessBackend executes apps as a subprocess
+pub struct SubprocessBackend {
     /// Optional default cache directory to use
     cache_dir: Option<PathBuf>,
 }
 
-impl LocalBackend {
+impl SubprocessBackend {
     pub fn new(cache_dir: Option<PathBuf>) -> Self {
         Self { cache_dir }
     }
 }
 
 #[async_trait]
-impl ExecutionBackend for LocalBackend {
-    type Handle = LocalHandle;
+impl ExecutionBackend for SubprocessBackend {
+    type Handle = SubprocessHandle;
 
     async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error> {
         // Convert ExecutionSpec to StartOptions for LocalApp
@@ -58,7 +58,7 @@ impl ExecutionBackend for LocalBackend {
         // Start the LocalApp
         let app = LocalApp::start(opts).await?;
 
-        Ok(LocalHandle {
+        Ok(SubprocessHandle {
             id: spec.id,
             app: Arc::new(Mutex::new(app)),
             output_receiver: Arc::new(Mutex::new(output_receiver)),
@@ -84,15 +84,15 @@ impl ExecutionBackend for LocalBackend {
     }
 }
 
-/// LocalHandle provides lifecycle management for a local subprocess execution
-pub struct LocalHandle {
+/// SubprocessHandle provides lifecycle management for a subprocess execution
+pub struct SubprocessHandle {
     id: String,
     app: Arc<Mutex<LocalApp>>,
     output_receiver: Arc<Mutex<OutputReceiver>>,
 }
 
 #[async_trait]
-impl ExecutionHandle for LocalHandle {
+impl ExecutionHandle for SubprocessHandle {
     fn id(&self) -> &str {
         &self.id
     }
