@@ -248,5 +248,3 @@ pub struct ServiceEndpoint {
     /// Full URL if applicable (e.g., "http://app-run-123.default.svc.cluster.local:8080")
     pub url: Option<String>,
 }
-
-// LocalBackend implemented in local.rs
