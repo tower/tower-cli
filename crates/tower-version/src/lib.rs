@@ -42,3 +42,39 @@ pub async fn check_latest_version() -> Result<Option<String>> {
     }
     Ok(None)
 }
+
+fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<_> = v.split('.').filter_map(|p| p.parse::<u32>().ok()).collect();
+    (parts.len() == 3).then(|| (parts[0], parts[1], parts[2]))
+}
+
+pub fn is_older_version(current: &str, latest: &str) -> bool {
+    matches!((parse_version(current), parse_version(latest)), (Some(c), Some(l)) if c < l)
+}
+
+pub fn is_newer_version(current: &str, latest: &str) -> bool {
+    matches!((parse_version(current), parse_version(latest)), (Some(c), Some(l)) if c > l)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_current_version_equal() {
+        assert!(!is_older_version("0.3.39", "0.3.39"));
+        assert!(!is_newer_version("0.3.39", "0.3.39"));
+    }
+
+    #[test]
+    fn test_older_version() {
+        assert!(is_older_version("0.3.38", "0.3.39"));
+        assert!(!is_newer_version("0.3.38", "0.3.39"));
+    }
+
+    #[test]
+    fn test_newer_version() {
+        assert!(!is_older_version("0.3.40", "0.3.39"));
+        assert!(is_newer_version("0.3.40", "0.3.39"));
+    }
+}
