@@ -1,5 +1,6 @@
 from typing import Optional
 
+
 def schedule_name() -> Optional[str]:
     """
     Retrieve the name of the schedule that invoked this run from the runtime
@@ -10,6 +11,7 @@ def schedule_name() -> Optional[str]:
     """
     return _get_runtime_env_variable("SCHEDULE_NAME", None)
 
+
 def is_scheduled_run() -> bool:
     """
     Check if the current run is a scheduled run based on environment variables.
@@ -17,6 +19,7 @@ def is_scheduled_run() -> bool:
         bool: True if it is a scheduled run, otherwise False.
     """
     return schedule_name() is not None
+
 
 def schedule_id() -> Optional[str]:
     """
@@ -28,6 +31,7 @@ def schedule_id() -> Optional[str]:
     """
     return _get_runtime_env_variable("SCHEDULE_ID", None)
 
+
 def run_id() -> Optional[str]:
     """
     Retrieve the ID of the current run from the runtime environment.
@@ -36,6 +40,7 @@ def run_id() -> Optional[str]:
         Optional[str]: The ID of the run if set, otherwise None.
     """
     return _get_runtime_env_variable("RUN_ID", None)
+
 
 def run_number() -> Optional[int]:
     """
@@ -47,6 +52,7 @@ def run_number() -> Optional[int]:
     run_number_str = _get_runtime_env_variable("RUN_NUMBER", None)
     return int(run_number_str) if run_number_str is not None else None
 
+
 def hostname() -> Optional[str]:
     """
     Retrieve the hostname of the current run assigned by the runtime
@@ -56,6 +62,7 @@ def hostname() -> Optional[str]:
         Optional[str]: The hostname if set, otherwise None.
     """
     return _get_env_variable("TOWER__HOST", None)
+
 
 def port() -> Optional[int]:
     """
@@ -68,6 +75,7 @@ def port() -> Optional[int]:
     port_str = _get_env_variable("TOWER__PORT", None)
     return int(port_str) if port_str is not None else None
 
+
 def is_cloud_run() -> bool:
     """
     Check if the current run is executing in the Tower cloud environment.
@@ -78,14 +86,16 @@ def is_cloud_run() -> bool:
     val = _get_runtime_env_variable("IS_TOWER_MANAGED", "")
     return _strtobool(val)
 
+
 def runner_name() -> str:
-    """ Retrieve the name of the runner executing this run from the runtime. If the
+    """Retrieve the name of the runner executing this run from the runtime. If the
     name is unknown, an empty string is returned.
 
     Returns:
         str: The name of the runner or an empty string if unknown.
     """
     return _get_runtime_env_variable("RUNNER_NAME", "")
+
 
 def runner_id() -> str:
     """
@@ -97,6 +107,7 @@ def runner_id() -> str:
     """
     return _get_runtime_env_variable("RUNNER_ID", "")
 
+
 def app_name() -> str:
     """
     Retrieve the name of the app being executed in this run from the runtime.
@@ -105,6 +116,7 @@ def app_name() -> str:
         str: The name of the app or an empty string if unknown.
     """
     return _get_runtime_env_variable("APP_NAME")
+
 
 def team_name() -> str:
     """
@@ -115,6 +127,7 @@ def team_name() -> str:
     """
     return _get_runtime_env_variable("TEAM_NAME", "")
 
+
 def environment() -> str:
     """
     Retrieve the name of the environment this run is running in.
@@ -123,6 +136,7 @@ def environment() -> str:
         str: The name of the environment or an empty string if unknown.
     """
     return _get_runtime_env_variable("ENVIRONMENT_NAME", "")
+
 
 def is_manual_run() -> bool:
     """
@@ -133,6 +147,7 @@ def is_manual_run() -> bool:
     """
     val = _get_runtime_env_variable("IS_MANUAL_RUN", "false")
     return _strtobool(val)
+
 
 def _get_runtime_env_variable(name: str, default: Optional[str] = "") -> Optional[str]:
     """
@@ -146,6 +161,7 @@ def _get_runtime_env_variable(name: str, default: Optional[str] = "") -> Optiona
     """
     return _get_env_variable(f"TOWER__RUNTIME__{name}", default)
 
+
 def _get_env_variable(var_name: str, default: Optional[str] = "") -> Optional[str]:
     """
     Helper function to retrieve an environment variable.
@@ -157,13 +173,15 @@ def _get_env_variable(var_name: str, default: Optional[str] = "") -> Optional[st
         Optional[str]: The value of the environment variable if set, otherwise None.
     """
     import os
+
     return os.getenv(var_name, default)
+
 
 def _strtobool(val: str) -> bool:
     val = val.lower()
-    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+    if val in ("y", "yes", "t", "true", "on", "1"):
         return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+    elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
         raise ValueError(f"invalid truth value {val!r}")

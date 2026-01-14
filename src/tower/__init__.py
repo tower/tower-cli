@@ -19,7 +19,7 @@ from ._client import (
     wait_for_runs,
 )
 
-from ._utils import(
+from ._utils import (
     param,
     parameter,
     secret,
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 # Sub-packages to expose
 #
 from . import info
+
 
 def __getattr__(name: str):
     """

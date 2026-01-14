@@ -1,4 +1,4 @@
-def secret(name: str, default: str =""):
+def secret(name: str, default: str = ""):
     """
     Retrieve a secret value from environment variables.
 
@@ -10,9 +10,11 @@ def secret(name: str, default: str =""):
         str: The value of the secret or the default value.
     """
     import os
+
     return os.getenv(name, default)
 
-def param(name: str, default: str =""):
+
+def param(name: str, default: str = ""):
     """
     Retrieve a parameter value from this invocation. In this implementation,
     it fetches the value from environment variables.
@@ -25,9 +27,11 @@ def param(name: str, default: str =""):
         str: The value of the parameter or the default value.
     """
     import os
+
     return os.getenv(name, default)
 
-def parameter(name: str, default: str =""):
+
+def parameter(name: str, default: str = ""):
     """
     Alias for param function to retrieve a parameter value from environment variables.
 
