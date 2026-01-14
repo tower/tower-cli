@@ -4,3 +4,6 @@ pub mod subprocess;
 
 #[cfg(feature = "k8s")]
 pub mod k8s;
+
+/// Simple backend for CLI --local runs
+pub mod cli;
