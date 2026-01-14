@@ -100,7 +100,7 @@ def runner_name() -> str:
 def runner_id() -> str:
     """
     Retrieve the ID of the runner executing this run from the runtime. If the
-    name is unknown, an empty string is returned.
+    ID is unknown, an empty string is returned.
 
     Returns:
         str: The ID of the runner or an empty string if unknown.
