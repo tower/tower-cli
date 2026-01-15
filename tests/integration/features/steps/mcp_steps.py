@@ -127,6 +127,7 @@ def create_towerfile(
     """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
 
     app_name = unique_app_name(context, app_name, force_new=True)
+    context.app_name = app_name
 
     template_dir = Path(__file__).parents[2] / "templates"
 

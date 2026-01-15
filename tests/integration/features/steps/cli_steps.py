@@ -6,6 +6,7 @@ import tempfile
 import shutil
 import json
 import shlex
+import re
 from datetime import datetime
 from pathlib import Path
 from behave import given, when, then
@@ -53,6 +54,37 @@ def step_run_cli_command(context, command):
         print(f"DEBUG: Command was: {full_command}")
         print(f"DEBUG: Working directory: {os.getcwd()}")
         raise
+
+
+@step('I run "{command}" via CLI using created app name')
+def step_run_cli_command_with_app_name(context, command):
+    """Run a Tower CLI command with the generated app name injected."""
+    if not hasattr(context, "app_name"):
+        raise AssertionError("Expected context.app_name to be set by app setup step")
+    formatted = command.format(app_name=context.app_name)
+    step_run_cli_command(context, formatted)
+
+
+@step('I run "{command}" via CLI and capture run number')
+def step_run_cli_command_capture_run_number(context, command):
+    """Run a Tower CLI command and capture the run number from its output."""
+    step_run_cli_command(context, command)
+    output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", context.cli_output)
+    match = re.search(r"Run #(?P<number>\d+)", output)
+    if not match:
+        raise AssertionError(f"Expected run number in output, got: {output}")
+    context.run_number = match.group("number")
+
+
+@step('I run "{command}" via CLI using created app name and run number')
+def step_run_cli_command_with_app_name_and_run(context, command):
+    """Run a Tower CLI command with the generated app name and run number injected."""
+    if not hasattr(context, "app_name"):
+        raise AssertionError("Expected context.app_name to be set by app setup step")
+    if not hasattr(context, "run_number"):
+        raise AssertionError("Expected context.run_number to be set by run step")
+    formatted = command.format(app_name=context.app_name, run_number=context.run_number)
+    step_run_cli_command(context, formatted)
 
 
 @step("timestamps should be yellow colored")
