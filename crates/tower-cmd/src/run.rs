@@ -10,12 +10,19 @@ use tower_telemetry::{debug, Context};
 
 use crate::{api, output, util::dates};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{
     mpsc::Receiver as MpscReceiver,
     oneshot::{self, Receiver as OneshotReceiver},
     Mutex,
 };
 use tokio::time::{sleep, timeout, Duration};
+use tower_runtime::execution::ExecutionHandle;
+use tower_runtime::execution::{
+    CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, PackageRef,
+    ResourceLimits, RuntimeConfig as ExecRuntimeConfig,
+};
+use tower_runtime::subprocess::SubprocessBackend;
 
 pub fn run_cmd() -> Command {
     Command::new("run")
@@ -147,7 +154,7 @@ where
     env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
 
     // There should always be a session, if there isn't one then I'm not sure how we got here?
-    let session = config.session.ok_or(Error::NoSession)?;
+    let session = config.session.as_ref().ok_or(Error::NoSession)?;
 
     env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
 
@@ -163,23 +170,10 @@ where
 
     // Build the package
     let mut package = build_package(&towerfile).await?;
-
     // Unpack the package
     package.unpack().await?;
-
     output::success(&format!("Launching app `{}`", towerfile.app.name));
-
-    // Create backend and launch app using SubprocessBackend
-    use tower_runtime::execution::{
-        CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, PackageRef,
-        ResourceLimits, RuntimeConfig as ExecRuntimeConfig,
-    };
-    use tower_runtime::subprocess::SubprocessBackend;
-
     let backend = SubprocessBackend::new(config.cache_dir.clone());
-
-    // Build ExecutionSpec for SubprocessBackend
-    use std::time::{SystemTime, UNIX_EPOCH};
     let run_id = format!(
         "cli-run-{}",
         SystemTime::now()
@@ -187,7 +181,64 @@ where
             .unwrap()
             .as_nanos()
     );
+    let handle = backend
+        .create(build_cli_execution_spec(
+            config,
+            env,
+            params,
+            secrets,
+            env_vars,
+            &mut package,
+            run_id,
+        ))
+        .await?;
+    let receiver = handle.logs().await?;
+    let output_task = tokio::spawn(output_handler(receiver));
 
+    // Monitor app status concurrently
+    let handle = Arc::new(Mutex::new(handle));
+    let status_task = tokio::spawn(monitor_cli_status(Arc::clone(&handle)));
+
+    // Wait for app to complete or SIGTERM
+    let status_result = tokio::select! {
+        status = status_task => {
+            debug!("Status task completed, result: {:?}", status);
+            status.unwrap()
+        },
+        _ = tokio::signal::ctrl_c(), if !output::get_output_mode().is_mcp() => {
+            output::write("\nReceived Ctrl+C, stopping local run...\n");
+            handle.lock().await.terminate().await.ok();
+            return Ok(output_task.await.unwrap());
+        }
+    };
+    let final_result = output_task.await.unwrap();
+
+    // And if we crashed, err out
+    match status_result {
+        Status::Exited => output::success("Your local run exited cleanly."),
+        Status::Crashed { code } => {
+            output::error(&format!("Your local run crashed with exit code: {}", code));
+            return Err(Error::AppCrashed);
+        }
+        _ => {
+            debug!("Unexpected status after monitoring: {:?}", status_result);
+            output::error("An unexpected error occurred while monitoring your local run status!");
+            return Err(Error::AppCrashed);
+        }
+    }
+
+    Ok(final_result)
+}
+
+fn build_cli_execution_spec(
+    config: Config,
+    env: &str,
+    params: HashMap<String, String>,
+    secrets: HashMap<String, String>,
+    env_vars: HashMap<String, String>,
+    package: &mut Package,
+    run_id: String,
+) -> ExecutionSpec {
     let spec = ExecutionSpec {
         id: run_id,
         package: PackageRef::Local {
@@ -227,47 +278,7 @@ where
         networking: None,
         telemetry_ctx: Context::new(),
     };
-
-    let handle = backend.create(spec).await?;
-
-    // Get log receiver from handle
-    use tower_runtime::execution::ExecutionHandle as _;
-    let receiver = handle.logs().await?;
-    let output_task = tokio::spawn(output_handler(receiver));
-
-    // Monitor app status concurrently
-    let handle = Arc::new(Mutex::new(handle));
-    let status_task = tokio::spawn(monitor_cli_status(Arc::clone(&handle)));
-
-    // Wait for app to complete or SIGTERM
-    let status_result = tokio::select! {
-        status = status_task => {
-            debug!("Status task completed, result: {:?}", status);
-            status.unwrap()
-        },
-        _ = tokio::signal::ctrl_c(), if !output::get_output_mode().is_mcp() => {
-            output::write("\nReceived Ctrl+C, stopping local run...\n");
-            handle.lock().await.terminate().await.ok();
-            return Ok(output_task.await.unwrap());
-        }
-    };
-    let final_result = output_task.await.unwrap();
-
-    // And if we crashed, err out
-    match status_result {
-        Status::Exited => output::success("Your local run exited cleanly."),
-        Status::Crashed { code } => {
-            output::error(&format!("Your local run crashed with exit code: {}", code));
-            return Err(Error::AppCrashed);
-        }
-        _ => {
-            debug!("Unexpected status after monitoring: {:?}", status_result);
-            output::error("An unexpected error occurred while monitoring your local run status!");
-            return Err(Error::AppCrashed);
-        }
-    }
-
-    Ok(final_result)
+    spec
 }
 
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
