@@ -272,7 +272,9 @@ async def describe_run(name: str, seq: int):
 
             # For logs-after-completion test apps, complete quickly to test log draining
             # Use 1 second so CLI has time to start streaming before completion
-            completion_threshold = 1.0 if "logs-after-completion" in name else 5.0
+            completion_threshold = (
+                1.0 if "logs-after-completion" in name or "logs-warning" in name else 5.0
+            )
 
             if elapsed > completion_threshold:
                 run_data["status"] = "exited"
@@ -490,6 +492,10 @@ def make_log_data(seq: int, line_num: int, content: str, timestamp: str):
 def make_log_event(seq: int, line_num: int, content: str, timestamp: str):
     return f"event: log\ndata: {json.dumps(make_log_data(seq, line_num, content, timestamp))}\n\n"
 
+def make_warning_event(content: str, timestamp: str):
+    data = {"data": {"content": content, "reported_at": timestamp}, "event": "warning"}
+    return f"event: warning\ndata: {json.dumps(data)}\n\n"
+
 
 @app.get("/v1/apps/{name}/runs/{seq}/logs")
 async def describe_run_logs(name: str, seq: int):
@@ -518,6 +524,13 @@ async def generate_logs_after_completion_test_stream(seq: int):
         seq, 2, "Second log after run completes", "2025-08-22T12:00:01Z"
     )
 
+async def generate_warning_log_stream(seq: int):
+    """Stream a warning and a couple of logs, then finish."""
+    yield make_warning_event("Rate limit approaching", "2025-08-22T12:00:00Z")
+    yield make_log_event(seq, 1, "Warning stream log 1", "2025-08-22T12:00:00Z")
+    await asyncio.sleep(1.2)
+    yield make_log_event(seq, 2, "Warning stream log 2", "2025-08-22T12:00:01Z")
+
 
 async def generate_normal_log_stream(seq: int):
     """Normal log stream for regular tests."""
@@ -533,7 +546,9 @@ async def stream_run_logs(name: str, seq: int):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
 
-    if "logs-after-completion" in name:
+    if "logs-warning" in name:
+        stream = generate_warning_log_stream(seq)
+    elif "logs-after-completion" in name:
         stream = generate_logs_after_completion_test_stream(seq)
     else:
         stream = generate_normal_log_stream(seq)

@@ -46,3 +46,10 @@ Feature: CLI Run Commands
     And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
     Then the output should show "First log before run completes"
     And the output should show "Second log after run completes"
+
+  Scenario: CLI apps logs follow should display warnings
+    Given I have a simple hello world application named "app-logs-warning"
+    When I run "tower deploy --create" via CLI
+    And I run "tower run --detached" via CLI and capture run number
+    And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
+    Then the output should show "Warning: Rate limit approaching"

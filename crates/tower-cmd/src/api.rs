@@ -410,10 +410,30 @@ async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStre
                     }
                     "warning" => {
                         let event_warning = serde_json::from_str(&message.data);
-                        if let Ok(event) = event_warning {
-                            tx.send(LogStreamEvent::EventWarning(event)).await.ok();
-                        } else {
-                            debug!("Failed to parse warning message: {:?}", message.data);
+                        match event_warning {
+                            Ok(event) => {
+                                tx.send(LogStreamEvent::EventWarning(event)).await.ok();
+                            }
+                            Err(err) => {
+                                let warning_data = serde_json::from_str(&message.data);
+                                match warning_data {
+                                    Ok(data) => {
+                                        let event = tower_api::models::EventWarning {
+                                            data,
+                                            event: tower_api::models::event_warning::Event::Warning,
+                                            id: None,
+                                            retry: None,
+                                        };
+                                        tx.send(LogStreamEvent::EventWarning(event)).await.ok();
+                                    }
+                                    Err(_) => {
+                                        debug!(
+                                            "Failed to parse warning message: {:?}. Error: {}",
+                                            message.data, err
+                                        );
+                                    }
+                                }
+                            }
                         }
                     }
                     _ => {

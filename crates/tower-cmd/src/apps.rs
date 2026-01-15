@@ -3,7 +3,7 @@ use config::Config;
 use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
 
-use tower_api::models::Run;
+use tower_api::models::{Run, RunLogLine};
 
 use crate::{api, output};
 
@@ -241,6 +241,7 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
     let enable_ctrl_c = !output::get_output_mode().is_mcp();
     let mut backoff = FOLLOW_BACKOFF_INITIAL;
     let mut cancel_monitor: Option<oneshot::Sender<()>> = None;
+    let mut last_line_num: Option<i64> = None;
 
     loop {
         let run = match api::describe_run(&config, &name, seq).await {
@@ -251,7 +252,7 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
         if is_run_finished(&run) {
             if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
                 for line in resp.log_lines {
-                    output::remote_log_event(&line);
+                    emit_log_if_new(&line, &mut last_line_num);
                 }
             }
             return;
@@ -273,6 +274,7 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                     run_complete,
                     enable_ctrl_c,
                     &run.dollar_link,
+                    &mut last_line_num,
                 )
                 .await
                 {
@@ -298,6 +300,10 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 }
             }
             Err(err) => {
+                if is_fatal_stream_error(&err) {
+                    output::error(&format!("Failed to stream run logs: {}", err));
+                    return;
+                }
                 output::error(&format!("Failed to stream run logs: {}", err));
                 sleep(backoff).await;
                 backoff = next_backoff(backoff);
@@ -338,20 +344,23 @@ async fn stream_logs_until_complete(
     mut run_complete: oneshot::Receiver<Run>,
     enable_ctrl_c: bool,
     run_link: &str,
+    last_line_num: &mut Option<i64>,
 ) -> Result<LogFollowOutcome, crate::Error> {
     loop {
         tokio::select! {
             event = log_stream.recv() => match event {
                 Some(api::LogStreamEvent::EventLog(log)) => {
-                    output::remote_log_event(&log);
+                    emit_log_if_new(&log, last_line_num);
                 },
+                Some(api::LogStreamEvent::EventWarning(warning)) => {
+                    output::write(&format!("Warning: {}\n", warning.data.content));
+                }
                 None => return Ok(LogFollowOutcome::Disconnected),
-                _ => {},
             },
             res = &mut run_complete => {
                 match res {
                     Ok(_) => {
-                        drain_remaining_logs(log_stream).await;
+                        drain_remaining_logs(log_stream, last_line_num).await;
                         return Ok(LogFollowOutcome::Completed);
                     }
                     // If monitoring failed, keep following and let the caller retry.
@@ -368,15 +377,48 @@ async fn stream_logs_until_complete(
     }
 }
 
-async fn drain_remaining_logs(mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>) {
+async fn drain_remaining_logs(
+    mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
+    last_line_num: &mut Option<i64>,
+) {
     let _ = tokio::time::timeout(LOG_DRAIN_DURATION, async {
         while let Some(event) = log_stream.recv().await {
-            if let api::LogStreamEvent::EventLog(log) = event {
-                output::remote_log_event(&log);
+            match event {
+                api::LogStreamEvent::EventLog(log) => {
+                    emit_log_if_new(&log, last_line_num);
+                }
+                api::LogStreamEvent::EventWarning(warning) => {
+                    output::write(&format!("Warning: {}\n", warning.data.content));
+                }
             }
         }
     })
     .await;
+}
+
+fn emit_log_if_new(log: &RunLogLine, last_line_num: &mut Option<i64>) {
+    if should_emit_line(last_line_num, log.line_num) {
+        output::remote_log_event(log);
+    }
+}
+
+fn should_emit_line(last_line_num: &mut Option<i64>, line_num: i64) -> bool {
+    if last_line_num.map_or(true, |last| line_num > last) {
+        *last_line_num = Some(line_num);
+        true
+    } else {
+        false
+    }
+}
+
+fn is_fatal_stream_error(err: &api::LogStreamError) -> bool {
+    match err {
+        api::LogStreamError::Reqwest(reqwest_err) => reqwest_err
+            .status()
+            .map(|status| status.is_client_error() && status.as_u16() != 429)
+            .unwrap_or(false),
+        api::LogStreamError::Unknown => false,
+    }
 }
 
 fn monitor_run_completion(
@@ -390,7 +432,7 @@ fn monitor_run_completion(
     let app_name = app_name.to_string();
 
     tokio::spawn(async move {
-        let mut failures = 0u32;
+        let mut failures = 0;
         loop {
             tokio::select! {
                 _ = &mut cancel => return,
@@ -435,8 +477,8 @@ fn is_run_finished(run: &Run) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        apps_cmd, next_backoff, stream_logs_until_complete, LogFollowOutcome,
-        FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
+        apps_cmd, next_backoff, should_emit_line, stream_logs_until_complete,
+        LogFollowOutcome, FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
     };
     use super::is_run_finished;
     use tokio::sync::{mpsc, oneshot};
@@ -445,7 +487,7 @@ mod tests {
     use tower_api::models::Run;
 
     #[test]
-    fn logs_follow_flag_is_parsed() {
+    fn test_follow_flag_parsing() {
         let matches = apps_cmd()
             .try_get_matches_from(["apps", "logs", "--follow", "hello-world#11"])
             .unwrap();
@@ -460,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    fn run_status_terminality_is_explicit() {
+    fn test_terminal_statuses_explicit() {
         let non_terminal = [Status::Scheduled, Status::Pending, Status::Running];
         for status in non_terminal {
             let run = Run {
@@ -486,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn run_status_variants_are_exhaustive() {
+    fn test_status_variants_exhaustive() {
         let status = Status::Scheduled;
         match status {
             Status::Scheduled => {}
@@ -500,9 +542,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stream_logs_completes_on_run_completion() {
+    async fn test_stream_completion_on_run_finish() {
         let (tx, rx) = mpsc::channel(1);
         let (done_tx, done_rx) = oneshot::channel();
+        let mut last_line_num = None;
 
         let done_task = tokio::spawn(async move {
             let _ = done_tx.send(Run::default());
@@ -510,25 +553,26 @@ mod tests {
             drop(tx);
         });
 
-        let res = stream_logs_until_complete(rx, done_rx, false, "link").await;
+        let res = stream_logs_until_complete(rx, done_rx, false, "link", &mut last_line_num).await;
         done_task.await.unwrap();
 
         assert!(matches!(res, Ok(LogFollowOutcome::Completed)));
     }
 
     #[tokio::test]
-    async fn stream_logs_returns_disconnected_on_closed_stream() {
+    async fn test_stream_disconnection_on_close() {
         let (tx, rx) = mpsc::channel(1);
         drop(tx);
         let (_done_tx, done_rx) = oneshot::channel::<Run>();
+        let mut last_line_num = None;
 
-        let res = stream_logs_until_complete(rx, done_rx, false, "link").await;
+        let res = stream_logs_until_complete(rx, done_rx, false, "link", &mut last_line_num).await;
 
         assert!(matches!(res, Ok(LogFollowOutcome::Disconnected)));
     }
 
     #[test]
-    fn backoff_grows_and_caps() {
+    fn test_backoff_growth_and_cap() {
         let mut backoff = FOLLOW_BACKOFF_INITIAL;
         backoff = next_backoff(backoff);
         assert_eq!(backoff, Duration::from_secs(1));
@@ -540,5 +584,33 @@ mod tests {
         assert_eq!(backoff, FOLLOW_BACKOFF_MAX);
         backoff = next_backoff(backoff);
         assert_eq!(backoff, FOLLOW_BACKOFF_MAX);
+    }
+
+    #[test]
+    fn test_duplicate_line_filtering() {
+        let mut last_line_num = None;
+        assert!(should_emit_line(&mut last_line_num, 1));
+        assert_eq!(last_line_num, Some(1));
+        assert!(!should_emit_line(&mut last_line_num, 1));
+        assert_eq!(last_line_num, Some(1));
+        assert!(!should_emit_line(&mut last_line_num, 0));
+        assert_eq!(last_line_num, Some(1));
+        assert!(should_emit_line(&mut last_line_num, 2));
+        assert_eq!(last_line_num, Some(2));
+        assert!(should_emit_line(&mut last_line_num, 10));
+        assert_eq!(last_line_num, Some(10));
+    }
+
+    #[test]
+    fn test_out_of_order_log_handling() {
+        let mut last_line_num = None;
+        assert!(should_emit_line(&mut last_line_num, 1));
+        assert_eq!(last_line_num, Some(1));
+        assert!(should_emit_line(&mut last_line_num, 3));
+        assert_eq!(last_line_num, Some(3));
+        assert!(!should_emit_line(&mut last_line_num, 2));
+        assert_eq!(last_line_num, Some(3));
+        assert!(should_emit_line(&mut last_line_num, 4));
+        assert_eq!(last_line_num, Some(4));
     }
 }
