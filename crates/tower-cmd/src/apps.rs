@@ -269,6 +269,9 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
             },
             Err(err) => {
                 output::error(&format!("Failed to stream run logs: {:?}", err));
+                sleep(backoff).await;
+                backoff = next_backoff(backoff);
+                continue;
             }
         }
 
@@ -370,6 +373,9 @@ fn monitor_run_completion(
                 Err(_) => {
                     failures += 1;
                     if failures >= 5 {
+                        output::error(
+                            "Failed to monitor run completion after repeated errors",
+                        );
                         return;
                     }
                 }
