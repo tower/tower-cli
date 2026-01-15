@@ -3,6 +3,3 @@
 pub mod subprocess;
 
 pub mod k8s;
-
-/// Simple backend for CLI --local runs
-pub mod cli;

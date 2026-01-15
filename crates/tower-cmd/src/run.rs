@@ -11,7 +11,6 @@ use tower_telemetry::{debug, Context};
 use crate::{api, output, util::dates};
 use std::sync::Arc;
 use tokio::sync::{
-    mpsc::unbounded_channel,
     mpsc::Receiver as MpscReceiver,
     oneshot::{self, Receiver as OneshotReceiver},
     Mutex,
@@ -168,26 +167,73 @@ where
     // Unpack the package
     package.unpack().await?;
 
-    // Create output channel - simple pattern for CLI
-    let (sender, receiver) = unbounded_channel();
-
     output::success(&format!("Launching app `{}`", towerfile.app.name));
-    let output_task = tokio::spawn(output_handler(receiver));
 
-    // Create backend and launch app
-    use tower_runtime::backends::cli::CliBackend;
-    let backend = CliBackend::new(config.cache_dir);
-    let handle = backend
-        .launch(
-            Context::new(),
-            sender,
-            package,
-            env.to_string(),
-            secrets,
-            params,
-            env_vars,
-        )
-        .await?;
+    // Create backend and launch app using SubprocessBackend
+    use tower_runtime::backends::subprocess::SubprocessBackend;
+    use tower_runtime::execution::{
+        CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, PackageRef,
+        ResourceLimits, RuntimeConfig as ExecRuntimeConfig,
+    };
+
+    let backend = SubprocessBackend::new(config.cache_dir.clone());
+
+    // Build ExecutionSpec for SubprocessBackend
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let run_id = format!(
+        "cli-run-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+
+    let spec = ExecutionSpec {
+        id: run_id,
+        package: PackageRef::Local {
+            path: package
+                .unpacked_path
+                .clone()
+                .expect("Package must be unpacked before execution"),
+        },
+        runtime: ExecRuntimeConfig {
+            image: "local".to_string(),
+            version: None,
+            cache: CacheConfig {
+                enable_bundle_cache: true,
+                enable_runtime_cache: true,
+                enable_dependency_cache: true,
+                backend: match config.cache_dir.clone() {
+                    Some(dir) => CacheBackend::Local { cache_dir: dir },
+                    None => CacheBackend::None,
+                },
+                isolation: CacheIsolation::None,
+            },
+            entrypoint: None,
+            command: None,
+        },
+        environment: env.to_string(),
+        secrets,
+        parameters: params,
+        env_vars,
+        resources: ResourceLimits {
+            cpu_millicores: None,
+            memory_mb: None,
+            storage_mb: None,
+            max_pids: None,
+            gpu_count: 0,
+            timeout_seconds: 3600,
+        },
+        networking: None,
+        telemetry_ctx: Context::new(),
+    };
+
+    let handle = backend.create(spec).await?;
+
+    // Get log receiver from handle
+    use tower_runtime::execution::ExecutionHandle as _;
+    let receiver = handle.logs().await?;
+    let output_task = tokio::spawn(output_handler(receiver));
 
     // Monitor app status concurrently
     let handle = Arc::new(Mutex::new(handle));
@@ -597,7 +643,11 @@ async fn monitor_output(mut output: OutputReceiver) {
 
 /// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_cli_status(handle: Arc<Mutex<tower_runtime::backends::cli::CliHandle>>) -> Status {
+async fn monitor_cli_status(
+    handle: Arc<Mutex<tower_runtime::backends::subprocess::SubprocessHandle>>,
+) -> Status {
+    use tower_runtime::execution::ExecutionHandle as _;
+
     debug!("Starting status monitoring for CLI execution");
     let mut check_count = 0;
     let mut err_count = 0;
