@@ -6,10 +6,10 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use tower_package::Package;
 
-pub mod backends;
 pub mod errors;
 pub mod execution;
 pub mod local;
+pub mod subprocess;
 
 use errors::Error;
 

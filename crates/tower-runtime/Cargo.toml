@@ -17,9 +17,5 @@ tower-package = { workspace = true }
 tower-telemetry = { workspace = true }
 tower-uv = { workspace = true }
 
-# K8s dependencies (optional)
-k8s-openapi = { workspace = true }
-kube = { workspace = true }
-
 [dev-dependencies]
 config = { workspace = true }

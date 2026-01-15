@@ -170,11 +170,11 @@ where
     output::success(&format!("Launching app `{}`", towerfile.app.name));
 
     // Create backend and launch app using SubprocessBackend
-    use tower_runtime::backends::subprocess::SubprocessBackend;
     use tower_runtime::execution::{
         CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, PackageRef,
         ResourceLimits, RuntimeConfig as ExecRuntimeConfig,
     };
+    use tower_runtime::subprocess::SubprocessBackend;
 
     let backend = SubprocessBackend::new(config.cache_dir.clone());
 
@@ -644,7 +644,7 @@ async fn monitor_output(mut output: OutputReceiver) {
 /// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
 async fn monitor_cli_status(
-    handle: Arc<Mutex<tower_runtime::backends::subprocess::SubprocessHandle>>,
+    handle: Arc<Mutex<tower_runtime::subprocess::SubprocessHandle>>,
 ) -> Status {
     use tower_runtime::execution::ExecutionHandle as _;
 

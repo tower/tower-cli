@@ -67,8 +67,6 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
-k8s-openapi = { version = "0.27.0", features = ["v1_31"] }
-kube = { version = "3.0.0", features = ["runtime", "derive", "client", "rustls-tls"], default-features = false }
 
 # The profile that 'dist' will build with
 [profile.dist]
