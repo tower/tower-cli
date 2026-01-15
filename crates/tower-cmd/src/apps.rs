@@ -240,6 +240,7 @@ const LOG_DRAIN_DURATION: Duration = Duration::from_secs(5);
 async fn follow_logs(config: Config, name: String, seq: i64) {
     let enable_ctrl_c = !output::get_output_mode().is_mcp();
     let mut backoff = FOLLOW_BACKOFF_INITIAL;
+    let mut cancel_monitor: Option<oneshot::Sender<()>> = None;
 
     loop {
         let run = match api::describe_run(&config, &name, seq).await {
@@ -256,9 +257,16 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
             return;
         }
 
-        let run_complete = monitor_run_completion(&config, &name, seq);
+        // Cancel any prior watcher so we don't accumulate pollers after reconnects.
+        if let Some(cancel) = cancel_monitor.take() {
+            let _ = cancel.send(());
+        }
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        cancel_monitor = Some(cancel_tx);
+        let run_complete = monitor_run_completion(&config, &name, seq, cancel_rx);
         match api::stream_run_logs(&config, &name, seq).await {
             Ok(log_stream) => {
+                // Reset after a successful connection so transient drops recover quickly.
                 backoff = FOLLOW_BACKOFF_INITIAL;
                 match stream_logs_until_complete(
                     log_stream,
@@ -268,10 +276,25 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 )
                 .await
                 {
-                    Ok(LogFollowOutcome::Completed) => return,
-                    Ok(LogFollowOutcome::Interrupted) => return,
+                    Ok(LogFollowOutcome::Completed) => {
+                        if let Some(cancel) = cancel_monitor.take() {
+                            let _ = cancel.send(());
+                        }
+                        return;
+                    }
+                    Ok(LogFollowOutcome::Interrupted) => {
+                        if let Some(cancel) = cancel_monitor.take() {
+                            let _ = cancel.send(());
+                        }
+                        return;
+                    }
                     Ok(LogFollowOutcome::Disconnected) => {}
-                    Err(_) => return,
+                    Err(_) => {
+                        if let Some(cancel) = cancel_monitor.take() {
+                            let _ = cancel.send(());
+                        }
+                        return;
+                    }
                 }
             }
             Err(err) => {
@@ -360,6 +383,7 @@ fn monitor_run_completion(
     config: &Config,
     app_name: &str,
     seq: i64,
+    mut cancel: oneshot::Receiver<()>,
 ) -> oneshot::Receiver<Run> {
     let (tx, rx) = oneshot::channel();
     let config_clone = config.clone();
@@ -368,22 +392,26 @@ fn monitor_run_completion(
     tokio::spawn(async move {
         let mut failures = 0u32;
         loop {
-            match api::describe_run(&config_clone, &app_name, seq).await {
-                Ok(res) => {
-                    if is_run_finished(&res.run) {
-                        let _ = tx.send(res.run);
-                        return;
+            tokio::select! {
+                _ = &mut cancel => return,
+                result = api::describe_run(&config_clone, &app_name, seq) => match result {
+                    Ok(res) => {
+                        failures = 0;
+                        if is_run_finished(&res.run) {
+                            let _ = tx.send(res.run);
+                            return;
+                        }
                     }
-                }
-                Err(_) => {
-                    failures += 1;
-                    if failures >= 5 {
-                        output::error(
-                            "Failed to monitor run completion after repeated errors",
-                        );
-                        return;
+                    Err(_) => {
+                        failures += 1;
+                        if failures >= 5 {
+                            output::error(
+                                "Failed to monitor run completion after repeated errors",
+                            );
+                            return;
+                        }
                     }
-                }
+                },
             }
             sleep(Duration::from_millis(500)).await;
         }
@@ -406,7 +434,10 @@ fn is_run_finished(run: &Run) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{apps_cmd, next_backoff, stream_logs_until_complete, LogFollowOutcome};
+    use super::{
+        apps_cmd, next_backoff, stream_logs_until_complete, LogFollowOutcome,
+        FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
+    };
     use super::is_run_finished;
     use tokio::sync::{mpsc, oneshot};
     use tokio::time::Duration;
@@ -498,7 +529,7 @@ mod tests {
 
     #[test]
     fn backoff_grows_and_caps() {
-        let mut backoff = Duration::from_millis(500);
+        let mut backoff = FOLLOW_BACKOFF_INITIAL;
         backoff = next_backoff(backoff);
         assert_eq!(backoff, Duration::from_secs(1));
         backoff = next_backoff(backoff);
@@ -506,8 +537,8 @@ mod tests {
         backoff = next_backoff(backoff);
         assert_eq!(backoff, Duration::from_secs(4));
         backoff = next_backoff(backoff);
-        assert_eq!(backoff, Duration::from_secs(5));
+        assert_eq!(backoff, FOLLOW_BACKOFF_MAX);
         backoff = next_backoff(backoff);
-        assert_eq!(backoff, Duration::from_secs(5));
+        assert_eq!(backoff, FOLLOW_BACKOFF_MAX);
     }
 }
