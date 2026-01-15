@@ -208,7 +208,7 @@ pub struct BackendCapabilities {
 /// ExecutionHandle represents a running execution
 #[async_trait]
 pub trait ExecutionHandle: Send + Sync {
-    /// Get unique identifier for this execution
+    /// Get a unique identifier for this execution
     fn id(&self) -> &str;
 
     /// Get current execution status

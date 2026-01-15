@@ -8,6 +8,7 @@ use tower_package::{Package, PackageSpec};
 use tower_runtime::{OutputReceiver, Status};
 use tower_telemetry::{debug, Context};
 
+use crate::{api, output, util::dates};
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::unbounded_channel,
@@ -16,8 +17,6 @@ use tokio::sync::{
     Mutex,
 };
 use tokio::time::{sleep, timeout, Duration};
-
-use crate::{api, output, util::dates};
 
 pub fn run_cmd() -> Command {
     Command::new("run")
