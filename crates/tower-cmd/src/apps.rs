@@ -9,15 +9,19 @@ pub fn apps_cmd() -> Command {
     Command::new("apps")
         .about("Manage the apps in your current Tower account")
         .arg_required_else_help(true)
-        .subcommand(Command::new("list").about("List all of your apps`"))
+        .subcommand(Command::new("list").about("List all of your apps"))
         .subcommand(
             Command::new("show")
                 .allow_external_subcommands(true)
+                .override_usage("tower apps show [OPTIONS] <APP_NAME>")
+                .after_help("Example: tower apps show hello-world")
                 .about("Show the details about an app in Tower"),
         )
         .subcommand(
             Command::new("logs")
                 .allow_external_subcommands(true)
+                .override_usage("tower apps logs [OPTIONS] <APP_NAME>#<RUN_NUMBER>")
+                .after_help("Example: tower apps logs hello-world#11")
                 .about("Get the logs from a previous Tower app run"),
         )
         .subcommand(
@@ -42,6 +46,8 @@ pub fn apps_cmd() -> Command {
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
+                .override_usage("tower apps delete [OPTIONS] <APP_NAME>")
+                .after_help("Example: tower apps delete hello-world")
                 .about("Delete an app in Tower"),
         )
 }
