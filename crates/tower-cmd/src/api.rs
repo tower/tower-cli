@@ -367,6 +367,17 @@ pub enum LogStreamError {
     Unknown,
 }
 
+impl std::fmt::Display for LogStreamError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogStreamError::Reqwest(err) => write!(f, "{err}"),
+            LogStreamError::Unknown => write!(f, "unknown log stream error"),
+        }
+    }
+}
+
+impl std::error::Error for LogStreamError {}
+
 impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
     fn from(err: reqwest_eventsource::CannotCloneRequestError) -> Self {
         debug!("Failed to clone request {:?}", err);

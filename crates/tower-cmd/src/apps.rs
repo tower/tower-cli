@@ -233,9 +233,13 @@ fn extract_app_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
     output::die(&line);
 }
 
+const FOLLOW_BACKOFF_INITIAL: Duration = Duration::from_millis(500);
+const FOLLOW_BACKOFF_MAX: Duration = Duration::from_secs(5);
+const LOG_DRAIN_DURATION: Duration = Duration::from_secs(5);
+
 async fn follow_logs(config: Config, name: String, seq: i64) {
     let enable_ctrl_c = !output::get_output_mode().is_mcp();
-    let mut backoff = Duration::from_millis(500);
+    let mut backoff = FOLLOW_BACKOFF_INITIAL;
 
     loop {
         let run = match api::describe_run(&config, &name, seq).await {
@@ -254,21 +258,24 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
 
         let run_complete = monitor_run_completion(&config, &name, seq);
         match api::stream_run_logs(&config, &name, seq).await {
-            Ok(log_stream) => match stream_logs_until_complete(
-                log_stream,
-                run_complete,
-                enable_ctrl_c,
-                &run.dollar_link,
-            )
-            .await
-            {
-                Ok(LogFollowOutcome::Completed) => return,
-                Ok(LogFollowOutcome::Interrupted) => return,
-                Ok(LogFollowOutcome::Disconnected) => {}
-                Err(_) => return,
-            },
+            Ok(log_stream) => {
+                backoff = FOLLOW_BACKOFF_INITIAL;
+                match stream_logs_until_complete(
+                    log_stream,
+                    run_complete,
+                    enable_ctrl_c,
+                    &run.dollar_link,
+                )
+                .await
+                {
+                    Ok(LogFollowOutcome::Completed) => return,
+                    Ok(LogFollowOutcome::Interrupted) => return,
+                    Ok(LogFollowOutcome::Disconnected) => {}
+                    Err(_) => return,
+                }
+            }
             Err(err) => {
-                output::error(&format!("Failed to stream run logs: {:?}", err));
+                output::error(&format!("Failed to stream run logs: {}", err));
                 sleep(backoff).await;
                 backoff = next_backoff(backoff);
                 continue;
@@ -289,10 +296,9 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
 }
 
 fn next_backoff(current: Duration) -> Duration {
-    let max = Duration::from_secs(5);
-    let next = current.checked_mul(2).unwrap_or(max);
-    if next > max {
-        max
+    let next = current.checked_mul(2).unwrap_or(FOLLOW_BACKOFF_MAX);
+    if next > FOLLOW_BACKOFF_MAX {
+        FOLLOW_BACKOFF_MAX
     } else {
         next
     }
@@ -340,8 +346,7 @@ async fn stream_logs_until_complete(
 }
 
 async fn drain_remaining_logs(mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>) {
-    let drain_duration = Duration::from_secs(5);
-    let _ = tokio::time::timeout(drain_duration, async {
+    let _ = tokio::time::timeout(LOG_DRAIN_DURATION, async {
         while let Some(event) = log_stream.recv().await {
             if let api::LogStreamEvent::EventLog(log) = event {
                 output::remote_log_event(&log);
