@@ -21,7 +21,9 @@ fn extract_aid_from_jwt(jwt: &str) -> Option<String> {
     let payload = parts[1];
     let decoded = URL_SAFE_NO_PAD.decode(payload).ok()?;
     let json: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
-    json.get("https://tower.dev/aid")?.as_str().map(String::from)
+    json.get("https://tower.dev/aid")?
+        .as_str()
+        .map(String::from)
 }
 
 const DEFAULT_TOWER_URL: &str = "https://api.tower.dev";
