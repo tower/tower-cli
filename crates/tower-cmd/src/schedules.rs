@@ -72,6 +72,8 @@ pub fn schedules_cmd() -> Command {
         .subcommand(
             Command::new("delete")
                 .allow_external_subcommands(true)
+                .override_usage("tower schedules delete [OPTIONS] <SCHEDULE_ID>")
+                .after_help("Example: tower schedules delete 123")
                 .about("Delete a schedule"),
         )
         .subcommand(
@@ -92,6 +94,8 @@ pub fn schedules_cmd() -> Command {
                         .action(clap::ArgAction::Append),
                 )
                 .allow_external_subcommands(true)
+                .override_usage("tower schedules update [OPTIONS] <SCHEDULE_ID>")
+                .after_help("Example: tower schedules update 123 --cron \"*/15 * * * *\"")
                 .about("Update an existing schedule"),
         )
 }
