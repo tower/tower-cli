@@ -35,8 +35,13 @@ pub const MAX_BUNDLE_SIZE: u64 = 50 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Parameter {
+    #[serde(default)]
     pub name: String,
-    pub description: String,
+
+    #[serde(default)]
+    pub description: Option<String>,
+
+    #[serde(default)]
     pub default: String,
 }
 
@@ -115,7 +120,7 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
     for p in &towerfile.parameters {
         parameters.push(Parameter {
             name: p.name.clone(),
-            description: p.description.clone(),
+            description: Some(p.description.clone()),
             default: p.default.clone(),
         });
     }
@@ -190,16 +195,16 @@ impl Package {
         }
     }
 
-    pub async fn from_unpacked_path(path: PathBuf) -> Self {
+    pub async fn from_unpacked_path(path: PathBuf) -> Result<Self, Error> {
         let manifest_path = path.join("MANIFEST");
-        let manifest = Manifest::from_path(&manifest_path).await.unwrap();
+        let manifest = Manifest::from_path(&manifest_path).await?;
 
-        Self {
+        Ok(Self {
             tmp_dir: None,
             package_file_path: None,
             unpacked_path: Some(path),
             manifest,
-        }
+        })
     }
 
     // build creates a new package from a PackageSpec. PackageSpec is typically composed of fields
