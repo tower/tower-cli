@@ -190,16 +190,16 @@ impl Package {
         }
     }
 
-    pub async fn from_unpacked_path(path: PathBuf) -> Self {
+    pub async fn from_unpacked_path(path: PathBuf) -> Result<Self, Error> {
         let manifest_path = path.join("MANIFEST");
-        let manifest = Manifest::from_path(&manifest_path).await.unwrap();
+        let manifest = Manifest::from_path(&manifest_path).await?;
 
-        Self {
+        Ok(Self {
             tmp_dir: None,
             package_file_path: None,
             unpacked_path: Some(path),
             manifest,
-        }
+        })
     }
 
     // build creates a new package from a PackageSpec. PackageSpec is typically composed of fields
