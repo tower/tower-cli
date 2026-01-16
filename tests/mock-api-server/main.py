@@ -273,7 +273,9 @@ async def describe_run(name: str, seq: int):
             # For logs-after-completion test apps, complete quickly to test log draining
             # Use 1 second so CLI has time to start streaming before completion
             completion_threshold = (
-                1.0 if "logs-after-completion" in name or "logs-warning" in name else 5.0
+                1.0
+                if "logs-after-completion" in name or "logs-warning" in name
+                else 5.0
             )
 
             if elapsed > completion_threshold:
@@ -492,6 +494,7 @@ def make_log_data(seq: int, line_num: int, content: str, timestamp: str):
 def make_log_event(seq: int, line_num: int, content: str, timestamp: str):
     return f"event: log\ndata: {json.dumps(make_log_data(seq, line_num, content, timestamp))}\n\n"
 
+
 def make_warning_event(content: str, timestamp: str):
     data = {"data": {"content": content, "reported_at": timestamp}, "event": "warning"}
     return f"event: warning\ndata: {json.dumps(data)}\n\n"
@@ -523,6 +526,7 @@ async def generate_logs_after_completion_test_stream(seq: int):
     yield make_log_event(
         seq, 2, "Second log after run completes", "2025-08-22T12:00:01Z"
     )
+
 
 async def generate_warning_log_stream(seq: int):
     """Stream a warning and a couple of logs, then finish."""
