@@ -1,7 +1,7 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use config::Config;
 use tokio::sync::oneshot;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, Duration, Instant};
 
 use tower_api::models::{Run, RunLogLine};
 
@@ -236,6 +236,8 @@ fn extract_app_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
 const FOLLOW_BACKOFF_INITIAL: Duration = Duration::from_millis(500);
 const FOLLOW_BACKOFF_MAX: Duration = Duration::from_secs(5);
 const LOG_DRAIN_DURATION: Duration = Duration::from_secs(5);
+const RUN_START_POLL_INTERVAL: Duration = Duration::from_millis(500);
+const RUN_START_MESSAGE_DELAY: Duration = Duration::from_secs(3);
 
 async fn follow_logs(config: Config, name: String, seq: i64) {
     let enable_ctrl_c = !output::get_output_mode().is_mcp();
@@ -244,7 +246,7 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
     let mut last_line_num: Option<i64> = None;
 
     loop {
-        let run = match api::describe_run(&config, &name, seq).await {
+        let mut run = match api::describe_run(&config, &name, seq).await {
             Ok(res) => res.run,
             Err(err) => output::tower_error_and_die(err, "Fetching run details failed"),
         };
@@ -256,6 +258,34 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 }
             }
             return;
+        }
+
+        if !is_run_started(&run) {
+            let wait_started = Instant::now();
+            let mut notified = false;
+            loop {
+                sleep(RUN_START_POLL_INTERVAL).await;
+                // Avoid blank output on slow starts while keeping fast starts quiet.
+                if should_notify_run_wait(notified, wait_started.elapsed()) {
+                    output::write("Waiting for run to start...\n");
+                    notified = true;
+                }
+                run = match api::describe_run(&config, &name, seq).await {
+                    Ok(res) => res.run,
+                    Err(err) => output::tower_error_and_die(err, "Fetching run details failed"),
+                };
+                if is_run_finished(&run) {
+                    if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
+                        for line in resp.log_lines {
+                            emit_log_if_new(&line, &mut last_line_num);
+                        }
+                    }
+                    return;
+                }
+                if is_run_started(&run) {
+                    break;
+                }
+            }
         }
 
         // Cancel any prior watcher so we don't accumulate pollers after reconnects.
@@ -474,11 +504,24 @@ fn is_run_finished(run: &Run) -> bool {
     }
 }
 
+fn is_run_started(run: &Run) -> bool {
+    match run.status {
+        tower_api::models::run::Status::Scheduled | tower_api::models::run::Status::Pending => {
+            false
+        }
+        _ => true,
+    }
+}
+
+fn should_notify_run_wait(already_notified: bool, elapsed: Duration) -> bool {
+    !already_notified && elapsed >= RUN_START_MESSAGE_DELAY
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        apps_cmd, next_backoff, should_emit_line, stream_logs_until_complete,
-        LogFollowOutcome, FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
+        apps_cmd, is_run_started, next_backoff, should_emit_line, should_notify_run_wait,
+        stream_logs_until_complete, LogFollowOutcome, FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
     };
     use super::is_run_finished;
     use tokio::sync::{mpsc, oneshot};
@@ -539,6 +582,43 @@ mod tests {
             Status::Exited => {}
             Status::Cancelled => {}
         }
+    }
+
+    #[test]
+    fn test_run_started_statuses() {
+        let not_started = [Status::Scheduled, Status::Pending];
+        for status in not_started {
+            let run = Run {
+                status,
+                ..Default::default()
+            };
+            assert!(!is_run_started(&run));
+        }
+
+        let started = [
+            Status::Running,
+            Status::Crashed,
+            Status::Errored,
+            Status::Exited,
+            Status::Cancelled,
+        ];
+        for status in started {
+            let run = Run {
+                status,
+                ..Default::default()
+            };
+            assert!(is_run_started(&run));
+        }
+    }
+
+    #[test]
+    fn test_run_wait_notification_logic() {
+        assert!(!should_notify_run_wait(true, super::RUN_START_MESSAGE_DELAY));
+        assert!(!should_notify_run_wait(
+            false,
+            super::RUN_START_MESSAGE_DELAY - Duration::from_millis(1)
+        ));
+        assert!(should_notify_run_wait(false, super::RUN_START_MESSAGE_DELAY));
     }
 
     #[tokio::test]
