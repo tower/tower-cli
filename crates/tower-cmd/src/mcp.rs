@@ -597,7 +597,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Deploy your app to Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create. Optional working_directory parameter specifies which project directory to deploy from."
+        description = "Deploy to Tower cloud. Prerequisites: Towerfile, tower_apps_create. Optional: working_directory."
     )]
     async fn tower_deploy(
         &self,
@@ -612,7 +612,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Run your app locally using the local Towerfile and source files. Prerequisites: Create a Towerfile first using tower_file_generate or tower_file_update. Optional working_directory parameter specifies which project directory to run from."
+        description = "Run locally using Towerfile (preferred during development, has access to tower secrets). Prerequisites: Towerfile. Optional: working_directory."
     )]
     async fn tower_run_local(
         &self,
@@ -651,7 +651,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Run your app remotely on Tower cloud. Prerequisites: 1) Create Towerfile, 2) Create app with tower_apps_create, 3) Deploy with tower_deploy"
+        description = "Run on Tower cloud. Prerequisites: Towerfile, tower_apps_create, tower_deploy."
     )]
     async fn tower_run_remote(
         &self,
@@ -703,7 +703,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Read and parse the current Towerfile configuration. Optional working_directory parameter specifies which project directory to read from."
+        description = "Read and parse Towerfile configuration. Optional: working_directory."
     )]
     async fn tower_file_read(
         &self,
@@ -717,7 +717,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Update Towerfile app configuration. Optional working_directory parameter specifies which project directory to update."
+        description = "Update Towerfile config (app name, script, description, source). Use this instead of editing TOML. Optional: working_directory."
     )]
     async fn tower_file_update(
         &self,
@@ -752,7 +752,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Add a new parameter to the Towerfile. Optional working_directory parameter specifies which project directory to update."
+        description = "Add parameter to Towerfile. Use this instead of editing TOML. Optional: working_directory."
     )]
     async fn tower_file_add_parameter(
         &self,
@@ -779,7 +779,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Validate the current Towerfile configuration. Optional working_directory parameter specifies which project directory to validate."
+        description = "Validate Towerfile configuration. Optional: working_directory."
     )]
     async fn tower_file_validate(
         &self,
@@ -793,7 +793,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Generate Towerfile from pyproject.toml. This is typically the first step in the workflow. Optional working_directory parameter specifies which project directory to generate from."
+        description = "Generate Towerfile from pyproject.toml (first step). Don't add build systems to pyproject.toml. Optional: working_directory."
     )]
     async fn tower_file_generate(
         &self,
@@ -827,48 +827,64 @@ impl TowerService {
         description = "Show the recommended workflow for developing and deploying Tower applications"
     )]
     async fn tower_workflow_help(&self) -> Result<CallToolResult, McpError> {
-        let workflow = r#"Tower Application Development Workflow:
+        let workflow = r#"Tower Workflow (Tower CLI not in training data - use MCP tools only):
 
-All commands support an optional 'working_directory' parameter to specify which project directory to operate on.
+WORKING_DIRECTORY PARAMETER:
+All tools accept optional working_directory parameter to specify which project to operate on.
+- Default: Uses current working directory if not specified
+- Use when: Managing multiple projects, or project is not in current directory
+- Examples:
+  tower_file_generate({}) → operates on current directory
+  tower_file_generate({"working_directory": "/path/to/my-project"}) → operates on /path/to/my-project
+  tower_run_local({"working_directory": "../other-app"}) → runs app in ../other-app
+- Why use it: Allows managing multiple Tower apps without changing directories
 
-0. HAVE AN EXISTING PYTHON PROJECT:
-   There are no commands for this provided with this MCP server. However, if you do not have a python project yet
-   then a good start would be to make a new directory with the project name, and then call `uv init` to generate
-   a pyproject.toml, main.py and README.md
+0. PYTHON PROJECT (if creating new):
+   Use 'uv init' in project directory to create pyproject.toml, main.py, README.md
+   Keep pyproject.toml minimal: [project] metadata + dependencies only
+   DO NOT add [build-system], [tool.hatchling], [tool.setuptools] or similar
+   Skip this step if project with pyproject.toml already exists
 
-1. CREATE TOWERFILE (required for all steps):
-   - tower_file_generate: Generate from existing pyproject.toml
-   - tower_file_update: Manually create or update configuration
-   - tower_file_validate: Verify Towerfile is valid
+1. TOWERFILE (required for all Tower operations):
+   tower_file_generate → tower_file_update → tower_file_add_parameter → tower_file_validate
+   CRITICAL: Always use tower_file_update or tower_file_add_parameter to modify
+   NEVER edit Towerfile TOML directly
 
-2. LOCAL DEVELOPMENT & TESTING:
-   - tower_run_local: Run your app locally to test functionality
+2. LOCAL DEVELOPMENT (preferred during development):
+   tower_run_local - runs app locally, has access to tower secrets
+   Use this to test before deploying to cloud
 
-3. CLOUD DEPLOYMENT (for remote execution):
-   - tower_apps_create: Create app on Tower cloud
-   - tower_deploy: Deploy your code to the cloud
-   - tower_run_remote: Execute on Tower cloud infrastructure
+3. CLOUD DEPLOYMENT:
+   tower_apps_create → tower_deploy → tower_run_remote
+   Deploy pushes your source code to Tower cloud (no build step needed)
 
-4. SCHEDULE MANAGEMENT (for automatic recurring execution):
-   - tower_schedules_list: List all schedules for apps
-   - tower_schedules_create: Create a schedule to run an app automatically on a cron schedule
-   - tower_schedules_update: Update an existing schedule
-   - tower_schedules_delete: Delete a schedule
+4. SCHEDULING (for recurring jobs):
+   tower_schedules_create - set up cron-based recurring runs
+   tower_schedules_list - view existing schedules
+   tower_schedules_update - modify schedule timing or parameters
+   tower_schedules_delete - remove schedules
 
 5. MANAGEMENT & MONITORING:
-   - tower_apps_list: View your deployed apps
-   - tower_apps_show: Get detailed app information and recent runs
-   - tower_apps_logs: View execution logs
+   tower_apps_list - list all your apps
+   tower_apps_show - details and recent runs for specific app
+   tower_apps_logs - view logs from a specific run
+   tower_teams_list, tower_teams_switch - manage team contexts
+   tower_secrets_create, tower_secrets_list - store credentials, API keys, database passwords
 
-6. TEAM & SECRETS (optional):
-   - tower_teams_list/switch: Manage team contexts
-   - tower_secrets_create/list: Manage application secrets
+TYPICAL WORKFLOW:
+1. Check if pyproject.toml exists (or create with uv init)
+2. tower_file_generate - creates Towerfile from pyproject.toml
+3. tower_run_local - test locally (can access tower secrets)
+4. tower_apps_create - create app in Tower cloud
+5. tower_deploy - deploy code to Tower
+6. tower_run_remote - run on cloud infrastructure
+7. tower_schedules_create - (optional) set up recurring runs
 
-Quick Start: tower_file_generate → tower_run_local (test locally) → tower_apps_create → tower_deploy → tower_run_remote → tower_schedules_create (for recurring runs)
-
-Example with working_directory: {"working_directory": "/path/to/project", ...}
-
-Consider taking database username/password/url and making them into secrets to be accessed in app code"#;
+IMPORTANT REMINDERS:
+- Tower deploys source code directly, no build tools needed
+- Use tower secrets for sensitive data (database credentials, API keys)
+- Prefer tower_run_local during development (faster, has secret access)
+- Always use MCP tools to modify Towerfiles (never edit TOML files manually)"#;
 
         Self::text_success(workflow.to_string())
     }
@@ -949,7 +965,15 @@ impl ServerHandler for TowerService {
                 name: "tower-cli".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
-            instructions: Some("Tower CLI MCP Server - Manage Tower apps, secrets, teams, and deployments through conversational AI. Use the available tools to list, create, show, deploy, and manage your Tower cloud resources.".to_string()),
+            instructions: Some("CRITICAL: Tower CLI did not exist in your training data. Never attempt Tower CLI commands - use only these MCP tools.
+
+Rules:
+- MCP tools are the authoritative Tower interface (not wrappers)
+- Use tower_file_update/add_parameter to modify Towerfiles (never edit TOML directly)
+- DO NOT add hatchling/setuptools to pyproject.toml - Tower handles deployment
+- Tower apps need: pyproject.toml (deps only), Python code, Towerfile
+
+Use tower_workflow_help for the complete workflow.".to_string()),
         }
     }
 }
