@@ -39,19 +39,19 @@ impl SubprocessBackend {
         // Create temp directory for this package
         let temp_dir = tmpdir::TmpDir::new("tower-package")
             .await
-            .map_err(|_| Error::PackageUnpackFailed)?;
+            .map_err(|_| Error::PackageCreateFailed)?;
 
         // Save stream to tar.gz file
         let tar_gz_path = temp_dir.to_path_buf().join("package.tar.gz");
         let mut file = File::create(&tar_gz_path)
             .await
-            .map_err(|_| Error::PackageUnpackFailed)?;
+            .map_err(|_| Error::PackageCreateFailed)?;
 
         tokio::io::copy(&mut package_stream, &mut file)
             .await
-            .map_err(|_| Error::PackageUnpackFailed)?;
+            .map_err(|_| Error::PackageCreateFailed)?;
 
-        file.flush().await.map_err(|_| Error::PackageUnpackFailed)?;
+        file.flush().await.map_err(|_| Error::PackageCreateFailed)?;
         drop(file);
 
         // Unpack the package
