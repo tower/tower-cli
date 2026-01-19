@@ -3,6 +3,7 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tokio::fs::File;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
 use tower_runtime::{OutputReceiver, Status};
@@ -19,8 +20,8 @@ use tokio::sync::{
 use tokio::time::{sleep, timeout, Duration};
 use tower_runtime::execution::ExecutionHandle;
 use tower_runtime::execution::{
-    CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, PackageRef,
-    ResourceLimits, RuntimeConfig as ExecRuntimeConfig,
+    CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, ResourceLimits,
+    RuntimeConfig as ExecRuntimeConfig,
 };
 use tower_runtime::subprocess::SubprocessBackend;
 
@@ -168,11 +169,17 @@ where
         }
     }
 
-    // Build the package
-    let mut package = build_package(&towerfile).await?;
-    // Unpack the package
-    package.unpack().await?;
+    // Build the package (creates tar.gz)
+    let package = build_package(&towerfile).await?;
     output::success(&format!("Launching app `{}`", towerfile.app.name));
+
+    // Open the tar.gz file as a stream
+    let package_path = package
+        .package_file_path
+        .as_ref()
+        .expect("Package must have a file path");
+    let package_file = File::open(package_path).await?;
+
     let backend = SubprocessBackend::new(config.cache_dir.clone());
     let run_id = format!(
         "cli-run-{}",
@@ -188,7 +195,7 @@ where
             params,
             secrets,
             env_vars,
-            &mut package,
+            package_file,
             run_id,
         ))
         .await?;
@@ -236,17 +243,12 @@ fn build_cli_execution_spec(
     params: HashMap<String, String>,
     secrets: HashMap<String, String>,
     env_vars: HashMap<String, String>,
-    package: &mut Package,
+    package_stream: File,
     run_id: String,
 ) -> ExecutionSpec {
     let spec = ExecutionSpec {
         id: run_id,
-        package: PackageRef::Local {
-            path: package
-                .unpacked_path
-                .clone()
-                .expect("Package must be unpacked before execution"),
-        },
+        package_stream: Box::new(package_stream),
         runtime: ExecRuntimeConfig {
             image: "local".to_string(),
             version: None,

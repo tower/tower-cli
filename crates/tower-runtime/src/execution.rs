@@ -7,6 +7,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tokio::io::AsyncRead;
 
 use crate::errors::Error;
 use crate::{OutputReceiver, Status};
@@ -16,13 +17,12 @@ use crate::{OutputReceiver, Status};
 // ============================================================================
 
 /// ExecutionSpec describes what to execute and how
-#[derive(Debug, Clone)]
 pub struct ExecutionSpec {
     /// Unique identifier for this execution (e.g., run_id)
     pub id: String,
 
-    /// Package reference (how to get the application code)
-    pub package: PackageRef,
+    /// Package as a stream of tar.gz data
+    pub package_stream: Box<dyn AsyncRead + Send + Unpin>,
 
     /// Runtime configuration (image, version, etc.)
     pub runtime: RuntimeConfig,
@@ -47,13 +47,6 @@ pub struct ExecutionSpec {
 
     /// Telemetry context for tracing
     pub telemetry_ctx: tower_telemetry::Context,
-}
-
-/// PackageRef describes where to get the application bundle
-#[derive(Debug, Clone)]
-pub enum PackageRef {
-    /// Local filesystem path
-    Local { path: PathBuf },
 }
 
 /// RuntimeConfig specifies the execution runtime environment

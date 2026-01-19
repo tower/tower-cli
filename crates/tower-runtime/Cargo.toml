@@ -11,6 +11,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 nix = { workspace = true }
 snafu = { workspace = true }
+tmpdir = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 tower-package = { workspace = true }

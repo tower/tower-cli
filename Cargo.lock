@@ -3626,7 +3626,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tar",
- "tokio-util",
  "tower-telemetry",
 ]
 
@@ -3639,6 +3638,7 @@ dependencies = [
  "config",
  "nix 0.30.1",
  "snafu",
+ "tmpdir",
  "tokio",
  "tokio-util",
  "tower-package",

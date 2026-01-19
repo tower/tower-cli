@@ -3,7 +3,7 @@
 use crate::errors::Error;
 use crate::execution::{
     BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    PackageRef, ServiceEndpoint,
+    ServiceEndpoint,
 };
 use crate::local::LocalApp;
 use crate::{App, OutputReceiver, StartOptions, Status};
@@ -11,6 +11,8 @@ use crate::{App, OutputReceiver, StartOptions, Status};
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 use tower_package::Package;
@@ -24,6 +26,41 @@ pub struct SubprocessBackend {
 impl SubprocessBackend {
     pub fn new(cache_dir: Option<PathBuf>) -> Self {
         Self { cache_dir }
+    }
+
+    /// Receive package stream and unpack it
+    ///
+    /// Takes a stream of tar.gz data, saves it to a temp file, and unpacks it
+    /// Returns the Package (which keeps the temp directory alive)
+    async fn receive_and_unpack_package(
+        &self,
+        mut package_stream: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
+    ) -> Result<Package, Error> {
+        // Create temp directory for this package
+        let temp_dir = tmpdir::TmpDir::new("tower-package")
+            .await
+            .map_err(|_| Error::PackageUnpackFailed)?;
+
+        // Save stream to tar.gz file
+        let tar_gz_path = temp_dir.to_path_buf().join("package.tar.gz");
+        let mut file = File::create(&tar_gz_path)
+            .await
+            .map_err(|_| Error::PackageUnpackFailed)?;
+
+        tokio::io::copy(&mut package_stream, &mut file)
+            .await
+            .map_err(|_| Error::PackageUnpackFailed)?;
+
+        file.flush().await.map_err(|_| Error::PackageUnpackFailed)?;
+        drop(file);
+
+        // Unpack the package
+        let mut package = Package::default();
+        package.package_file_path = Some(tar_gz_path);
+        package.tmp_dir = Some(temp_dir);
+        package.unpack().await?;
+
+        Ok(package)
     }
 }
 
@@ -41,11 +78,17 @@ impl ExecutionBackend for SubprocessBackend {
             _ => self.cache_dir.clone(),
         };
 
+        // Receive package stream and unpack it
+        let package = self.receive_and_unpack_package(spec.package_stream).await?;
+
+        let unpacked_path = package
+            .unpacked_path
+            .clone()
+            .ok_or(Error::PackageUnpackFailed)?;
+
         let opts = StartOptions {
             ctx: spec.telemetry_ctx,
-            package: match spec.package {
-                PackageRef::Local { path } => Package::from_unpacked_path(path).await,
-            },
+            package: Package::from_unpacked_path(unpacked_path).await,
             cwd: None, // LocalApp determines cwd from package
             environment: spec.environment,
             secrets: spec.secrets,
@@ -62,6 +105,7 @@ impl ExecutionBackend for SubprocessBackend {
             id: spec.id,
             app: Arc::new(Mutex::new(app)),
             output_receiver: Arc::new(Mutex::new(output_receiver)),
+            _package: package, // Keep package alive so temp dir doesn't get cleaned up
         })
     }
 
@@ -89,6 +133,7 @@ pub struct SubprocessHandle {
     id: String,
     app: Arc<Mutex<LocalApp>>,
     output_receiver: Arc<Mutex<OutputReceiver>>,
+    _package: Package, // Keep package alive to prevent temp dir cleanup
 }
 
 #[async_trait]
