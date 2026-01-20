@@ -64,6 +64,9 @@ pub enum Error {
 
     #[snafu(display("cancelled"))]
     Cancelled,
+
+    #[snafu(display("dependency installation failed"))]
+    DependencyInstallationFailed,
 }
 
 impl From<std::io::Error> for Error {
