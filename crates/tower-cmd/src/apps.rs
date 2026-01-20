@@ -519,11 +519,11 @@ fn should_notify_run_wait(already_notified: bool, elapsed: Duration) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::is_run_finished;
     use super::{
         apps_cmd, is_run_started, next_backoff, should_emit_line, should_notify_run_wait,
         stream_logs_until_complete, LogFollowOutcome, FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
     };
-    use super::is_run_finished;
     use tokio::sync::{mpsc, oneshot};
     use tokio::time::Duration;
     use tower_api::models::run::Status;
@@ -613,12 +613,18 @@ mod tests {
 
     #[test]
     fn test_run_wait_notification_logic() {
-        assert!(!should_notify_run_wait(true, super::RUN_START_MESSAGE_DELAY));
+        assert!(!should_notify_run_wait(
+            true,
+            super::RUN_START_MESSAGE_DELAY
+        ));
         assert!(!should_notify_run_wait(
             false,
             super::RUN_START_MESSAGE_DELAY - Duration::from_millis(1)
         ));
-        assert!(should_notify_run_wait(false, super::RUN_START_MESSAGE_DELAY));
+        assert!(should_notify_run_wait(
+            false,
+            super::RUN_START_MESSAGE_DELAY
+        ));
     }
 
     #[tokio::test]

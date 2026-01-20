@@ -702,9 +702,7 @@ impl TowerService {
         }
     }
 
-    #[tool(
-        description = "Read and parse Towerfile configuration. Optional: working_directory."
-    )]
+    #[tool(description = "Read and parse Towerfile configuration. Optional: working_directory.")]
     async fn tower_file_read(
         &self,
         Parameters(request): Parameters<EmptyRequest>,
@@ -778,9 +776,7 @@ impl TowerService {
         }
     }
 
-    #[tool(
-        description = "Validate Towerfile configuration. Optional: working_directory."
-    )]
+    #[tool(description = "Validate Towerfile configuration. Optional: working_directory.")]
     async fn tower_file_validate(
         &self,
         Parameters(request): Parameters<EmptyRequest>,

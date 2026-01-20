@@ -88,7 +88,7 @@ impl ExecutionBackend for SubprocessBackend {
 
         let opts = StartOptions {
             ctx: spec.telemetry_ctx,
-            package: Package::from_unpacked_path(unpacked_path).await,
+            package: Package::from_unpacked_path(unpacked_path).await?,
             cwd: None, // LocalApp determines cwd from package
             environment: spec.environment,
             secrets: spec.secrets,

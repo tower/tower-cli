@@ -493,7 +493,7 @@ dependencies = [
 name = "config"
 version = "0.3.43"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "chrono",
  "clap",
  "dirs",
