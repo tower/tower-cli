@@ -17,14 +17,14 @@ pub enum Error {
     #[snafu(display("not implemented"))]
     NotImplemented,
 
-    #[snafu(display("bundle download failed"))]
-    BundleDownloadFailed,
+    #[snafu(display("package download failed"))]
+    PackageDownloadFailed,
 
-    #[snafu(display("bundle create failed"))]
-    BundleCreateFailed,
+    #[snafu(display("package create failed"))]
+    PackageCreateFailed,
 
-    #[snafu(display("bundle unpack failed"))]
-    BundleUnpackFailed,
+    #[snafu(display("package unpack failed"))]
+    PackageUnpackFailed,
 
     #[snafu(display("container already initialized"))]
     AlreadyInitialized,
@@ -64,6 +64,18 @@ pub enum Error {
 
     #[snafu(display("cancelled"))]
     Cancelled,
+
+    #[snafu(display("app not started"))]
+    AppNotStarted,
+
+    #[snafu(display("no execution handle"))]
+    NoHandle,
+
+    #[snafu(display("invalid package"))]
+    InvalidPackage,
+
+    #[snafu(display("dependency installation failed"))]
+    DependencyInstallationFailed,
 }
 
 impl From<std::io::Error> for Error {
@@ -89,5 +101,11 @@ impl From<tower_uv::Error> for Error {
             tower_uv::Error::InvalidUv => Error::SpawnFailed,
             tower_uv::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
         }
+    }
+}
+
+impl From<tower_package::Error> for Error {
+    fn from(_: tower_package::Error) -> Self {
+        Error::PackageUnpackFailed
     }
 }

@@ -18,6 +18,19 @@ def log(msg):
     print(f"\033[36m[test-runner]\033[0m {msg}")
 
 
+def reset_session_fixture(test_home):
+    """Reset the session.json fixture to its committed state before tests.
+
+    The CLI may modify session.json during MCP operations (like team switching),
+    so we restore it to the canonical committed version before each test run.
+    """
+    session_file = test_home / ".config" / "tower" / "session.json"
+    subprocess.run(
+        ["git", "checkout", str(session_file)],
+        capture_output=True,
+    )
+
+
 def check_mock_server_health(url):
     """Check if the mock server is running and responding."""
     try:
@@ -129,6 +142,8 @@ def main():
         return 1
 
     finally:
+        reset_session_fixture(test_home)
+
         if mock_process:
             log("Stopping mock server...")
             mock_process.terminate()

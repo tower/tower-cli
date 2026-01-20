@@ -127,6 +127,7 @@ def create_towerfile(
     """Create a Towerfile for testing - pure function with no side effects beyond file creation"""
 
     app_name = unique_app_name(context, app_name, force_new=True)
+    context.app_name = app_name
 
     template_dir = Path(__file__).parents[2] / "templates"
 
@@ -880,7 +881,7 @@ def step_then_receive_workflow_help_sse(context):
     ), f"Expected success response, got: {context.mcp_response}"
     assert "content" in context.mcp_response
     content = context.mcp_response["content"][0].text
-    assert "Tower Application Development Workflow" in content
+    assert "Tower Workflow" in content
 
 
 @then("I should receive workflow help content via HTTP")
@@ -897,7 +898,7 @@ def step_then_receive_workflow_help_stdio(context):
     result = context.mcp_response["result"]
     assert "content" in result
     content = result["content"][0]["text"]
-    assert "Tower Application Development Workflow" in content
+    assert "Tower Workflow" in content
 
 
 @given('I have a simple hello world application named "{app_name}"')
