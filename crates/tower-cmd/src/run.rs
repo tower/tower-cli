@@ -3,20 +3,27 @@ use clap::{Arg, ArgMatches, Command};
 use config::{Config, Towerfile};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tokio::fs::File;
 use tower_api::models::Run;
 use tower_package::{Package, PackageSpec};
-use tower_runtime::{local::LocalApp, App, AppLauncher, OutputReceiver, Status};
+use tower_runtime::{OutputReceiver, Status};
 use tower_telemetry::{debug, Context};
 
+use crate::{api, output, util::dates};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{
-    mpsc::{unbounded_channel, Receiver as MpscReceiver},
+    mpsc::Receiver as MpscReceiver,
     oneshot::{self, Receiver as OneshotReceiver},
     Mutex,
 };
 use tokio::time::{sleep, timeout, Duration};
-
-use crate::{api, output, util::dates};
+use tower_runtime::execution::ExecutionHandle;
+use tower_runtime::execution::{
+    CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, ResourceLimits,
+    RuntimeConfig as ExecRuntimeConfig,
+};
+use tower_runtime::subprocess::SubprocessBackend;
 
 pub fn run_cmd() -> Command {
     Command::new("run")
@@ -148,7 +155,7 @@ where
     env_vars.insert("TOWER_URL".to_string(), config.tower_url.to_string());
 
     // There should always be a session, if there isn't one then I'm not sure how we got here?
-    let session = config.session.ok_or(Error::NoSession)?;
+    let session = config.session.as_ref().ok_or(Error::NoSession)?;
 
     env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
 
@@ -162,34 +169,42 @@ where
         }
     }
 
-    // Build the package
-    let mut package = build_package(&towerfile).await?;
-
-    // Unpack the package
-    package.unpack().await?;
-
-    let (sender, receiver) = unbounded_channel();
-
+    // Build the package (creates tar.gz)
+    let package = build_package(&towerfile).await?;
     output::success(&format!("Launching app `{}`", towerfile.app.name));
+
+    // Open the tar.gz file as a stream
+    let package_path = package
+        .package_file_path
+        .as_ref()
+        .expect("Package must have a file path");
+    let package_file = File::open(package_path).await?;
+
+    let backend = SubprocessBackend::new(config.cache_dir.clone());
+    let run_id = format!(
+        "cli-run-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let handle = backend
+        .create(build_cli_execution_spec(
+            config,
+            env,
+            params,
+            secrets,
+            env_vars,
+            package_file,
+            run_id,
+        ))
+        .await?;
+    let receiver = handle.logs().await?;
     let output_task = tokio::spawn(output_handler(receiver));
 
-    let mut launcher: AppLauncher<LocalApp> = AppLauncher::default();
-    launcher
-        .launch(
-            Context::new(),
-            sender,
-            package,
-            env.to_string(),
-            secrets,
-            params,
-            env_vars,
-            config.cache_dir,
-        )
-        .await?;
-
-    // Monitor app output and status concurrently
-    let app = Arc::new(Mutex::new(launcher.app.unwrap()));
-    let status_task = tokio::spawn(monitor_local_status(Arc::clone(&app)));
+    // Monitor app status concurrently
+    let handle = Arc::new(Mutex::new(handle));
+    let status_task = tokio::spawn(monitor_cli_status(Arc::clone(&handle)));
 
     // Wait for app to complete or SIGTERM
     let status_result = tokio::select! {
@@ -199,7 +214,7 @@ where
         },
         _ = tokio::signal::ctrl_c(), if !output::get_output_mode().is_mcp() => {
             output::write("\nReceived Ctrl+C, stopping local run...\n");
-            app.lock().await.terminate().await.ok();
+            handle.lock().await.terminate().await.ok();
             return Ok(output_task.await.unwrap());
         }
     };
@@ -220,6 +235,52 @@ where
     }
 
     Ok(final_result)
+}
+
+fn build_cli_execution_spec(
+    config: Config,
+    env: &str,
+    params: HashMap<String, String>,
+    secrets: HashMap<String, String>,
+    env_vars: HashMap<String, String>,
+    package_stream: File,
+    run_id: String,
+) -> ExecutionSpec {
+    let spec = ExecutionSpec {
+        id: run_id,
+        package_stream: Box::new(package_stream),
+        runtime: ExecRuntimeConfig {
+            image: "local".to_string(),
+            version: None,
+            cache: CacheConfig {
+                enable_bundle_cache: true,
+                enable_runtime_cache: true,
+                enable_dependency_cache: true,
+                backend: match config.cache_dir.clone() {
+                    Some(dir) => CacheBackend::Local { cache_dir: dir },
+                    None => CacheBackend::None,
+                },
+                isolation: CacheIsolation::None,
+            },
+            entrypoint: None,
+            command: None,
+        },
+        environment: env.to_string(),
+        secrets,
+        parameters: params,
+        env_vars,
+        resources: ResourceLimits {
+            cpu_millicores: None,
+            memory_mb: None,
+            storage_mb: None,
+            max_pids: None,
+            gpu_count: 0,
+            timeout_seconds: 3600,
+        },
+        networking: None,
+        telemetry_ctx: Context::new(),
+    };
+    spec
 }
 
 /// do_run_local is the entrypoint for running an app locally. It will load the Towerfile, build
@@ -595,8 +656,12 @@ async fn monitor_output(mut output: OutputReceiver) {
 
 /// monitor_local_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
-    debug!("Starting status monitoring for LocalApp");
+async fn monitor_cli_status(
+    handle: Arc<Mutex<tower_runtime::subprocess::SubprocessHandle>>,
+) -> Status {
+    use tower_runtime::execution::ExecutionHandle as _;
+
+    debug!("Starting status monitoring for CLI execution");
     let mut check_count = 0;
     let mut err_count = 0;
 
@@ -604,11 +669,11 @@ async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
         check_count += 1;
 
         debug!(
-            "Status check #{}, attempting to get app status",
+            "Status check #{}, attempting to get CLI handle status",
             check_count
         );
 
-        match app.lock().await.status().await {
+        match handle.lock().await.status().await {
             Ok(status) => {
                 // We reset the error count to indicate that we can intermittently get statuses.
                 err_count = 0;
@@ -616,30 +681,27 @@ async fn monitor_local_status(app: Arc<Mutex<LocalApp>>) -> Status {
                 match status {
                     Status::Exited => {
                         debug!("Run exited cleanly, stopping status monitoring");
-
-                        // We're done. Exit this loop and function.
                         return status;
                     }
                     Status::Crashed { .. } => {
                         debug!("Run crashed, stopping status monitoring");
-
-                        // We're done. Exit this loop and function.
                         return status;
                     }
                     _ => {
+                        debug!("Handle status: other, continuing to monitor");
                         sleep(Duration::from_millis(100)).await;
                     }
                 }
             }
             Err(e) => {
-                debug!("Failed to get app status: {:?}", e);
+                debug!("Failed to get handle status: {:?}", e);
                 err_count += 1;
 
                 // If we get five errors in a row, we abandon monitoring.
                 if err_count >= 5 {
-                    debug!("Failed to get app status after 5 attempts, giving up");
+                    debug!("Failed to get handle status after 5 attempts, giving up");
                     output::error("An error occured while monitoring your local run status!");
-                    return tower_runtime::Status::Crashed { code: -1 };
+                    return Status::Crashed { code: -1 };
                 }
 
                 // Otherwise, keep on keepin' on.

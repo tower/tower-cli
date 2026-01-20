@@ -10,13 +10,12 @@ license = { workspace = true }
 async-compression = { workspace = true }
 config = { workspace = true }
 glob = { workspace = true }
-serde = { workspace = true } 
-serde_json = { workspace = true } 
+serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
-snafu = { workspace = true } 
+snafu = { workspace = true }
 tmpdir = { workspace = true }
-tokio = { workspace = true } 
+tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-tar = { workspace = true }
-tokio-util = { workspace = true }
 tower-telemetry = { workspace = true }

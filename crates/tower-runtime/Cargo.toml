@@ -7,14 +7,16 @@ rust-version = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+async-trait = { workspace = true }
 chrono = { workspace = true }
 nix = { workspace = true }
-snafu = { workspace = true } 
+snafu = { workspace = true }
+tmpdir = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
-tower-package = { workspace = true } 
-tower-telemetry = { workspace = true } 
-tower-uv = { workspace = true } 
+tower-package = { workspace = true }
+tower-telemetry = { workspace = true }
+tower-uv = { workspace = true }
 
 [dev-dependencies]
 config = { workspace = true }

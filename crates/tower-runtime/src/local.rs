@@ -353,6 +353,18 @@ impl App for LocalApp {
         })
     }
 
+    async fn terminate(&mut self) -> Result<(), Error> {
+        self.terminator.cancel();
+
+        // Now we should wait for the join handle to finish.
+        if let Some(execute_handle) = self.execute_handle.take() {
+            let _ = execute_handle.await;
+            self.execute_handle = None;
+        }
+
+        Ok(())
+    }
+
     async fn status(&self) -> Result<Status, Error> {
         let mut status = self.status.lock().await;
 
@@ -378,18 +390,6 @@ impl App for LocalApp {
                 }
             }
         }
-    }
-
-    async fn terminate(&mut self) -> Result<(), Error> {
-        self.terminator.cancel();
-
-        // Now we should wait for the join handle to finish.
-        if let Some(execute_handle) = self.execute_handle.take() {
-            let _ = execute_handle.await;
-            self.execute_handle = None;
-        }
-
-        Ok(())
     }
 }
 
