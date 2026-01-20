@@ -222,7 +222,13 @@ async fn execute_local_app(
         ));
 
         // Wait for venv to finish up.
-        wait_for_process(ctx.clone(), &cancel_token, child).await;
+        let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
+
+        if res != 0 {
+            // If the venv process failed, we want to return an error.
+            let _ = sx.send(res);
+            return Err(Error::VirtualEnvCreationFailed);
+        }
 
         // Check once more if the process was cancelled before we do a uv sync. The sync itself,
         // once started, will take a while and we have logic for checking for cancellation.
@@ -269,7 +275,13 @@ async fn execute_local_app(
                 ));
 
                 // Let's wait for the setup to finish. We don't care about the results.
-                wait_for_process(ctx.clone(), &cancel_token, child).await;
+                let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
+
+                if res != 0 {
+                    // If the sync process failed, we want to return an error.
+                    let _ = sx.send(res);
+                    return Err(Error::DependencyInstallationFailed);
+                }
             }
         }
 
