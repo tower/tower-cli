@@ -1,0 +1,9 @@
+[project]
+name = "05-broken-dependencies"
+version = "0.1.0"
+description = "App with a non-existent dependency to test failure handling"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "this-package-definitely-does-not-exist-xyz-123456789>=1.0.0",
+]

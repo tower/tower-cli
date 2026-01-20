@@ -1,0 +1,3 @@
+[app]
+name = "05-broken-dependencies"
+script = "./main.py"

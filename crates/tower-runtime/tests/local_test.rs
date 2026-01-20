@@ -328,3 +328,50 @@ async fn test_running_app_with_secret() {
     let status = app.status().await.expect("Failed to get app status");
     assert!(status == Status::Exited, "App should be running");
 }
+
+#[tokio::test]
+async fn test_abort_on_dependency_installation_failure() {
+    debug!("Running 05-broken-dependencies");
+    // This test verifies that when dependency installation fails (uv sync returns non-zero),
+    // the app correctly reports a Crashed status rather than continuing execution.
+    let broken_deps_dir = get_example_app_dir("05-broken-dependencies");
+    let package = build_package_from_dir(&broken_deps_dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new(),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir()),
+    };
+
+    // Start the app using the LocalApp runtime
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    // Drain all output - we need to consume the channel for the app to complete
+    while let Some(output) = receiver.recv().await {
+        debug!("Received output: {:?}", output.line);
+    }
+
+    // The status should be Crashed since dependency installation failed
+    let status = app.status().await.expect("Failed to get app status");
+    match status {
+        Status::Crashed { code } => {
+            assert!(code != 0, "Exit code should be non-zero, got {}", code);
+        }
+        Status::Exited => {
+            panic!("App should have crashed due to dependency installation failure, not exited successfully");
+        }
+        Status::Running => {
+            panic!("App should not still be running");
+        }
+        Status::None => {
+            panic!("App should have a status");
+        }
+    }
+}
