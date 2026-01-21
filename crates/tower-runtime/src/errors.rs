@@ -76,6 +76,9 @@ pub enum Error {
 
     #[snafu(display("dependency installation failed"))]
     DependencyInstallationFailed,
+
+    #[snafu(display("failed to wait for process: {message}"))]
+    ProcessWaitFailed { message: String },
 }
 
 impl From<std::io::Error> for Error {

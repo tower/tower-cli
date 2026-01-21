@@ -11,6 +11,9 @@ pub mod execution;
 pub mod local;
 pub mod subprocess;
 
+// Re-export SubprocessBackend from subprocess module
+pub use subprocess::SubprocessBackend;
+
 use errors::Error;
 
 #[derive(Copy, Clone)]
@@ -41,6 +44,7 @@ pub enum Status {
     None,
     Running,
     Exited,
+    Cancelled,
     Crashed { code: i32 },
 }
 
@@ -48,16 +52,14 @@ pub type OutputReceiver = UnboundedReceiver<Output>;
 
 pub type OutputSender = UnboundedSender<Output>;
 
+#[deprecated(note = "use `execution::App` instead")]
 pub trait App: Send + Sync {
-    // start will start the process
     fn start(opts: StartOptions) -> impl Future<Output = Result<Self, Error>> + Send
     where
         Self: Sized;
 
-    // terminate will terminate the subprocess
     fn terminate(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 
-    // status checks the status of an app
     fn status(&self) -> impl Future<Output = Result<Status, Error>> + Send;
 }
 

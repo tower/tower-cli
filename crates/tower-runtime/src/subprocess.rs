@@ -1,23 +1,17 @@
-//! Subprocess execution backend
+//! Local subprocess execution backend
 
 use crate::errors::Error;
-use crate::execution::{
-    BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    ServiceEndpoint,
-};
+use crate::execution::{Backend, BackendCapabilities, CacheBackend, ExecutionSpec};
 use crate::local::LocalApp;
-use crate::{App, OutputReceiver, StartOptions, Status};
+use crate::StartOptions;
 
 use async_trait::async_trait;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::Mutex;
-use tokio::time::Duration;
 use tower_package::Package;
 
-/// SubprocessBackend executes apps as a subprocess
+/// SubprocessBackend executes apps as local subprocesses
 pub struct SubprocessBackend {
     /// Optional default cache directory to use
     cache_dir: Option<PathBuf>,
@@ -65,10 +59,10 @@ impl SubprocessBackend {
 }
 
 #[async_trait]
-impl ExecutionBackend for SubprocessBackend {
-    type Handle = SubprocessHandle;
+impl Backend for SubprocessBackend {
+    type App = LocalApp;
 
-    async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error> {
+    async fn create(&self, spec: ExecutionSpec) -> Result<Self::App, Error> {
         // Convert ExecutionSpec to StartOptions for LocalApp
         let (output_sender, output_receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -94,19 +88,13 @@ impl ExecutionBackend for SubprocessBackend {
             secrets: spec.secrets,
             parameters: spec.parameters,
             env_vars: spec.env_vars,
-            output_sender: output_sender.clone(),
+            output_sender,
             cache_dir,
         };
 
-        // Start the LocalApp
-        let app = LocalApp::start(opts).await?;
-
-        Ok(SubprocessHandle {
-            id: spec.id,
-            app: Arc::new(Mutex::new(app)),
-            output_receiver: Arc::new(Mutex::new(output_receiver)),
-            _package: package, // Keep package alive so temp dir doesn't get cleaned up
-        })
+        // Start the LocalApp with the execution ID, output receiver, and package
+        // The package is kept alive so the temp dir doesn't get cleaned up
+        LocalApp::new(spec.id, opts, Some(output_receiver), Some(package)).await
     }
 
     fn capabilities(&self) -> BackendCapabilities {
@@ -124,77 +112,6 @@ impl ExecutionBackend for SubprocessBackend {
 
     async fn cleanup(&self) -> Result<(), Error> {
         // Nothing to cleanup for local backend
-        Ok(())
-    }
-}
-
-/// SubprocessHandle provides lifecycle management for a subprocess execution
-pub struct SubprocessHandle {
-    id: String,
-    app: Arc<Mutex<LocalApp>>,
-    output_receiver: Arc<Mutex<OutputReceiver>>,
-    _package: Package, // Keep package alive to prevent temp dir cleanup
-}
-
-#[async_trait]
-impl ExecutionHandle for SubprocessHandle {
-    fn id(&self) -> &str {
-        &self.id
-    }
-
-    async fn status(&self) -> Result<Status, Error> {
-        let app = self.app.lock().await;
-        app.status().await
-    }
-
-    async fn logs(&self) -> Result<OutputReceiver, Error> {
-        // Create a new channel for log streaming
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-
-        // Spawn a task to forward Output from the internal receiver
-        let output_receiver = self.output_receiver.clone();
-        tokio::spawn(async move {
-            let mut receiver = output_receiver.lock().await;
-            while let Some(output) = receiver.recv().await {
-                if tx.send(output).is_err() {
-                    break; // Receiver dropped
-                }
-            }
-        });
-
-        Ok(rx)
-    }
-
-    async fn terminate(&mut self) -> Result<(), Error> {
-        let mut app = self.app.lock().await;
-        app.terminate().await
-    }
-
-    async fn kill(&mut self) -> Result<(), Error> {
-        // For local processes, kill is the same as terminate
-        self.terminate().await
-    }
-
-    async fn wait_for_completion(&self) -> Result<Status, Error> {
-        loop {
-            let status = self.status().await?;
-            match status {
-                Status::None | Status::Running => {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                }
-                _ => return Ok(status),
-            }
-        }
-    }
-
-    async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error> {
-        // Local backend doesn't support service endpoints
-        Ok(None)
-    }
-
-    async fn cleanup(&mut self) -> Result<(), Error> {
-        // Ensure the app is terminated
-        self.terminate().await?;
         Ok(())
     }
 }

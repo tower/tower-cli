@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use tower_runtime::{local::LocalApp, App, StartOptions, Status};
+use tower_runtime::execution::App as _;
+use tower_runtime::{local::LocalApp, StartOptions, Status};
 
 use config::Towerfile;
 use tower_package::{Package, PackageSpec};
@@ -372,6 +373,9 @@ async fn test_abort_on_dependency_installation_failure() {
         }
         Status::None => {
             panic!("App should have a status");
+        }
+        Status::Cancelled => {
+            panic!("App should not have been cancelled");
         }
     }
 }

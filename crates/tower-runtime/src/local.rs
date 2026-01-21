@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
@@ -33,20 +34,19 @@ use tower_package::{Manifest, Package};
 use tower_telemetry::debug;
 use tower_uv::Uv;
 
-use crate::{App, Channel, Output, FD};
+use crate::execution::App;
+use crate::{Channel, Output, OutputReceiver, FD};
+
+type Completion = Result<Status, Error>;
 
 pub struct LocalApp {
+    id: String,
     status: Mutex<Option<Status>>,
-
-    // waiter is what we use to communicate that the overall process is finished by the execution
-    // handle.
-    waiter: Mutex<oneshot::Receiver<i32>>,
-
-    // terminator is what we use to flag that we want to terminate the child process.
+    completion_receiver: Mutex<oneshot::Receiver<Completion>>,
     terminator: CancellationToken,
-
-    // execute_handle keeps track of the current state of the execution lifecycle.
-    execute_handle: Option<JoinHandle<Result<(), Error>>>,
+    task: Option<JoinHandle<Result<(), Error>>>,
+    output_receiver: Mutex<Option<OutputReceiver>>,
+    _package: Option<Package>,
 }
 
 // Helper function to check if a file is executable
@@ -101,7 +101,7 @@ async fn find_bash() -> Result<PathBuf, Error> {
 
 async fn execute_local_app(
     opts: StartOptions,
-    sx: oneshot::Sender<i32>,
+    tx: oneshot::Sender<Completion>,
     cancel_token: CancellationToken,
 ) -> Result<(), Error> {
     let ctx = opts.ctx.clone();
@@ -159,7 +159,7 @@ async fn execute_local_app(
     if cancel_token.is_cancelled() {
         // if there's a waiter, we want them to know that the process was cancelled so we have
         // to return something on the relevant channel.
-        let _ = sx.send(-1);
+        let _ = tx.send(Ok(Status::Cancelled));
         return Err(Error::Cancelled);
     }
 
@@ -176,7 +176,7 @@ async fn execute_local_app(
         )
         .await?;
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        let _ = tx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     } else {
         // we put Uv in to protected mode when there's no caching configured/enabled.
         let protected_mode = opts.cache_dir.is_none();
@@ -198,7 +198,7 @@ async fn execute_local_app(
         // ensure everything is in place.
         if cancel_token.is_cancelled() {
             // again tell any waiters that we cancelled.
-            let _ = sx.send(-1);
+            let _ = tx.send(Ok(Status::Cancelled));
             return Err(Error::Cancelled);
         }
 
@@ -222,19 +222,19 @@ async fn execute_local_app(
         ));
 
         // Wait for venv to finish up.
-        let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
-
-        if res != 0 {
-            // If the venv process failed, we want to return an error.
-            let _ = sx.send(res);
-            return Err(Error::VirtualEnvCreationFailed);
+        match wait_for_process(ctx.clone(), &cancel_token, child).await {
+            Ok(Status::Exited) => {}
+            res => {
+                let _ = tx.send(res);
+                return Err(Error::VirtualEnvCreationFailed);
+            }
         }
 
         // Check once more if the process was cancelled before we do a uv sync. The sync itself,
         // once started, will take a while and we have logic for checking for cancellation.
         if cancel_token.is_cancelled() {
             // again tell any waiters that we cancelled.
-            let _ = sx.send(-1);
+            let _ = tx.send(Ok(Status::Cancelled));
             return Err(Error::Cancelled);
         }
 
@@ -275,12 +275,13 @@ async fn execute_local_app(
                 ));
 
                 // Let's wait for the setup to finish. We don't care about the results.
-                let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
-
-                if res != 0 {
+                match wait_for_process(ctx.clone(), &cancel_token, child).await {
+                    Ok(Status::Exited) => {}
                     // If the sync process failed, we want to return an error.
-                    let _ = sx.send(res);
-                    return Err(Error::DependencyInstallationFailed);
+                    res => {
+                        let _ = tx.send(res);
+                        return Err(Error::DependencyInstallationFailed);
+                    }
                 }
             }
         }
@@ -289,7 +290,7 @@ async fn execute_local_app(
         if cancel_token.is_cancelled() {
             // if there's a waiter, we want them to know that the process was cancelled so we have
             // to return something on the relevant channel.
-            let _ = sx.send(-1);
+            let _ = tx.send(Ok(Status::Cancelled));
             return Err(Error::Cancelled);
         }
 
@@ -312,7 +313,7 @@ async fn execute_local_app(
             BufReader::new(stderr),
         ));
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        let _ = tx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     }
 
     // Everything was properly executed I suppose.
@@ -324,70 +325,105 @@ impl Drop for LocalApp {
         // CancellationToken::cancel() is not async
         self.terminator.cancel();
 
-        // Optionally spawn a task to wait for the handle
-        if let Some(execute_handle) = self.execute_handle.take() {
-            if let Ok(handle) = Handle::try_current() {
-                handle.spawn(async move {
-                    let _ = execute_handle.await;
+        // Optionally spawn a task to wait for execution to complete
+        if let Some(task) = self.task.take() {
+            if let Ok(rt) = Handle::try_current() {
+                rt.spawn(async move {
+                    let _ = task.await;
                 });
             }
         }
     }
 }
 
-impl App for LocalApp {
-    async fn start(opts: StartOptions) -> Result<Self, Error> {
+impl LocalApp {
+    /// Create a new LocalApp with the given ID and StartOptions.
+    ///
+    /// The `output_receiver` parameter is optional - when provided (via Backend interface),
+    /// the `logs()` method will return this receiver. When None (legacy interface),
+    /// logs are sent to the output_sender in StartOptions and `logs()` returns an empty stream.
+    ///
+    /// The `package` parameter keeps the package (and its temp directory) alive for the
+    /// duration of the execution.
+    pub async fn new(
+        id: String,
+        opts: StartOptions,
+        output_receiver: Option<OutputReceiver>,
+        package: Option<Package>,
+    ) -> Result<Self, Error> {
         let terminator = CancellationToken::new();
-
-        let (sx, rx) = oneshot::channel::<i32>();
-        let waiter = Mutex::new(rx);
-
-        let handle = tokio::spawn(execute_local_app(opts, sx, terminator.clone()));
-        let execute_handle = Some(handle);
+        let (tx, rx) = oneshot::channel::<Completion>();
+        let task = tokio::spawn(execute_local_app(opts, tx, terminator.clone()));
 
         Ok(Self {
-            execute_handle,
+            id,
+            task: Some(task),
             terminator,
-            waiter,
+            completion_receiver: Mutex::new(rx),
             status: Mutex::new(None),
+            output_receiver: Mutex::new(output_receiver),
+            _package: package,
         })
     }
 
-    async fn terminate(&mut self) -> Result<(), Error> {
-        self.terminator.cancel();
+    /// Create a LocalApp using the legacy start() interface (for backward compatibility).
+    ///
+    /// Output is sent to the output_sender in StartOptions. The `logs()` method
+    /// will return an empty stream (use the output_sender's receiver directly).
+    pub async fn start(opts: StartOptions) -> Result<Self, Error> {
+        Self::new("local".to_string(), opts, None, None).await
+    }
+}
 
-        // Now we should wait for the join handle to finish.
-        if let Some(execute_handle) = self.execute_handle.take() {
-            let _ = execute_handle.await;
-            self.execute_handle = None;
-        }
-
-        Ok(())
+#[async_trait]
+impl App for LocalApp {
+    fn id(&self) -> &str {
+        &self.id
     }
 
     async fn status(&self) -> Result<Status, Error> {
         let mut status = self.status.lock().await;
 
         if let Some(status) = *status {
-            Ok(status)
-        } else {
-            let mut waiter = self.waiter.lock().await;
-            let res = waiter.try_recv();
+            return Ok(status);
+        }
 
-            match res {
-                Err(TryRecvError::Empty) => Ok(Status::Running),
-                Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
-                Ok(t) => {
-                    // We save this for the next time this gets called.
-                    if t == 0 {
-                        *status = Some(Status::Exited);
-                        Ok(Status::Exited)
-                    } else {
-                        let next_status = Status::Crashed { code: t };
-                        *status = Some(next_status);
-                        Ok(next_status)
-                    }
+        match self.completion_receiver.lock().await.try_recv() {
+            Err(TryRecvError::Empty) => Ok(Status::Running),
+            Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
+            Ok(completion) => {
+                let next_status = completion?;
+                *status = Some(next_status);
+                Ok(next_status)
+            }
+        }
+    }
+
+    async fn logs(&self) -> Result<OutputReceiver, Error> {
+        // Take the receiver (can only be called once meaningfully)
+        // Returns empty channel if already taken or using legacy interface
+        let (_, empty) = tokio::sync::mpsc::unbounded_channel();
+        Ok(self.output_receiver.lock().await.take().unwrap_or(empty))
+    }
+
+    async fn terminate(&mut self) -> Result<(), Error> {
+        self.terminator.cancel();
+
+        if let Some(task) = self.task.take() {
+            let _ = task.await;
+        }
+
+        Ok(())
+    }
+
+    async fn wait_for_completion(&self) -> Result<Status, Error> {
+        loop {
+            let status = self.status().await?;
+            match status {
+                Status::None | Status::Running => {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
+                _ => return Ok(status),
             }
         }
     }
@@ -536,31 +572,32 @@ async fn wait_for_process(
     ctx: tower_telemetry::Context,
     cancel_token: &CancellationToken,
     mut child: Child,
-) -> i32 {
-    let code = loop {
+) -> Completion {
+    loop {
         if cancel_token.is_cancelled() {
             debug!(ctx: &ctx, "process cancelled, terminating child process");
             kill_child_process(&ctx, child).await;
-            break -1; // return -1 to indicate that the process was cancelled.
+            return Ok(Status::Cancelled);
         }
 
-        let timeout = timeout(Duration::from_millis(25), child.wait()).await;
-
-        if let Ok(res) = timeout {
-            if let Ok(status) = res {
-                break status.code().expect("no status code");
-            } else {
-                // something went wrong.
-                debug!(ctx: &ctx, "failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
-                break -1;
+        match timeout(Duration::from_millis(25), child.wait()).await {
+            Err(_) => continue, // timeout, check cancellation again
+            Ok(Err(e)) => {
+                debug!(ctx: &ctx, "IO error waiting on child process: {}", e);
+                return Err(Error::ProcessWaitFailed {
+                    message: e.to_string(),
+                });
+            }
+            Ok(Ok(status)) => {
+                let code = status.code().expect("process should have exit code");
+                debug!(ctx: &ctx, "process exited with code {}", code);
+                return Ok(match code {
+                    0 => Status::Exited,
+                    _ => Status::Crashed { code },
+                });
             }
         }
-    };
-
-    debug!(ctx: &ctx, "process exited with code {}", code);
-
-    // this just shuts up the compiler about ignoring the results.
-    code
+    }
 }
 
 async fn drain_output<R: AsyncRead + Unpin>(
