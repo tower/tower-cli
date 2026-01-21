@@ -589,11 +589,11 @@ async fn wait_for_process(
                 });
             }
             Ok(Ok(status)) => {
-                let code = status.code().expect("process should have exit code");
-                debug!(ctx: &ctx, "process exited with code {}", code);
-                return Ok(match code {
-                    0 => Status::Exited,
-                    _ => Status::Crashed { code },
+                debug!(ctx: &ctx, "process exited: {:?}", status);
+                return Ok(match status.code() {
+                    Some(0) => Status::Exited,
+                    Some(code) => Status::Crashed { code },
+                    None => Status::Cancelled, // killed by signal
                 });
             }
         }
