@@ -205,7 +205,7 @@ async fn execute_local_app(
         let mut child = uv.venv(&working_dir, &env_vars).await?;
 
         // Drain the logs to the output channel.
-        let stdout = child.stdout.take().expect("no stdout");
+        let stdout = child.stdout.take().expect("stdout should be available");
         tokio::spawn(drain_output(
             FD::Stdout,
             Channel::Setup,
@@ -213,7 +213,7 @@ async fn execute_local_app(
             BufReader::new(stdout),
         ));
 
-        let stderr = child.stderr.take().expect("no stderr");
+        let stderr = child.stderr.take().expect("stderr should be available");
         tokio::spawn(drain_output(
             FD::Stderr,
             Channel::Setup,
@@ -258,7 +258,7 @@ async fn execute_local_app(
             }
             Ok(mut child) => {
                 // Drain the logs to the output channel.
-                let stdout = child.stdout.take().expect("no stdout");
+                let stdout = child.stdout.take().expect("stdout should be available");
                 tokio::spawn(drain_output(
                     FD::Stdout,
                     Channel::Setup,
@@ -266,7 +266,7 @@ async fn execute_local_app(
                     BufReader::new(stdout),
                 ));
 
-                let stderr = child.stderr.take().expect("no stderr");
+                let stderr = child.stderr.take().expect("stderr should be available");
                 tokio::spawn(drain_output(
                     FD::Stderr,
                     Channel::Setup,
@@ -297,7 +297,7 @@ async fn execute_local_app(
         let mut child = uv.run(&working_dir, &program_path, &env_vars).await?;
 
         // Drain the logs to the output channel.
-        let stdout = child.stdout.take().expect("no stdout");
+        let stdout = child.stdout.take().expect("stdout should be available");
         tokio::spawn(drain_output(
             FD::Stdout,
             Channel::Program,
@@ -305,7 +305,7 @@ async fn execute_local_app(
             BufReader::new(stdout),
         ));
 
-        let stderr = child.stderr.take().expect("no stderr");
+        let stderr = child.stderr.take().expect("stderr should be available");
         tokio::spawn(drain_output(
             FD::Stderr,
             Channel::Program,
@@ -608,7 +608,7 @@ async fn drain_output<R: AsyncRead + Unpin>(
 ) {
     let mut lines = input.lines();
 
-    while let Some(line) = lines.next_line().await.expect("line iteration fialed") {
+    while let Some(line) = lines.next_line().await.expect("line iteration should succeed") {
         let _ = output.send(Output {
             channel,
             fd,
