@@ -149,17 +149,19 @@ pub struct NetworkingSpec {
 }
 
 // ============================================================================
-// Execution Backend Trait
+// Backend Trait
 // ============================================================================
 
-/// ExecutionBackend abstracts the compute substrate
+/// Backend creates App instances for a specific compute substrate.
+///
+/// Implementations: SubprocessBackend (subprocess), K8sBackend (Kubernetes)
 #[async_trait]
-pub trait ExecutionBackend: Send + Sync {
-    /// The handle type this backend returns
-    type Handle: ExecutionHandle;
+pub trait Backend: Send + Sync {
+    /// The App type this backend creates
+    type App: App;
 
-    /// Create a new execution environment
-    async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error>;
+    /// Create a new app execution
+    async fn create(&self, spec: ExecutionSpec) -> Result<Self::App, Error>;
 
     /// Get backend capabilities
     fn capabilities(&self) -> BackendCapabilities;
@@ -195,13 +197,15 @@ pub struct BackendCapabilities {
 }
 
 // ============================================================================
-// Execution Handle Trait
+// App Trait
 // ============================================================================
 
-/// ExecutionHandle represents a running execution
+/// App represents a running Tower application instance.
+///
+/// Implementations: LocalApp (subprocess), K8sApp (Kubernetes pod)
 #[async_trait]
-pub trait ExecutionHandle: Send + Sync {
-    /// Get a unique identifier for this execution
+pub trait App: Send + Sync {
+    /// Unique identifier for this execution
     fn id(&self) -> &str;
 
     /// Get current execution status
@@ -210,20 +214,26 @@ pub trait ExecutionHandle: Send + Sync {
     /// Subscribe to log stream
     async fn logs(&self) -> Result<OutputReceiver, Error>;
 
-    /// Terminate execution gracefully
+    /// Terminate execution gracefully (SIGTERM equivalent)
     async fn terminate(&mut self) -> Result<(), Error>;
 
-    /// Force kill execution
-    async fn kill(&mut self) -> Result<(), Error>;
+    /// Force kill execution (SIGKILL equivalent)
+    async fn kill(&mut self) -> Result<(), Error> {
+        self.terminate().await // default: same as terminate
+    }
 
     /// Wait for execution to complete
     async fn wait_for_completion(&self) -> Result<Status, Error>;
 
-    /// Get service endpoint
-    async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error>;
+    /// Get service endpoint (for long-running apps)
+    async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error> {
+        Ok(None) // default: no endpoint
+    }
 
     /// Cleanup resources
-    async fn cleanup(&mut self) -> Result<(), Error>;
+    async fn cleanup(&mut self) -> Result<(), Error> {
+        self.terminate().await // default: just terminate
+    }
 }
 
 /// ServiceEndpoint describes how to reach a running service
@@ -240,4 +250,45 @@ pub struct ServiceEndpoint {
 
     /// Full URL if applicable (e.g., "http://app-run-123.default.svc.cluster.local:8080")
     pub url: Option<String>,
+}
+
+// ============================================================================
+// Deprecated Legacy Traits (kept so tower-runner sees clear migration warnings)
+// ============================================================================
+
+/// Previous name for [`Backend`]. Kept so downstream builds emit a deprecation
+/// warning pointing at the new name instead of an unresolved-import error.
+#[deprecated(note = "use `Backend` instead; associated type `Handle` is now `App`")]
+#[async_trait]
+#[allow(deprecated)]
+pub trait ExecutionBackend: Send + Sync {
+    type Handle: ExecutionHandle;
+
+    async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error>;
+
+    fn capabilities(&self) -> BackendCapabilities;
+
+    async fn cleanup(&self) -> Result<(), Error>;
+}
+
+/// Previous name for [`App`]. Kept so downstream builds emit a deprecation
+/// warning pointing at the new name instead of an unresolved-import error.
+#[deprecated(note = "use `App` instead")]
+#[async_trait]
+pub trait ExecutionHandle: Send + Sync {
+    fn id(&self) -> &str;
+
+    async fn status(&self) -> Result<Status, Error>;
+
+    async fn logs(&self) -> Result<OutputReceiver, Error>;
+
+    async fn terminate(&mut self) -> Result<(), Error>;
+
+    async fn kill(&mut self) -> Result<(), Error>;
+
+    async fn wait_for_completion(&self) -> Result<Status, Error>;
+
+    async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error>;
+
+    async fn cleanup(&mut self) -> Result<(), Error>;
 }

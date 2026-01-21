@@ -1,13 +1,12 @@
-//! Subprocess execution backend
+//! Local subprocess execution backend
 
 use crate::auto_cleanup;
 use crate::errors::Error;
 use crate::execution::{
-    BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    ServiceEndpoint,
+    App, Backend, BackendCapabilities, CacheBackend, ExecutionSpec, ServiceEndpoint,
 };
 use crate::local::LocalApp;
-use crate::{App, OutputReceiver, StartOptions, Status};
+use crate::{OutputReceiver, StartOptions, Status};
 
 use async_trait::async_trait;
 use std::path::PathBuf;
@@ -23,7 +22,7 @@ use tower_package::Package;
 /// Cleanup timeout after a run finishes (5 minutes)
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
-/// SubprocessBackend executes apps as a subprocess
+/// SubprocessBackend executes apps as local subprocesses
 pub struct SubprocessBackend {
     /// Optional default cache directory to use
     cache_dir: Option<PathBuf>,
@@ -90,10 +89,10 @@ impl SubprocessBackend {
 }
 
 #[async_trait]
-impl ExecutionBackend for SubprocessBackend {
-    type Handle = SubprocessHandle;
+impl Backend for SubprocessBackend {
+    type App = SubprocessHandle;
 
-    async fn create(&self, spec: ExecutionSpec) -> Result<Self::Handle, Error> {
+    async fn create(&self, spec: ExecutionSpec) -> Result<Self::App, Error> {
         // Convert ExecutionSpec to StartOptions for LocalApp
         let (output_sender, output_receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -146,12 +145,15 @@ impl ExecutionBackend for SubprocessBackend {
             secrets: spec.secrets,
             parameters: spec.parameters,
             env_vars,
-            output_sender: output_sender.clone(),
+            output_sender,
             cache_dir: final_cache_dir, // UV will use this via --cache-dir flag
         };
 
-        // Start the LocalApp
-        let app = Arc::new(Mutex::new(LocalApp::start(opts).await?));
+        // Start the LocalApp — the execution ID is used for monitoring; the package's
+        // tmp_dir is tracked separately below so auto_cleanup can reclaim it.
+        let app = Arc::new(Mutex::new(
+            LocalApp::new(spec.id.clone(), opts, None, None).await?,
+        ));
 
         let package_tmp_dir = Arc::new(Mutex::new(package_tmp_dir));
         let uv_temp_dir = Arc::new(Mutex::new(uv_temp_dir));
@@ -207,7 +209,7 @@ pub struct SubprocessHandle {
 }
 
 #[async_trait]
-impl ExecutionHandle for SubprocessHandle {
+impl App for SubprocessHandle {
     fn id(&self) -> &str {
         &self.id
     }
