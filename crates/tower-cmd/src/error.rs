@@ -1,6 +1,7 @@
 use snafu::prelude::*;
 use tower_api::apis::default_api::{
-    DeployAppError, DescribeAppError, DescribeRunError, RunAppError, UpdateAppError,
+    CreateAppError, DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
+    UpdateAppError,
 };
 use tower_telemetry::debug;
 
@@ -91,6 +92,12 @@ pub enum Error {
         source: tower_api::apis::Error<DeployAppError>,
     },
 
+    // API create app error
+    #[snafu(display("API create app error: {}", source))]
+    ApiCreateAppError {
+        source: tower_api::apis::Error<CreateAppError>,
+    },
+
     // API describe app error
     #[snafu(display("API describe app error: {}", source))]
     ApiDescribeAppError {
@@ -102,6 +109,9 @@ pub enum Error {
     ApiUpdateAppError {
         source: tower_api::apis::Error<UpdateAppError>,
     },
+
+    #[snafu(display("Unexpected API response: {}", message))]
+    UnexpectedApiResponse { message: String },
 
     // Channel error
     #[snafu(display("Channel receive error"))]
@@ -176,6 +186,12 @@ impl From<tower_api::apis::Error<RunAppError>> for Error {
 impl From<tower_api::apis::Error<DeployAppError>> for Error {
     fn from(source: tower_api::apis::Error<DeployAppError>) -> Self {
         Self::ApiDeployError { source }
+    }
+}
+
+impl From<tower_api::apis::Error<CreateAppError>> for Error {
+    fn from(source: tower_api::apis::Error<CreateAppError>) -> Self {
+        Self::ApiCreateAppError { source }
     }
 }
 

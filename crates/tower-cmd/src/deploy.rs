@@ -43,6 +43,9 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
             crate::Error::ApiDeployError { source } => {
                 output::tower_error_and_die(source, "Deploying app failed")
             }
+            crate::Error::ApiCreateAppError { source } => {
+                output::tower_error_and_die(source, "Creating app failed")
+            }
             crate::Error::ApiDescribeAppError { source } => {
                 output::tower_error_and_die(source, "Fetching app details failed")
             }
@@ -78,7 +81,7 @@ pub async fn deploy_from_dir(
     util::apps::ensure_app_exists(
         &api_config,
         &towerfile.app.name,
-        &towerfile.app.description,
+        towerfile.app.description.as_deref(),
         create_app,
     )
     .await?;

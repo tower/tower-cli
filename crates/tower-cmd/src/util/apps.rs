@@ -1,18 +1,20 @@
 use crate::output;
-use http::StatusCode;
 use promptly::prompt_default;
 use tower_api::apis::{
     configuration::Configuration,
-    default_api::{self, CreateAppParams, DescribeAppParams, DescribeAppSuccess, UpdateAppParams},
+    default_api::{
+        self, CreateAppParams, DescribeAppParams, DescribeAppSuccess, UpdateAppParams,
+    },
 };
 use tower_api::models::{
     CreateAppParams as CreateAppParamsModel, UpdateAppParams as UpdateAppParamsModel,
 };
+use tower_telemetry::debug;
 
 pub async fn ensure_app_exists(
     api_config: &Configuration,
     app_name: &str,
-    description: &str,
+    description: Option<&str>,
     create_app: bool,
 ) -> Result<(), crate::Error> {
     // Try to describe the app first (with spinner)
@@ -32,31 +34,39 @@ pub async fn ensure_app_exists(
     // If the app exists, return Ok
     if let Ok(response) = describe_result {
         spinner.success();
-        if !description.is_empty() {
-            if let Some(DescribeAppSuccess::Status200(body)) = response.entity {
-                if body.app.short_description != description {
-                    let mut update_spinner = output::spinner("Updating app description...");
-                    let update_result = default_api::update_app(
-                        api_config,
-                        UpdateAppParams {
-                            name: app_name.to_string(),
-                            update_app_params: UpdateAppParamsModel {
-                                schema: None,
-                                description: Some(Some(description.to_string())),
-                                is_externally_accessible: None,
-                                status: None,
-                                subdomain: None,
-                            },
-                        },
-                    )
-                    .await;
+        if let Some(description) = description {
+            let body = match response.entity {
+                Some(DescribeAppSuccess::Status200(body)) => body,
+                other => {
+                    debug!("unexpected describe app response entity: {:?}", other);
+                    return Err(crate::Error::UnexpectedApiResponse {
+                        message: "Describe app response missing payload".to_string(),
+                    });
+                }
+            };
 
-                    match update_result {
-                        Ok(_) => update_spinner.success(),
-                        Err(err) => {
-                            update_spinner.failure();
-                            return Err(crate::Error::ApiUpdateAppError { source: err });
-                        }
+            if body.app.short_description != description {
+                let mut update_spinner = output::spinner("Updating app description...");
+                let update_result = default_api::update_app(
+                    api_config,
+                    UpdateAppParams {
+                        name: app_name.to_string(),
+                        update_app_params: UpdateAppParamsModel {
+                            schema: None,
+                            description: Some(Some(description.to_string())),
+                            is_externally_accessible: None,
+                            status: None,
+                            subdomain: None,
+                        },
+                    },
+                )
+                .await;
+
+                match update_result {
+                    Ok(_) => update_spinner.success(),
+                    Err(err) => {
+                        update_spinner.failure();
+                        return Err(crate::Error::ApiUpdateAppError { source: err });
                     }
                 }
             }
@@ -111,7 +121,7 @@ pub async fn ensure_app_exists(
                 schema: None,
                 name: app_name.to_string(),
                 // API create expects short_description; CLI/Towerfile expose "description".
-                short_description: Some(description.to_string()),
+                short_description: description.map(|desc| desc.to_string()),
                 slug: None,
                 is_externally_accessible: None,
                 subdomain: None,
@@ -128,22 +138,8 @@ pub async fn ensure_app_exists(
         }
         Err(create_err) => {
             spinner.failure();
-            // Convert any creation error to a response error
-            Err(crate::Error::ApiDescribeAppError {
-                source: tower_api::apis::Error::ResponseError(
-                    tower_api::apis::ResponseContent {
-                        tower_trace_id: "".to_string(),
-                        status: match &create_err {
-                            tower_api::apis::Error::ResponseError(resp) => resp.status,
-                            _ => StatusCode::INTERNAL_SERVER_ERROR,
-                        },
-                        content: match &create_err {
-                            tower_api::apis::Error::ResponseError(resp) => resp.content.clone(),
-                            _ => create_err.to_string(),
-                        },
-                        entity: None,
-                    },
-                ),
+            Err(crate::Error::ApiCreateAppError {
+                source: create_err,
             })
         }
     }
