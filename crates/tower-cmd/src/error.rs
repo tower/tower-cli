@@ -1,6 +1,6 @@
 use snafu::prelude::*;
 use tower_api::apis::default_api::{
-    DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
+    DeployAppError, DescribeAppError, DescribeRunError, RunAppError, UpdateAppError,
 };
 use tower_telemetry::debug;
 
@@ -97,6 +97,12 @@ pub enum Error {
         source: tower_api::apis::Error<DescribeAppError>,
     },
 
+    // API update app error
+    #[snafu(display("API update app error: {}", source))]
+    ApiUpdateAppError {
+        source: tower_api::apis::Error<UpdateAppError>,
+    },
+
     // Channel error
     #[snafu(display("Channel receive error"))]
     ChannelReceiveError,
@@ -176,6 +182,12 @@ impl From<tower_api::apis::Error<DeployAppError>> for Error {
 impl From<tower_api::apis::Error<DescribeAppError>> for Error {
     fn from(source: tower_api::apis::Error<DescribeAppError>) -> Self {
         Self::ApiDescribeAppError { source }
+    }
+}
+
+impl From<tower_api::apis::Error<UpdateAppError>> for Error {
+    fn from(source: tower_api::apis::Error<UpdateAppError>) -> Self {
+        Self::ApiUpdateAppError { source }
     }
 }
 

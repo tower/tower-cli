@@ -27,3 +27,11 @@ Feature: CLI App Management
     Then the output should be valid JSON
     And the JSON should contain the created app information
     And the app name should be "test-cli-app-123"
+    And the app description should be "Test app"
+
+  Scenario: CLI deploy updates app description from Towerfile
+    Given I have a valid Towerfile in the current directory
+    And I run "tower apps create --json --name {app_name}" via CLI using created app name
+    When I run "tower deploy --create" via CLI
+    And I run "tower apps show --json {app_name}" via CLI using created app name
+    Then the app description should be "A test app"

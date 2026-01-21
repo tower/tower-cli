@@ -333,3 +333,35 @@ def step_app_name_should_be(context, expected_name):
     assert (
         actual_name == expected_name
     ), f"Expected app name '{expected_name}', got '{actual_name}'"
+
+
+@step('the app description should be "{expected_description}"')
+def step_app_description_should_be(context, expected_description):
+    """Verify app description matches expected value"""
+    data = json.loads(context.cli_output)
+    candidates = []
+
+    if "app" in data:
+        candidates.append(data["app"])
+    if "data" in data and "app" in data["data"]:
+        candidates.append(data["data"]["app"])
+
+    if not candidates:
+        candidates.append(data)
+
+    actual_description = None
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            if "short_description" in candidate:
+                actual_description = candidate["short_description"]
+                break
+            if "description" in candidate:
+                actual_description = candidate["description"]
+                break
+
+    assert actual_description is not None, (
+        f"Could not find app description in JSON response: {data}"
+    )
+    assert (
+        actual_description == expected_description
+    ), f"Expected description '{expected_description}', got '{actual_description}'"
