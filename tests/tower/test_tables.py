@@ -5,6 +5,7 @@ import tempfile
 import pathlib
 from urllib.parse import urljoin
 from urllib.request import pathname2url
+import threading
 
 # We import all the things we need from Tower.
 import tower.polars as pl
@@ -214,8 +215,21 @@ def test_upsert_concurrent_writes_with_retry(sql_catalog):
     )
     table.insert(initial_data)
 
+    retry_count = {"value": 0}
+    retry_lock = threading.Lock()
+
     def upsert_ticker(ticker: str, new_price: float):
         t = tower.tables("concurrent_test", catalog=sql_catalog).load()
+
+        original_refresh = t._table.refresh
+
+        def tracked_refresh():
+            with retry_lock:
+                retry_count["value"] += 1
+            return original_refresh()
+
+        t._table.refresh = tracked_refresh
+
         data = pa.Table.from_pylist(
             [{"ticker": ticker, "date": "2024-01-01", "price": new_price}],
             schema=schema,
@@ -232,6 +246,9 @@ def test_upsert_concurrent_writes_with_retry(sql_catalog):
         results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
     assert len(results) == 3
+    assert (
+        retry_count["value"] > 0
+    ), "Expected at least one retry due to concurrent conflicts"
 
     final_table = tower.tables("concurrent_test", catalog=sql_catalog).load()
     df = final_table.read()
@@ -263,8 +280,21 @@ def test_upsert_concurrent_writes_same_row(sql_catalog):
     )
     table.insert(initial_data)
 
+    retry_count = {"value": 0}
+    retry_lock = threading.Lock()
+
     def upsert_counter(value: int):
         t = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
+
+        original_refresh = t._table.refresh
+
+        def tracked_refresh():
+            with retry_lock:
+                retry_count["value"] += 1
+            return original_refresh()
+
+        t._table.refresh = tracked_refresh
+
         data = pa.Table.from_pylist(
             [{"id": 1, "counter": value}],
             schema=schema,
@@ -277,6 +307,10 @@ def test_upsert_concurrent_writes_same_row(sql_catalog):
         results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
     assert len(results) == 5
+
+    assert (
+        retry_count["value"] > 0
+    ), "Expected at least one retry due to concurrent conflicts"
 
     final_table = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
     df = final_table.read()
