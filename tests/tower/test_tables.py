@@ -10,6 +10,9 @@ from urllib.request import pathname2url
 import tower.polars as pl
 import pyarrow as pa
 from pyiceberg.catalog.memory import InMemoryCatalog
+from pyiceberg.catalog.sql import SqlCatalog
+
+import concurrent.futures
 
 # Imports the library under test
 import tower
@@ -39,6 +42,28 @@ def in_memory_catalog():
         shutil.rmtree(temp_dir)
     except FileNotFoundError:
         # Directory was already cleaned up, which is fine
+        pass
+
+
+@pytest.fixture
+def sql_catalog():
+    temp_dir = tempfile.mkdtemp()  # ← Returns string path, no auto-cleanup
+    abs_path = pathlib.Path(temp_dir).absolute()
+    file_url = urljoin("file:", pathname2url(str(abs_path)))
+
+    catalog = SqlCatalog(
+        "test.sql.catalog",
+        **{
+            "uri": f"sqlite:///{abs_path}/catalog.db?check_same_thread=False",
+            "warehouse": file_url,
+        },
+    )
+
+    yield catalog
+
+    try:
+        shutil.rmtree(abs_path)
+    except FileNotFoundError:
         pass
 
 
@@ -164,6 +189,102 @@ def test_upsert_to_tables(in_memory_catalog):
 
     # The age should match what we updated the relevant record to
     assert res["age"].item() == 26
+
+
+def test_upsert_concurrent_writes_with_retry(sql_catalog):
+    """Test that concurrent upserts succeed with retry logic handling conflicts."""
+    schema = pa.schema(
+        [
+            pa.field("ticker", pa.string()),
+            pa.field("date", pa.string()),
+            pa.field("price", pa.float64()),
+        ]
+    )
+
+    ref = tower.tables("concurrent_test", catalog=sql_catalog)
+    table = ref.create_if_not_exists(schema)
+
+    initial_data = pa.Table.from_pylist(
+        [
+            {"ticker": "AAPL", "date": "2024-01-01", "price": 100.0},
+            {"ticker": "GOOGL", "date": "2024-01-01", "price": 200.0},
+            {"ticker": "MSFT", "date": "2024-01-01", "price": 300.0},
+        ],
+        schema=schema,
+    )
+    table.insert(initial_data)
+
+    def upsert_ticker(ticker: str, new_price: float):
+        t = tower.tables("concurrent_test", catalog=sql_catalog).load()
+        data = pa.Table.from_pylist(
+            [{"ticker": ticker, "date": "2024-01-01", "price": new_price}],
+            schema=schema,
+        )
+        t.upsert(data, join_cols=["ticker", "date"])
+        return ticker
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(upsert_ticker, "AAPL", 150.0),
+            executor.submit(upsert_ticker, "GOOGL", 250.0),
+            executor.submit(upsert_ticker, "MSFT", 350.0),
+        ]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    assert len(results) == 3
+
+    final_table = tower.tables("concurrent_test", catalog=sql_catalog).load()
+    df = final_table.read()
+
+    assert len(df) == 3
+
+    ticker_prices = {row["ticker"]: row["price"] for row in df.iter_rows(named=True)}
+
+    assert ticker_prices["AAPL"] == 150.0
+    assert ticker_prices["GOOGL"] == 250.0
+    assert ticker_prices["MSFT"] == 350.0
+
+
+def test_upsert_concurrent_writes_same_row(sql_catalog):
+    """Test concurrent upserts to the SAME row - last write wins."""
+    schema = pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("counter", pa.int64()),
+        ]
+    )
+
+    ref = tower.tables("concurrent_same_row_test", catalog=sql_catalog)
+    table = ref.create_if_not_exists(schema)
+
+    initial_data = pa.Table.from_pylist(
+        [{"id": 1, "counter": 0}],
+        schema=schema,
+    )
+    table.insert(initial_data)
+
+    def upsert_counter(value: int):
+        t = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
+        data = pa.Table.from_pylist(
+            [{"id": 1, "counter": value}],
+            schema=schema,
+        )
+        t.upsert(data, join_cols=["id"])
+        return value
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(upsert_counter, i) for i in range(1, 6)]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    assert len(results) == 5
+
+    final_table = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
+    df = final_table.read()
+
+    assert len(df) == 1
+
+    final_counter = df.select("counter").item()
+    assert final_counter in [1, 2, 3, 4, 5]
 
 
 def test_delete_from_tables(in_memory_catalog):
