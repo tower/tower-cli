@@ -1,17 +1,17 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.generate_app_statistics_response import GenerateAppStatisticsResponse
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    environment: Union[Unset, str] = UNSET,
+    environment: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -29,21 +29,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[GenerateAppStatisticsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | GenerateAppStatisticsResponse:
     if response.status_code == 200:
         response_200 = GenerateAppStatisticsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[GenerateAppStatisticsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | GenerateAppStatisticsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -55,22 +55,22 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[GenerateAppStatisticsResponse]:
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | GenerateAppStatisticsResponse]:
     """Generate app statistics
 
      Generates current statistics about apps
 
     Args:
-        environment (Union[Unset, str]): The environment to filter the statistics by. If not
-            provided, statistics for all environments will be returned.
+        environment (str | Unset): The environment to filter the statistics by. If not provided,
+            statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GenerateAppStatisticsResponse]
+        Response[ErrorModel | GenerateAppStatisticsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -87,22 +87,22 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[GenerateAppStatisticsResponse]:
+    environment: str | Unset = UNSET,
+) -> ErrorModel | GenerateAppStatisticsResponse | None:
     """Generate app statistics
 
      Generates current statistics about apps
 
     Args:
-        environment (Union[Unset, str]): The environment to filter the statistics by. If not
-            provided, statistics for all environments will be returned.
+        environment (str | Unset): The environment to filter the statistics by. If not provided,
+            statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GenerateAppStatisticsResponse
+        ErrorModel | GenerateAppStatisticsResponse
     """
 
     return sync_detailed(
@@ -114,22 +114,22 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[GenerateAppStatisticsResponse]:
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | GenerateAppStatisticsResponse]:
     """Generate app statistics
 
      Generates current statistics about apps
 
     Args:
-        environment (Union[Unset, str]): The environment to filter the statistics by. If not
-            provided, statistics for all environments will be returned.
+        environment (str | Unset): The environment to filter the statistics by. If not provided,
+            statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GenerateAppStatisticsResponse]
+        Response[ErrorModel | GenerateAppStatisticsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -144,22 +144,22 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[GenerateAppStatisticsResponse]:
+    environment: str | Unset = UNSET,
+) -> ErrorModel | GenerateAppStatisticsResponse | None:
     """Generate app statistics
 
      Generates current statistics about apps
 
     Args:
-        environment (Union[Unset, str]): The environment to filter the statistics by. If not
-            provided, statistics for all environments will be returned.
+        environment (str | Unset): The environment to filter the statistics by. If not provided,
+            statistics for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GenerateAppStatisticsResponse
+        ErrorModel | GenerateAppStatisticsResponse
     """
 
     return (

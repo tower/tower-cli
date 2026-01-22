@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -12,22 +14,23 @@ T = TypeVar("T", bound="UpdateTeamParams")
 class UpdateTeamParams:
     """
     Attributes:
-        name (Union[None, str]): The name of the team to update. This is optional, if you supply null it will not update
-            the team name.
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        name (None | str): The name of the team to update. This is optional, if you supply null it will not update the
+            team name.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateTeamParams.json.
     """
 
-    name: Union[None, str]
-    schema: Union[Unset, str] = UNSET
+    name: None | str
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        name: Union[None, str]
+        name: None | str
         name = self.name
 
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "name": name,
@@ -42,10 +45,10 @@ class UpdateTeamParams:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
 
-        def _parse_name(data: object) -> Union[None, str]:
+        def _parse_name(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         name = _parse_name(d.pop("name"))
 

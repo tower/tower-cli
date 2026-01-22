@@ -24,3 +24,6 @@ pytest.ini
 
 # from nix builds
 /result
+
+# wheel build artifacts
+*.data/

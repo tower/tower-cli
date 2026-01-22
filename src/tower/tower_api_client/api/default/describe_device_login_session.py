@@ -1,13 +1,14 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.describe_device_login_session_response import (
     DescribeDeviceLoginSessionResponse,
 )
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -17,7 +18,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/login/device/{device_code}".format(
-            device_code=device_code,
+            device_code=quote(str(device_code), safe=""),
         ),
     }
 
@@ -25,21 +26,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DescribeDeviceLoginSessionResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DescribeDeviceLoginSessionResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = DescribeDeviceLoginSessionResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DescribeDeviceLoginSessionResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DescribeDeviceLoginSessionResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -51,8 +52,8 @@ def _build_response(
 def sync_detailed(
     device_code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Response[DescribeDeviceLoginSessionResponse]:
+    client: AuthenticatedClient | Client,
+) -> Response[DescribeDeviceLoginSessionResponse | ErrorModel]:
     """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
@@ -65,7 +66,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeDeviceLoginSessionResponse]
+        Response[DescribeDeviceLoginSessionResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -82,8 +83,8 @@ def sync_detailed(
 def sync(
     device_code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[DescribeDeviceLoginSessionResponse]:
+    client: AuthenticatedClient | Client,
+) -> DescribeDeviceLoginSessionResponse | ErrorModel | None:
     """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
@@ -96,7 +97,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeDeviceLoginSessionResponse
+        DescribeDeviceLoginSessionResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -108,8 +109,8 @@ def sync(
 async def asyncio_detailed(
     device_code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Response[DescribeDeviceLoginSessionResponse]:
+    client: AuthenticatedClient | Client,
+) -> Response[DescribeDeviceLoginSessionResponse | ErrorModel]:
     """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
@@ -122,7 +123,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeDeviceLoginSessionResponse]
+        Response[DescribeDeviceLoginSessionResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -137,8 +138,8 @@ async def asyncio_detailed(
 async def asyncio(
     device_code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[DescribeDeviceLoginSessionResponse]:
+    client: AuthenticatedClient | Client,
+) -> DescribeDeviceLoginSessionResponse | ErrorModel | None:
     """Describe device login session
 
      Checks if a device login code has been claimed and returns the user session if so.
@@ -151,7 +152,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeDeviceLoginSessionResponse
+        DescribeDeviceLoginSessionResponse | ErrorModel
     """
 
     return (

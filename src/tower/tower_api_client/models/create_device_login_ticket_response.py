@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -21,7 +23,7 @@ class CreateDeviceLoginTicketResponse:
         login_url (str): The URL where the user should go to enter the user code.
         user_code (str): The code that the user needs to enter to authenticate.
         verification_url (str): The URL that the device should poll to check authentication status.
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateDeviceLoginTicketResponse.json.
     """
 
@@ -32,7 +34,7 @@ class CreateDeviceLoginTicketResponse:
     login_url: str
     user_code: str
     verification_url: str
-    schema: Union[Unset, str] = UNSET
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         device_code = self.device_code
@@ -52,6 +54,7 @@ class CreateDeviceLoginTicketResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "device_code": device_code,

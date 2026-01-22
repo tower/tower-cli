@@ -1,12 +1,13 @@
 import datetime
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.describe_run_logs_response import DescribeRunLogsResponse
+from ...models.error_model import ErrorModel
 from ...types import UNSET, Response, Unset
 
 
@@ -14,11 +15,11 @@ def _get_kwargs(
     name: str,
     seq: int,
     *,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
-    json_start_at: Union[Unset, str] = UNSET
+    json_start_at: str | Unset = UNSET
     if not isinstance(start_at, Unset):
         json_start_at = start_at.isoformat()
     params["start_at"] = json_start_at
@@ -28,8 +29,8 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/apps/{name}/runs/{seq}/logs".format(
-            name=name,
-            seq=seq,
+            name=quote(str(name), safe=""),
+            seq=quote(str(seq), safe=""),
         ),
         "params": params,
     }
@@ -38,21 +39,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DescribeRunLogsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DescribeRunLogsResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = DescribeRunLogsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DescribeRunLogsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DescribeRunLogsResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -66,8 +67,8 @@ def sync_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-) -> Response[DescribeRunLogsResponse]:
+    start_at: datetime.datetime | Unset = UNSET,
+) -> Response[DescribeRunLogsResponse | ErrorModel]:
     """Describe run logs
 
      Retrieves the logs associated with a particular run of an app.
@@ -75,15 +76,14 @@ def sync_detailed(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
-        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
-            (inclusive).
+        start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeRunLogsResponse]
+        Response[DescribeRunLogsResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -104,8 +104,8 @@ def sync(
     seq: int,
     *,
     client: AuthenticatedClient,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-) -> Optional[DescribeRunLogsResponse]:
+    start_at: datetime.datetime | Unset = UNSET,
+) -> DescribeRunLogsResponse | ErrorModel | None:
     """Describe run logs
 
      Retrieves the logs associated with a particular run of an app.
@@ -113,15 +113,14 @@ def sync(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
-        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
-            (inclusive).
+        start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeRunLogsResponse
+        DescribeRunLogsResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -137,8 +136,8 @@ async def asyncio_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-) -> Response[DescribeRunLogsResponse]:
+    start_at: datetime.datetime | Unset = UNSET,
+) -> Response[DescribeRunLogsResponse | ErrorModel]:
     """Describe run logs
 
      Retrieves the logs associated with a particular run of an app.
@@ -146,15 +145,14 @@ async def asyncio_detailed(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
-        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
-            (inclusive).
+        start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeRunLogsResponse]
+        Response[DescribeRunLogsResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -173,8 +171,8 @@ async def asyncio(
     seq: int,
     *,
     client: AuthenticatedClient,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-) -> Optional[DescribeRunLogsResponse]:
+    start_at: datetime.datetime | Unset = UNSET,
+) -> DescribeRunLogsResponse | ErrorModel | None:
     """Describe run logs
 
      Retrieves the logs associated with a particular run of an app.
@@ -182,15 +180,14 @@ async def asyncio(
     Args:
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
-        start_at (Union[Unset, datetime.datetime]): Fetch logs from this timestamp onwards
-            (inclusive).
+        start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeRunLogsResponse
+        DescribeRunLogsResponse | ErrorModel
     """
 
     return (

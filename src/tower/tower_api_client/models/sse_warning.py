@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
 from typing import Any, TypeVar
@@ -25,6 +27,7 @@ class SSEWarning:
         reported_at = self.reported_at.isoformat()
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "content": content,

@@ -1,18 +1,18 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_teams_response import ListTeamsResponse
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -32,21 +32,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListTeamsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListTeamsResponse:
     if response.status_code == 200:
         response_200 = ListTeamsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListTeamsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListTeamsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,23 +58,23 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-) -> Response[ListTeamsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+) -> Response[ErrorModel | ListTeamsResponse]:
     """List teams
 
      List all the teams that the user is a member of.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListTeamsResponse]
+        Response[ErrorModel | ListTeamsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -92,23 +92,23 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-) -> Optional[ListTeamsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+) -> ErrorModel | ListTeamsResponse | None:
     """List teams
 
      List all the teams that the user is a member of.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListTeamsResponse
+        ErrorModel | ListTeamsResponse
     """
 
     return sync_detailed(
@@ -121,23 +121,23 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-) -> Response[ListTeamsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+) -> Response[ErrorModel | ListTeamsResponse]:
     """List teams
 
      List all the teams that the user is a member of.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListTeamsResponse]
+        Response[ErrorModel | ListTeamsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -153,23 +153,23 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-) -> Optional[ListTeamsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+) -> ErrorModel | ListTeamsResponse | None:
     """List teams
 
      List all the teams that the user is a member of.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListTeamsResponse
+        ErrorModel | ListTeamsResponse
     """
 
     return (

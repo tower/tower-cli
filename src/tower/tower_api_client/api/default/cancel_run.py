@@ -1,11 +1,12 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.cancel_run_response import CancelRunResponse
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -16,8 +17,8 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/apps/{name}/runs/{seq}".format(
-            name=name,
-            seq=seq,
+            name=quote(str(name), safe=""),
+            seq=quote(str(seq), safe=""),
         ),
     }
 
@@ -25,21 +26,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[CancelRunResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CancelRunResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = CancelRunResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[CancelRunResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[CancelRunResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -53,7 +54,7 @@ def sync_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[CancelRunResponse]:
+) -> Response[CancelRunResponse | ErrorModel]:
     """Cancel run
 
      Cancel a run
@@ -67,7 +68,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CancelRunResponse]
+        Response[CancelRunResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -87,7 +88,7 @@ def sync(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[CancelRunResponse]:
+) -> CancelRunResponse | ErrorModel | None:
     """Cancel run
 
      Cancel a run
@@ -101,7 +102,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CancelRunResponse
+        CancelRunResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -116,7 +117,7 @@ async def asyncio_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[CancelRunResponse]:
+) -> Response[CancelRunResponse | ErrorModel]:
     """Cancel run
 
      Cancel a run
@@ -130,7 +131,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CancelRunResponse]
+        Response[CancelRunResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -148,7 +149,7 @@ async def asyncio(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[CancelRunResponse]:
+) -> CancelRunResponse | ErrorModel | None:
     """Cancel run
 
      Cancel a run
@@ -162,7 +163,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CancelRunResponse
+        CancelRunResponse | ErrorModel
     """
 
     return (

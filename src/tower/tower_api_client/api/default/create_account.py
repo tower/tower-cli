@@ -1,12 +1,12 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_account_params import CreateAccountParams
 from ...models.create_account_response import CreateAccountResponse
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -21,9 +21,8 @@ def _get_kwargs(
         "url": "/accounts",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -31,21 +30,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[CreateAccountResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CreateAccountResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = CreateAccountResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[CreateAccountResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[CreateAccountResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,9 +55,9 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: CreateAccountParams,
-) -> Response[CreateAccountResponse]:
+) -> Response[CreateAccountResponse | ErrorModel]:
     """Create account
 
      This is the primary way that users register new accounts with Tower.
@@ -71,7 +70,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateAccountResponse]
+        Response[CreateAccountResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -87,9 +86,9 @@ def sync_detailed(
 
 def sync(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: CreateAccountParams,
-) -> Optional[CreateAccountResponse]:
+) -> CreateAccountResponse | ErrorModel | None:
     """Create account
 
      This is the primary way that users register new accounts with Tower.
@@ -102,7 +101,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateAccountResponse
+        CreateAccountResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -113,9 +112,9 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: CreateAccountParams,
-) -> Response[CreateAccountResponse]:
+) -> Response[CreateAccountResponse | ErrorModel]:
     """Create account
 
      This is the primary way that users register new accounts with Tower.
@@ -128,7 +127,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateAccountResponse]
+        Response[CreateAccountResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -142,9 +141,9 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: CreateAccountParams,
-) -> Optional[CreateAccountResponse]:
+) -> CreateAccountResponse | ErrorModel | None:
     """Create account
 
      This is the primary way that users register new accounts with Tower.
@@ -157,7 +156,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateAccountResponse
+        CreateAccountResponse | ErrorModel
     """
 
     return (

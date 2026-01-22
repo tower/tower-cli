@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -14,13 +16,13 @@ class APIKey:
     Attributes:
         created_at (datetime.datetime):
         identifier (str):
-        last_used_at (Union[None, datetime.datetime]):
+        last_used_at (datetime.datetime | None):
         name (str):
     """
 
     created_at: datetime.datetime
     identifier: str
-    last_used_at: Union[None, datetime.datetime]
+    last_used_at: datetime.datetime | None
     name: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -28,7 +30,7 @@ class APIKey:
 
         identifier = self.identifier
 
-        last_used_at: Union[None, str]
+        last_used_at: None | str
         if isinstance(self.last_used_at, datetime.datetime):
             last_used_at = self.last_used_at.isoformat()
         else:
@@ -37,6 +39,7 @@ class APIKey:
         name = self.name
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "created_at": created_at,
@@ -55,7 +58,7 @@ class APIKey:
 
         identifier = d.pop("identifier")
 
-        def _parse_last_used_at(data: object) -> Union[None, datetime.datetime]:
+        def _parse_last_used_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
             try:
@@ -64,9 +67,9 @@ class APIKey:
                 last_used_at_type_0 = isoparse(data)
 
                 return last_used_at_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union[None, datetime.datetime], data)
+            return cast(datetime.datetime | None, data)
 
         last_used_at = _parse_last_used_at(d.pop("last_used_at"))
 

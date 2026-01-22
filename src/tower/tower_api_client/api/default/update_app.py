@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.update_app_params import UpdateAppParams
 from ...models.update_app_response import UpdateAppResponse
 from ...types import Response
@@ -20,13 +21,12 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "put",
         "url": "/apps/{name}".format(
-            name=name,
+            name=quote(str(name), safe=""),
         ),
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -34,21 +34,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdateAppResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | UpdateAppResponse:
     if response.status_code == 200:
         response_200 = UpdateAppResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdateAppResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | UpdateAppResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -62,7 +62,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
-) -> Response[UpdateAppResponse]:
+) -> Response[ErrorModel | UpdateAppResponse]:
     """Update app
 
      Update an app in the currently authenticated account.
@@ -76,7 +76,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAppResponse]
+        Response[ErrorModel | UpdateAppResponse]
     """
 
     kwargs = _get_kwargs(
@@ -96,7 +96,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
-) -> Optional[UpdateAppResponse]:
+) -> ErrorModel | UpdateAppResponse | None:
     """Update app
 
      Update an app in the currently authenticated account.
@@ -110,7 +110,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAppResponse
+        ErrorModel | UpdateAppResponse
     """
 
     return sync_detailed(
@@ -125,7 +125,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
-) -> Response[UpdateAppResponse]:
+) -> Response[ErrorModel | UpdateAppResponse]:
     """Update app
 
      Update an app in the currently authenticated account.
@@ -139,7 +139,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateAppResponse]
+        Response[ErrorModel | UpdateAppResponse]
     """
 
     kwargs = _get_kwargs(
@@ -157,7 +157,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
-) -> Optional[UpdateAppResponse]:
+) -> ErrorModel | UpdateAppResponse | None:
     """Update app
 
      Update an app in the currently authenticated account.
@@ -171,7 +171,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateAppResponse
+        ErrorModel | UpdateAppResponse
     """
 
     return (

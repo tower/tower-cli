@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -21,13 +22,12 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/apps/{name}/runs".format(
-            name=name,
+            name=quote(str(name), safe=""),
         ),
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -35,16 +35,18 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[ErrorModel, RunAppResponse]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | RunAppResponse | None:
     if response.status_code == 201:
         response_201 = RunAppResponse.from_dict(response.json())
 
         return response_201
+
     if response.status_code == 401:
         response_401 = ErrorModel.from_dict(response.json())
 
         return response_401
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -52,8 +54,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[ErrorModel, RunAppResponse]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | RunAppResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -67,7 +69,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
-) -> Response[Union[ErrorModel, RunAppResponse]]:
+) -> Response[ErrorModel | RunAppResponse]:
     """Run app
 
      Runs an app with the supplied parameters.
@@ -81,7 +83,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ErrorModel, RunAppResponse]]
+        Response[ErrorModel | RunAppResponse]
     """
 
     kwargs = _get_kwargs(
@@ -101,7 +103,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
-) -> Optional[Union[ErrorModel, RunAppResponse]]:
+) -> ErrorModel | RunAppResponse | None:
     """Run app
 
      Runs an app with the supplied parameters.
@@ -115,7 +117,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ErrorModel, RunAppResponse]
+        ErrorModel | RunAppResponse
     """
 
     return sync_detailed(
@@ -130,7 +132,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
-) -> Response[Union[ErrorModel, RunAppResponse]]:
+) -> Response[ErrorModel | RunAppResponse]:
     """Run app
 
      Runs an app with the supplied parameters.
@@ -144,7 +146,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ErrorModel, RunAppResponse]]
+        Response[ErrorModel | RunAppResponse]
     """
 
     kwargs = _get_kwargs(
@@ -162,7 +164,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: RunAppParams,
-) -> Optional[Union[ErrorModel, RunAppResponse]]:
+) -> ErrorModel | RunAppResponse | None:
     """Run app
 
      Runs an app with the supplied parameters.
@@ -176,7 +178,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ErrorModel, RunAppResponse]
+        ErrorModel | RunAppResponse
     """
 
     return (
