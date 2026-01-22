@@ -110,9 +110,6 @@ pub enum Error {
         source: tower_api::apis::Error<UpdateAppError>,
     },
 
-    #[snafu(display("Unexpected API response: {}", message))]
-    UnexpectedApiResponse { message: String },
-
     // Channel error
     #[snafu(display("Channel receive error"))]
     ChannelReceiveError,

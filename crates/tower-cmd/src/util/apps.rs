@@ -2,14 +2,11 @@ use crate::output;
 use promptly::prompt_default;
 use tower_api::apis::{
     configuration::Configuration,
-    default_api::{
-        self, CreateAppParams, DescribeAppParams, DescribeAppSuccess, UpdateAppParams,
-    },
+    default_api::{self, CreateAppParams, DescribeAppParams, UpdateAppParams},
 };
 use tower_api::models::{
     CreateAppParams as CreateAppParamsModel, UpdateAppParams as UpdateAppParamsModel,
 };
-use tower_telemetry::debug;
 
 pub async fn ensure_app_exists(
     api_config: &Configuration,
@@ -31,46 +28,32 @@ pub async fn ensure_app_exists(
     )
     .await;
 
-    // If the app exists, return Ok
-    if let Ok(response) = describe_result {
+    // If the app exists, update description if provided (no diff check, latest wins)
+    if describe_result.is_ok() {
         spinner.success();
-        if let Some(description) = description {
-            let body = match response.entity {
-                Some(DescribeAppSuccess::Status200(body)) => body,
-                other => {
-                    debug!("unexpected describe app response entity: {:?}", other);
-                    return Err(crate::Error::UnexpectedApiResponse {
-                        message: "Describe app response missing payload".to_string(),
-                    });
-                }
-            };
 
-            if body.app.short_description != description {
-                let mut update_spinner = output::spinner("Updating app description...");
-                let update_result = default_api::update_app(
+        if let Some(desc) = description {
+            if !desc.trim().is_empty() {
+                if let Err(err) = default_api::update_app(
                     api_config,
                     UpdateAppParams {
                         name: app_name.to_string(),
                         update_app_params: UpdateAppParamsModel {
                             schema: None,
-                            description: Some(Some(description.to_string())),
+                            description: Some(Some(desc.to_string())),
                             is_externally_accessible: None,
                             status: None,
                             subdomain: None,
                         },
                     },
                 )
-                .await;
-
-                match update_result {
-                    Ok(_) => update_spinner.success(),
-                    Err(err) => {
-                        update_spinner.failure();
-                        return Err(crate::Error::ApiUpdateAppError { source: err });
-                    }
+                .await
+                {
+                    return Err(crate::Error::ApiUpdateAppError { source: err });
                 }
             }
         }
+
         return Ok(());
     }
 
