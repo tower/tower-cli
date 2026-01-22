@@ -12,31 +12,16 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{serde_as, DefaultOnNull};
 
 #[serde_as]
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct EventWarning {
-    #[serde_as(as = "DefaultOnNull")]
-    #[serde(rename = "data")]
-    pub data: models::SseWarning,
-    /// The event name.
-    #[serde_as(as = "DefaultOnNull")]
-    #[serde(rename = "event")]
-    pub event: Event,
-    /// The event ID.
-    #[serde(rename = "id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<i32>,
-    /// The retry time in milliseconds.
-    #[serde(rename = "retry", skip_serializing_if = "Option::is_none")]
-    pub retry: Option<i32>,
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ServerSentEventsInner2 {
+    EventShouldertap(models::EventShouldertap),
+    EventWarning(models::EventWarning),
 }
 
-impl EventWarning {
-    pub fn new(data: models::SseWarning, event: Event) -> EventWarning {
-        EventWarning {
-            data,
-            event,
-            id: None,
-            retry: None,
-        }
+impl Default for ServerSentEventsInner2 {
+    fn default() -> Self {
+        Self::EventShouldertap(Default::default())
     }
 }
 /// The event name.

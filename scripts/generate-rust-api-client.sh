@@ -27,7 +27,7 @@ CONFIG_FILE="rust-api-client-generator-config.yaml"
 ARGS="generate --config ${CONFIG_FILE}"
 
 # OPENAPI_GENERATOR_VERSION is the version of the openapi-generator-cli to use.
-OPENAPI_GENERATOR_VERSION="7.13.0"
+OPENAPI_GENERATOR_VERSION="7.19.0"
 
 # We need to get the OpenAPI spec file into scope in the first place.
 curl -sL ${TOWER_URL}/v1/openapi.json -o ${BASEDIR}/openapi.json
