@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -13,22 +15,22 @@ class CreateAppParams:
     """
     Attributes:
         name (str): The name of the app.
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateAppParams.json.
-        is_externally_accessible (Union[Unset, bool]): Indicates that web traffic should be routed to this app and that
-            its runs should get a hostname assigned to it. Default: False.
-        short_description (Union[Unset, str]): A description of the app.
-        slug (Union[Unset, str]): The slug of the app. Legacy CLI will send it but we don't need it.
-        subdomain (Union[None, Unset, str]): The subdomain this app is accessible under. Requires
-            is_externally_accessible to be true.
+        is_externally_accessible (bool | Unset): Indicates that web traffic should be routed to this app and that its
+            runs should get a hostname assigned to it. Default: False.
+        short_description (str | Unset): A description of the app.
+        slug (str | Unset): The slug of the app. Legacy CLI will send it but we don't need it.
+        subdomain (None | str | Unset): The subdomain this app is accessible under. Requires is_externally_accessible to
+            be true.
     """
 
     name: str
-    schema: Union[Unset, str] = UNSET
-    is_externally_accessible: Union[Unset, bool] = False
-    short_description: Union[Unset, str] = UNSET
-    slug: Union[Unset, str] = UNSET
-    subdomain: Union[None, Unset, str] = UNSET
+    schema: str | Unset = UNSET
+    is_externally_accessible: bool | Unset = False
+    short_description: str | Unset = UNSET
+    slug: str | Unset = UNSET
+    subdomain: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -41,13 +43,14 @@ class CreateAppParams:
 
         slug = self.slug
 
-        subdomain: Union[None, Unset, str]
+        subdomain: None | str | Unset
         if isinstance(self.subdomain, Unset):
             subdomain = UNSET
         else:
             subdomain = self.subdomain
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "name": name,
@@ -79,12 +82,12 @@ class CreateAppParams:
 
         slug = d.pop("slug", UNSET)
 
-        def _parse_subdomain(data: object) -> Union[None, Unset, str]:
+        def _parse_subdomain(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         subdomain = _parse_subdomain(d.pop("subdomain", UNSET))
 

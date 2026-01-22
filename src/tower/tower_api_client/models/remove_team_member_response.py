@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -17,12 +19,12 @@ class RemoveTeamMemberResponse:
     """
     Attributes:
         team_member (User):
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/RemoveTeamMemberResponse.json.
     """
 
-    team_member: "User"
-    schema: Union[Unset, str] = UNSET
+    team_member: User
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         team_member = self.team_member.to_dict()
@@ -30,6 +32,7 @@ class RemoveTeamMemberResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "team_member": team_member,

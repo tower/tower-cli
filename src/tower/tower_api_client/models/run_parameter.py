@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -23,6 +25,7 @@ class RunParameter:
         value = self.value
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "name": name,

@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_team_members_response import ListTeamMembersResponse
 from ...types import Response
 
@@ -15,7 +16,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/teams/{name}/members".format(
-            name=name,
+            name=quote(str(name), safe=""),
         ),
     }
 
@@ -23,21 +24,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListTeamMembersResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListTeamMembersResponse:
     if response.status_code == 200:
         response_200 = ListTeamMembersResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListTeamMembersResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListTeamMembersResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -50,7 +51,7 @@ def sync_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-) -> Response[ListTeamMembersResponse]:
+) -> Response[ErrorModel | ListTeamMembersResponse]:
     """List team members
 
      List the members of a team
@@ -63,7 +64,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListTeamMembersResponse]
+        Response[ErrorModel | ListTeamMembersResponse]
     """
 
     kwargs = _get_kwargs(
@@ -81,7 +82,7 @@ def sync(
     name: str,
     *,
     client: AuthenticatedClient,
-) -> Optional[ListTeamMembersResponse]:
+) -> ErrorModel | ListTeamMembersResponse | None:
     """List team members
 
      List the members of a team
@@ -94,7 +95,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListTeamMembersResponse
+        ErrorModel | ListTeamMembersResponse
     """
 
     return sync_detailed(
@@ -107,7 +108,7 @@ async def asyncio_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-) -> Response[ListTeamMembersResponse]:
+) -> Response[ErrorModel | ListTeamMembersResponse]:
     """List team members
 
      List the members of a team
@@ -120,7 +121,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListTeamMembersResponse]
+        Response[ErrorModel | ListTeamMembersResponse]
     """
 
     kwargs = _get_kwargs(
@@ -136,7 +137,7 @@ async def asyncio(
     name: str,
     *,
     client: AuthenticatedClient,
-) -> Optional[ListTeamMembersResponse]:
+) -> ErrorModel | ListTeamMembersResponse | None:
     """List team members
 
      List the members of a team
@@ -149,7 +150,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListTeamMembersResponse
+        ErrorModel | ListTeamMembersResponse
     """
 
     return (

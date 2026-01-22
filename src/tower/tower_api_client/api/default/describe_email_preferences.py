@@ -1,11 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.describe_email_preferences_body import DescribeEmailPreferencesBody
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -19,21 +19,21 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DescribeEmailPreferencesBody]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DescribeEmailPreferencesBody | ErrorModel:
     if response.status_code == 200:
         response_200 = DescribeEmailPreferencesBody.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DescribeEmailPreferencesBody]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DescribeEmailPreferencesBody | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -45,7 +45,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[DescribeEmailPreferencesBody]:
+) -> Response[DescribeEmailPreferencesBody | ErrorModel]:
     """Describe email preferences
 
      Describes the current user's email preferences.
@@ -55,7 +55,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeEmailPreferencesBody]
+        Response[DescribeEmailPreferencesBody | ErrorModel]
     """
 
     kwargs = _get_kwargs()
@@ -70,7 +70,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> Optional[DescribeEmailPreferencesBody]:
+) -> DescribeEmailPreferencesBody | ErrorModel | None:
     """Describe email preferences
 
      Describes the current user's email preferences.
@@ -80,7 +80,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeEmailPreferencesBody
+        DescribeEmailPreferencesBody | ErrorModel
     """
 
     return sync_detailed(
@@ -91,7 +91,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[DescribeEmailPreferencesBody]:
+) -> Response[DescribeEmailPreferencesBody | ErrorModel]:
     """Describe email preferences
 
      Describes the current user's email preferences.
@@ -101,7 +101,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeEmailPreferencesBody]
+        Response[DescribeEmailPreferencesBody | ErrorModel]
     """
 
     kwargs = _get_kwargs()
@@ -114,7 +114,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> Optional[DescribeEmailPreferencesBody]:
+) -> DescribeEmailPreferencesBody | ErrorModel | None:
     """Describe email preferences
 
      Describes the current user's email preferences.
@@ -124,7 +124,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeEmailPreferencesBody
+        DescribeEmailPreferencesBody | ErrorModel
     """
 
     return (

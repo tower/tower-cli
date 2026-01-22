@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -16,13 +18,13 @@ T = TypeVar("T", bound="ListMyTeamInvitationsResponse")
 class ListMyTeamInvitationsResponse:
     """
     Attributes:
-        team_invitations (list['TeamInvitation']): All of team invitations
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        team_invitations (list[TeamInvitation]): All of team invitations
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListMyTeamInvitationsResponse.json.
     """
 
-    team_invitations: list["TeamInvitation"]
-    schema: Union[Unset, str] = UNSET
+    team_invitations: list[TeamInvitation]
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         team_invitations = []
@@ -33,6 +35,7 @@ class ListMyTeamInvitationsResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "team_invitations": team_invitations,

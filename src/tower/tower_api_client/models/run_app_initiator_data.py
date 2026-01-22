@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -21,6 +23,7 @@ class RunAppInitiatorData:
         type_ = self.type_.value
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "type": type_,

@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.stream_run_logs_event_log import StreamRunLogsEventLog
 from ...models.stream_run_logs_event_warning import StreamRunLogsEventWarning
 from ...types import Response
@@ -17,8 +18,8 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/apps/{name}/runs/{seq}/logs/stream".format(
-            name=name,
-            seq=seq,
+            name=quote(str(name), safe=""),
+            seq=quote(str(seq), safe=""),
         ),
     }
 
@@ -26,8 +27,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[list[Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.text
@@ -35,35 +36,37 @@ def _parse_response(
 
             def _parse_response_200_item(
                 data: object,
-            ) -> Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]:
+            ) -> StreamRunLogsEventLog | StreamRunLogsEventWarning:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    response_200_item_type_0 = StreamRunLogsEventLog.from_dict(data)
+                    response_200_item_event_log = StreamRunLogsEventLog.from_dict(data)
 
-                    return response_200_item_type_0
-                except:  # noqa: E722
+                    return response_200_item_event_log
+                except (TypeError, ValueError, AttributeError, KeyError):
                     pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                response_200_item_type_1 = StreamRunLogsEventWarning.from_dict(data)
+                response_200_item_event_warning = StreamRunLogsEventWarning.from_dict(
+                    data
+                )
 
-                return response_200_item_type_1
+                return response_200_item_event_warning
 
             response_200_item = _parse_response_200_item(response_200_item_data)
 
             response_200.append(response_200_item)
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[list[Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -77,7 +80,7 @@ def sync_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[list[Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]]]:
+) -> Response[ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]]:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -91,7 +94,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['StreamRunLogsEventLog', 'StreamRunLogsEventWarning']]]
+        Response[ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]]
     """
 
     kwargs = _get_kwargs(
@@ -111,7 +114,7 @@ def sync(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[list[Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]]]:
+) -> ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning] | None:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -125,7 +128,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['StreamRunLogsEventLog', 'StreamRunLogsEventWarning']]
+        ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]
     """
 
     return sync_detailed(
@@ -140,7 +143,7 @@ async def asyncio_detailed(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Response[list[Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]]]:
+) -> Response[ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]]:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -154,7 +157,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[Union['StreamRunLogsEventLog', 'StreamRunLogsEventWarning']]]
+        Response[ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]]
     """
 
     kwargs = _get_kwargs(
@@ -172,7 +175,7 @@ async def asyncio(
     seq: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[list[Union["StreamRunLogsEventLog", "StreamRunLogsEventWarning"]]]:
+) -> ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning] | None:
     """Stream run logs
 
      Streams the logs associated with a particular run of an app in real-time.
@@ -186,7 +189,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[Union['StreamRunLogsEventLog', 'StreamRunLogsEventWarning']]
+        ErrorModel | list[StreamRunLogsEventLog | StreamRunLogsEventWarning]
     """
 
     return (

@@ -1,10 +1,10 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.refresh_session_params import RefreshSessionParams
 from ...models.refresh_session_response import RefreshSessionResponse
 from ...types import Response
@@ -21,9 +21,8 @@ def _get_kwargs(
         "url": "/session/refresh",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -31,21 +30,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[RefreshSessionResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | RefreshSessionResponse:
     if response.status_code == 200:
         response_200 = RefreshSessionResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[RefreshSessionResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | RefreshSessionResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,11 +57,12 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: RefreshSessionParams,
-) -> Response[RefreshSessionResponse]:
+) -> Response[ErrorModel | RefreshSessionResponse]:
     """Refresh session
 
-     Returns a new session based on the supplied authentication context. This is helpful when clients
-    want to use POST instead of GET to check session information.
+     If your access tokens expire, this API endpoint takes a Refresh Token and returns a new set of
+    Access Tokens for your session. Note that we don't rotate the Refresh Token itself, and it's not
+    returned by this API endpoint.
 
     Args:
         body (RefreshSessionParams):
@@ -72,7 +72,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[RefreshSessionResponse]
+        Response[ErrorModel | RefreshSessionResponse]
     """
 
     kwargs = _get_kwargs(
@@ -90,11 +90,12 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: RefreshSessionParams,
-) -> Optional[RefreshSessionResponse]:
+) -> ErrorModel | RefreshSessionResponse | None:
     """Refresh session
 
-     Returns a new session based on the supplied authentication context. This is helpful when clients
-    want to use POST instead of GET to check session information.
+     If your access tokens expire, this API endpoint takes a Refresh Token and returns a new set of
+    Access Tokens for your session. Note that we don't rotate the Refresh Token itself, and it's not
+    returned by this API endpoint.
 
     Args:
         body (RefreshSessionParams):
@@ -104,7 +105,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        RefreshSessionResponse
+        ErrorModel | RefreshSessionResponse
     """
 
     return sync_detailed(
@@ -117,11 +118,12 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: RefreshSessionParams,
-) -> Response[RefreshSessionResponse]:
+) -> Response[ErrorModel | RefreshSessionResponse]:
     """Refresh session
 
-     Returns a new session based on the supplied authentication context. This is helpful when clients
-    want to use POST instead of GET to check session information.
+     If your access tokens expire, this API endpoint takes a Refresh Token and returns a new set of
+    Access Tokens for your session. Note that we don't rotate the Refresh Token itself, and it's not
+    returned by this API endpoint.
 
     Args:
         body (RefreshSessionParams):
@@ -131,7 +133,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[RefreshSessionResponse]
+        Response[ErrorModel | RefreshSessionResponse]
     """
 
     kwargs = _get_kwargs(
@@ -147,11 +149,12 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: RefreshSessionParams,
-) -> Optional[RefreshSessionResponse]:
+) -> ErrorModel | RefreshSessionResponse | None:
     """Refresh session
 
-     Returns a new session based on the supplied authentication context. This is helpful when clients
-    want to use POST instead of GET to check session information.
+     If your access tokens expire, this API endpoint takes a Refresh Token and returns a new set of
+    Access Tokens for your session. Note that we don't rotate the Refresh Token itself, and it's not
+    returned by this API endpoint.
 
     Args:
         body (RefreshSessionParams):
@@ -161,7 +164,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        RefreshSessionResponse
+        ErrorModel | RefreshSessionResponse
     """
 
     return (

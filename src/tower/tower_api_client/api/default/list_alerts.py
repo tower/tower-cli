@@ -1,24 +1,24 @@
 import datetime
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_alerts_response import ListAlertsResponse
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    alert_type: Union[Unset, str] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    acked: Union[Unset, str] = UNSET,
-    environment: Union[Unset, str] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    alert_type: str | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    acked: str | Unset = UNSET,
+    environment: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -28,12 +28,12 @@ def _get_kwargs(
 
     params["alert_type"] = alert_type
 
-    json_start_at: Union[Unset, str] = UNSET
+    json_start_at: str | Unset = UNSET
     if not isinstance(start_at, Unset):
         json_start_at = start_at.isoformat()
     params["start_at"] = json_start_at
 
-    json_end_at: Union[Unset, str] = UNSET
+    json_end_at: str | Unset = UNSET
     if not isinstance(end_at, Unset):
         json_end_at = end_at.isoformat()
     params["end_at"] = json_end_at
@@ -54,21 +54,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListAlertsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListAlertsResponse:
     if response.status_code == 200:
         response_200 = ListAlertsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListAlertsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListAlertsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -80,35 +80,35 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    alert_type: Union[Unset, str] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    acked: Union[Unset, str] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListAlertsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    alert_type: str | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    acked: str | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListAlertsResponse]:
     """List alerts
 
      List alerts for the current account with optional filtering
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        alert_type (Union[Unset, str]): Filter alerts by alert type
-        start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        alert_type (str | Unset): Filter alerts by alert type
+        start_at (datetime.datetime | Unset): Filter alerts created after or at this datetime
             (inclusive)
-        acked (Union[Unset, str]): Filter alerts by acknowledged status.
-        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
+        end_at (datetime.datetime | Unset): Filter alerts created before or at this datetime
+            (inclusive)
+        acked (str | Unset): Filter alerts by acknowledged status.
+        environment (str | Unset): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListAlertsResponse]
+        Response[ErrorModel | ListAlertsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -131,35 +131,35 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    alert_type: Union[Unset, str] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    acked: Union[Unset, str] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListAlertsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    alert_type: str | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    acked: str | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListAlertsResponse | None:
     """List alerts
 
      List alerts for the current account with optional filtering
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        alert_type (Union[Unset, str]): Filter alerts by alert type
-        start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        alert_type (str | Unset): Filter alerts by alert type
+        start_at (datetime.datetime | Unset): Filter alerts created after or at this datetime
             (inclusive)
-        acked (Union[Unset, str]): Filter alerts by acknowledged status.
-        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
+        end_at (datetime.datetime | Unset): Filter alerts created before or at this datetime
+            (inclusive)
+        acked (str | Unset): Filter alerts by acknowledged status.
+        environment (str | Unset): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListAlertsResponse
+        ErrorModel | ListAlertsResponse
     """
 
     return sync_detailed(
@@ -177,35 +177,35 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    alert_type: Union[Unset, str] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    acked: Union[Unset, str] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListAlertsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    alert_type: str | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    acked: str | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListAlertsResponse]:
     """List alerts
 
      List alerts for the current account with optional filtering
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        alert_type (Union[Unset, str]): Filter alerts by alert type
-        start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        alert_type (str | Unset): Filter alerts by alert type
+        start_at (datetime.datetime | Unset): Filter alerts created after or at this datetime
             (inclusive)
-        acked (Union[Unset, str]): Filter alerts by acknowledged status.
-        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
+        end_at (datetime.datetime | Unset): Filter alerts created before or at this datetime
+            (inclusive)
+        acked (str | Unset): Filter alerts by acknowledged status.
+        environment (str | Unset): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListAlertsResponse]
+        Response[ErrorModel | ListAlertsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -226,35 +226,35 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    alert_type: Union[Unset, str] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    acked: Union[Unset, str] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListAlertsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    alert_type: str | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    acked: str | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListAlertsResponse | None:
     """List alerts
 
      List alerts for the current account with optional filtering
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        alert_type (Union[Unset, str]): Filter alerts by alert type
-        start_at (Union[Unset, datetime.datetime]): Filter alerts created after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter alerts created before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        alert_type (str | Unset): Filter alerts by alert type
+        start_at (datetime.datetime | Unset): Filter alerts created after or at this datetime
             (inclusive)
-        acked (Union[Unset, str]): Filter alerts by acknowledged status.
-        environment (Union[Unset, str]): Filter alerts by environment (e.g., production, staging)
+        end_at (datetime.datetime | Unset): Filter alerts created before or at this datetime
+            (inclusive)
+        acked (str | Unset): Filter alerts by acknowledged status.
+        environment (str | Unset): Filter alerts by environment (e.g., production, staging)
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListAlertsResponse
+        ErrorModel | ListAlertsResponse
     """
 
     return (

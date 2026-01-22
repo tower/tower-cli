@@ -1,17 +1,17 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.describe_secrets_key_response import DescribeSecretsKeyResponse
+from ...models.error_model import ErrorModel
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    format_: Union[Unset, str] = UNSET,
+    format_: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -29,21 +29,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DescribeSecretsKeyResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DescribeSecretsKeyResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = DescribeSecretsKeyResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DescribeSecretsKeyResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DescribeSecretsKeyResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -55,22 +55,21 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    format_: Union[Unset, str] = UNSET,
-) -> Response[DescribeSecretsKeyResponse]:
+    format_: str | Unset = UNSET,
+) -> Response[DescribeSecretsKeyResponse | ErrorModel]:
     """Describe encryption key
 
      Gets the encryption key used for encrypting secrets that you want to create in Tower.
 
     Args:
-        format_ (Union[Unset, str]): The format to return the key in. Options are 'pkcs1' and
-            'spki'.
+        format_ (str | Unset): The format to return the key in. Options are 'pkcs1' and 'spki'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeSecretsKeyResponse]
+        Response[DescribeSecretsKeyResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -87,22 +86,21 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    format_: Union[Unset, str] = UNSET,
-) -> Optional[DescribeSecretsKeyResponse]:
+    format_: str | Unset = UNSET,
+) -> DescribeSecretsKeyResponse | ErrorModel | None:
     """Describe encryption key
 
      Gets the encryption key used for encrypting secrets that you want to create in Tower.
 
     Args:
-        format_ (Union[Unset, str]): The format to return the key in. Options are 'pkcs1' and
-            'spki'.
+        format_ (str | Unset): The format to return the key in. Options are 'pkcs1' and 'spki'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeSecretsKeyResponse
+        DescribeSecretsKeyResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -114,22 +112,21 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    format_: Union[Unset, str] = UNSET,
-) -> Response[DescribeSecretsKeyResponse]:
+    format_: str | Unset = UNSET,
+) -> Response[DescribeSecretsKeyResponse | ErrorModel]:
     """Describe encryption key
 
      Gets the encryption key used for encrypting secrets that you want to create in Tower.
 
     Args:
-        format_ (Union[Unset, str]): The format to return the key in. Options are 'pkcs1' and
-            'spki'.
+        format_ (str | Unset): The format to return the key in. Options are 'pkcs1' and 'spki'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeSecretsKeyResponse]
+        Response[DescribeSecretsKeyResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -144,22 +141,21 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    format_: Union[Unset, str] = UNSET,
-) -> Optional[DescribeSecretsKeyResponse]:
+    format_: str | Unset = UNSET,
+) -> DescribeSecretsKeyResponse | ErrorModel | None:
     """Describe encryption key
 
      Gets the encryption key used for encrypting secrets that you want to create in Tower.
 
     Args:
-        format_ (Union[Unset, str]): The format to return the key in. Options are 'pkcs1' and
-            'spki'.
+        format_ (str | Unset): The format to return the key in. Options are 'pkcs1' and 'spki'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeSecretsKeyResponse
+        DescribeSecretsKeyResponse | ErrorModel
     """
 
     return (
