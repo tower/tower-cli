@@ -177,16 +177,6 @@ async def describe_app(name: str, response: Response):
 
 @app.put("/v1/apps/{name}")
 async def update_app(name: str, app_data: Dict[str, Any], response: Response):
-    # Simulate update failure for test app to verify deploy doesn't fail
-    if name == "update-fail-test":
-        response.status_code = 500
-        return {
-            "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
-            "title": "Internal Server Error",
-            "status": 500,
-            "detail": "Simulated update failure for testing",
-        }
-
     app_info = mock_apps_db.get(name)
     if not app_info:
         response.status_code = 404

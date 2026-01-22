@@ -2,11 +2,9 @@ use crate::output;
 use promptly::prompt_default;
 use tower_api::apis::{
     configuration::Configuration,
-    default_api::{self, CreateAppParams, DescribeAppParams, UpdateAppParams},
+    default_api::{self, CreateAppParams, DescribeAppParams},
 };
-use tower_api::models::{
-    CreateAppParams as CreateAppParamsModel, UpdateAppParams as UpdateAppParamsModel,
-};
+use tower_api::models::CreateAppParams as CreateAppParamsModel;
 
 pub async fn ensure_app_exists(
     api_config: &Configuration,
@@ -28,33 +26,9 @@ pub async fn ensure_app_exists(
     )
     .await;
 
-    // If the app exists, update description if provided (no diff check, latest wins)
+    // If the app exists, return Ok (description is create-only).
     if describe_result.is_ok() {
         spinner.success();
-
-        if let Some(desc) = description {
-            if !desc.trim().is_empty() {
-                // Description is metadata - warn on failure but don't block deploy
-                if let Err(_err) = default_api::update_app(
-                    api_config,
-                    UpdateAppParams {
-                        name: app_name.to_string(),
-                        update_app_params: UpdateAppParamsModel {
-                            schema: None,
-                            description: Some(Some(desc.to_string())),
-                            is_externally_accessible: None,
-                            status: None,
-                            subdomain: None,
-                        },
-                    },
-                )
-                .await
-                {
-                    eprintln!("Warning: Failed to update app description");
-                }
-            }
-        }
-
         return Ok(());
     }
 

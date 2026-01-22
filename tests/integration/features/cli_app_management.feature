@@ -29,36 +29,8 @@ Feature: CLI App Management
     And the app name should be "test-cli-app-123"
     And the app description should be "Test app"
 
-  Scenario: CLI deploy updates app description from Towerfile
-    Given I have a valid Towerfile in the current directory
-    And I run "tower apps create --json --name {app_name}" via CLI using created app name
-    When I run "tower deploy --create" via CLI
-    And I run "tower apps show --json {app_name}" via CLI using created app name
-    Then the app description should be "A test app"
-
   Scenario: CLI deploy --create creates app with description from Towerfile
     Given I have a valid Towerfile in the current directory
     When I run "tower deploy --create" via CLI
     And I run "tower apps show --json {app_name}" via CLI using created app name
     Then the app description should be "A test app"
-
-  Scenario: CLI deploy with empty description does not update app
-    Given I have a Towerfile with empty description in the current directory
-    And I run "tower apps create --json --name {app_name} --description 'Original description'" via CLI using created app name
-    When I run "tower deploy --create" via CLI
-    And I run "tower apps show --json {app_name}" via CLI using created app name
-    Then the app description should be "Original description"
-
-  Scenario: CLI deploy with no description field does not update app
-    Given I have a Towerfile with no description in the current directory
-    And I run "tower apps create --json --name {app_name} --description 'Original description'" via CLI using created app name
-    When I run "tower deploy --create" via CLI
-    And I run "tower apps show --json {app_name}" via CLI using created app name
-    Then the app description should be "Original description"
-
-  Scenario: CLI deploy succeeds even when description update fails
-    Given I have a Towerfile for update-fail-test app in the current directory
-    And I run "tower apps create --json --name update-fail-test" via CLI
-    When I run "tower deploy --create" via CLI
-    Then the output should show "Version"
-    And the output should show "deployed to Tower"

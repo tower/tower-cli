@@ -212,66 +212,6 @@ def step_create_valid_towerfile(context):
     create_towerfile(context)
 
 
-@given("I have a Towerfile with empty description in the current directory")
-def step_create_towerfile_empty_description(context):
-    create_towerfile(context, description="")
-
-
-@given("I have a Towerfile with no description in the current directory")
-def step_create_towerfile_no_description(context):
-    """Create a Towerfile without a description field"""
-    from pathlib import Path
-
-    app_name = unique_app_name(context, "hello-world", force_new=True)
-    context.app_name = app_name
-
-    template_dir = Path(__file__).parents[2] / "templates"
-
-    # Create Towerfile without description field
-    towerfile_content = f"""[app]
-name = "{app_name}"
-script = "./hello.py"
-source = ["./hello.py"]
-
-[build]
-python = "3.11"
-"""
-    Path("Towerfile").write_text(towerfile_content)
-
-    # Copy script file
-    script_template = template_dir / "hello.py"
-    if script_template.exists():
-        import shutil
-        shutil.copy(script_template, "hello.py")
-
-
-@given('I have a Towerfile for update-fail-test app in the current directory')
-def step_create_towerfile_update_fail(context):
-    """Create a Towerfile for the update-fail-test app"""
-    from pathlib import Path
-
-    context.app_name = "update-fail-test"
-    template_dir = Path(__file__).parents[2] / "templates"
-
-    # Create Towerfile with description that will trigger update failure in mock
-    towerfile_content = """[app]
-name = "update-fail-test"
-script = "./hello.py"
-description = "This will fail to update"
-source = ["./hello.py"]
-
-[build]
-python = "3.11"
-"""
-    Path("Towerfile").write_text(towerfile_content)
-
-    # Copy script file
-    script_template = template_dir / "hello.py"
-    if script_template.exists():
-        import shutil
-        shutil.copy(script_template, "hello.py")
-
-
 @given("I have a simple hello world application")
 def step_create_hello_world_app(context):
     create_towerfile(context)
