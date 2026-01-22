@@ -8,7 +8,7 @@ version = "0.3.46"
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = [
   "automation",
@@ -25,7 +25,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -96,7 +95,7 @@ dev = [
   { include-group = "test" },
   "black==24.10.0",
   "mypy==1.13.0",
-  "openapi-python-client==0.24.3",
+  "openapi-python-client==0.28.1",
   "pre-commit==4.0.1",
   "pyiceberg[sql-sqlite]==0.9.1",
 ]
