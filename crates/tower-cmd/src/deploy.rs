@@ -49,9 +49,6 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
             crate::Error::ApiDescribeAppError { source } => {
                 output::tower_error_and_die(source, "Fetching app details failed")
             }
-            crate::Error::ApiUpdateAppError { source } => {
-                output::tower_error_and_die(source, "Updating app description failed")
-            }
             crate::Error::PackageError { source } => {
                 output::package_error(source);
                 std::process::exit(1);

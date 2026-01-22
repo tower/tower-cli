@@ -55,3 +55,10 @@ Feature: CLI App Management
     When I run "tower deploy --create" via CLI
     And I run "tower apps show --json {app_name}" via CLI using created app name
     Then the app description should be "Original description"
+
+  Scenario: CLI deploy succeeds even when description update fails
+    Given I have a Towerfile for update-fail-test app in the current directory
+    And I run "tower apps create --json --name update-fail-test" via CLI
+    When I run "tower deploy --create" via CLI
+    Then the output should show "Version"
+    And the output should show "deployed to Tower"

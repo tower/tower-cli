@@ -34,7 +34,8 @@ pub async fn ensure_app_exists(
 
         if let Some(desc) = description {
             if !desc.trim().is_empty() {
-                if let Err(err) = default_api::update_app(
+                // Description is metadata - warn on failure but don't block deploy
+                if let Err(_err) = default_api::update_app(
                     api_config,
                     UpdateAppParams {
                         name: app_name.to_string(),
@@ -49,7 +50,7 @@ pub async fn ensure_app_exists(
                 )
                 .await
                 {
-                    return Err(crate::Error::ApiUpdateAppError { source: err });
+                    eprintln!("Warning: Failed to update app description");
                 }
             }
         }
