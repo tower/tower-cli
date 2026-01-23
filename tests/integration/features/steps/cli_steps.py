@@ -359,9 +359,9 @@ def step_app_description_should_be(context, expected_description):
                 actual_description = candidate["description"]
                 break
 
-    assert actual_description is not None, (
-        f"Could not find app description in JSON response: {data}"
-    )
+    assert (
+        actual_description is not None
+    ), f"Could not find app description in JSON response: {data}"
     assert (
         actual_description == expected_description
     ), f"Expected description '{expected_description}', got '{actual_description}'"
