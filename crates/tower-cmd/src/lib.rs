@@ -99,7 +99,7 @@ impl App {
         }
 
         match matches.subcommand() {
-            Some(("login", _)) => session::do_login(config).await,
+            Some(("login", args)) => session::do_login(config, args).await,
             Some(("version", _)) => version::do_version().await,
             Some(("apps", sub_matches)) => {
                 let apps_command = sub_matches.subcommand();
