@@ -14,7 +14,6 @@ pub fn login_cmd() -> Command {
                 .long("no-browser")
                 .short('n')
                 .help("Do not attempt to open the browser automatically")
-                .default_value("false")
                 .action(clap::ArgAction::SetTrue),
         )
         .about("Create a session with Tower")
