@@ -45,7 +45,7 @@ async fn handle_device_login(
     open_browser: bool,
     claim: CreateDeviceLoginTicketResponse,
 ) {
-    // Put this in the debug logs just in case somethign weird happens.
+    // Put this in the debug logs just in case something weird happens.
     debug!("Login URL: {}", claim.login_url);
 
     let login_instructions = format!(
