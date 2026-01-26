@@ -73,6 +73,7 @@ pub async fn create_app(
         create_app_params: tower_api::models::CreateAppParams {
             schema: None,
             name: name.to_string(),
+            // API create expects short_description; CLI/Towerfile expose "description".
             short_description: Some(description.to_string()),
             slug: None,
             is_externally_accessible: None,
