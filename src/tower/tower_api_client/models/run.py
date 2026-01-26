@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -24,47 +26,47 @@ class Run:
         link (str): $link is deprecated. Individual responses include links.
         app_name (str):
         app_version (str):
-        cancelled_at (Union[None, datetime.datetime]):
+        cancelled_at (datetime.datetime | None):
         created_at (datetime.datetime):
-        ended_at (Union[None, datetime.datetime]):
+        ended_at (datetime.datetime | None):
         environment (str):
-        exit_code (Union[None, int]): Exit code of the run, if the run is completed. Null if there is no exit code
+        exit_code (int | None): Exit code of the run, if the run is completed. Null if there is no exit code
         initiator (RunInitiator):
         is_scheduled (bool): Whether this run was triggered by a schedule (true) or on-demand (false). Historical
             records default to false.
         number (int):
-        parameters (list['RunParameter']): Parameters used to invoke this run.
+        parameters (list[RunParameter]): Parameters used to invoke this run.
         run_id (str):
         scheduled_at (datetime.datetime):
-        started_at (Union[None, datetime.datetime]):
+        started_at (datetime.datetime | None):
         status (RunStatus):
         status_group (RunStatusGroup):
-        app_slug (Union[Unset, str]): This property is deprecated. Please use app_name instead.
-        hostname (Union[Unset, str]): hostname is deprecated, use subdomain
-        subdomain (Union[None, Unset, str]): If app is externally accessible, then you can access this run with this
+        app_slug (str | Unset): This property is deprecated. Use app_name instead.
+        hostname (str | Unset): hostname is deprecated, use subdomain
+        subdomain (None | str | Unset): If app is externally accessible, then you can access this run with this
             hostname.
     """
 
     link: str
     app_name: str
     app_version: str
-    cancelled_at: Union[None, datetime.datetime]
+    cancelled_at: datetime.datetime | None
     created_at: datetime.datetime
-    ended_at: Union[None, datetime.datetime]
+    ended_at: datetime.datetime | None
     environment: str
-    exit_code: Union[None, int]
-    initiator: "RunInitiator"
+    exit_code: int | None
+    initiator: RunInitiator
     is_scheduled: bool
     number: int
-    parameters: list["RunParameter"]
+    parameters: list[RunParameter]
     run_id: str
     scheduled_at: datetime.datetime
-    started_at: Union[None, datetime.datetime]
+    started_at: datetime.datetime | None
     status: RunStatus
     status_group: RunStatusGroup
-    app_slug: Union[Unset, str] = UNSET
-    hostname: Union[Unset, str] = UNSET
-    subdomain: Union[None, Unset, str] = UNSET
+    app_slug: str | Unset = UNSET
+    hostname: str | Unset = UNSET
+    subdomain: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         link = self.link
@@ -73,7 +75,7 @@ class Run:
 
         app_version = self.app_version
 
-        cancelled_at: Union[None, str]
+        cancelled_at: None | str
         if isinstance(self.cancelled_at, datetime.datetime):
             cancelled_at = self.cancelled_at.isoformat()
         else:
@@ -81,7 +83,7 @@ class Run:
 
         created_at = self.created_at.isoformat()
 
-        ended_at: Union[None, str]
+        ended_at: None | str
         if isinstance(self.ended_at, datetime.datetime):
             ended_at = self.ended_at.isoformat()
         else:
@@ -89,7 +91,7 @@ class Run:
 
         environment = self.environment
 
-        exit_code: Union[None, int]
+        exit_code: int | None
         exit_code = self.exit_code
 
         initiator = self.initiator.to_dict()
@@ -107,7 +109,7 @@ class Run:
 
         scheduled_at = self.scheduled_at.isoformat()
 
-        started_at: Union[None, str]
+        started_at: None | str
         if isinstance(self.started_at, datetime.datetime):
             started_at = self.started_at.isoformat()
         else:
@@ -121,13 +123,14 @@ class Run:
 
         hostname = self.hostname
 
-        subdomain: Union[None, Unset, str]
+        subdomain: None | str | Unset
         if isinstance(self.subdomain, Unset):
             subdomain = UNSET
         else:
             subdomain = self.subdomain
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "$link": link,
@@ -170,7 +173,7 @@ class Run:
 
         app_version = d.pop("app_version")
 
-        def _parse_cancelled_at(data: object) -> Union[None, datetime.datetime]:
+        def _parse_cancelled_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
             try:
@@ -179,15 +182,15 @@ class Run:
                 cancelled_at_type_0 = isoparse(data)
 
                 return cancelled_at_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union[None, datetime.datetime], data)
+            return cast(datetime.datetime | None, data)
 
         cancelled_at = _parse_cancelled_at(d.pop("cancelled_at"))
 
         created_at = isoparse(d.pop("created_at"))
 
-        def _parse_ended_at(data: object) -> Union[None, datetime.datetime]:
+        def _parse_ended_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
             try:
@@ -196,18 +199,18 @@ class Run:
                 ended_at_type_0 = isoparse(data)
 
                 return ended_at_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union[None, datetime.datetime], data)
+            return cast(datetime.datetime | None, data)
 
         ended_at = _parse_ended_at(d.pop("ended_at"))
 
         environment = d.pop("environment")
 
-        def _parse_exit_code(data: object) -> Union[None, int]:
+        def _parse_exit_code(data: object) -> int | None:
             if data is None:
                 return data
-            return cast(Union[None, int], data)
+            return cast(int | None, data)
 
         exit_code = _parse_exit_code(d.pop("exit_code"))
 
@@ -228,7 +231,7 @@ class Run:
 
         scheduled_at = isoparse(d.pop("scheduled_at"))
 
-        def _parse_started_at(data: object) -> Union[None, datetime.datetime]:
+        def _parse_started_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
             try:
@@ -237,9 +240,9 @@ class Run:
                 started_at_type_0 = isoparse(data)
 
                 return started_at_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union[None, datetime.datetime], data)
+            return cast(datetime.datetime | None, data)
 
         started_at = _parse_started_at(d.pop("started_at"))
 
@@ -251,12 +254,12 @@ class Run:
 
         hostname = d.pop("hostname", UNSET)
 
-        def _parse_subdomain(data: object) -> Union[None, Unset, str]:
+        def _parse_subdomain(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         subdomain = _parse_subdomain(d.pop("subdomain", UNSET))
 

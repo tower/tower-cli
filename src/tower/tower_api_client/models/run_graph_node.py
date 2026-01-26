@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -18,8 +20,8 @@ class RunGraphNode:
         parent_id (RunGraphRunID):
     """
 
-    id: "RunGraphRunID"
-    parent_id: "RunGraphRunID"
+    id: RunGraphRunID
+    parent_id: RunGraphRunID
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id.to_dict()
@@ -27,6 +29,7 @@ class RunGraphNode:
         parent_id = self.parent_id.to_dict()
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "id": id,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -39,6 +41,7 @@ class RunStatistics:
         total_runs = self.total_runs
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "cancelled_runs": cancelled_runs,

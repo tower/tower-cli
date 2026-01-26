@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -18,15 +20,15 @@ class Session:
     """
     Attributes:
         featurebase_identity (FeaturebaseIdentity):
-        teams (list['Team']):
+        teams (list[Team]):
         token (Token):
         user (User):
     """
 
-    featurebase_identity: "FeaturebaseIdentity"
-    teams: list["Team"]
-    token: "Token"
-    user: "User"
+    featurebase_identity: FeaturebaseIdentity
+    teams: list[Team]
+    token: Token
+    user: User
 
     def to_dict(self) -> dict[str, Any]:
         featurebase_identity = self.featurebase_identity.to_dict()
@@ -41,6 +43,7 @@ class Session:
         user = self.user.to_dict()
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "featurebase_identity": featurebase_identity,

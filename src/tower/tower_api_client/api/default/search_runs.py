@@ -1,11 +1,11 @@
 import datetime
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.search_runs_response import SearchRunsResponse
 from ...models.search_runs_status_item import SearchRunsStatusItem
 from ...types import UNSET, Response, Unset
@@ -13,12 +13,12 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[SearchRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[SearchRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -26,7 +26,7 @@ def _get_kwargs(
 
     params["page_size"] = page_size
 
-    json_status: Union[Unset, list[str]] = UNSET
+    json_status: list[str] | Unset = UNSET
     if not isinstance(status, Unset):
         json_status = []
         for status_item_data in status:
@@ -35,12 +35,12 @@ def _get_kwargs(
 
     params["status"] = json_status
 
-    json_start_at: Union[Unset, str] = UNSET
+    json_start_at: str | Unset = UNSET
     if not isinstance(start_at, Unset):
         json_start_at = start_at.isoformat()
     params["start_at"] = json_start_at
 
-    json_end_at: Union[Unset, str] = UNSET
+    json_end_at: str | Unset = UNSET
     if not isinstance(end_at, Unset):
         json_end_at = end_at.isoformat()
     params["end_at"] = json_end_at
@@ -59,21 +59,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[SearchRunsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | SearchRunsResponse:
     if response.status_code == 200:
         response_200 = SearchRunsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[SearchRunsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | SearchRunsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -85,35 +85,35 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[SearchRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[SearchRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[SearchRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | SearchRunsResponse]:
     """Search runs
 
      Search, filter, and list runs across all of the apps in your account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[SearchRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[SearchRunsStatusItem] | Unset): Filter runs by status(es). Define multiple
+            with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[SearchRunsResponse]
+        Response[ErrorModel | SearchRunsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -135,35 +135,35 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[SearchRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[SearchRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[SearchRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | SearchRunsResponse | None:
     """Search runs
 
      Search, filter, and list runs across all of the apps in your account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[SearchRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[SearchRunsStatusItem] | Unset): Filter runs by status(es). Define multiple
+            with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        SearchRunsResponse
+        ErrorModel | SearchRunsResponse
     """
 
     return sync_detailed(
@@ -180,35 +180,35 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[SearchRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[SearchRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[SearchRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | SearchRunsResponse]:
     """Search runs
 
      Search, filter, and list runs across all of the apps in your account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[SearchRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[SearchRunsStatusItem] | Unset): Filter runs by status(es). Define multiple
+            with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[SearchRunsResponse]
+        Response[ErrorModel | SearchRunsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -228,35 +228,35 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[SearchRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[SearchRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[SearchRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | SearchRunsResponse | None:
     """Search runs
 
      Search, filter, and list runs across all of the apps in your account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[SearchRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[SearchRunsStatusItem] | Unset): Filter runs by status(es). Define multiple
+            with a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
             (inclusive). Provide timestamps in ISO-8601 format.
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        SearchRunsResponse
+        ErrorModel | SearchRunsResponse
     """
 
     return (

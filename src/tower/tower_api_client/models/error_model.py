@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -16,34 +18,34 @@ T = TypeVar("T", bound="ErrorModel")
 class ErrorModel:
     """
     Attributes:
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ErrorModel.json.
-        detail (Union[Unset, str]): A human-readable explanation specific to this occurrence of the problem. Example:
-            Property foo is required but is missing..
-        errors (Union[Unset, list['ErrorDetail']]): Optional list of individual error details
-        instance (Union[Unset, str]): A URI reference that identifies the specific occurrence of the problem. Example:
+        detail (str | Unset): A human-readable explanation specific to this occurrence of the problem. Example: Property
+            foo is required but is missing..
+        errors (list[ErrorDetail] | Unset): Optional list of individual error details
+        instance (str | Unset): A URI reference that identifies the specific occurrence of the problem. Example:
             https://example.com/error-log/abc123.
-        status (Union[Unset, int]): HTTP status code Example: 400.
-        title (Union[Unset, str]): A short, human-readable summary of the problem type. This value should not change
-            between occurrences of the error. Example: Bad Request.
-        type_ (Union[Unset, str]): A URI reference to human-readable documentation for the error. Default:
-            'about:blank'. Example: https://example.com/errors/example.
+        status (int | Unset): HTTP status code Example: 400.
+        title (str | Unset): A short, human-readable summary of the problem type. This value should not change between
+            occurrences of the error. Example: Bad Request.
+        type_ (str | Unset): A URI reference to human-readable documentation for the error. Default: 'about:blank'.
+            Example: https://example.com/errors/example.
     """
 
-    schema: Union[Unset, str] = UNSET
-    detail: Union[Unset, str] = UNSET
-    errors: Union[Unset, list["ErrorDetail"]] = UNSET
-    instance: Union[Unset, str] = UNSET
-    status: Union[Unset, int] = UNSET
-    title: Union[Unset, str] = UNSET
-    type_: Union[Unset, str] = "about:blank"
+    schema: str | Unset = UNSET
+    detail: str | Unset = UNSET
+    errors: list[ErrorDetail] | Unset = UNSET
+    instance: str | Unset = UNSET
+    status: int | Unset = UNSET
+    title: str | Unset = UNSET
+    type_: str | Unset = "about:blank"
 
     def to_dict(self) -> dict[str, Any]:
         schema = self.schema
 
         detail = self.detail
 
-        errors: Union[Unset, list[dict[str, Any]]] = UNSET
+        errors: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.errors, Unset):
             errors = []
             for errors_item_data in self.errors:
@@ -59,6 +61,7 @@ class ErrorModel:
         type_ = self.type_
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update({})
         if schema is not UNSET:
             field_dict["$schema"] = schema
@@ -86,12 +89,14 @@ class ErrorModel:
 
         detail = d.pop("detail", UNSET)
 
-        errors = []
         _errors = d.pop("errors", UNSET)
-        for errors_item_data in _errors or []:
-            errors_item = ErrorDetail.from_dict(errors_item_data)
+        errors: list[ErrorDetail] | Unset = UNSET
+        if _errors is not UNSET:
+            errors = []
+            for errors_item_data in _errors:
+                errors_item = ErrorDetail.from_dict(errors_item_data)
 
-            errors.append(errors_item)
+                errors.append(errors_item)
 
         instance = d.pop("instance", UNSET)
 

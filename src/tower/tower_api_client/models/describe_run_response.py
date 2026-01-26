@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -19,13 +21,13 @@ class DescribeRunResponse:
     Attributes:
         links (DescribeRunLinks):
         run (Run):
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/DescribeRunResponse.json.
     """
 
-    links: "DescribeRunLinks"
-    run: "Run"
-    schema: Union[Unset, str] = UNSET
+    links: DescribeRunLinks
+    run: Run
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         links = self.links.to_dict()
@@ -35,6 +37,7 @@ class DescribeRunResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "$links": links,

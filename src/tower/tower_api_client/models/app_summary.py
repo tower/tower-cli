@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -16,11 +18,11 @@ class AppSummary:
     """
     Attributes:
         app (App):
-        runs (list['Run']):
+        runs (list[Run]):
     """
 
-    app: "App"
-    runs: list["Run"]
+    app: App
+    runs: list[Run]
 
     def to_dict(self) -> dict[str, Any]:
         app = self.app.to_dict()
@@ -31,6 +33,7 @@ class AppSummary:
             runs.append(runs_item)
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "app": app,

@@ -1,11 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.describe_session_response import DescribeSessionResponse
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -19,21 +19,21 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DescribeSessionResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DescribeSessionResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = DescribeSessionResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DescribeSessionResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DescribeSessionResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -45,7 +45,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[DescribeSessionResponse]:
+) -> Response[DescribeSessionResponse | ErrorModel]:
     """Describe session
 
      Validate your current session and return the user information associated with the session.
@@ -55,7 +55,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeSessionResponse]
+        Response[DescribeSessionResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs()
@@ -70,7 +70,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> Optional[DescribeSessionResponse]:
+) -> DescribeSessionResponse | ErrorModel | None:
     """Describe session
 
      Validate your current session and return the user information associated with the session.
@@ -80,7 +80,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeSessionResponse
+        DescribeSessionResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -91,7 +91,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[DescribeSessionResponse]:
+) -> Response[DescribeSessionResponse | ErrorModel]:
     """Describe session
 
      Validate your current session and return the user information associated with the session.
@@ -101,7 +101,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DescribeSessionResponse]
+        Response[DescribeSessionResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs()
@@ -114,7 +114,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> Optional[DescribeSessionResponse]:
+) -> DescribeSessionResponse | ErrorModel | None:
     """Describe session
 
      Validate your current session and return the user information associated with the session.
@@ -124,7 +124,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DescribeSessionResponse
+        DescribeSessionResponse | ErrorModel
     """
 
     return (

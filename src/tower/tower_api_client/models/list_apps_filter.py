@@ -5,6 +5,7 @@ class ListAppsFilter(str, Enum):
     DISABLED = "disabled"
     HEALTHY = "healthy"
     RUNNING = "running"
+    SCHEDULED = "scheduled"
     WITHWARNING = "withWarning"
 
     def __str__(self) -> str:

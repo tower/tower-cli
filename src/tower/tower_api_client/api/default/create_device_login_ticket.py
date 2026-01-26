@@ -1,13 +1,13 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_device_login_ticket_response import (
     CreateDeviceLoginTicketResponse,
 )
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -21,21 +21,21 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[CreateDeviceLoginTicketResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CreateDeviceLoginTicketResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = CreateDeviceLoginTicketResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[CreateDeviceLoginTicketResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[CreateDeviceLoginTicketResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -46,8 +46,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Response[CreateDeviceLoginTicketResponse]:
+    client: AuthenticatedClient | Client,
+) -> Response[CreateDeviceLoginTicketResponse | ErrorModel]:
     """Create device login ticket
 
      Creates a new device login ticket and returns the codes and urls needed for authentication.
@@ -57,7 +57,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateDeviceLoginTicketResponse]
+        Response[CreateDeviceLoginTicketResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs()
@@ -71,8 +71,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[CreateDeviceLoginTicketResponse]:
+    client: AuthenticatedClient | Client,
+) -> CreateDeviceLoginTicketResponse | ErrorModel | None:
     """Create device login ticket
 
      Creates a new device login ticket and returns the codes and urls needed for authentication.
@@ -82,7 +82,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateDeviceLoginTicketResponse
+        CreateDeviceLoginTicketResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -92,8 +92,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Response[CreateDeviceLoginTicketResponse]:
+    client: AuthenticatedClient | Client,
+) -> Response[CreateDeviceLoginTicketResponse | ErrorModel]:
     """Create device login ticket
 
      Creates a new device login ticket and returns the codes and urls needed for authentication.
@@ -103,7 +103,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateDeviceLoginTicketResponse]
+        Response[CreateDeviceLoginTicketResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs()
@@ -115,8 +115,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[CreateDeviceLoginTicketResponse]:
+    client: AuthenticatedClient | Client,
+) -> CreateDeviceLoginTicketResponse | ErrorModel | None:
     """Create device login ticket
 
      Creates a new device login ticket and returns the codes and urls needed for authentication.
@@ -126,7 +126,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateDeviceLoginTicketResponse
+        CreateDeviceLoginTicketResponse | ErrorModel
     """
 
     return (

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -18,14 +20,14 @@ class ListRunnersResponse:
     """
     Attributes:
         pages (Pagination):
-        runners (list['Runner']):
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        runners (list[Runner]):
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListRunnersResponse.json.
     """
 
-    pages: "Pagination"
-    runners: list["Runner"]
-    schema: Union[Unset, str] = UNSET
+    pages: Pagination
+    runners: list[Runner]
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         pages = self.pages.to_dict()
@@ -38,6 +40,7 @@ class ListRunnersResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "pages": pages,

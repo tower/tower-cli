@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
 from typing import Any, TypeVar
@@ -39,6 +41,7 @@ class StatisticsSettings:
         timezone = self.timezone
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "end_at": end_at,
