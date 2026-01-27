@@ -1,6 +1,11 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs::{self, OpenOptions};
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
+
+use fs2::FileExt;
+use seahash::SeaHasher;
 use tokio::process::{Child, Command};
 use tower_telemetry::debug;
 
@@ -106,6 +111,107 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
     env_vars
 }
 
+/// Cleans up stale UV lock files from the system temp directory.
+///
+/// UV creates lock files (e.g., `uv-<hash>.lock`) in the temp directory for concurrent operation
+/// safety. These files are not automatically cleaned up when UV exits. This function finds all
+/// such files and removes any that are not currently locked by another process.
+fn cleanup_stale_uv_lock_files() {
+    let temp_dir = std::env::temp_dir();
+
+    let entries = match fs::read_dir(&temp_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            debug!(
+                "Failed to read temp directory for lock file cleanup: {:?}",
+                e
+            );
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        // Only process files matching the uv-*.lock pattern
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            if !file_name.starts_with("uv-") || !file_name.ends_with(".lock") {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        // Try to open the file and acquire an exclusive lock
+        let file = match OpenOptions::new().read(true).write(true).open(&path) {
+            Ok(f) => f,
+            Err(_) => continue, // Can't open, skip it
+        };
+
+        // Try to acquire an exclusive lock without blocking
+        if file.try_lock_exclusive().is_ok() {
+            // We got the lock, meaning no other process is using this file.
+            // Unlock and delete it.
+            let _ = FileExt::unlock(&file);
+            drop(file); // Close the file handle before deleting
+
+            if let Err(e) = fs::remove_file(&path) {
+                debug!("Failed to remove stale lock file {:?}: {:?}", path, e);
+            } else {
+                debug!("Cleaned up stale UV lock file: {:?}", path);
+            }
+        }
+        // If we couldn't get the lock, another process is using it, so leave it alone
+    }
+}
+
+/// Computes the lock file path that uv will create for a given working directory.
+///
+/// This replicates uv's lock file naming: `uv-{hash}.lock` where the hash is
+/// a seahash of the workspace path. When running uv commands with a specific
+/// working directory, this function can predict which lock file will be used.
+pub fn compute_uv_lock_file_path(cwd: &Path) -> PathBuf {
+    let mut hasher = SeaHasher::new();
+    cwd.hash(&mut hasher);
+    let hash = hasher.finish();
+    let hash_hex = hex::encode(hash.to_le_bytes());
+
+    std::env::temp_dir().join(format!("uv-{}.lock", hash_hex))
+}
+
+/// Cleans up the lock file for a specific working directory after uv exits.
+///
+/// This should be called after a uv process completes to clean up the lock file
+/// it created. The lock file is only removed if no other process is using it.
+///
+/// Returns `true` if the lock file was successfully removed, `false` otherwise
+/// (either because it didn't exist, couldn't be opened, or is still locked).
+pub fn cleanup_lock_file_for_cwd(cwd: &Path) -> bool {
+    let lock_path = compute_uv_lock_file_path(cwd);
+
+    let file = match OpenOptions::new().read(true).write(true).open(&lock_path) {
+        Ok(f) => f,
+        Err(_) => return false, // File doesn't exist or can't be opened
+    };
+
+    // Only delete if we can acquire exclusive lock (no other process using it)
+    if file.try_lock_exclusive().is_ok() {
+        let _ = FileExt::unlock(&file);
+        drop(file); // Close the file handle before deleting
+
+        if let Err(e) = fs::remove_file(&lock_path) {
+            debug!("Failed to remove lock file {:?}: {:?}", lock_path, e);
+            false
+        } else {
+            debug!("Cleaned up UV lock file for {:?}: {:?}", cwd, lock_path);
+            true
+        }
+    } else {
+        // Another process is still using this lock file
+        false
+    }
+}
+
 async fn test_uv_path(path: &PathBuf) -> Result<(), Error> {
     let res = Command::new(&path)
         .arg("--color")
@@ -138,6 +244,9 @@ pub struct Uv {
 
 impl Uv {
     pub async fn new(cache_dir: Option<PathBuf>, protected_mode: bool) -> Result<Self, Error> {
+        // Opportunistically clean up any stale UV lock files left behind from previous runs.
+        cleanup_stale_uv_lock_files();
+
         match install::find_or_setup_uv().await {
             Ok(uv_path) => {
                 test_uv_path(&uv_path).await?;
@@ -169,6 +278,11 @@ impl Uv {
             .current_dir(cwd)
             .arg("venv")
             .envs(env_vars);
+
+        #[cfg(unix)]
+        {
+            cmd.process_group(0);
+        }
 
         if let Some(dir) = &self.cache_dir {
             cmd.arg("--cache-dir").arg(dir);
@@ -300,5 +414,107 @@ impl Uv {
 
     pub async fn is_valid(&self) -> bool {
         test_uv_path(&self.uv_path).await.is_ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_compute_uv_lock_file_path_is_deterministic() {
+        let path = Path::new("/some/project/path");
+
+        let lock_path_1 = compute_uv_lock_file_path(path);
+        let lock_path_2 = compute_uv_lock_file_path(path);
+
+        assert_eq!(lock_path_1, lock_path_2);
+    }
+
+    #[test]
+    fn test_compute_uv_lock_file_path_different_paths_produce_different_hashes() {
+        let path_a = Path::new("/project/a");
+        let path_b = Path::new("/project/b");
+
+        let lock_path_a = compute_uv_lock_file_path(path_a);
+        let lock_path_b = compute_uv_lock_file_path(path_b);
+
+        assert_ne!(lock_path_a, lock_path_b);
+    }
+
+    #[test]
+    fn test_compute_uv_lock_file_path_format() {
+        let path = Path::new("/test/path");
+        let lock_path = compute_uv_lock_file_path(path);
+
+        let file_name = lock_path.file_name().unwrap().to_str().unwrap();
+        assert!(file_name.starts_with("uv-"));
+        assert!(file_name.ends_with(".lock"));
+
+        // Hash should be 16 hex characters (8 bytes as hex)
+        let hash_part = &file_name[3..file_name.len() - 5];
+        assert_eq!(hash_part.len(), 16);
+        assert!(hash_part.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_cleanup_lock_file_for_cwd_removes_unlocked_file() {
+        let temp_dir = std::env::temp_dir();
+        let test_cwd = temp_dir.join("test-cleanup-cwd");
+
+        // Compute where the lock file would be
+        let lock_path = compute_uv_lock_file_path(&test_cwd);
+
+        // Create the lock file manually
+        {
+            let mut file = fs::File::create(&lock_path).unwrap();
+            file.write_all(b"test").unwrap();
+        }
+
+        assert!(lock_path.exists());
+
+        // Clean it up
+        let result = cleanup_lock_file_for_cwd(&test_cwd);
+
+        assert!(result);
+        assert!(!lock_path.exists());
+    }
+
+    #[test]
+    fn test_cleanup_lock_file_for_cwd_returns_false_for_nonexistent() {
+        let nonexistent_cwd = Path::new("/nonexistent/path/that/does/not/exist");
+
+        let result = cleanup_lock_file_for_cwd(nonexistent_cwd);
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_cleanup_lock_file_for_cwd_respects_lock() {
+        let temp_dir = std::env::temp_dir();
+        let test_cwd = temp_dir.join("test-cleanup-locked-cwd");
+
+        let lock_path = compute_uv_lock_file_path(&test_cwd);
+
+        // Create and hold a lock on the file
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&lock_path)
+            .unwrap();
+        file.lock_exclusive().unwrap();
+
+        // Try to clean up while locked - should fail
+        let result = cleanup_lock_file_for_cwd(&test_cwd);
+
+        assert!(!result);
+        assert!(lock_path.exists());
+
+        // Release the lock and clean up
+        drop(file);
+        let _ = fs::remove_file(&lock_path);
     }
 }

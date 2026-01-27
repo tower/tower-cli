@@ -10,8 +10,11 @@ license = { workspace = true }
 async-compression = { workspace = true }
 async_zip = { workspace = true }
 dirs = { workspace = true }
+fs2 = { workspace = true }
 futures-lite = { workspace = true }
+hex = { workspace = true }
 reqwest = { workspace = true }
+seahash = { workspace = true }
 tokio = { workspace = true }
 tokio-tar = { workspace = true }
 tower-telemetry = { workspace = true }
