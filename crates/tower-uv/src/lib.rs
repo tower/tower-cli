@@ -7,7 +7,7 @@ use tower_telemetry::debug;
 pub mod install;
 
 // UV_VERSION is the version of UV to download and install when setting up a local UV deployment.
-pub const UV_VERSION: &str = "0.7.13";
+pub const UV_VERSION: &str = "0.9.27";
 
 #[derive(Debug)]
 pub enum Error {
