@@ -61,14 +61,18 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         env_vars.insert("SYSTEMROOT".to_string(), systemroot);
 
         // We also need to bring along the TEMP environment variable because Python needs it for
-        // things like creating temporary files, etc.
-        let temp = std::env::var("TEMP").unwrap_or_default();
-        env_vars.insert("TEMP".to_string(), temp);
+        // things like creating temporary files, etc. But only set if not already provided.
+        if !env_vars.contains_key("TEMP") {
+            let temp = std::env::var("TEMP").unwrap_or_default();
+            env_vars.insert("TEMP".to_string(), temp);
+        }
 
         // Apparently, according to some random person on Stack Overflow, sometimes the var can be
         // TEMP and sometimes it can be TMP. So uh...let's just grab both just in case.
-        let tmp = std::env::var("TMP").unwrap_or_default();
-        env_vars.insert("TMP".to_string(), tmp);
+        if !env_vars.contains_key("TMP") {
+            let tmp = std::env::var("TMP").unwrap_or_default();
+            env_vars.insert("TMP".to_string(), tmp);
+        }
     }
 
     #[cfg(not(windows))]
@@ -83,16 +87,23 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
         env_vars.insert("PATH".to_string(), path);
 
         // On Unix systems, we also want to bring along the TMPDIR environment variable for temp
-        // files.
-        let tmpdir = std::env::var("TMPDIR").unwrap_or_default();
-        env_vars.insert("TMPDIR".to_string(), tmpdir);
+        // files. But only set it if not already provided (to allow custom temp directories).
+        if !env_vars.contains_key("TMPDIR") {
+            let tmpdir = std::env::var("TMPDIR").unwrap_or_default();
+            env_vars.insert("TMPDIR".to_string(), tmpdir);
+        }
 
         // Also other potentially-set temp vars. These may not be set.
-        let temp = std::env::var("TEMP").unwrap_or_default();
-        env_vars.insert("TEMP".to_string(), temp);
+        // Only set if not already provided.
+        if !env_vars.contains_key("TEMP") {
+            let temp = std::env::var("TEMP").unwrap_or_default();
+            env_vars.insert("TEMP".to_string(), temp);
+        }
 
-        let tmp = std::env::var("TMP").unwrap_or_default();
-        env_vars.insert("TMP".to_string(), tmp);
+        if !env_vars.contains_key("TMP") {
+            let tmp = std::env::var("TMP").unwrap_or_default();
+            env_vars.insert("TMP".to_string(), tmp);
+        }
 
         // Let's pass in TZ as well to propagate that to child processes.
         let tz = std::env::var("TZ").unwrap_or_default();
