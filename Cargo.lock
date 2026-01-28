@@ -3687,6 +3687,7 @@ dependencies = [
  "fs2",
  "futures-lite",
  "hex",
+ "regex",
  "reqwest",
  "seahash",
  "tokio",

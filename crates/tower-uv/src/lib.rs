@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use fs2::FileExt;
+use regex::Regex;
 use seahash::SeaHasher;
 use tokio::process::{Child, Command};
 use tower_telemetry::debug;
@@ -116,7 +117,7 @@ fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, Str
 /// UV creates lock files (e.g., `uv-<hash>.lock`) in the temp directory for concurrent operation
 /// safety. These files are not automatically cleaned up when UV exits. This function finds all
 /// such files and removes any that are not currently locked by another process.
-fn cleanup_stale_uv_lock_files() {
+pub fn cleanup_stale_uv_lock_files() {
     let temp_dir = std::env::temp_dir();
 
     let entries = match fs::read_dir(&temp_dir) {
@@ -134,8 +135,8 @@ fn cleanup_stale_uv_lock_files() {
         let path = entry.path();
 
         // Only process files matching the uv-*.lock pattern
-        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            if !file_name.starts_with("uv-") || !file_name.ends_with(".lock") {
+        if let Some(file_name) = path.file_name() {
+            if is_uv_lock_file_name(&file_name) {
                 continue;
             }
         } else {
@@ -145,7 +146,10 @@ fn cleanup_stale_uv_lock_files() {
         // Try to open the file and acquire an exclusive lock
         let file = match OpenOptions::new().read(true).write(true).open(&path) {
             Ok(f) => f,
-            Err(_) => continue, // Can't open, skip it
+            Err(e) => {
+                debug!("Failed to open lock file {:?}: {:?}", path, e);
+                continue
+            }
         };
 
         // Try to acquire an exclusive lock without blocking
@@ -163,6 +167,18 @@ fn cleanup_stale_uv_lock_files() {
         }
         // If we couldn't get the lock, another process is using it, so leave it alone
     }
+}
+
+fn is_uv_lock_file_name<S: AsRef<std::ffi::OsStr>>(lock_name: S) -> bool {
+    // There isn't a really great way of _not_ instantiating this on each call, without using a
+    // LazyLock or some other synchronization method. So, we just take the runtime hit instead of
+    // the synchonization hit.
+    let uv_lock_pattern = Regex::new(r"^uv-[0-9a-f]{16}\.lock$").unwrap();
+    let os_str = lock_name.as_ref();
+
+    os_str.to_str()
+        .map(|name| uv_lock_pattern.is_match(name))
+        .unwrap_or(false)
 }
 
 /// Computes the lock file path that uv will create for a given working directory.
@@ -244,9 +260,6 @@ pub struct Uv {
 
 impl Uv {
     pub async fn new(cache_dir: Option<PathBuf>, protected_mode: bool) -> Result<Self, Error> {
-        // Opportunistically clean up any stale UV lock files left behind from previous runs.
-        cleanup_stale_uv_lock_files();
-
         match install::find_or_setup_uv().await {
             Ok(uv_path) => {
                 test_uv_path(&uv_path).await?;
