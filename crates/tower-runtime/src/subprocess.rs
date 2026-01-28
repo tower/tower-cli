@@ -78,6 +78,19 @@ impl ExecutionBackend for SubprocessBackend {
             _ => self.cache_dir.clone(),
         };
 
+        // Create a unique temp directory for uv if no cache directory is configured
+        let (final_cache_dir, uv_temp_dir) = if cache_dir.is_none() {
+            let temp_path = std::env::temp_dir().join(format!("tower-uv-{}", spec.id));
+            tokio::fs::create_dir_all(&temp_path)
+                .await
+                .map_err(|_| Error::PackageCreateFailed)?;
+            // Use the temp directory as cache_dir and track it for cleanup
+            (Some(temp_path.clone()), Some(temp_path))
+        } else {
+            // Use provided cache_dir, no temp dir to clean up
+            (cache_dir, None)
+        };
+
         // Receive package stream and unpack it
         let package = self.receive_and_unpack_package(spec.package_stream).await?;
 
@@ -86,6 +99,14 @@ impl ExecutionBackend for SubprocessBackend {
             .clone()
             .ok_or(Error::PackageUnpackFailed)?;
 
+        // Set TMPDIR to the same isolated directory to ensure lock files also go there
+        let mut env_vars = spec.env_vars;
+        if let Some(ref temp_dir) = uv_temp_dir {
+            env_vars.insert("TMPDIR".to_string(), temp_dir.to_string_lossy().to_string());
+            env_vars.insert("TEMP".to_string(), temp_dir.to_string_lossy().to_string());
+            env_vars.insert("TMP".to_string(), temp_dir.to_string_lossy().to_string());
+        }
+
         let opts = StartOptions {
             ctx: spec.telemetry_ctx,
             package: Package::from_unpacked_path(unpacked_path).await?,
@@ -93,9 +114,9 @@ impl ExecutionBackend for SubprocessBackend {
             environment: spec.environment,
             secrets: spec.secrets,
             parameters: spec.parameters,
-            env_vars: spec.env_vars,
+            env_vars,
             output_sender: output_sender.clone(),
-            cache_dir,
+            cache_dir: final_cache_dir, // UV will use this via --cache-dir flag
         };
 
         // Start the LocalApp
@@ -106,6 +127,7 @@ impl ExecutionBackend for SubprocessBackend {
             app: Arc::new(Mutex::new(app)),
             output_receiver: Arc::new(Mutex::new(output_receiver)),
             _package: package, // Keep package alive so temp dir doesn't get cleaned up
+            uv_temp_dir,
         })
     }
 
@@ -133,7 +155,18 @@ pub struct SubprocessHandle {
     id: String,
     app: Arc<Mutex<LocalApp>>,
     output_receiver: Arc<Mutex<OutputReceiver>>,
-    _package: Package, // Keep package alive to prevent temp dir cleanup
+    _package: Package,            // Keep package alive to prevent temp dir cleanup
+    uv_temp_dir: Option<PathBuf>, // Track uv's temp directory for cleanup
+}
+
+impl Drop for SubprocessHandle {
+    fn drop(&mut self) {
+        // Best-effort cleanup of temp directory when handle is dropped
+        if let Some(temp_dir) = self.uv_temp_dir.take() {
+            // Spawn blocking task to remove directory
+            let _ = std::fs::remove_dir_all(&temp_dir);
+        }
+    }
 }
 
 #[async_trait]
@@ -195,6 +228,15 @@ impl ExecutionHandle for SubprocessHandle {
     async fn cleanup(&mut self) -> Result<(), Error> {
         // Ensure the app is terminated
         self.terminate().await?;
+
+        // Clean up uv's temp directory if it was created
+        if let Some(ref temp_dir) = self.uv_temp_dir {
+            if let Err(e) = tokio::fs::remove_dir_all(temp_dir).await {
+                // Log but don't fail - cleanup is best-effort
+                tower_telemetry::debug!("Failed to clean up uv temp directory: {:?}", e);
+            }
+        }
+
         Ok(())
     }
 }
