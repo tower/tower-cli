@@ -79,15 +79,16 @@ impl ExecutionBackend for SubprocessBackend {
         };
 
         // Create a unique temp directory for uv if no cache directory is configured
-        // This gives UV an isolated cache that we can clean up completely after execution
-        let uv_temp_dir = if cache_dir.is_none() {
+        let (final_cache_dir, uv_temp_dir) = if cache_dir.is_none() {
             let temp_path = std::env::temp_dir().join(format!("tower-uv-{}", spec.id));
             tokio::fs::create_dir_all(&temp_path)
                 .await
                 .map_err(|_| Error::PackageCreateFailed)?;
-            Some(temp_path)
+            // Use the temp directory as cache_dir and track it for cleanup
+            (Some(temp_path.clone()), Some(temp_path))
         } else {
-            None
+            // Use provided cache_dir, no temp dir to clean up
+            (cache_dir, None)
         };
 
         // Receive package stream and unpack it
@@ -98,16 +99,9 @@ impl ExecutionBackend for SubprocessBackend {
             .clone()
             .ok_or(Error::PackageUnpackFailed)?;
 
-        // Set UV_CACHE_DIR to control where UV stores its cache and lock files
-        // This ensures all UV artifacts go into our managed temp directory
+        // Set TMPDIR to the same isolated directory to ensure lock files also go there
         let mut env_vars = spec.env_vars;
         if let Some(ref temp_dir) = uv_temp_dir {
-            // UV_CACHE_DIR is the primary control for UV's cache location
-            env_vars.insert(
-                "UV_CACHE_DIR".to_string(),
-                temp_dir.to_string_lossy().to_string(),
-            );
-            // Also set TMPDIR for any other temporary files
             env_vars.insert("TMPDIR".to_string(), temp_dir.to_string_lossy().to_string());
             env_vars.insert("TEMP".to_string(), temp_dir.to_string_lossy().to_string());
             env_vars.insert("TMP".to_string(), temp_dir.to_string_lossy().to_string());
@@ -122,7 +116,7 @@ impl ExecutionBackend for SubprocessBackend {
             parameters: spec.parameters,
             env_vars,
             output_sender: output_sender.clone(),
-            cache_dir,
+            cache_dir: final_cache_dir, // UV will use this via --cache-dir flag
         };
 
         // Start the LocalApp
