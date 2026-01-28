@@ -18,9 +18,8 @@ use tokio::sync::{
     Mutex,
 };
 use tokio::time::{sleep, timeout, Duration};
-use tower_runtime::execution::ExecutionHandle;
 use tower_runtime::execution::{
-    CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, ResourceLimits,
+    App as _, Backend, CacheBackend, CacheConfig, CacheIsolation, ExecutionSpec, ResourceLimits,
     RuntimeConfig as ExecRuntimeConfig,
 };
 use tower_runtime::subprocess::SubprocessBackend;
@@ -204,7 +203,7 @@ where
 
     // Monitor app status concurrently
     let handle = Arc::new(Mutex::new(handle));
-    let status_task = tokio::spawn(monitor_cli_status(Arc::clone(&handle)));
+    let status_task = tokio::spawn(monitor_app_status(Arc::clone(&handle)));
 
     // Wait for app to complete or SIGTERM
     let status_result = tokio::select! {
@@ -223,6 +222,7 @@ where
     // And if we crashed, err out
     match status_result {
         Status::Exited => output::success("Your local run exited cleanly."),
+        Status::Cancelled => output::success("Your local run was cancelled."),
         Status::Crashed { code } => {
             output::error(&format!("Your local run crashed with exit code: {}", code));
             return Err(Error::AppCrashed);
@@ -654,12 +654,10 @@ async fn monitor_output(mut output: OutputReceiver) {
     }
 }
 
-/// monitor_local_status is a helper function that will monitor the status of a given app and waits for
+/// monitor_app_status is a helper function that will monitor the status of a given app and waits for
 /// it to progress to a terminal state.
-async fn monitor_cli_status(
-    handle: Arc<Mutex<tower_runtime::subprocess::SubprocessHandle>>,
-) -> Status {
-    use tower_runtime::execution::ExecutionHandle as _;
+async fn monitor_app_status(handle: Arc<Mutex<tower_runtime::local::LocalApp>>) -> Status {
+    use tower_runtime::execution::App as _;
 
     debug!("Starting status monitoring for CLI execution");
     let mut check_count = 0;
@@ -681,6 +679,10 @@ async fn monitor_cli_status(
                 match status {
                     Status::Exited => {
                         debug!("Run exited cleanly, stopping status monitoring");
+                        return status;
+                    }
+                    Status::Cancelled => {
+                        debug!("Run was cancelled, stopping status monitoring");
                         return status;
                     }
                     Status::Crashed { .. } => {
