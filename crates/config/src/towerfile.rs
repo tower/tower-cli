@@ -28,8 +28,8 @@ pub struct App {
     #[serde(default)]
     pub schedule: String,
 
-    #[serde(default)]
-    pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 
     #[serde(default)]
     pub import_paths: Vec<PathBuf>,
@@ -58,7 +58,7 @@ impl Towerfile {
                 script: String::from(""),
                 source: vec![],
                 schedule: String::from("0 0 * * *"),
-                description: String::from(""),
+                description: None,
                 import_paths: vec![],
             },
         }
@@ -147,6 +147,7 @@ mod test {
         assert_eq!(towerfile.app.script, "./script.py");
         assert_eq!(towerfile.app.source, vec!["*.py"]);
         assert_eq!(towerfile.app.schedule, "0 0 * * *");
+        assert_eq!(towerfile.app.description, None);
     }
 
     #[test]
@@ -163,6 +164,7 @@ mod test {
         assert_eq!(towerfile.app.script, "./script.py");
         assert_eq!(towerfile.app.source, vec!["*.py"]);
         assert_eq!(towerfile.app.schedule, "");
+        assert_eq!(towerfile.app.description, None);
     }
 
     #[test]
@@ -316,6 +318,7 @@ default = "value2"
         assert_eq!(towerfile.app.name, reparsed.app.name);
         assert_eq!(towerfile.app.script, reparsed.app.script);
         assert_eq!(towerfile.app.source, reparsed.app.source);
+        assert_eq!(towerfile.app.description, reparsed.app.description);
         assert_eq!(towerfile.parameters.len(), reparsed.parameters.len());
         assert_eq!(towerfile.parameters[0].name, reparsed.parameters[0].name);
     }

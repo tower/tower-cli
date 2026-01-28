@@ -734,7 +734,7 @@ impl TowerService {
             towerfile.app.script = script;
         }
         if let Some(description) = request.description {
-            towerfile.app.description = description;
+            towerfile.app.description = Some(description);
         }
         if let Some(source) = request.source {
             towerfile.app.source = source;

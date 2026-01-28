@@ -1,5 +1,5 @@
 use crate::output;
-use clap::Command;
+use clap::{Arg, ArgMatches, Command};
 use config::{Config, Session};
 use tokio::{time, time::Duration};
 use tower_api::models::CreateDeviceLoginTicketResponse;
@@ -8,18 +8,29 @@ use tower_telemetry::debug;
 use crate::api;
 
 pub fn login_cmd() -> Command {
-    Command::new("login").about("Create a session with Tower")
+    Command::new("login")
+        .arg(
+            Arg::new("no-browser")
+                .long("no-browser")
+                .short('n')
+                .help("Do not attempt to open the browser automatically")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .about("Create a session with Tower")
 }
 
-pub async fn do_login(config: Config) {
+pub async fn do_login(config: Config, args: &ArgMatches) {
     output::banner();
+
+    // Open a browser by default, unless the --no-browser flag is set.
+    let open_browser = !args.get_flag("no-browser");
 
     let mut spinner = output::spinner("Starting device login...");
 
     match api::create_device_login_ticket(&config).await {
         Ok(resp) => {
             spinner.success();
-            handle_device_login(config, resp).await;
+            handle_device_login(config, open_browser, resp).await;
         }
         Err(err) => {
             spinner.failure();
@@ -28,18 +39,29 @@ pub async fn do_login(config: Config) {
     }
 }
 
-async fn handle_device_login(config: Config, claim: CreateDeviceLoginTicketResponse) {
-    // Try to open the login URL in browser
-    if let Err(err) = webbrowser::open(&claim.login_url) {
-        debug!("failed to open web browser: {}", err);
+async fn handle_device_login(
+    config: Config,
+    open_browser: bool,
+    claim: CreateDeviceLoginTicketResponse,
+) {
+    // Put this in the debug logs just in case something weird happens.
+    debug!("Login URL: {}", claim.login_url);
 
-        let line = format!(
-            "Please open the following URL in your browser: {}\n",
-            claim.login_url
-        );
-        output::write(&line);
+    let login_instructions = format!(
+        "Please open the following URL in your browser: {}\n",
+        claim.login_url
+    );
+
+    // Try to open the login URL in browser
+    if open_browser {
+        if let Err(err) = webbrowser::open(&claim.login_url) {
+            debug!("failed to open web browser: {}", err);
+            output::write(&login_instructions);
+        } else {
+            debug!("opened browser to {}", claim.login_url);
+        }
     } else {
-        debug!("opened browser to {}", claim.login_url);
+        output::write(&login_instructions);
     }
 
     let mut spinner = output::spinner("Waiting for login...");
