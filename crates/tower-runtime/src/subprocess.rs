@@ -79,7 +79,7 @@ impl ExecutionBackend for SubprocessBackend {
         };
 
         // Create a unique temp directory for uv if no cache directory is configured
-        // This prevents uv from leaving lock files scattered in /tmp
+        // This gives UV an isolated cache that we can clean up completely after execution
         let uv_temp_dir = if cache_dir.is_none() {
             let temp_path = std::env::temp_dir().join(format!("tower-uv-{}", spec.id));
             tokio::fs::create_dir_all(&temp_path)
@@ -98,9 +98,16 @@ impl ExecutionBackend for SubprocessBackend {
             .clone()
             .ok_or(Error::PackageUnpackFailed)?;
 
-        // Set custom TMPDIR for uv to use
+        // Set UV_CACHE_DIR to control where UV stores its cache and lock files
+        // This ensures all UV artifacts go into our managed temp directory
         let mut env_vars = spec.env_vars;
         if let Some(ref temp_dir) = uv_temp_dir {
+            // UV_CACHE_DIR is the primary control for UV's cache location
+            env_vars.insert(
+                "UV_CACHE_DIR".to_string(),
+                temp_dir.to_string_lossy().to_string(),
+            );
+            // Also set TMPDIR for any other temporary files
             env_vars.insert("TMPDIR".to_string(), temp_dir.to_string_lossy().to_string());
             env_vars.insert("TEMP".to_string(), temp_dir.to_string_lossy().to_string());
             env_vars.insert("TMP".to_string(), temp_dir.to_string_lossy().to_string());
