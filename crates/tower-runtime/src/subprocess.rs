@@ -38,7 +38,7 @@ impl SubprocessBackend {
         mut package_stream: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
     ) -> Result<Package, Error> {
         // Create temp directory for this package
-        let temp_dir = tmpdir::TmpDir::new("tower-package")
+        let temp_dir = TmpDir::new("tower-package")
             .await
             .map_err(|_| Error::PackageCreateFailed)?;
 
