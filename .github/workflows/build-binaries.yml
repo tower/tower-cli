@@ -252,6 +252,9 @@ jobs:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
           distro: ${{ matrix.platform.arch == 'arm' && 'bookworm' || 'ubuntu22.04' }}
           githubToken: ${{ github.token }}
+          # Use sparse registry to avoid 32-bit file size limits (!)
+          env: |
+            CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip python3-venv python3-dev cargo libffi-dev
