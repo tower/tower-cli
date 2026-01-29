@@ -147,7 +147,7 @@ pub fn cleanup_stale_uv_lock_files() {
 
         // Only process files matching the uv-*.lock pattern
         if let Some(file_name) = path.file_name() {
-            if is_uv_lock_file_name(&file_name) {
+            if !is_uv_lock_file_name(&file_name) {
                 continue;
             }
         } else {
@@ -540,5 +540,39 @@ mod tests {
         // Release the lock and clean up
         drop(file);
         let _ = fs::remove_file(&lock_path);
+    }
+
+    #[test]
+    fn test_cleanup_stale_uv_lock_files_only_removes_uv_lock_files() {
+        let temp_dir = std::env::temp_dir();
+
+        // Create a valid UV lock file (matches uv-<16 hex chars>.lock pattern)
+        let uv_lock_file = temp_dir.join("uv-0123456789abcdef.lock");
+        {
+            let mut file = fs::File::create(&uv_lock_file).unwrap();
+            file.write_all(b"test uv lock").unwrap();
+        }
+
+        // Create a non-UV file that should NOT be touched
+        let non_uv_file = temp_dir.join("not-a-uv-lock-file.txt");
+        {
+            let mut file = fs::File::create(&non_uv_file).unwrap();
+            file.write_all(b"other file").unwrap();
+        }
+
+        assert!(uv_lock_file.exists());
+        assert!(non_uv_file.exists());
+
+        // Run the cleanup
+        cleanup_stale_uv_lock_files();
+
+        // UV lock file should be removed (it wasn't locked)
+        assert!(!uv_lock_file.exists(), "UV lock file should have been cleaned up");
+
+        // Non-UV file should still exist
+        assert!(non_uv_file.exists(), "Non-UV file should not have been touched");
+
+        // Clean up the non-UV file
+        let _ = fs::remove_file(&non_uv_file);
     }
 }
