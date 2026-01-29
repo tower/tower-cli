@@ -2,6 +2,7 @@ from typing import Optional, Generic, TypeVar, Union, List
 from dataclasses import dataclass
 
 from pyiceberg.exceptions import NoSuchTableError
+from pyiceberg.exceptions import CommitFailedException
 
 TTable = TypeVar("TTable", bound="Table")
 
@@ -24,6 +25,9 @@ from .utils.tables import (
     make_table_name,
     namespace_or_default,
 )
+
+import time
+import random
 
 
 @dataclass
@@ -178,13 +182,20 @@ class Table:
         self._stats.inserts += data.num_rows
         return self
 
-    def upsert(self, data: pa.Table, join_cols: Optional[list[str]] = None) -> TTable:
+    def upsert(
+        self,
+        data: pa.Table,
+        join_cols: Optional[list[str]] = None,
+        max_retries: int = 5,
+        retry_delay_seconds: float = 0.5,
+    ) -> TTable:
         """
-        Performs an upsert operation (update or insert) on the Iceberg table.
+        Performs an upsert operation (update or insert) on the Iceberg table. In case of commit conflicts, reloads the metadata and retries.
 
         This method will:
         - Update existing rows if they match the join columns
         - Insert new rows if no match is found
+        - Retry for max_retries if commits fail
         All operations are case-sensitive by default.
 
         Args:
@@ -192,9 +203,16 @@ class Table:
                 must match the schema of the target table.
             join_cols (Optional[list[str]]): The columns that form the key to match rows on.
                 If not provided, all columns will be used for matching.
+            max_retries (int): Maximum number of retry attempts on commit conflicts.
+                Defaults to 5.
+            retry_delay_seconds (float): Wait time in seconds between retries.
+                Defaults to 0.5 seconds.
 
         Returns:
             TTable: The table instance with the upserted rows, allowing for method chaining.
+
+        Raises:
+            CommitFailedException: If all retry attempts are exhausted.
 
         Note:
             - The operation is always case-sensitive
@@ -217,22 +235,34 @@ class Table:
             >>> print(f"Updated {stats.updates} rows")
             >>> print(f"Inserted {stats.inserts} rows")
         """
-        res = self._table.upsert(
-            data,
-            join_cols=join_cols,
-            # All upserts will always be case sensitive. Perhaps we'll add this
-            # as a parameter in the future?
-            case_sensitive=True,
-            # These are the defaults, but we're including them to be complete.
-            when_matched_update_all=True,
-            when_not_matched_insert_all=True,
-        )
+        last_exception = None
 
-        # Update the stats with the results of the relevant upsert.
-        self._stats.updates += res.rows_updated
-        self._stats.inserts += res.rows_inserted
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    self._table.refresh()
 
-        return self
+                res = self._table.upsert(
+                    data,
+                    join_cols=join_cols,
+                    # All upserts will always be case sensitive. Perhaps we'll add this
+                    # as a parameter in the future?
+                    case_sensitive=True,
+                    # These are the defaults, but we're including them to be complete.
+                    when_matched_update_all=True,
+                    when_not_matched_insert_all=True,
+                )
+
+                self._stats.updates += res.rows_updated
+                self._stats.inserts += res.rows_inserted
+                return self
+
+            except CommitFailedException as e:
+                last_exception = e
+                if attempt < max_retries:
+                    time.sleep(retry_delay_seconds)
+
+        raise last_exception
 
     def delete(self, filters: Union[str, List[pc.Expression]]) -> TTable:
         """

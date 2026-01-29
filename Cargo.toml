@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.43"
+version = "0.3.44"
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.81"
 authors = ["Brad Heller <brad@tower.dev>"]
@@ -28,20 +28,24 @@ config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
 ctrlc = "3"
 dirs = "5"
+fs2 = "0.4"
 futures = "0.3"
 futures-util = "0.3"
 futures-lite = "2.6"
 glob = "0.3"
+hex = "0.4"
 http = "1.1"
 indicatif = "0.17"
 nix = { version = "0.30", features = ["signal"] }
 pem = "3"
 promptly = "0.3"
 rand = "0.8"
+regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 reqwest-eventsource = { version = "0.6" }
 rpassword = "7"
 rsa = "0.9"
+seahash = "4.1"
 serde = "1"
 serde_json = "1.0"
 sha2 = "0.10"

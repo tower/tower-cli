@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.11'",
@@ -2744,7 +2744,7 @@ wheels = [
 
 [[package]]
 name = "tower"
-version = "0.3.43"
+version = "0.3.44"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
