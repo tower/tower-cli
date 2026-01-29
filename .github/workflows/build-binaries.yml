@@ -240,6 +240,7 @@ jobs:
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
         env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
           # Set the CFLAGS for the aarch64 target, defining the ARM architecture
           # for the ring crate's build script. This is a workaround for the
           # issue where the ring crate's build script is not able to detect the
@@ -257,6 +258,7 @@ jobs:
             apt-get install -y --no-install-recommends python3 python3-pip python3-venv python3-dev cargo libffi-dev
           # Create and use a virtual environment to avoid the externally-managed-environment error
           run: |
+            export CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
             python3 -m venv /tmp/venv
             . /tmp/venv/bin/activate
             pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
