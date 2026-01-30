@@ -6,6 +6,7 @@ httpUserAgent: "Tower CLI"
 templateDir: rust-client-templates
 nameMappings:
   $schema: schema
+  App: deprecated_app
 
 globalProperties:
   modelDocs: false
