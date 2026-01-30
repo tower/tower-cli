@@ -35,32 +35,51 @@ impl SubprocessBackend {
     /// Returns the Package (which keeps the temp directory alive)
     async fn receive_and_unpack_package(
         &self,
+        ctx: &tower_telemetry::Context,
         mut package_stream: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
     ) -> Result<Package, Error> {
+        use tower_telemetry::{debug, error, info};
         // Create temp directory for this package
-        let temp_dir = TmpDir::new("tower-package")
-            .await
-            .map_err(|_| Error::PackageCreateFailed)?;
+        let temp_dir = TmpDir::new("tower-package").await.map_err(|e| {
+            error!(ctx: ctx, "Failed to create temp directory: {:?}", e);
+            Error::PackageCreateFailed
+        })?;
 
         // Save stream to tar.gz file
         let tar_gz_path = temp_dir.to_path_buf().join("package.tar.gz");
-        let mut file = File::create(&tar_gz_path)
-            .await
-            .map_err(|_| Error::PackageCreateFailed)?;
+        debug!(ctx: ctx, "Saving package stream to {:?}", tar_gz_path);
 
-        tokio::io::copy(&mut package_stream, &mut file)
-            .await
-            .map_err(|_| Error::PackageCreateFailed)?;
+        let mut file = File::create(&tar_gz_path).await.map_err(|e| {
+            error!(ctx: ctx, "Failed to create package file: {:?}", e);
+            Error::PackageCreateFailed
+        })?;
 
-        file.flush().await.map_err(|_| Error::PackageCreateFailed)?;
+        let bytes_copied = tokio::io::copy(&mut package_stream, &mut file)
+            .await
+            .map_err(|e| {
+                error!(ctx: ctx, "Failed to save package stream: {:?}", e);
+                Error::PackageCreateFailed
+            })?;
+
+        debug!(ctx: ctx, "Downloaded {} bytes", bytes_copied);
+
+        file.flush().await.map_err(|e| {
+            error!(ctx: ctx, "Failed to flush package file: {:?}", e);
+            Error::PackageCreateFailed
+        })?;
         drop(file);
 
         // Unpack the package
+        info!(ctx: ctx, "Unpacking package");
         let mut package = Package::default();
         package.package_file_path = Some(tar_gz_path);
         package.tmp_dir = Some(temp_dir);
-        package.unpack().await?;
+        package.unpack().await.map_err(|e| {
+            error!(ctx: ctx, "Failed to unpack package: {:?}", e);
+            Error::PackageUnpackFailed
+        })?;
 
+        info!(ctx: ctx, "Successfully unpacked package");
         Ok(package)
     }
 }
@@ -93,7 +112,9 @@ impl ExecutionBackend for SubprocessBackend {
         };
 
         // Receive package stream and unpack it
-        let mut package = self.receive_and_unpack_package(spec.package_stream).await?;
+        let mut package = self
+            .receive_and_unpack_package(&spec.telemetry_ctx, spec.package_stream)
+            .await?;
 
         let unpacked_path = package
             .unpacked_path
