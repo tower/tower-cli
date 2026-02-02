@@ -159,7 +159,7 @@ pub fn cleanup_stale_uv_lock_files() {
             Ok(f) => f,
             Err(e) => {
                 debug!("Failed to open lock file {:?}: {:?}", path, e);
-                continue
+                continue;
             }
         };
 
@@ -187,7 +187,8 @@ fn is_uv_lock_file_name<S: AsRef<std::ffi::OsStr>>(lock_name: S) -> bool {
     let uv_lock_pattern = Regex::new(r"^uv-[0-9a-f]{16}\.lock$").unwrap();
     let os_str = lock_name.as_ref();
 
-    os_str.to_str()
+    os_str
+        .to_str()
         .map(|name| uv_lock_pattern.is_match(name))
         .unwrap_or(false)
 }
@@ -567,10 +568,16 @@ mod tests {
         cleanup_stale_uv_lock_files();
 
         // UV lock file should be removed (it wasn't locked)
-        assert!(!uv_lock_file.exists(), "UV lock file should have been cleaned up");
+        assert!(
+            !uv_lock_file.exists(),
+            "UV lock file should have been cleaned up"
+        );
 
         // Non-UV file should still exist
-        assert!(non_uv_file.exists(), "Non-UV file should not have been touched");
+        assert!(
+            non_uv_file.exists(),
+            "Non-UV file should not have been touched"
+        );
 
         // Clean up the non-UV file
         let _ = fs::remove_file(&non_uv_file);
