@@ -96,9 +96,7 @@ pub async fn ensure_app_exists(
         }
         Err(create_err) => {
             spinner.failure();
-            Err(crate::Error::ApiCreateAppError {
-                source: create_err,
-            })
+            Err(crate::Error::ApiCreateAppError { source: create_err })
         }
     }
 }
