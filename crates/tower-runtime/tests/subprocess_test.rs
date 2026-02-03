@@ -45,7 +45,7 @@ async fn create_execution_spec(id: String, package: Package) -> ExecutionSpec {
 
     ExecutionSpec {
         id,
-        telemetry_ctx: tower_telemetry::Context::new(),
+        telemetry_ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package_stream: Box::new(file),
         environment: "test".to_string(),
         secrets: HashMap::new(),
