@@ -247,7 +247,7 @@ fn build_cli_execution_spec(
     run_id: String,
 ) -> ExecutionSpec {
     let spec = ExecutionSpec {
-        id: run_id,
+        id: run_id.clone(),
         package_stream: Box::new(package_stream),
         runtime: ExecRuntimeConfig {
             image: "local".to_string(),
@@ -278,7 +278,7 @@ fn build_cli_execution_spec(
             timeout_seconds: 3600,
         },
         networking: None,
-        telemetry_ctx: Context::new(),
+        telemetry_ctx: Context::new("local-runner".to_string()).with_runid(&run_id),
     };
     spec
 }

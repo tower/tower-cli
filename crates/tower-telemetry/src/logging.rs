@@ -7,9 +7,9 @@ macro_rules! event_with_level {
     // With context
     ($level:expr, ctx: $ctx:expr, $fmt:expr, $($arg:tt)+) => {
         if let Some(runid) = &$ctx.runid {
-            $crate::tracing::event!($level, "tower.runid" = %runid, "{}", format!($fmt, $($arg)+))
+            $crate::tracing::event!($level, "tower.runid" = %runid, "tower.runner_id" = %$ctx.runner_id, "{}", format!($fmt, $($arg)+))
         } else {
-            $crate::tracing::event!($level, "{}", format!($fmt, $($arg)+))
+            $crate::tracing::event!($level, "tower.runner_id" = %$ctx.runner_id, "{}", format!($fmt, $($arg)+))
         }
     };
 
