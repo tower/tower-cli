@@ -2,16 +2,20 @@
 pub struct Context {
     /// runid is the ID of the run in the current context.
     pub runid: Option<String>,
+    /// runner_id is the ID of the runner instance in the current context.
+    pub runner_id: String,
 }
 
 impl Context {
-    pub fn from_runid(runid: &str) -> Self {
+    pub fn new(runner_id: String) -> Self {
         Self {
-            runid: Some(runid.to_string()),
+            runid: None,
+            runner_id,
         }
     }
 
-    pub fn new() -> Self {
-        Self { runid: None }
+    pub fn with_runid(mut self, runid: &str) -> Self {
+        self.runid = Some(runid.to_string());
+        self
     }
 }

@@ -48,7 +48,7 @@ async fn test_running_hello_world_json_logs() {
 
     // We need to create the package, which will load the app
     let opts = StartOptions {
-        ctx: tower_telemetry::Context::new(),
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package,
         output_sender: sender,
         cwd: None,
@@ -97,7 +97,7 @@ async fn test_running_hello_world() {
 
     // We need to create the package, which will load the app
     let opts = StartOptions {
-        ctx: tower_telemetry::Context::new(),
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package,
         output_sender: sender,
         cwd: None,
@@ -142,7 +142,7 @@ async fn test_running_use_faker() {
 
     // We need to create the package, which will load the app
     let opts = StartOptions {
-        ctx: tower_telemetry::Context::new(),
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package,
         output_sender: sender,
         cwd: None,
@@ -194,7 +194,7 @@ async fn test_running_legacy_app() {
 
     // We need to create the package, which will load the app
     let opts = StartOptions {
-        ctx: tower_telemetry::Context::new(),
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package,
         output_sender: sender,
         cwd: None,
@@ -260,7 +260,7 @@ async fn test_running_app_with_secret() {
 
     // We need to create the package, which will load the app
     let opts = StartOptions {
-        ctx: tower_telemetry::Context::new(),
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package,
         output_sender: sender,
         cwd: None,
@@ -339,7 +339,7 @@ async fn test_abort_on_dependency_installation_failure() {
     let (sender, mut receiver) = unbounded_channel();
 
     let opts = StartOptions {
-        ctx: tower_telemetry::Context::new(),
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
         package,
         output_sender: sender,
         cwd: None,
