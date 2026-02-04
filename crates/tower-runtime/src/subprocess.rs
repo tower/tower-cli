@@ -1,5 +1,6 @@
 //! Subprocess execution backend
 
+use crate::auto_cleanup;
 use crate::errors::Error;
 use crate::execution::{
     BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
@@ -10,6 +11,7 @@ use crate::{App, OutputReceiver, StartOptions, Status};
 
 use async_trait::async_trait;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tmpdir::TmpDir;
 use tokio::fs::File;
@@ -17,6 +19,9 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 use tower_package::Package;
+
+/// Cleanup timeout after a run finishes (5 minutes)
+const CLEANUP_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 /// SubprocessBackend executes apps as a subprocess
 pub struct SubprocessBackend {
@@ -146,14 +151,29 @@ impl ExecutionBackend for SubprocessBackend {
         };
 
         // Start the LocalApp
-        let app = LocalApp::start(opts).await?;
+        let app = Arc::new(Mutex::new(LocalApp::start(opts).await?));
+
+        let package_tmp_dir = Arc::new(Mutex::new(package_tmp_dir));
+        let uv_temp_dir = Arc::new(Mutex::new(uv_temp_dir));
+        let cleanup_called = Arc::new(AtomicBool::new(false));
+
+        // Spawn automatic cleanup monitor (temporary workaround for disconnected control plane)
+        auto_cleanup::spawn_cleanup_monitor(
+            spec.id.clone(),
+            Arc::clone(&app),
+            Arc::clone(&package_tmp_dir),
+            Arc::clone(&uv_temp_dir),
+            Arc::clone(&cleanup_called),
+            CLEANUP_TIMEOUT,
+        );
 
         Ok(SubprocessHandle {
             id: spec.id,
-            app: Arc::new(Mutex::new(app)),
+            app,
             output_receiver: Arc::new(Mutex::new(output_receiver)),
             package_tmp_dir,
             uv_temp_dir,
+            cleanup_called,
         })
     }
 
@@ -181,22 +201,9 @@ pub struct SubprocessHandle {
     id: String,
     app: Arc<Mutex<LocalApp>>,
     output_receiver: Arc<Mutex<OutputReceiver>>,
-    package_tmp_dir: Option<TmpDir>, // Track package temp directory for cleanup
-    uv_temp_dir: Option<PathBuf>,    // Track UV's temp directory for cleanup
-}
-
-impl Drop for SubprocessHandle {
-    fn drop(&mut self) {
-        // Best-effort cleanup of UV temp directory when handle is dropped
-        if let Some(temp_dir) = self.uv_temp_dir.take() {
-            let _ = std::fs::remove_dir_all(&temp_dir);
-        }
-
-        // Best-effort cleanup of package temp directory when handle is dropped
-        if let Some(tmp_dir) = self.package_tmp_dir.take() {
-            let _ = std::fs::remove_dir_all(tmp_dir.to_path_buf());
-        }
-    }
+    package_tmp_dir: Arc<Mutex<Option<TmpDir>>>,
+    uv_temp_dir: Arc<Mutex<Option<PathBuf>>>,
+    cleanup_called: Arc<AtomicBool>,
 }
 
 #[async_trait]
@@ -256,23 +263,28 @@ impl ExecutionHandle for SubprocessHandle {
     }
 
     async fn cleanup(&mut self) -> Result<(), Error> {
+        use tower_telemetry::{debug, info};
+
+        info!("Explicit cleanup called for run {}", self.id);
+
+        // Mark cleanup as called (prevents timer from running)
+        self.cleanup_called.store(true, Ordering::Relaxed);
+
         // Ensure the app is terminated
         self.terminate().await?;
 
-        // Clean up uv's temp directory if it was created
-        if let Some(ref temp_dir) = self.uv_temp_dir {
-            if let Err(e) = tokio::fs::remove_dir_all(temp_dir).await {
-                // Log but don't fail - cleanup is best-effort
-                tower_telemetry::debug!("Failed to clean up uv temp directory: {:?}", e);
+        // Clean up uv's temp directory
+        if let Some(temp_dir) = self.uv_temp_dir.lock().await.take() {
+            if let Err(e) = tokio::fs::remove_dir_all(&temp_dir).await {
+                debug!("Failed to clean up uv temp directory: {:?}", e);
             }
         }
 
         // Clean up package temp directory
-        if let Some(tmp_dir) = self.package_tmp_dir.take() {
+        if let Some(tmp_dir) = self.package_tmp_dir.lock().await.take() {
             let path = tmp_dir.to_path_buf();
             if let Err(e) = tokio::fs::remove_dir_all(&path).await {
-                // Log but don't fail - cleanup is best-effort
-                tower_telemetry::debug!("Failed to clean up package temp directory: {:?}", e);
+                debug!("Failed to clean up package temp directory: {:?}", e);
             }
         }
 
