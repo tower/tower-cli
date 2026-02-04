@@ -14,11 +14,14 @@ use tokio::sync::Mutex;
 
 use crate::App;
 
+/// How often to poll the app status to check if it has reached terminal state
+const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(5);
+
 /// Spawns a background task that monitors an app and performs automatic cleanup
 /// after a timeout if explicit cleanup hasn't been called.
 ///
 /// This task:
-/// 1. Polls the app status every n seconds
+/// 1. Polls the app status every STATUS_POLL_INTERVAL
 /// 2. When the app reaches a terminal state, waits for cleanup_timeout
 /// 3. If cleanup_called flag is still false, performs cleanup and logs a warning
 pub fn spawn_cleanup_monitor<T: App + 'static>(
@@ -34,7 +37,7 @@ pub fn spawn_cleanup_monitor<T: App + 'static>(
 
         // Wait for terminal state
         loop {
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(STATUS_POLL_INTERVAL).await;
             let status = app.lock().await.status().await;
             if matches!(status, Ok(s) if s.is_terminal()) {
                 info!(
@@ -150,22 +153,28 @@ mod tests {
         // Verify directories exist before cleanup
         assert!(tokio::fs::metadata(uv_temp_path.clone()).await.is_ok());
 
-        // Spawn cleanup monitor with short timeout (500ms)
+        let cleanup_timeout = Duration::from_secs(1);
+
+        // Spawn cleanup monitor
         spawn_cleanup_monitor(
             "test-run-1".to_string(),
             app,
             package_tmp_dir.clone(),
             uv_temp_dir.clone(),
             cleanup_called.clone(),
-            Duration::from_millis(500),
+            cleanup_timeout,
         );
 
         // Wait for:
         // - App to transition (100ms)
-        // - Polling to detect terminal state (up to 1000ms)
-        // - Cleanup timeout (500ms)
-        // - Buffer (500ms)
-        tokio::time::sleep(Duration::from_millis(2200)).await;
+        // - Polling to detect terminal state (up to STATUS_POLL_INTERVAL)
+        // - Cleanup timeout
+        // - Buffer (1000ms)
+        let wait_time = Duration::from_millis(100)
+            + STATUS_POLL_INTERVAL
+            + cleanup_timeout
+            + Duration::from_secs(1);
+        tokio::time::sleep(wait_time).await;
 
         // Verify cleanup happened
         assert!(
@@ -204,18 +213,22 @@ mod tests {
         let uv_temp_dir = Arc::new(Mutex::new(Some(uv_temp_path.clone())));
         let cleanup_called = Arc::new(AtomicBool::new(false));
 
-        // Spawn cleanup monitor with short timeout (500ms)
+        let cleanup_timeout = Duration::from_secs(1);
+
+        // Spawn cleanup monitor
         spawn_cleanup_monitor(
             "test-run-2".to_string(),
             app,
             package_tmp_dir.clone(),
             uv_temp_dir.clone(),
             cleanup_called.clone(),
-            Duration::from_millis(500),
+            cleanup_timeout,
         );
 
-        // Wait for app to transition + polling to detect it (up to 1100ms)
-        tokio::time::sleep(Duration::from_millis(1200)).await;
+        // Wait for app to transition + polling to detect it
+        let wait_before_cleanup =
+            Duration::from_millis(100) + STATUS_POLL_INTERVAL + Duration::from_millis(100);
+        tokio::time::sleep(wait_before_cleanup).await;
 
         // Simulate explicit cleanup call before timeout expires
         cleanup_called.store(true, Ordering::Relaxed);
@@ -228,8 +241,8 @@ mod tests {
             let _ = tokio::fs::remove_dir_all(tmp_dir.to_path_buf()).await;
         }
 
-        // Wait past the cleanup timeout (already waited 1200ms, need 500ms more + buffer)
-        tokio::time::sleep(Duration::from_millis(700)).await;
+        // Wait past the cleanup timeout to ensure automatic cleanup would have triggered
+        tokio::time::sleep(cleanup_timeout + Duration::from_secs(1)).await;
 
         // Verify cleanup flag is still true
         assert!(
@@ -250,10 +263,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_cleanup_waits_for_terminal_state() {
-        // Create a mock app that takes longer to transition (1500ms)
+        // Create a mock app that takes longer to transition (6s)
         let app = Arc::new(Mutex::new(MockLocalApp::new(
             Status::Running,
-            Duration::from_millis(1500),
+            Duration::from_secs(6),
         )));
 
         // Create temp directories
@@ -262,18 +275,20 @@ mod tests {
         let uv_temp_dir = Arc::new(Mutex::new(Some(uv_temp_path.clone())));
         let cleanup_called = Arc::new(AtomicBool::new(false));
 
-        // Spawn cleanup monitor with short timeout (200ms)
+        let cleanup_timeout = Duration::from_millis(500);
+
+        // Spawn cleanup monitor
         spawn_cleanup_monitor(
             "test-run-3".to_string(),
             app.clone(),
             package_tmp_dir.clone(),
             uv_temp_dir.clone(),
             cleanup_called.clone(),
-            Duration::from_millis(200),
+            cleanup_timeout,
         );
 
-        // Check status well before transition (500ms)
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        // Check status well before transition
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // Cleanup should NOT have happened yet because app is still Running
         assert!(
@@ -288,11 +303,15 @@ mod tests {
         );
 
         // Wait for:
-        // - Rest of transition (1000ms more)
-        // - Polling to detect terminal state (up to 1000ms)
-        // - Cleanup timeout (200ms)
-        // - Buffer (300ms)
-        tokio::time::sleep(Duration::from_millis(2600)).await;
+        // - Rest of transition (4s more)
+        // - Polling to detect terminal state (up to STATUS_POLL_INTERVAL)
+        // - Cleanup timeout
+        // - Buffer (1s)
+        let remaining_wait = Duration::from_secs(4)
+            + STATUS_POLL_INTERVAL
+            + cleanup_timeout
+            + Duration::from_secs(1);
+        tokio::time::sleep(remaining_wait).await;
 
         // Now cleanup should have happened
         assert!(
