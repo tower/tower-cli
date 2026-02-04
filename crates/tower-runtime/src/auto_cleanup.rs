@@ -3,8 +3,6 @@
 //! This module exists to handle the case where the control plane
 //! disconnects and never sends a cleanup call to the runner. Under normal circumstances,
 //! the control plane should always call cleanup after a run finishes.
-//!
-//! **TODO**: Possibly remove this module once the control plane reliability issues are resolved.
 //! ref: TOW-1342
 
 use std::path::PathBuf;
