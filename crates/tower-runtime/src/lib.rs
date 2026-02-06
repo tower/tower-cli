@@ -6,6 +6,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use tower_package::Package;
 
+pub mod auto_cleanup;
 pub mod errors;
 pub mod execution;
 pub mod local;
@@ -42,6 +43,13 @@ pub enum Status {
     Running,
     Exited,
     Crashed { code: i32 },
+}
+
+impl Status {
+    /// Returns true if this status represents a terminal state (run is finished)
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Status::Exited | Status::Crashed { .. })
+    }
 }
 
 pub type OutputReceiver = UnboundedReceiver<Output>;
