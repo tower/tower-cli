@@ -1,11 +1,12 @@
 import datetime
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_runs_response import ListRunsResponse
 from ...models.list_runs_status_item import ListRunsStatusItem
 from ...types import UNSET, Response, Unset
@@ -14,12 +15,12 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     name: str,
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[ListRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -27,7 +28,7 @@ def _get_kwargs(
 
     params["page_size"] = page_size
 
-    json_status: Union[Unset, list[str]] = UNSET
+    json_status: list[str] | Unset = UNSET
     if not isinstance(status, Unset):
         json_status = []
         for status_item_data in status:
@@ -36,12 +37,12 @@ def _get_kwargs(
 
     params["status"] = json_status
 
-    json_start_at: Union[Unset, str] = UNSET
+    json_start_at: str | Unset = UNSET
     if not isinstance(start_at, Unset):
         json_start_at = start_at.isoformat()
     params["start_at"] = json_start_at
 
-    json_end_at: Union[Unset, str] = UNSET
+    json_end_at: str | Unset = UNSET
     if not isinstance(end_at, Unset):
         json_end_at = end_at.isoformat()
     params["end_at"] = json_end_at
@@ -53,7 +54,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/apps/{name}/runs".format(
-            name=name,
+            name=quote(str(name), safe=""),
         ),
         "params": params,
     }
@@ -62,21 +63,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListRunsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListRunsResponse:
     if response.status_code == 200:
         response_200 = ListRunsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListRunsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListRunsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -89,13 +90,13 @@ def sync_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[ListRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListRunsResponse]:
     """List runs
 
      Generates a list of all the runs for a given app. The list is paginated based on the query string
@@ -103,23 +104,23 @@ def sync_detailed(
 
     Args:
         name (str): The name of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[ListRunsStatusItem] | Unset): Filter runs by status(es). Define multiple with
+            a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after or at this datetime
             (inclusive)
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
+            (inclusive)
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListRunsResponse]
+        Response[ErrorModel | ListRunsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -143,13 +144,13 @@ def sync(
     name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[ListRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListRunsResponse | None:
     """List runs
 
      Generates a list of all the runs for a given app. The list is paginated based on the query string
@@ -157,23 +158,23 @@ def sync(
 
     Args:
         name (str): The name of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[ListRunsStatusItem] | Unset): Filter runs by status(es). Define multiple with
+            a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after or at this datetime
             (inclusive)
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
+            (inclusive)
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListRunsResponse
+        ErrorModel | ListRunsResponse
     """
 
     return sync_detailed(
@@ -192,13 +193,13 @@ async def asyncio_detailed(
     name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[ListRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListRunsResponse]:
     """List runs
 
      Generates a list of all the runs for a given app. The list is paginated based on the query string
@@ -206,23 +207,23 @@ async def asyncio_detailed(
 
     Args:
         name (str): The name of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[ListRunsStatusItem] | Unset): Filter runs by status(es). Define multiple with
+            a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after or at this datetime
             (inclusive)
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
+            (inclusive)
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListRunsResponse]
+        Response[ErrorModel | ListRunsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -244,13 +245,13 @@ async def asyncio(
     name: str,
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    status: Union[Unset, list[ListRunsStatusItem]] = UNSET,
-    start_at: Union[Unset, datetime.datetime] = UNSET,
-    end_at: Union[Unset, datetime.datetime] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListRunsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    status: list[ListRunsStatusItem] | Unset = UNSET,
+    start_at: datetime.datetime | Unset = UNSET,
+    end_at: datetime.datetime | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListRunsResponse | None:
     """List runs
 
      Generates a list of all the runs for a given app. The list is paginated based on the query string
@@ -258,23 +259,23 @@ async def asyncio(
 
     Args:
         name (str): The name of the app to fetch runs for.
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        status (Union[Unset, list[ListRunsStatusItem]]): Filter runs by status(es). Define
-            multiple with a comma-separated list. Supplying none will return all statuses.
-        start_at (Union[Unset, datetime.datetime]): Filter runs scheduled after or at this
-            datetime (inclusive)
-        end_at (Union[Unset, datetime.datetime]): Filter runs scheduled before or at this datetime
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        status (list[ListRunsStatusItem] | Unset): Filter runs by status(es). Define multiple with
+            a comma-separated list. Supplying none will return all statuses.
+        start_at (datetime.datetime | Unset): Filter runs scheduled after or at this datetime
             (inclusive)
-        environment (Union[Unset, str]): Filter runs by environment. If not provided, all
-            environments will be included.
+        end_at (datetime.datetime | Unset): Filter runs scheduled before or at this datetime
+            (inclusive)
+        environment (str | Unset): Filter runs by environment. If not provided, all environments
+            will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListRunsResponse
+        ErrorModel | ListRunsResponse
     """
 
     return (

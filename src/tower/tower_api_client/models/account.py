@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -14,12 +16,12 @@ class Account:
     Attributes:
         is_self_hosted_only (bool):
         name (str):
-        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
+        slug (str | Unset): This property is deprecated. Use name instead.
     """
 
     is_self_hosted_only: bool
     name: str
-    slug: Union[Unset, str] = UNSET
+    slug: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         is_self_hosted_only = self.is_self_hosted_only
@@ -29,6 +31,7 @@ class Account:
         slug = self.slug
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "is_self_hosted_only": is_self_hosted_only,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -20,7 +22,6 @@ class Alert:
         alert_type (str):
         created_at (datetime.datetime):
         detail (RunFailureAlert):
-        environment (str):
         seq (int):
         status (str):
     """
@@ -28,8 +29,7 @@ class Alert:
     acked: bool
     alert_type: str
     created_at: datetime.datetime
-    detail: "RunFailureAlert"
-    environment: str
+    detail: RunFailureAlert
     seq: int
     status: str
 
@@ -42,20 +42,18 @@ class Alert:
 
         detail = self.detail.to_dict()
 
-        environment = self.environment
-
         seq = self.seq
 
         status = self.status
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "acked": acked,
                 "alert_type": alert_type,
                 "created_at": created_at,
                 "detail": detail,
-                "environment": environment,
                 "seq": seq,
                 "status": status,
             }
@@ -76,8 +74,6 @@ class Alert:
 
         detail = RunFailureAlert.from_dict(d.pop("detail"))
 
-        environment = d.pop("environment")
-
         seq = d.pop("seq")
 
         status = d.pop("status")
@@ -87,7 +83,6 @@ class Alert:
             alert_type=alert_type,
             created_at=created_at,
             detail=detail,
-            environment=environment,
             seq=seq,
             status=status,
         )

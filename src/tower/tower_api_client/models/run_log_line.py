@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -20,8 +22,8 @@ class RunLogLine:
         line_num (int): Line number.
         reported_at (datetime.datetime): Timestamp of the log line.
         run_id (str): The uuid of the Run.
-        message (Union[Unset, str]): This property is deprecated. Please use content instead.
-        timestamp (Union[Unset, datetime.datetime]): This property is deprecated. Please use reported_at instead.
+        message (str | Unset): This property is deprecated. Use content instead.
+        timestamp (datetime.datetime | Unset): This property is deprecated. Use reported_at instead.
     """
 
     channel: RunLogLineChannel
@@ -29,8 +31,8 @@ class RunLogLine:
     line_num: int
     reported_at: datetime.datetime
     run_id: str
-    message: Union[Unset, str] = UNSET
-    timestamp: Union[Unset, datetime.datetime] = UNSET
+    message: str | Unset = UNSET
+    timestamp: datetime.datetime | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         channel = self.channel.value
@@ -45,11 +47,12 @@ class RunLogLine:
 
         message = self.message
 
-        timestamp: Union[Unset, str] = UNSET
+        timestamp: str | Unset = UNSET
         if not isinstance(self.timestamp, Unset):
             timestamp = self.timestamp.isoformat()
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "channel": channel,
@@ -82,7 +85,7 @@ class RunLogLine:
         message = d.pop("message", UNSET)
 
         _timestamp = d.pop("timestamp", UNSET)
-        timestamp: Union[Unset, datetime.datetime]
+        timestamp: datetime.datetime | Unset
         if isinstance(_timestamp, Unset):
             timestamp = UNSET
         else:

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -16,22 +18,22 @@ T = TypeVar("T", bound="Runner")
 class Runner:
     """
     Attributes:
-        active_runs (list['Run']):
+        active_runs (list[Run]):
         created_at (str):
         id (str):
         max_concurrent_apps (int):
         num_runs (int):
         status (str):
-        last_health_check_at (Union[Unset, str]):
+        last_health_check_at (str | Unset):
     """
 
-    active_runs: list["Run"]
+    active_runs: list[Run]
     created_at: str
     id: str
     max_concurrent_apps: int
     num_runs: int
     status: str
-    last_health_check_at: Union[Unset, str] = UNSET
+    last_health_check_at: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         active_runs = []
@@ -52,6 +54,7 @@ class Runner:
         last_health_check_at = self.last_health_check_at
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "active_runs": active_runs,

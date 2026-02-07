@@ -1,10 +1,10 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_secret_environments_response import ListSecretEnvironmentsResponse
 from ...types import Response
 
@@ -19,21 +19,21 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListSecretEnvironmentsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListSecretEnvironmentsResponse:
     if response.status_code == 200:
         response_200 = ListSecretEnvironmentsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListSecretEnvironmentsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListSecretEnvironmentsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -45,7 +45,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[ListSecretEnvironmentsResponse]:
+) -> Response[ErrorModel | ListSecretEnvironmentsResponse]:
     """List secret environments
 
      Lists all the environments associated with secrets.
@@ -55,7 +55,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListSecretEnvironmentsResponse]
+        Response[ErrorModel | ListSecretEnvironmentsResponse]
     """
 
     kwargs = _get_kwargs()
@@ -70,7 +70,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> Optional[ListSecretEnvironmentsResponse]:
+) -> ErrorModel | ListSecretEnvironmentsResponse | None:
     """List secret environments
 
      Lists all the environments associated with secrets.
@@ -80,7 +80,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListSecretEnvironmentsResponse
+        ErrorModel | ListSecretEnvironmentsResponse
     """
 
     return sync_detailed(
@@ -91,7 +91,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[ListSecretEnvironmentsResponse]:
+) -> Response[ErrorModel | ListSecretEnvironmentsResponse]:
     """List secret environments
 
      Lists all the environments associated with secrets.
@@ -101,7 +101,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListSecretEnvironmentsResponse]
+        Response[ErrorModel | ListSecretEnvironmentsResponse]
     """
 
     kwargs = _get_kwargs()
@@ -114,7 +114,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> Optional[ListSecretEnvironmentsResponse]:
+) -> ErrorModel | ListSecretEnvironmentsResponse | None:
     """List secret environments
 
      Lists all the environments associated with secrets.
@@ -124,7 +124,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListSecretEnvironmentsResponse
+        ErrorModel | ListSecretEnvironmentsResponse
     """
 
     return (

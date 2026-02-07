@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -14,14 +16,14 @@ class InviteTeamMemberParams:
     Attributes:
         emails (str): The email addresses of the people to invite. It can be a list in any format (comma separated,
             newline separated, etc.) and it will be parsed into individual addresses
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/InviteTeamMemberParams.json.
-        message (Union[Unset, str]): Optional message to include in the invite email
+        message (str | Unset): Optional message to include in the invite email
     """
 
     emails: str
-    schema: Union[Unset, str] = UNSET
-    message: Union[Unset, str] = UNSET
+    schema: str | Unset = UNSET
+    message: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         emails = self.emails
@@ -31,6 +33,7 @@ class InviteTeamMemberParams:
         message = self.message
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "emails": emails,

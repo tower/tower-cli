@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -8,7 +10,7 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.features import Features
+    from ..models.feature import Feature
 
 
 T = TypeVar("T", bound="Plan")
@@ -18,60 +20,57 @@ T = TypeVar("T", bound="Plan")
 class Plan:
     """
     Attributes:
-        account_id (str):
         base_plan_name (str):
         created_at (datetime.datetime):
-        features (Features):
+        features (list[Feature]):
         id (str):
         start_at (datetime.datetime):
-        status (str):
-        end_at (Union[Unset, datetime.datetime]):
-        extras (Union[Unset, Features]):
+        end_at (datetime.datetime | Unset):
+        extras (list[Feature] | Unset):
     """
 
-    account_id: str
     base_plan_name: str
     created_at: datetime.datetime
-    features: "Features"
+    features: list[Feature]
     id: str
     start_at: datetime.datetime
-    status: str
-    end_at: Union[Unset, datetime.datetime] = UNSET
-    extras: Union[Unset, "Features"] = UNSET
+    end_at: datetime.datetime | Unset = UNSET
+    extras: list[Feature] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        account_id = self.account_id
-
         base_plan_name = self.base_plan_name
 
         created_at = self.created_at.isoformat()
 
-        features = self.features.to_dict()
+        features = []
+        for features_item_data in self.features:
+            features_item = features_item_data.to_dict()
+            features.append(features_item)
 
         id = self.id
 
         start_at = self.start_at.isoformat()
 
-        status = self.status
-
-        end_at: Union[Unset, str] = UNSET
+        end_at: str | Unset = UNSET
         if not isinstance(self.end_at, Unset):
             end_at = self.end_at.isoformat()
 
-        extras: Union[Unset, dict[str, Any]] = UNSET
+        extras: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.extras, Unset):
-            extras = self.extras.to_dict()
+            extras = []
+            for extras_item_data in self.extras:
+                extras_item = extras_item_data.to_dict()
+                extras.append(extras_item)
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
-                "account_id": account_id,
                 "base_plan_name": base_plan_name,
                 "created_at": created_at,
                 "features": features,
                 "id": id,
                 "start_at": start_at,
-                "status": status,
             }
         )
         if end_at is not UNSET:
@@ -83,45 +82,46 @@ class Plan:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.features import Features
+        from ..models.feature import Feature
 
         d = dict(src_dict)
-        account_id = d.pop("account_id")
-
         base_plan_name = d.pop("base_plan_name")
 
         created_at = isoparse(d.pop("created_at"))
 
-        features = Features.from_dict(d.pop("features"))
+        features = []
+        _features = d.pop("features")
+        for features_item_data in _features:
+            features_item = Feature.from_dict(features_item_data)
+
+            features.append(features_item)
 
         id = d.pop("id")
 
         start_at = isoparse(d.pop("start_at"))
 
-        status = d.pop("status")
-
         _end_at = d.pop("end_at", UNSET)
-        end_at: Union[Unset, datetime.datetime]
+        end_at: datetime.datetime | Unset
         if isinstance(_end_at, Unset):
             end_at = UNSET
         else:
             end_at = isoparse(_end_at)
 
         _extras = d.pop("extras", UNSET)
-        extras: Union[Unset, Features]
-        if isinstance(_extras, Unset):
-            extras = UNSET
-        else:
-            extras = Features.from_dict(_extras)
+        extras: list[Feature] | Unset = UNSET
+        if _extras is not UNSET:
+            extras = []
+            for extras_item_data in _extras:
+                extras_item = Feature.from_dict(extras_item_data)
+
+                extras.append(extras_item)
 
         plan = cls(
-            account_id=account_id,
             base_plan_name=base_plan_name,
             created_at=created_at,
             features=features,
             id=id,
             start_at=start_at,
-            status=status,
             end_at=end_at,
             extras=extras,
         )

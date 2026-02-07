@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -14,13 +16,13 @@ class AcknowledgeAllAlertsResponse:
     Attributes:
         count (int): Number of alerts that were acknowledged
         status (str):
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/AcknowledgeAllAlertsResponse.json.
     """
 
     count: int
     status: str
-    schema: Union[Unset, str] = UNSET
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         count = self.count
@@ -30,6 +32,7 @@ class AcknowledgeAllAlertsResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "count": count,
