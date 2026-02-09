@@ -11,7 +11,7 @@ debugging steps when integration tests fail with schema errors.
 """
 
 from fastapi import FastAPI, HTTPException, Response, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
@@ -247,13 +247,20 @@ async def run_app(name: str, run_params: Dict[str, Any]):
 
     parameters = run_params.get("parameters", {})
     if "nonexistent_param" in parameters:
-        raise HTTPException(
+        return JSONResponse(
             status_code=422,
-            detail={
-                "detail": "Validation error",
-                "status": 422,
+            content={
+                "$schema": "http://localhost:8081/v1/schemas/ErrorModel.json",
                 "title": "Unprocessable Entity",
-                "errors": [{"message": "Unknown parameter"}],
+                "status": 422,
+                "detail": "Validation error",
+                "errors": [
+                    {
+                        "message": "Unknown parameter",
+                        "location": "body.parameters",
+                        "value": parameters,
+                    }
+                ],
             },
         )
 
