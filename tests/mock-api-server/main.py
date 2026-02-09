@@ -657,6 +657,8 @@ async def update_schedule(id_or_name: str, schedule_data: Dict[str, Any]):
     schedule = mock_schedules_db[id_or_name]
     if "cron" in schedule_data:
         schedule["cron"] = schedule_data["cron"]
+    if "name" in schedule_data:
+        schedule["name"] = schedule_data["name"]
     if "parameters" in schedule_data:
         schedule["parameters"] = schedule_data["parameters"]
     schedule["updated_at"] = now_iso()
