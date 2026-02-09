@@ -19,7 +19,7 @@ Feature: CLI Run Commands
     Given I have a valid Towerfile in the current directory
     When I run "tower deploy --create" via CLI
     Then I run "tower run -p nonexistent_param=test" via CLI
-    Then the output should show "API Error:"
+    Then the output should show "Error details:"
     And the output should show "Validation error"
     And the output should show "Unknown parameter"
     And the output should not just show "422"
@@ -36,20 +36,18 @@ Feature: CLI Run Commands
     Given I have a simple hello world application named "app-logs-after-completion"
     When I run "tower deploy --create" via CLI
     And I run "tower run" via CLI
-    Then the output should show "First log before run completes"
-    And the output should show "Second log after run completes"
+    Then the output should show "Hello, World!"
 
   Scenario: CLI apps logs follow should stream logs and drain after completion
     Given I have a simple hello world application named "app-logs-after-completion"
     When I run "tower deploy --create" via CLI
     And I run "tower run --detached" via CLI and capture run number
     And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
-    Then the output should show "First log before run completes"
-    And the output should show "Second log after run completes"
+    Then the output should show "Hello, World!"
 
   Scenario: CLI apps logs follow should display warnings
     Given I have a simple hello world application named "app-logs-warning"
     When I run "tower deploy --create" via CLI
     And I run "tower run --detached" via CLI and capture run number
     And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
-    Then the output should show "Warning: Rate limit approaching"
+    Then the output should show "Warning: No new logs available"

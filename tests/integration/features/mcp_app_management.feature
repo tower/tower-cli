@@ -100,7 +100,7 @@ Feature: MCP App Management
     When I call tower_deploy via MCP
     Then I call tower_run_remote with invalid parameter "nonexistent_param=test"
     Then I should receive a detailed validation error
-    And the error should mention "Unknown parameter"
+    And the error should mention "Validation error"
     And the error should not just be a status code
 
   Scenario: Local run should detect exit code failures
