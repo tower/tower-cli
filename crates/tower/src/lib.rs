@@ -22,23 +22,28 @@ mod bindings {
 
         let spec = PackageSpec::from_towerfile(&towerfile);
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
+        let rt = tokio::runtime::Runtime::new()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
-        let package = rt
-            .block_on(Package::build(spec))
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let output = PathBuf::from(output);
 
-        let src = package
-            .package_file_path
-            .as_ref()
-            .ok_or_else(|| PyRuntimeError::new_err("package build produced no output file"))?;
+        // Everything must happen inside block_on because Package holds a TmpDir
+        // whose Drop implementation requires an active tokio reactor.
+        rt.block_on(async {
+            let package = Package::build(spec)
+                .await
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
-        std::fs::copy(src, output).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+            let src = package
+                .package_file_path
+                .as_ref()
+                .ok_or_else(|| PyRuntimeError::new_err("package build produced no output file"))?;
 
-        Ok(())
+            std::fs::copy(src, &output)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+            Ok(())
+        })
     }
 
     #[pymodule]
