@@ -78,7 +78,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: x86_64
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
@@ -101,7 +101,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: aarch64
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
@@ -140,7 +140,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
@@ -178,7 +178,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           manylinux: auto
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
@@ -232,7 +232,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
           # Set the CFLAGS for the aarch64 target, defining the ARM architecture
@@ -288,7 +288,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -326,7 +326,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist --find-interpreter
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
