@@ -217,10 +217,6 @@ jobs:
             # see https://github.com/astral-sh/ruff/issues/3791
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
-          - target: armv7-unknown-linux-gnueabihf
-            arch: armv7
-          - target: arm-unknown-linux-musleabihf
-            arch: arm
 
     steps:
       - uses: actions/checkout@v4.2.2
