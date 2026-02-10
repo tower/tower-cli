@@ -49,11 +49,12 @@ dbt = ["dbt-core>=1.9,<1.10"] # Can not use dbt 1.10+ due to dependency conflict
 all = ["tower[ai,iceberg,dbt]"]
 
 [tool.maturin]
-bindings = "bin"
+bindings = "pyo3"
 manifest-path = "crates/tower/Cargo.toml"
-module-name = "tower"
+module-name = "tower._native"
 python-source = "src"
 strip = true
+features = ["pyo3"]
 exclude = []
 include = ["rust-toolchain.toml"]
 
