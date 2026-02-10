@@ -6,6 +6,7 @@ mod bindings {
     use pyo3::prelude::*;
 
     use config::Towerfile;
+    use tower_cmd::App;
     use tower_package::{Package, PackageSpec};
 
     /// Build a Tower package from a directory containing a Towerfile.
@@ -46,9 +47,24 @@ mod bindings {
         })
     }
 
+    /// Run the Tower CLI with the given arguments.
+    ///
+    /// Args:
+    ///     args: Command line arguments (typically sys.argv).
+    #[pyfunction]
+    fn _run_cli(args: Vec<String>) -> PyResult<()> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+        rt.block_on(App::new_from_args(args).run());
+
+        Ok(())
+    }
+
     #[pymodule]
     pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_function(wrap_pyfunction!(build_package, m)?)?;
+        m.add_function(wrap_pyfunction!(_run_cli, m)?)?;
         Ok(())
     }
 }
