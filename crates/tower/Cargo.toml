@@ -28,8 +28,6 @@ config = { workspace = true }
 
 [lib]
 name = "_native"
-crate-type = ["cdylib"]
-required-features = ["pyo3"]
 
 [[bin]]
 name = "tower"
