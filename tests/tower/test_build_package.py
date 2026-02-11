@@ -7,7 +7,10 @@ import tempfile
 
 import pytest
 
-_native = pytest.importorskip("tower._native", reason="native extension not built (run: maturin develop --features pyo3)")
+_native = pytest.importorskip(
+    "tower._native",
+    reason="native extension not built (run: maturin develop --features pyo3)",
+)
 
 
 def _make_app(tmp_path, towerfile_content, files=None):
