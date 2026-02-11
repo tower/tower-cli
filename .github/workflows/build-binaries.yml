@@ -162,7 +162,8 @@ jobs:
     runs-on: windows-11-arm
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        # Python ARM64 Windows builds started with 3.11
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
