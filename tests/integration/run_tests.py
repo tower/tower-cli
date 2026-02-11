@@ -74,12 +74,16 @@ def main():
         (project_root / "target" / build / "tower").exists()
         for build in ["debug", "release"]
     )
-    has_path_binary = subprocess.run(
-        ["which", "tower"], capture_output=True
-    ).returncode == 0 if not has_cargo_binary else False
+    has_path_binary = (
+        subprocess.run(["which", "tower"], capture_output=True).returncode == 0
+        if not has_cargo_binary
+        else False
+    )
 
     if not has_cargo_binary and not has_path_binary:
-        log("ERROR: Tower binary not found. Please run 'cargo build' or 'maturin develop' first.")
+        log(
+            "ERROR: Tower binary not found. Please run 'cargo build' or 'maturin develop' first."
+        )
         return 1
 
     try:
