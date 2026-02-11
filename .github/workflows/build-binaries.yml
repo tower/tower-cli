@@ -121,10 +121,8 @@ jobs:
         platform:
           - target: x86_64-pc-windows-msvc
             arch: x64
-            interpreter: -i python3
           - target: aarch64-pc-windows-msvc
             arch: x64
-            interpreter: -i 3.13
           # NOTE: Disabling this target due to poor support in PyArrow and
           # friends.
           #- target: i686-pc-windows-msvc
@@ -138,15 +136,22 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
+      - name: "Download Python ARM64 libs for cross-compilation"
+        if: startsWith(matrix.platform.target, 'aarch64')
+        shell: pwsh
+        run: |
+          $pyver = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"
+          Write-Output "Installing pythonarm64 $pyver"
+          nuget install pythonarm64 -Version $pyver -ExcludeVersion -OutputDirectory "${{ runner.temp }}\python-arm64"
+          Write-Output "PYO3_CROSS_LIB_DIR=${{ runner.temp }}\python-arm64\pythonarm64\tools\libs" >> $env:GITHUB_ENV
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist ${{ matrix.platform.interpreter }}
+          args: --release --locked --out dist -i ${{ startsWith(matrix.platform.target, 'aarch64') && '3.13' || 'python3' }}
         env:
-          # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
+          # aarch64 cross-compilation, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
-          PYO3_CROSS_PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
       - name: "Test wheel"
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
