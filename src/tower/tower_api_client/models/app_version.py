@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -17,13 +19,13 @@ class AppVersion:
     """
     Attributes:
         created_at (datetime.datetime):
-        parameters (list['Parameter']):
+        parameters (list[Parameter]):
         towerfile (str): The Towerfile that this version was created from.
         version (str):
     """
 
     created_at: datetime.datetime
-    parameters: list["Parameter"]
+    parameters: list[Parameter]
     towerfile: str
     version: str
 
@@ -40,6 +42,7 @@ class AppVersion:
         version = self.version
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "created_at": created_at,

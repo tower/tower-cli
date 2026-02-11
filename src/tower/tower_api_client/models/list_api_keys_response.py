@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -17,15 +19,15 @@ T = TypeVar("T", bound="ListAPIKeysResponse")
 class ListAPIKeysResponse:
     """
     Attributes:
-        api_keys (list['APIKey']): List of API keys
+        api_keys (list[APIKey]): List of API keys
         pages (Pagination):
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListAPIKeysResponse.json.
     """
 
-    api_keys: list["APIKey"]
-    pages: "Pagination"
-    schema: Union[Unset, str] = UNSET
+    api_keys: list[APIKey]
+    pages: Pagination
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         api_keys = []
@@ -38,6 +40,7 @@ class ListAPIKeysResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "api_keys": api_keys,

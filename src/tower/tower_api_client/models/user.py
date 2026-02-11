@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -24,7 +26,8 @@ class User:
         is_subscribed_to_changelog (bool):
         last_name (str):
         profile_photo_url (str):
-        is_invitation_claimed (Union[Unset, bool]): This property is deprecated. It will be removed in a future version.
+        promo_code (str):
+        is_invitation_claimed (bool | Unset): This property is deprecated. It will be removed in a future version.
     """
 
     company: str
@@ -37,7 +40,8 @@ class User:
     is_subscribed_to_changelog: bool
     last_name: str
     profile_photo_url: str
-    is_invitation_claimed: Union[Unset, bool] = UNSET
+    promo_code: str
+    is_invitation_claimed: bool | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         company = self.company
@@ -60,9 +64,12 @@ class User:
 
         profile_photo_url = self.profile_photo_url
 
+        promo_code = self.promo_code
+
         is_invitation_claimed = self.is_invitation_claimed
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "company": company,
@@ -75,6 +82,7 @@ class User:
                 "is_subscribed_to_changelog": is_subscribed_to_changelog,
                 "last_name": last_name,
                 "profile_photo_url": profile_photo_url,
+                "promo_code": promo_code,
             }
         )
         if is_invitation_claimed is not UNSET:
@@ -105,6 +113,8 @@ class User:
 
         profile_photo_url = d.pop("profile_photo_url")
 
+        promo_code = d.pop("promo_code")
+
         is_invitation_claimed = d.pop("is_invitation_claimed", UNSET)
 
         user = cls(
@@ -118,6 +128,7 @@ class User:
             is_subscribed_to_changelog=is_subscribed_to_changelog,
             last_name=last_name,
             profile_photo_url=profile_photo_url,
+            promo_code=promo_code,
             is_invitation_claimed=is_invitation_claimed,
         )
 

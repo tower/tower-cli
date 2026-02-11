@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
@@ -22,9 +22,8 @@ def _get_kwargs(
         "url": "/secrets",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -32,28 +31,33 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[CreateSecretResponse, ErrorModel]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CreateSecretResponse | ErrorModel | None:
     if response.status_code == 201:
         response_201 = CreateSecretResponse.from_dict(response.json())
 
         return response_201
+
     if response.status_code == 401:
         response_401 = ErrorModel.from_dict(response.json())
 
         return response_401
+
     if response.status_code == 409:
         response_409 = ErrorModel.from_dict(response.json())
 
         return response_409
+
     if response.status_code == 412:
         response_412 = ErrorModel.from_dict(response.json())
 
         return response_412
+
     if response.status_code == 500:
         response_500 = ErrorModel.from_dict(response.json())
 
         return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -61,8 +65,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[CreateSecretResponse, ErrorModel]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[CreateSecretResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -75,7 +79,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateSecretParams,
-) -> Response[Union[CreateSecretResponse, ErrorModel]]:
+) -> Response[CreateSecretResponse | ErrorModel]:
     """Create secret
 
      Creates a new secret and associates it with the current account.
@@ -88,7 +92,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[CreateSecretResponse, ErrorModel]]
+        Response[CreateSecretResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -106,7 +110,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: CreateSecretParams,
-) -> Optional[Union[CreateSecretResponse, ErrorModel]]:
+) -> CreateSecretResponse | ErrorModel | None:
     """Create secret
 
      Creates a new secret and associates it with the current account.
@@ -119,7 +123,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[CreateSecretResponse, ErrorModel]
+        CreateSecretResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -132,7 +136,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateSecretParams,
-) -> Response[Union[CreateSecretResponse, ErrorModel]]:
+) -> Response[CreateSecretResponse | ErrorModel]:
     """Create secret
 
      Creates a new secret and associates it with the current account.
@@ -145,7 +149,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[CreateSecretResponse, ErrorModel]]
+        Response[CreateSecretResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -161,7 +165,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: CreateSecretParams,
-) -> Optional[Union[CreateSecretResponse, ErrorModel]]:
+) -> CreateSecretResponse | ErrorModel | None:
     """Create secret
 
      Creates a new secret and associates it with the current account.
@@ -174,7 +178,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[CreateSecretResponse, ErrorModel]
+        CreateSecretResponse | ErrorModel
     """
 
     return (

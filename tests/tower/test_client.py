@@ -55,7 +55,7 @@ def mock_run_response_factory():
                 "exit_code": None,
                 "status_group": status_group,
                 "parameters": parameters,
-                "initiator": {"type": "tower_cli"},
+                "initiator": {"type": "tower_cli", "details": {}},
                 "is_scheduled": False,
             },
             "$links": {
@@ -103,6 +103,7 @@ def create_run_object():
             initiator=RunInitiator.from_dict(
                 {
                     "type": "tower_cli",
+                    "details": {},
                 }
             ),
             is_scheduled=False,

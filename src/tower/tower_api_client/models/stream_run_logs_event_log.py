@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -26,14 +27,14 @@ class StreamRunLogsEventLog:
     Attributes:
         data (RunLogLine):
         event (Literal['log']): The event name.
-        id (Union[Unset, int]): The event ID.
-        retry (Union[Unset, int]): The retry time in milliseconds.
+        id (int | Unset): The event ID.
+        retry (int | Unset): The retry time in milliseconds.
     """
 
-    data: "RunLogLine"
+    data: RunLogLine
     event: Literal["log"]
-    id: Union[Unset, int] = UNSET
-    retry: Union[Unset, int] = UNSET
+    id: int | Unset = UNSET
+    retry: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

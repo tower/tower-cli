@@ -1,19 +1,19 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_schedules_response import ListSchedulesResponse
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -35,21 +35,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListSchedulesResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListSchedulesResponse:
     if response.status_code == 200:
         response_200 = ListSchedulesResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListSchedulesResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListSchedulesResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -61,18 +61,18 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListSchedulesResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListSchedulesResponse]:
     """List schedules
 
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
 
     Raises:
@@ -80,7 +80,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListSchedulesResponse]
+        Response[ErrorModel | ListSchedulesResponse]
     """
 
     kwargs = _get_kwargs(
@@ -99,18 +99,18 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListSchedulesResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListSchedulesResponse | None:
     """List schedules
 
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
 
     Raises:
@@ -118,7 +118,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListSchedulesResponse
+        ErrorModel | ListSchedulesResponse
     """
 
     return sync_detailed(
@@ -132,18 +132,18 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListSchedulesResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListSchedulesResponse]:
     """List schedules
 
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
 
     Raises:
@@ -151,7 +151,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListSchedulesResponse]
+        Response[ErrorModel | ListSchedulesResponse]
     """
 
     kwargs = _get_kwargs(
@@ -168,18 +168,18 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListSchedulesResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListSchedulesResponse | None:
     """List schedules
 
      List all schedules for an app.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): Filter schedules by environment. If not provided, all
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
 
     Raises:
@@ -187,7 +187,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListSchedulesResponse
+        ErrorModel | ListSchedulesResponse
     """
 
     return (

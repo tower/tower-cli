@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -12,15 +14,15 @@ T = TypeVar("T", bound="UpdateAccountParams")
 class UpdateAccountParams:
     """
     Attributes:
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateAccountParams.json.
-        is_self_hosted_only (Union[Unset, bool]): Whether the account is for self-hosted use only
-        name (Union[Unset, str]): The new name for the account, if any
+        is_self_hosted_only (bool | Unset): Whether the account is for self-hosted use only
+        name (str | Unset): The new name for the account, if any
     """
 
-    schema: Union[Unset, str] = UNSET
-    is_self_hosted_only: Union[Unset, bool] = UNSET
-    name: Union[Unset, str] = UNSET
+    schema: str | Unset = UNSET
+    is_self_hosted_only: bool | Unset = UNSET
+    name: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         schema = self.schema
@@ -30,6 +32,7 @@ class UpdateAccountParams:
         name = self.name
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update({})
         if schema is not UNSET:
             field_dict["$schema"] = schema

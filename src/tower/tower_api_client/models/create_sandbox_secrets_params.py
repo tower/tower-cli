@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -14,13 +16,13 @@ class CreateSandboxSecretsParams:
     Attributes:
         environment (str): Environment to create secrets in
         secret_keys (list[str]): List of secret keys to create with Tower defaults
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateSandboxSecretsParams.json.
     """
 
     environment: str
     secret_keys: list[str]
-    schema: Union[Unset, str] = UNSET
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         environment = self.environment
@@ -30,6 +32,7 @@ class CreateSandboxSecretsParams:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "environment": environment,

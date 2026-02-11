@@ -1,20 +1,20 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_secrets_response import ListSecretsResponse
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -38,21 +38,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListSecretsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListSecretsResponse:
     if response.status_code == 200:
         response_200 = ListSecretsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListSecretsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListSecretsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -64,28 +64,28 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Response[ListSecretsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> Response[ErrorModel | ListSecretsResponse]:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all secrets or only the ones that are not marked as
+            deleted.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListSecretsResponse]
+        Response[ErrorModel | ListSecretsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -105,28 +105,28 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Optional[ListSecretsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> ErrorModel | ListSecretsResponse | None:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all secrets or only the ones that are not marked as
+            deleted.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListSecretsResponse
+        ErrorModel | ListSecretsResponse
     """
 
     return sync_detailed(
@@ -141,28 +141,28 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Response[ListSecretsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> Response[ErrorModel | ListSecretsResponse]:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all secrets or only the ones that are not marked as
+            deleted.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListSecretsResponse]
+        Response[ErrorModel | ListSecretsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -180,28 +180,28 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Optional[ListSecretsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> ErrorModel | ListSecretsResponse | None:
     """List secrets
 
      Lists all the secrets associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all secrets or only the ones that are not
-            marked as deleted.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all secrets or only the ones that are not marked as
+            deleted.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListSecretsResponse
+        ErrorModel | ListSecretsResponse
     """
 
     return (

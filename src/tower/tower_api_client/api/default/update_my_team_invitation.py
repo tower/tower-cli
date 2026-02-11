@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.update_my_team_invitation_params import UpdateMyTeamInvitationParams
 from ...models.update_my_team_invitation_response import UpdateMyTeamInvitationResponse
 from ...types import Response
@@ -21,9 +22,8 @@ def _get_kwargs(
         "url": "/team-invites",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -31,12 +31,28 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdateMyTeamInvitationResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | UpdateMyTeamInvitationResponse | None:
     if response.status_code == 200:
         response_200 = UpdateMyTeamInvitationResponse.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 404:
+        response_404 = ErrorModel.from_dict(response.json())
+
+        return response_404
+
+    if response.status_code == 422:
+        response_422 = ErrorModel.from_dict(response.json())
+
+        return response_422
+
+    if response.status_code == 500:
+        response_500 = ErrorModel.from_dict(response.json())
+
+        return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -44,8 +60,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdateMyTeamInvitationResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | UpdateMyTeamInvitationResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,7 +74,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: UpdateMyTeamInvitationParams,
-) -> Response[UpdateMyTeamInvitationResponse]:
+) -> Response[ErrorModel | UpdateMyTeamInvitationResponse]:
     """Update my team invitation
 
      Update a team invitation that you have pending
@@ -71,7 +87,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateMyTeamInvitationResponse]
+        Response[ErrorModel | UpdateMyTeamInvitationResponse]
     """
 
     kwargs = _get_kwargs(
@@ -89,7 +105,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: UpdateMyTeamInvitationParams,
-) -> Optional[UpdateMyTeamInvitationResponse]:
+) -> ErrorModel | UpdateMyTeamInvitationResponse | None:
     """Update my team invitation
 
      Update a team invitation that you have pending
@@ -102,7 +118,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateMyTeamInvitationResponse
+        ErrorModel | UpdateMyTeamInvitationResponse
     """
 
     return sync_detailed(
@@ -115,7 +131,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: UpdateMyTeamInvitationParams,
-) -> Response[UpdateMyTeamInvitationResponse]:
+) -> Response[ErrorModel | UpdateMyTeamInvitationResponse]:
     """Update my team invitation
 
      Update a team invitation that you have pending
@@ -128,7 +144,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateMyTeamInvitationResponse]
+        Response[ErrorModel | UpdateMyTeamInvitationResponse]
     """
 
     kwargs = _get_kwargs(
@@ -144,7 +160,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: UpdateMyTeamInvitationParams,
-) -> Optional[UpdateMyTeamInvitationResponse]:
+) -> ErrorModel | UpdateMyTeamInvitationResponse | None:
     """Update my team invitation
 
      Update a team invitation that you have pending
@@ -157,7 +173,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateMyTeamInvitationResponse
+        ErrorModel | UpdateMyTeamInvitationResponse
     """
 
     return (

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -31,6 +33,7 @@ class AppStatistics:
         running_apps = self.running_apps
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "all_apps": all_apps,

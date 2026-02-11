@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -25,34 +27,38 @@ class App:
         health_status (AppHealthStatus): This property is deprecated. It will always be 'healthy'.
         is_externally_accessible (bool):
         name (str): The name of the app.
-        next_run_at (Union[None, datetime.datetime]): The next time this app will run as part of it's schedule, null if
-            none.
+        next_run_at (datetime.datetime | None): The next time this app will run as part of it's schedule, null if none.
         owner (str): The account slug that owns this app.
-        schedule (Union[None, str]): The schedule associated with this app, null if none.
+        pending_timeout (int): The maximum time in seconds that a run can stay in the pending state before being marked
+            as cancelled. Default: 600.
+        running_timeout (int): The number of seconds that a run can stay running before it gets cancelled. Value of 0
+            (default) means no timeout. Default: 0.
+        schedule (None | str): The schedule associated with this app, null if none.
         short_description (str): A short description of the app. Can be empty.
-        version (Union[None, str]): The current version of this app, null if none.
-        last_run (Union[Unset, Run]):
-        run_results (Union[Unset, RunResults]):
-        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
-        status (Union[Unset, AppStatus]): The status of the app.
-        subdomain (Union[Unset, str]): The subdomain that this app is accessible via. Must be externally accessible
-            first.
+        version (None | str): The current version of this app, null if none.
+        last_run (Run | Unset):
+        run_results (RunResults | Unset):
+        slug (str | Unset): This property is deprecated. Use name instead.
+        status (AppStatus | Unset): The status of the app.
+        subdomain (str | Unset): The subdomain that this app is accessible via. Must be externally accessible first.
     """
 
     created_at: datetime.datetime
     health_status: AppHealthStatus
     is_externally_accessible: bool
     name: str
-    next_run_at: Union[None, datetime.datetime]
+    next_run_at: datetime.datetime | None
     owner: str
-    schedule: Union[None, str]
+    schedule: None | str
     short_description: str
-    version: Union[None, str]
-    last_run: Union[Unset, "Run"] = UNSET
-    run_results: Union[Unset, "RunResults"] = UNSET
-    slug: Union[Unset, str] = UNSET
-    status: Union[Unset, AppStatus] = UNSET
-    subdomain: Union[Unset, str] = UNSET
+    version: None | str
+    pending_timeout: int = 600
+    running_timeout: int = 0
+    last_run: Run | Unset = UNSET
+    run_results: RunResults | Unset = UNSET
+    slug: str | Unset = UNSET
+    status: AppStatus | Unset = UNSET
+    subdomain: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
@@ -63,7 +69,7 @@ class App:
 
         name = self.name
 
-        next_run_at: Union[None, str]
+        next_run_at: None | str
         if isinstance(self.next_run_at, datetime.datetime):
             next_run_at = self.next_run_at.isoformat()
         else:
@@ -71,31 +77,36 @@ class App:
 
         owner = self.owner
 
-        schedule: Union[None, str]
+        pending_timeout = self.pending_timeout
+
+        running_timeout = self.running_timeout
+
+        schedule: None | str
         schedule = self.schedule
 
         short_description = self.short_description
 
-        version: Union[None, str]
+        version: None | str
         version = self.version
 
-        last_run: Union[Unset, dict[str, Any]] = UNSET
+        last_run: dict[str, Any] | Unset = UNSET
         if not isinstance(self.last_run, Unset):
             last_run = self.last_run.to_dict()
 
-        run_results: Union[Unset, dict[str, Any]] = UNSET
+        run_results: dict[str, Any] | Unset = UNSET
         if not isinstance(self.run_results, Unset):
             run_results = self.run_results.to_dict()
 
         slug = self.slug
 
-        status: Union[Unset, str] = UNSET
+        status: str | Unset = UNSET
         if not isinstance(self.status, Unset):
             status = self.status.value
 
         subdomain = self.subdomain
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "created_at": created_at,
@@ -104,6 +115,8 @@ class App:
                 "name": name,
                 "next_run_at": next_run_at,
                 "owner": owner,
+                "pending_timeout": pending_timeout,
+                "running_timeout": running_timeout,
                 "schedule": schedule,
                 "short_description": short_description,
                 "version": version,
@@ -136,7 +149,7 @@ class App:
 
         name = d.pop("name")
 
-        def _parse_next_run_at(data: object) -> Union[None, datetime.datetime]:
+        def _parse_next_run_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
             try:
@@ -145,39 +158,43 @@ class App:
                 next_run_at_type_0 = isoparse(data)
 
                 return next_run_at_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union[None, datetime.datetime], data)
+            return cast(datetime.datetime | None, data)
 
         next_run_at = _parse_next_run_at(d.pop("next_run_at"))
 
         owner = d.pop("owner")
 
-        def _parse_schedule(data: object) -> Union[None, str]:
+        pending_timeout = d.pop("pending_timeout")
+
+        running_timeout = d.pop("running_timeout")
+
+        def _parse_schedule(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         schedule = _parse_schedule(d.pop("schedule"))
 
         short_description = d.pop("short_description")
 
-        def _parse_version(data: object) -> Union[None, str]:
+        def _parse_version(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         version = _parse_version(d.pop("version"))
 
         _last_run = d.pop("last_run", UNSET)
-        last_run: Union[Unset, Run]
+        last_run: Run | Unset
         if isinstance(_last_run, Unset):
             last_run = UNSET
         else:
             last_run = Run.from_dict(_last_run)
 
         _run_results = d.pop("run_results", UNSET)
-        run_results: Union[Unset, RunResults]
+        run_results: RunResults | Unset
         if isinstance(_run_results, Unset):
             run_results = UNSET
         else:
@@ -186,7 +203,7 @@ class App:
         slug = d.pop("slug", UNSET)
 
         _status = d.pop("status", UNSET)
-        status: Union[Unset, AppStatus]
+        status: AppStatus | Unset
         if isinstance(_status, Unset):
             status = UNSET
         else:
@@ -201,6 +218,8 @@ class App:
             name=name,
             next_run_at=next_run_at,
             owner=owner,
+            pending_timeout=pending_timeout,
+            running_timeout=running_timeout,
             schedule=schedule,
             short_description=short_description,
             version=version,

@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.update_password_reset_params import UpdatePasswordResetParams
 from ...models.update_password_reset_response import UpdatePasswordResetResponse
 from ...types import Response
@@ -20,13 +21,12 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/accounts/password-reset/{code}".format(
-            code=code,
+            code=quote(str(code), safe=""),
         ),
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -34,21 +34,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdatePasswordResetResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | UpdatePasswordResetResponse:
     if response.status_code == 200:
         response_200 = UpdatePasswordResetResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdatePasswordResetResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | UpdatePasswordResetResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -60,9 +60,9 @@ def _build_response(
 def sync_detailed(
     code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: UpdatePasswordResetParams,
-) -> Response[UpdatePasswordResetResponse]:
+) -> Response[ErrorModel | UpdatePasswordResetResponse]:
     """Update password reset
 
      Updates the password reset code with the new password
@@ -76,7 +76,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdatePasswordResetResponse]
+        Response[ErrorModel | UpdatePasswordResetResponse]
     """
 
     kwargs = _get_kwargs(
@@ -94,9 +94,9 @@ def sync_detailed(
 def sync(
     code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: UpdatePasswordResetParams,
-) -> Optional[UpdatePasswordResetResponse]:
+) -> ErrorModel | UpdatePasswordResetResponse | None:
     """Update password reset
 
      Updates the password reset code with the new password
@@ -110,7 +110,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdatePasswordResetResponse
+        ErrorModel | UpdatePasswordResetResponse
     """
 
     return sync_detailed(
@@ -123,9 +123,9 @@ def sync(
 async def asyncio_detailed(
     code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: UpdatePasswordResetParams,
-) -> Response[UpdatePasswordResetResponse]:
+) -> Response[ErrorModel | UpdatePasswordResetResponse]:
     """Update password reset
 
      Updates the password reset code with the new password
@@ -139,7 +139,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdatePasswordResetResponse]
+        Response[ErrorModel | UpdatePasswordResetResponse]
     """
 
     kwargs = _get_kwargs(
@@ -155,9 +155,9 @@ async def asyncio_detailed(
 async def asyncio(
     code: str,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: UpdatePasswordResetParams,
-) -> Optional[UpdatePasswordResetResponse]:
+) -> ErrorModel | UpdatePasswordResetResponse | None:
     """Update password reset
 
      Updates the password reset code with the new password
@@ -171,7 +171,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdatePasswordResetResponse
+        ErrorModel | UpdatePasswordResetResponse
     """
 
     return (

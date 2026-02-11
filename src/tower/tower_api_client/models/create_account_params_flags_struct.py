@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -19,6 +21,7 @@ class CreateAccountParamsFlagsStruct:
         is_test_account = self.is_test_account
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "is_test_account": is_test_account,

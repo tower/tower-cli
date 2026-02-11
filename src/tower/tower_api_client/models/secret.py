@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
 from typing import Any, TypeVar
@@ -33,6 +35,7 @@ class Secret:
         preview = self.preview
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "created_at": created_at,
