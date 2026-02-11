@@ -23,14 +23,14 @@ mod bindings {
 
         let spec = PackageSpec::from_towerfile(&towerfile);
 
-        let rt = tokio::runtime::Runtime::new()
+        let runtime = tokio::runtime::Runtime::new()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         let output = PathBuf::from(output);
 
         // Everything must happen inside block_on because Package holds a TmpDir
         // whose Drop implementation requires an active tokio reactor.
-        rt.block_on(async {
+        runtime.block_on(async {
             let package = Package::build(spec)
                 .await
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
@@ -53,12 +53,12 @@ mod bindings {
     ///     args: Command line arguments (typically sys.argv).
     #[pyfunction]
     fn _run_cli(args: Vec<String>) -> PyResult<()> {
-        let rt = tokio::runtime::Runtime::new()
+        let runtime = tokio::runtime::Runtime::new()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         // App::new_from_args() must run inside block_on because
         // Session::from_config_dir() requires an active tokio reactor.
-        rt.block_on(async {
+        runtime.block_on(async {
             App::new_from_args(args).run().await;
         });
 
