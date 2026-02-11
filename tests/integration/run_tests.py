@@ -68,13 +68,18 @@ def start_mock_server():
 
 def main():
     """Run the integration tests."""
-    # Check prerequisites
+    # Check prerequisites - look for tower binary from cargo build or on PATH
     project_root = Path(__file__).parent.parent.parent
-    if not any(
+    has_cargo_binary = any(
         (project_root / "target" / build / "tower").exists()
         for build in ["debug", "release"]
-    ):
-        log("ERROR: Tower binary not found. Please run 'cargo build' first.")
+    )
+    has_path_binary = subprocess.run(
+        ["which", "tower"], capture_output=True
+    ).returncode == 0 if not has_cargo_binary else False
+
+    if not has_cargo_binary and not has_path_binary:
+        log("ERROR: Tower binary not found. Please run 'cargo build' or 'maturin develop' first.")
         return 1
 
     try:
