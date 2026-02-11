@@ -2,6 +2,7 @@
 /.venv
 *.pyc
 __pycache__
+*.so
 
 
 # may contain sensitive data

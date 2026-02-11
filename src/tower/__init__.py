@@ -25,6 +25,8 @@ from ._utils import (
     secret,
 )
 
+from ._native import build_package
+
 
 from ._features import override_get_attr, get_available_features, is_feature_enabled
 

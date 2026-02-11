@@ -78,7 +78,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: x86_64
-          args: --release --locked --out dist
+          args: --release --locked --out dist -i python3
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
@@ -101,10 +101,10 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: aarch64
-          args: --release --locked --out dist
+          args: --release --locked --out dist -i python3
       - name: "Test wheel - aarch64"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          pip install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
@@ -121,10 +121,7 @@ jobs:
         platform:
           - target: x86_64-pc-windows-msvc
             arch: x64
-          - target: aarch64-pc-windows-msvc
-            arch: x64
-          # NOTE: Disabling this target due to poor support in PyArrow and
-          # friends.
+          # NOTE: i686 disabled due to poor support in PyArrow and friends.
           #- target: i686-pc-windows-msvc
           #  arch: x86
     steps:
@@ -140,21 +137,45 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist
-        env:
-          # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
-          XWIN_VERSION: 16
+          args: --release --locked --out dist -i python3
       - name: "Test wheel"
-        if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         run: |
-          python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          python -m pip install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
           name: wheels-${{ matrix.platform.target }}
+          path: dist
+
+  windows-aarch64:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+      - uses: actions/setup-python@v5.5.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@v1.49.1
+        with:
+          target: aarch64-pc-windows-msvc
+          args: --release --locked --out dist -i python3
+      - name: "Test wheel"
+        shell: bash
+        run: |
+          python -m pip install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
+          ${{ env.EXECUTABLE_NAME }} --help
+          python -m ${{ env.MODULE_NAME }} --help
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: wheels-aarch64-pc-windows-msvc
           path: dist
 
   linux:
@@ -178,7 +199,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           manylinux: auto
-          args: --release --locked --out dist
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
@@ -197,7 +218,7 @@ jobs:
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          pip install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
@@ -216,7 +237,7 @@ jobs:
             arch: aarch64
             # see https://github.com/astral-sh/ruff/issues/3791
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16 -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -232,7 +253,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
           # Set the CFLAGS for the aarch64 target, defining the ARM architecture
@@ -244,8 +265,8 @@ jobs:
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
-          arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
-          distro: ${{ matrix.platform.arch == 'arm' && 'bookworm' || 'ubuntu22.04' }}
+          arch: ${{ matrix.platform.arch }}
+          distro: ubuntu22.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
@@ -258,7 +279,7 @@ jobs:
             export CARGO_HOME=/tmp/cargo-home
             python3 -m venv /tmp/venv
             . /tmp/venv/bin/activate
-            pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+            pip3 install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
             ${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
@@ -288,7 +309,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -298,7 +319,7 @@ jobs:
           run: |
             apk add python3 python3-dev py3-pip rust
             python -m venv .venv
-            .venv/bin/pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
@@ -326,8 +347,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
-          docker-options: ${{ matrix.platform.maturin_docker_options }}
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
         with:
@@ -338,7 +358,7 @@ jobs:
             apk add python3 python3-dev py3-pip rust
           run: |
             python -m venv .venv
-            .venv/bin/pip3 install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
