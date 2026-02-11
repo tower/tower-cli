@@ -121,8 +121,10 @@ jobs:
         platform:
           - target: x86_64-pc-windows-msvc
             arch: x64
+            interpreter: -i python3
           - target: aarch64-pc-windows-msvc
             arch: x64
+            interpreter: ""
           # NOTE: Disabling this target due to poor support in PyArrow and
           # friends.
           #- target: i686-pc-windows-msvc
@@ -140,10 +142,11 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist -i python3
+          args: --release --locked --out dist ${{ matrix.platform.interpreter }}
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
+          PYO3_CROSS_PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
       - name: "Test wheel"
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
@@ -178,6 +181,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           manylinux: auto
+          docker-options: -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
           args: --release --locked --out dist --find-interpreter
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
@@ -216,7 +220,7 @@ jobs:
             arch: aarch64
             # see https://github.com/astral-sh/ruff/issues/3791
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16 -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -244,8 +248,8 @@ jobs:
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
-          arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
-          distro: ${{ matrix.platform.arch == 'arm' && 'bookworm' || 'ubuntu22.04' }}
+          arch: ${{ matrix.platform.arch }}
+          distro: ubuntu22.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
@@ -288,6 +292,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
+          docker-options: -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
           args: --release --locked --out dist --find-interpreter
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -314,6 +319,7 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-musl
             arch: aarch64
+            maturin_docker_options: -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
     steps:
       - uses: actions/checkout@v4.2.2
         with:
