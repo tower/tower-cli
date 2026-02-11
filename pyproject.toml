@@ -29,6 +29,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Rust",
   "Topic :: Software Development :: Libraries :: Python Modules",
@@ -37,7 +38,7 @@ classifiers = [
 dependencies = [
   "attrs==24.2.0",
   "httpx==0.28.1",
-  "pydantic>=2.11.0,<3.0.0",
+  "pydantic>=2.12.0,<3.0.0",
   "pydantic-core>=2.27.0,<3.0.0",
   "python-dateutil==2.9.0.post0",
 ]

@@ -65,6 +65,9 @@ jobs:
   macos-x86_64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-15
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -72,22 +75,25 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           architecture: x64
       - name: "Build wheels - x86_64"
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: x86_64
-          args: --release --locked --out dist -i python3
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: wheels-macos-x86_64
+          name: wheels-macos-x86_64-py${{ matrix.python-version }}
           path: dist
 
   macos-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-15
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -95,13 +101,13 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           architecture: arm64
       - name: "Build wheels - aarch64"
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: aarch64
-          args: --release --locked --out dist -i python3
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: "Test wheel - aarch64"
         run: |
           pip install ${{ env.PACKAGE_NAME }} --find-links dist/ --force-reinstall
@@ -110,7 +116,7 @@ jobs:
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: wheels-aarch64-apple-darwin
+          name: wheels-aarch64-apple-darwin-py${{ matrix.python-version }}
           path: dist
 
   windows:
@@ -124,6 +130,7 @@ jobs:
           # NOTE: i686 disabled due to poor support in PyArrow and friends.
           #- target: i686-pc-windows-msvc
           #  arch: x86
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -131,13 +138,13 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.platform.arch }}
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist -i python3
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: "Test wheel"
         shell: bash
         run: |
@@ -147,12 +154,15 @@ jobs:
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: wheels-${{ matrix.platform.target }}
+          name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
   windows-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: windows-11-arm
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -160,12 +170,12 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v5.5.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: aarch64-pc-windows-msvc
-          args: --release --locked --out dist -i python3
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: "Test wheel"
         shell: bash
         run: |
@@ -175,7 +185,7 @@ jobs:
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: wheels-aarch64-pc-windows-msvc
+          name: wheels-aarch64-pc-windows-msvc-py${{ matrix.python-version }}
           path: dist
 
   linux:
@@ -199,7 +209,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           manylinux: auto
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
@@ -253,7 +263,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
           # Set the CFLAGS for the aarch64 target, defining the ARM architecture
@@ -309,7 +319,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -347,7 +357,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13
+          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
         with:
