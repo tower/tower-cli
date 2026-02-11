@@ -56,7 +56,11 @@ mod bindings {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
-        rt.block_on(App::new_from_args(args).run());
+        // App::new_from_args() must run inside block_on because
+        // Session::from_config_dir() requires an active tokio reactor.
+        rt.block_on(async {
+            App::new_from_args(args).run().await;
+        });
 
         Ok(())
     }

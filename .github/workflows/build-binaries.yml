@@ -149,7 +149,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist -i python3
+          args: --release --locked --out dist ${{ !startsWith(matrix.platform.target, 'aarch64') && '-i python3' || '' }}
         env:
           # aarch64 cross-compilation, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
