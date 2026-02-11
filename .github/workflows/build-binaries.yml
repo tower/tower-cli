@@ -134,7 +134,7 @@ jobs:
           # NOTE: i686 disabled due to poor support in PyArrow and friends.
           #- target: i686-pc-windows-msvc
           #  arch: x86
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -214,7 +214,7 @@ jobs:
         uses: PyO3/maturin-action@v1.49.1
         with:
           manylinux: auto
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
@@ -269,7 +269,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
           # Set the CFLAGS for the aarch64 target, defining the ARM architecture
@@ -326,7 +326,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -365,7 +365,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.9 python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
         with:
