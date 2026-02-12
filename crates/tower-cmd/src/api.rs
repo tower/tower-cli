@@ -846,13 +846,11 @@ pub async fn create_schedule(
 
     let params = tower_api::apis::default_api::CreateScheduleParams {
         create_schedule_params: tower_api::models::CreateScheduleParams {
-            schema: None,
             app_name: app_name.to_string(),
             cron: cron.to_string(),
             environment: Some(environment.to_string()),
-            app_version: None,
             parameters: run_parameters,
-            status: None,
+            ..Default::default()
         },
     };
 
@@ -881,14 +879,11 @@ pub async fn update_schedule(
     });
 
     let params = tower_api::apis::default_api::UpdateScheduleParams {
-        id: schedule_id.to_string(),
+        id_or_name: schedule_id.to_string(),
         update_schedule_params: tower_api::models::UpdateScheduleParams {
-            schema: None,
             cron: cron.map(|s| s.clone()),
-            environment: None,
-            app_version: None,
             parameters: run_parameters,
-            status: None,
+            ..Default::default()
         },
     };
 

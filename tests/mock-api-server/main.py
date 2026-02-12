@@ -59,6 +59,8 @@ mock_apps_db["predeployed-test-app"] = {
     "created_at": datetime.datetime.now().isoformat(),
     "next_run_at": None,
     "health_status": "healthy",
+    "pending_timeout": 300,
+    "running_timeout": 0,
     "run_results": {
         "cancelled": 0,
         "crashed": 0,
@@ -83,13 +85,16 @@ def now_iso():
 
 
 def create_schedule_object(
-    schedule_id, app_name, cron, environment="default", parameters=None
+    schedule_id, app_name, cron, environment="default", parameters=None, name=None
 ):
     return {
         "id": schedule_id,
+        "name": name or f"{app_name}-schedule",
         "app_name": app_name,
+        "app_status": "active",
         "cron": cron,
         "environment": environment,
+        "overlap_policy": "skip",
         "status": "active",
         "created_at": now_iso(),
         "updated_at": now_iso(),
@@ -143,6 +148,8 @@ async def create_app(app_data: Dict[str, Any]):
         "name": app_name,
         "next_run_at": None,
         "owner": "mock_owner",
+        "pending_timeout": 300,
+        "running_timeout": 0,
         "run_results": {
             "cancelled": 0,
             "crashed": 0,
@@ -222,7 +229,7 @@ async def deploy_app(name: str, response: Response):
     return {"version": deployed_version}
 
 
-@app.post("/v1/apps/{name}/runs")
+@app.post("/v1/apps/{name}/runs", status_code=201)
 async def run_app(name: str, run_params: Dict[str, Any]):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
@@ -273,6 +280,7 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         "is_scheduled": True,
         "initiator": {
             "type": "tower_cli",
+            "details": {},
         },
     }
     mock_runs_db[run_id] = new_run
@@ -474,6 +482,7 @@ async def get_session():
                 "is_subscribed_to_changelog": False,
                 "last_name": "User",
                 "profile_photo_url": "https://example.com/photo.jpg",
+                "promo_code": "",
             },
             "teams": [
                 {"name": "default", "type": "user", "token": {"jwt": "mock_jwt_token"}}
@@ -604,7 +613,7 @@ async def list_schedules():
     }
 
 
-@app.post("/v1/schedules")
+@app.post("/v1/schedules", status_code=201)
 async def create_schedule(schedule_data: Dict[str, Any]):
     """Mock endpoint for creating a schedule."""
     app_name = schedule_data.get("app_name")
@@ -624,15 +633,15 @@ async def create_schedule(schedule_data: Dict[str, Any]):
     return {"schedule": new_schedule}
 
 
-@app.put("/v1/schedules/{schedule_id}")
-async def update_schedule(schedule_id: str, schedule_data: Dict[str, Any]):
+@app.put("/v1/schedules/{id_or_name}")
+async def update_schedule(id_or_name: str, schedule_data: Dict[str, Any]):
     """Mock endpoint for updating a schedule."""
-    if schedule_id not in mock_schedules_db:
+    if id_or_name not in mock_schedules_db:
         raise HTTPException(
-            status_code=404, detail=f"Schedule '{schedule_id}' not found"
+            status_code=404, detail=f"Schedule '{id_or_name}' not found"
         )
 
-    schedule = mock_schedules_db[schedule_id]
+    schedule = mock_schedules_db[id_or_name]
     if "cron" in schedule_data:
         schedule["cron"] = schedule_data["cron"]
     if "parameters" in schedule_data:
