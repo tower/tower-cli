@@ -238,6 +238,7 @@ const FOLLOW_BACKOFF_MAX: Duration = Duration::from_secs(5);
 const LOG_DRAIN_DURATION: Duration = Duration::from_secs(5);
 const RUN_START_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const RUN_START_MESSAGE_DELAY: Duration = Duration::from_secs(3);
+const RUN_START_TIMEOUT: Duration = Duration::from_secs(30);
 
 async fn follow_logs(config: Config, name: String, seq: i64) {
     let enable_ctrl_c = !output::get_output_mode().is_mcp();
@@ -265,6 +266,12 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
             let mut notified = false;
             loop {
                 sleep(RUN_START_POLL_INTERVAL).await;
+
+                if wait_started.elapsed() > RUN_START_TIMEOUT {
+                    output::error("Timed out waiting for run to start. The runner may be unavailable.");
+                    return;
+                }
+
                 // Avoid blank output on slow starts while keeping fast starts quiet.
                 if should_notify_run_wait(notified, wait_started.elapsed()) {
                     output::write("Waiting for run to start...\n");
