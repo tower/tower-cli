@@ -7,10 +7,11 @@ import tempfile
 
 import pytest
 
-_native = pytest.importorskip(
-    "tower._native",
-    reason="native extension not built (run: maturin develop --features pyo3)",
-)
+#tower.packages = pytest.importorskip(
+#    "tower.tower.packages",
+#    reason="native extension not built (run: maturin develop --features pyo3)",
+#)
+import tower
 
 
 def _make_app(tmp_path, towerfile_content, files=None):
@@ -49,7 +50,7 @@ class TestBuildPackage:
         app_dir = _make_app(tmp_path, SIMPLE_TOWERFILE, {"main.py": "print('hello')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         assert os.path.isfile(output)
         assert tarfile.is_tarfile(output)
@@ -58,7 +59,7 @@ class TestBuildPackage:
         app_dir = _make_app(tmp_path, SIMPLE_TOWERFILE, {"main.py": "print('hello')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         assert "MANIFEST" in entries
@@ -67,7 +68,7 @@ class TestBuildPackage:
         app_dir = _make_app(tmp_path, SIMPLE_TOWERFILE, {"main.py": "print('hello')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         manifest = json.loads(entries["MANIFEST"])
@@ -85,7 +86,7 @@ class TestBuildPackage:
         )
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         assert "app/main.py" in entries
@@ -95,7 +96,7 @@ class TestBuildPackage:
         app_dir = _make_app(tmp_path, SIMPLE_TOWERFILE, {"main.py": "print('hello')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         assert "Towerfile" in entries
@@ -118,7 +119,7 @@ source = ["*.py", "**/*.py"]
         )
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         assert "app/main.py" in entries
@@ -136,7 +137,7 @@ schedule = "0 0 * * *"
         app_dir = _make_app(tmp_path, towerfile, {"job.py": "print('run')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         manifest = json.loads(entries["MANIFEST"])
@@ -157,7 +158,7 @@ default = "100"
         app_dir = _make_app(tmp_path, towerfile, {"main.py": "print('run')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         manifest = json.loads(entries["MANIFEST"])
@@ -169,7 +170,7 @@ default = "100"
         app_dir = _make_app(tmp_path, SIMPLE_TOWERFILE, {"main.py": "print('hello')"})
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         manifest = json.loads(entries["MANIFEST"])
@@ -187,7 +188,7 @@ default = "100"
         )
         output = str(tmp_path / "out.tar.gz")
 
-        _native.build_package(app_dir, output)
+        tower.packages.build_package(app_dir, output)
 
         entries = _read_package(output)
         pycache_entries = [k for k in entries if "__pycache__" in k]
@@ -198,14 +199,14 @@ default = "100"
         output = str(tmp_path / "out.tar.gz")
 
         with pytest.raises(RuntimeError):
-            _native.build_package(app_dir, output)
+            tower.packages.build_package(app_dir, output)
 
     def test_error_invalid_towerfile(self, tmp_path):
         app_dir = _make_app(tmp_path, "this is not valid toml [[[", {"main.py": ""})
         output = str(tmp_path / "out.tar.gz")
 
         with pytest.raises(RuntimeError):
-            _native.build_package(app_dir, output)
+            tower.packages.build_package(app_dir, output)
 
     def test_error_missing_app_name(self, tmp_path):
         towerfile = """\
@@ -216,4 +217,4 @@ script = "main.py"
         output = str(tmp_path / "out.tar.gz")
 
         with pytest.raises(RuntimeError):
-            _native.build_package(app_dir, output)
+            tower.packages.build_package(app_dir, output)
