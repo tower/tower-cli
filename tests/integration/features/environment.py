@@ -45,6 +45,10 @@ def after_scenario(context, scenario):
 
 
 def _find_tower_binary():
+    if binary := os.environ.get("TOWER_CLI_BINARY"):
+        if Path(binary).exists():
+            return binary
+
     # Look for debug build first
     debug_path = (
         Path(__file__).parent.parent.parent.parent / "target" / "debug" / "tower"
