@@ -104,7 +104,10 @@ def start_mock_server():
 def main():
     """Run the integration tests."""
     # Check prerequisites - look for tower binary from env, cargo build, or PATH
-    has_env_binary = bool(os.environ.get("TOWER_CLI_BINARY") and Path(os.environ["TOWER_CLI_BINARY"]).exists())
+    has_env_binary = bool(
+        os.environ.get("TOWER_CLI_BINARY")
+        and Path(os.environ["TOWER_CLI_BINARY"]).exists()
+    )
     project_root = Path(__file__).parent.parent.parent
     has_cargo_binary = any(
         (project_root / "target" / build / "tower").exists()

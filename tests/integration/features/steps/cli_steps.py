@@ -32,10 +32,6 @@ def step_run_cli_command(context, command):
         test_env["CLICOLOR_FORCE"] = "1"  # Force colored output
         test_env["TOWER_URL"] = context.tower_url  # Use configured API URL
 
-        # Only set mock JWT if not already configured externally
-        if "TOWER_JWT" not in os.environ:
-            test_env["TOWER_JWT"] = "mock_jwt_token"
-
         # Override HOME to use test session (which contains auth credentials)
         test_home = Path(__file__).parent.parent.parent / "test-home"
         test_env["HOME"] = str(test_home.absolute())
