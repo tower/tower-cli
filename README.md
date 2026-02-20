@@ -14,7 +14,7 @@ Built for teams shipping vertical AI services and SaaS.
 
 ## What is [Tower](https://tower.dev)?
 
-Code-first platform for deploying Python data apps, pipelines, and AI agents, with built-in orchestration, analytical storage, and multi-tenant APIs.
+Code-first platform for deploying Python data apps, pipelines, and AI agents, with built-in orchestration, analytical storage, and multi-tenant APIs. Works natively with AI coding assistants via MCP.
 
 ## Install
 
@@ -73,7 +73,31 @@ Tower gives you:
    Success! Run #1 for app `hello-world` has been scheduled
    ```
 
-Full walkthrough: **[Quick Start](https://docs.tower.dev/docs/getting-started/quick-start)** · **[Quickstart with MCP](https://docs.tower.dev/docs/getting-started/quickstart-with-mcp)** (AI assistants).
+Full walkthrough: **[Quick Start](https://docs.tower.dev/docs/getting-started/quick-start)**
+
+## Using Tower with Claude (MCP)
+
+You can build, deploy, and manage Tower apps through natural language using the Tower MCP server. Tower includes an MCP (Model Context Protocol) server that allows AI coding assistants like Claude to interact directly with your Tower apps.
+
+1. **Add the MCP server to Claude:**
+
+   ```bash
+   claude mcp add tower tower mcp-server
+   ```
+
+2. **Clone the examples and start a Claude session:**
+
+   ```bash
+   git clone https://github.com/tower/tower-examples
+   cd tower-examples
+   claude
+   ```
+
+3. **Ask Claude to build and deploy** — for example:
+
+   > Create a Python app that fetches data from an API and prints a summary. Deploy it to Tower and run it.
+
+Full walkthrough: **[Quickstart with MCP](https://docs.tower.dev/docs/getting-started/quickstart-with-mcp)**
 
 If this saved you time, consider giving the repo a ⭐.
 
