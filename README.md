@@ -6,9 +6,9 @@ Built for teams shipping vertical AI services and SaaS.
 
 > Bridge the last mile from code to production.
 
-![PyPI Version](https://img.shields.io/pypi/v/tower)
-![License](https://img.shields.io/pypi/l/tower)
-![PyPI Downloads](https://img.shields.io/pypi/dm/tower)
+![PyPI Version](https://img.shields.io/pypi/v/tower?style=flat&color=blue)
+![License](https://img.shields.io/pypi/l/tower?style=flat&color=blue)
+[![Monthly Downloads](https://static.pepy.tech/personalized-badge/tower?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=blue&right_color=blue&left_text=monthly%20downloads)](https://pepy.tech/projects/tower)
 
 [![Tower demo](https://img.youtube.com/vi/r0TuiO7B-eQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=r0TuiO7B-eQ)
 
