@@ -28,7 +28,7 @@ pip install -U tower
 
 ## Why Tower?
 
-Shipping AI-generated or hand-written Python but struggling to:
+Are you shipping AI-generated or hand-written Python but struggling to:
 
 - Turn scripts into production services
 - Expose APIs for users and tenants
@@ -98,6 +98,8 @@ You can build, deploy, and manage Tower apps through natural language using the 
    > Create a Python app that fetches data from an API and prints a summary. Deploy it to Tower and run it.
 
 Full walkthrough: **[Quickstart with MCP](https://docs.tower.dev/docs/getting-started/quickstart-with-mcp)**
+
+Using a different AI assistant like Cursor, Zed, or VS Code? See the **[MCP Server reference](https://docs.tower.dev/docs/reference/mcp-server)** for setup instructions across all supported clients.
 
 If this saved you time, consider giving the repo a ⭐.
 
