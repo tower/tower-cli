@@ -31,15 +31,15 @@ pip install -U tower
 Are you shipping AI-generated or hand-written Python but struggling to:
 
 - Turn scripts into production services
-- Expose APIs for users and tenants
+- Expose APIs for users and customers/tenants
 - Store and query analytical data
 - Run reliably across environments
 
 Tower gives you:
 
 - **Python-native orchestration** and control-plane APIs for pipelines and agents.
-- **Same code locally and in the cloud** - one CLI; serverless or your own compute.
-- **Observability, user/tenant management**, and managed Iceberg storage (Snowflake, Spark compatible).
+- **Consistent execution environment** for your code; run on serverless or your own compute.
+- **Observability, user and tenant management**, and managed Iceberg storage (Snowflake, Spark compatible).
 
 ---
 
@@ -75,9 +75,13 @@ Tower gives you:
 
 Full walkthrough: **[Quick Start](https://docs.tower.dev/docs/getting-started/quick-start)**
 
-## Using Tower with Claude (MCP)
+## Using Tower with Claude, Cursor and other AI assistants (MCP)
 
-You can build, deploy, and manage Tower apps through natural language using the Tower MCP server. Tower includes an MCP (Model Context Protocol) server that allows AI coding assistants like Claude to interact directly with your Tower apps.
+You can build, deploy, and manage Tower apps through natural language using the Tower MCP server. Tower includes an MCP (Model Context Protocol) server that allows AI code assistants like Claude or Cursor to interact directly with your Tower apps.
+
+Full walkthrough: **[Quickstart with MCP](https://docs.tower.dev/docs/getting-started/quickstart-with-mcp)**
+
+### Add Tower to Claude
 
 1. **Add the MCP server to Claude:**
 
@@ -95,11 +99,21 @@ You can build, deploy, and manage Tower apps through natural language using the 
 
 3. **Ask Claude to build and deploy** — for example:
 
-   > Create a Python app that fetches data from an API and prints a summary. Deploy it to Tower and run it.
+   > Create a Python app that fetches stock ticker data from the Yahoo Finance API and prints a summary. Deploy it to Tower and run it.
 
-Full walkthrough: **[Quickstart with MCP](https://docs.tower.dev/docs/getting-started/quickstart-with-mcp)**
 
-Using a different AI assistant like Cursor, Zed, or VS Code? See the **[MCP Server reference](https://docs.tower.dev/docs/reference/mcp-server)** for setup instructions across all supported clients.
+### Add Tower to Cursor
+
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en-US/install-mcp?name=tower&config=eyJjb21tYW5kIjoidG93ZXIiLCJhcmdzIjpbIm1jcC1zZXJ2ZXIiXX0=) 
+
+Or [open this link directly](cursor://anysphere.cursor-deeplink/mcp/install?name=tower&config=eyJjb21tYW5kIjoidG93ZXIiLCJhcmdzIjpbIm1jcC1zZXJ2ZXIiXX0=).
+
+If that doesn't work, see the **[MCP Server reference](https://docs.tower.dev/docs/reference/mcp-server)** for additional setup instructions.
+
+### Add Tower to other AI Assistants 
+
+Using a different AI assistant like Zed, VS Code or Gemini? See the **[MCP Server reference](https://docs.tower.dev/docs/reference/mcp-server)** for setup instructions across all supported clients.
+
 
 If this saved you time, consider giving the repo a ⭐.
 
@@ -107,11 +121,11 @@ If this saved you time, consider giving the repo a ⭐.
 
 ## Features
 
-- **Same code locally and in the cloud** - `tower run` anywhere; your compute or Tower serverless. No environment drift.
+- **Consistent execution environment everywhere** - `tower run` on Tower serverless or your own compute. Same execution environment.
 - **Deploy in under 30 seconds** - `tower deploy` packages and ships; code encrypted at rest.
 - **Secrets** - CLI-managed; injected as env vars in runner only (E2E encrypted).
-- **Optional AI and Iceberg** - `tower[ai]` or `tower[iceberg]`; [details](INSTALL-AND-REFERENCE.md#optional-features).
-- **MCP server** - Deploy and launch runs from AI coding assistants.
+- **Optional AI inference, Iceberg or dbt** - `tower[ai]`, `tower[iceberg]` or `tower[dbt]`; [details](INSTALL-AND-REFERENCE.md#optional-features).
+- **MCP server** - Deploy and launch runs from AI coding assistants; [details](https://docs.tower.dev/docs/reference/mcp-server).
 
 ---
 
@@ -123,10 +137,11 @@ If this saved you time, consider giving the repo a ⭐.
 
 ## Use Cases
 
-- **Data pipelines** - ELT, dbt Core, notebooks, batch jobs.
-- **Data agents** - Fresh data, Tower apps as tools, lakehouse queries.
+- **Data pipelines** - ELT, dbt Core, dltHub, batch jobs.
+- **Interactive apps and APIs** - Notebooks, marimo, endpoints, FastAPI.
+- **Data agents** - Fresh, company-specific data, Tower apps as Agentic Tools, lakehouse as facts database.
 - **Platforms and SaaS** - Multi-tenant apps, headless data stacks.
-- **Sensitive / on-prem** - Self-hosted runners; data stays in your env.
+- **Sensitive data workloads / on-prem** - Self-hosted runners; data stays in your environment.
 
 In production at [Inflow](https://tower.dev), [dltHub](https://dlthub.com/blog/tower), [a-Gnostics](https://blog.softelegance.com/a-gnostics/how-a-gnostics-improved-electricity-consumption-forecasts-with-a-faster-and-more-cost-effective-weather-service-and-tower-dev/), and others.
 
@@ -189,8 +204,8 @@ With an AI coding assistant (e.g. Claude, Cursor), the flow goes through the Tow
 
 ## Not For
 
-- GUI-first pipeline design (Tower is code/CLI-first).
-- GPU-heavy model training or inference as the primary workload.
+- GUI-first pipeline design (Tower is natural language / code / CLI-first).
+- GPU-heavy model training or inference as the primary workload (Tower offloads GPU inference to cloud services).
 
 ---
 

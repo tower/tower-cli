@@ -1,4 +1,4 @@
-# Tower CLI — Development Guide
+# Tower CLI and SDK — Development Guide
 
 Development setup and tooling for contributors.
 
@@ -22,7 +22,7 @@ uv run python
 
 ```python
 >>> import tower
->>> tower.some_function()
+>>> table = tower.tables("my_table").load()
 ```
 
 ## Running the CLI locally
@@ -62,6 +62,18 @@ When the OpenAPI spec changes, regenerate the Python API client:
 
 ```bash
 ./scripts/generate-python-api-client.sh
+```
+
+## Code Formatting
+
+We use Black for Python code formatting. The pre-commit hooks will automatically format your code, but you can also run it manually:
+
+```bash
+# Format all Python files in the project
+uv run --group dev black .
+
+# Check formatting without making changes
+uv run --group dev black --check .
 ```
 
 ## Code of conduct

@@ -79,7 +79,7 @@ inputs:
 
 ## Using the CLI
 
-The Tower CLI and cloud runtime live in this repository to ensure local and cloud environments behave identically.
+Both the Tower CLI and the cloud runtime live in this repository to ensure that Tower local and cloud execution environments behave identically.
 
 ### Command overview
 
