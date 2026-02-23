@@ -141,7 +141,7 @@ If you find Tower useful, consider giving the repo a ⭐.
 - **Platforms and SaaS** - Multi-tenant apps, headless data stacks.
 - **Sensitive data workloads / on-prem** - Self-hosted runners; data stays in your environment.
 
-In production at [Inflow](https://tower.dev), [dltHub](https://dlthub.com/blog/tower), [a-Gnostics](https://blog.softelegance.com/a-gnostics/how-a-gnostics-improved-electricity-consumption-forecasts-with-a-faster-and-more-cost-effective-weather-service-and-tower-dev/), and others.
+In production at [CosmoLaser](https://tower.dev/blog/how-cosmolaser-s-chief-marketer-uses-claude-code-to-run-his-etl-pipelines-on-tower), [Inflow](http://tower.dev/#testimonials), [dltHub](https://dlthub.com/blog/tower), [a-Gnostics](https://blog.softelegance.com/a-gnostics/how-a-gnostics-improved-electricity-consumption-forecasts-with-a-faster-and-more-cost-effective-weather-service-and-tower-dev/), and others.
 
 ---
 
