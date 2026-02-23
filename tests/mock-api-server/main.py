@@ -11,7 +11,7 @@ debugging steps when integration tests fail with schema errors.
 """
 
 from fastapi import FastAPI, HTTPException, Response, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
@@ -247,13 +247,20 @@ async def run_app(name: str, run_params: Dict[str, Any]):
 
     parameters = run_params.get("parameters", {})
     if "nonexistent_param" in parameters:
-        raise HTTPException(
+        return JSONResponse(
             status_code=422,
-            detail={
-                "detail": "Validation error",
-                "status": 422,
+            content={
+                "$schema": "http://localhost:8081/v1/schemas/ErrorModel.json",
                 "title": "Unprocessable Entity",
-                "errors": [{"message": "Unknown parameter"}],
+                "status": 422,
+                "detail": "Validation error",
+                "errors": [
+                    {
+                        "message": "Unknown parameter",
+                        "location": "body.parameters",
+                        "value": parameters,
+                    }
+                ],
             },
         )
 
@@ -530,7 +537,7 @@ def make_log_event(seq: int, line_num: int, content: str, timestamp: str):
 
 
 def make_warning_event(content: str, timestamp: str):
-    data = {"data": {"content": content, "reported_at": timestamp}, "event": "warning"}
+    data = {"content": content, "reported_at": timestamp}
     return f"event: warning\ndata: {json.dumps(data)}\n\n"
 
 
@@ -549,25 +556,31 @@ async def describe_run_logs(name: str, seq: int):
 
 
 async def generate_logs_after_completion_test_stream(seq: int):
-    """Log before run completion, then log after.
-
-    Timeline: Run completes at 1 second, second log sent at 1.5 seconds.
-    """
+    """Emit realistic runner logs then close, matching real server behavior."""
+    yield make_log_event(seq, 1, "Using CPython 3.12.9", "2025-08-22T12:00:00Z")
     yield make_log_event(
-        seq, 1, "First log before run completes", "2025-08-22T12:00:00Z"
+        seq, 2, "Creating virtual environment at: .venv", "2025-08-22T12:00:00Z"
     )
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(0.5)
     yield make_log_event(
-        seq, 2, "Second log after run completes", "2025-08-22T12:00:01Z"
+        seq, 3, "Activate with: source .venv/bin/activate", "2025-08-22T12:00:01Z"
     )
+    yield make_log_event(seq, 4, "Hello, World!", "2025-08-22T12:00:01Z")
 
 
 async def generate_warning_log_stream(seq: int):
-    """Stream a warning and a couple of logs, then finish."""
-    yield make_warning_event("Rate limit approaching", "2025-08-22T12:00:00Z")
-    yield make_log_event(seq, 1, "Warning stream log 1", "2025-08-22T12:00:00Z")
-    await asyncio.sleep(1.2)
-    yield make_log_event(seq, 2, "Warning stream log 2", "2025-08-22T12:00:01Z")
+    """Stream logs then emit warning before closing, matching real server behavior."""
+    yield make_log_event(seq, 1, "Using CPython 3.12.9", "2025-08-22T12:00:00Z")
+    yield make_log_event(
+        seq, 2, "Creating virtual environment at: .venv", "2025-08-22T12:00:00Z"
+    )
+    await asyncio.sleep(0.5)
+    yield make_log_event(
+        seq, 3, "Activate with: source .venv/bin/activate", "2025-08-22T12:00:00Z"
+    )
+    yield make_log_event(seq, 4, "Hello, World!", "2025-08-22T12:00:01Z")
+    await asyncio.sleep(0.5)
+    yield make_warning_event("No new logs available", "2025-08-22T12:00:02Z")
 
 
 async def generate_normal_log_stream(seq: int):
@@ -644,6 +657,8 @@ async def update_schedule(id_or_name: str, schedule_data: Dict[str, Any]):
     schedule = mock_schedules_db[id_or_name]
     if "cron" in schedule_data:
         schedule["cron"] = schedule_data["cron"]
+    if "name" in schedule_data:
+        schedule["name"] = schedule_data["name"]
     if "parameters" in schedule_data:
         schedule["parameters"] = schedule_data["parameters"]
     schedule["updated_at"] = now_iso()

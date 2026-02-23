@@ -30,7 +30,7 @@ def step_run_cli_command(context, command):
         test_env = os.environ.copy()
         test_env["FORCE_COLOR"] = "1"  # Force colored output
         test_env["CLICOLOR_FORCE"] = "1"  # Force colored output
-        test_env["TOWER_URL"] = context.tower_url  # Use mock API
+        test_env["TOWER_URL"] = context.tower_url  # Use configured API URL
 
         # Override HOME to use test session (which contains auth credentials)
         test_home = Path(__file__).parent.parent.parent / "test-home"
@@ -44,9 +44,11 @@ def step_run_cli_command(context, command):
             env=test_env,
         )
         context.cli_output = result.stdout + result.stderr
+        context.cli_stdout = result.stdout
         context.cli_return_code = result.returncode
     except subprocess.TimeoutExpired:
         context.cli_output = "Command timed out"
+        context.cli_stdout = ""
         context.cli_return_code = 124
     except Exception as e:
         print(f"DEBUG: Exception in CLI command: {type(e).__name__}: {e}")
@@ -266,11 +268,17 @@ def step_table_should_show_columns(context, column_list):
         assert column in output, f"Expected column '{column}' in table, got: {output}"
 
 
+def parse_cli_json(context):
+    """Parse JSON from CLI stdout (excludes stderr)."""
+    raw = getattr(context, "cli_stdout", context.cli_output)
+    return json.loads(raw)
+
+
 @step("the output should be valid JSON")
 def step_output_should_be_valid_json(context):
     """Verify output is valid JSON"""
     try:
-        json.loads(context.cli_output)
+        parse_cli_json(context)
     except json.JSONDecodeError as e:
         raise AssertionError(
             f"Output is not valid JSON: {e}\nOutput: {context.cli_output}"
@@ -280,7 +288,7 @@ def step_output_should_be_valid_json(context):
 @step("the JSON should contain app information")
 def step_json_should_contain_app_info(context):
     """Verify JSON contains app-related information"""
-    data = json.loads(context.cli_output)
+    data = parse_cli_json(context)
     assert (
         "app" in data or "name" in data
     ), f"Expected app information in JSON, got: {data}"
@@ -289,7 +297,7 @@ def step_json_should_contain_app_info(context):
 @step("the JSON should contain runs array")
 def step_json_should_contain_runs_array(context):
     """Verify JSON contains runs array"""
-    data = json.loads(context.cli_output)
+    data = parse_cli_json(context)
     assert "runs" in data and isinstance(
         data["runs"], list
     ), f"Expected runs array in JSON, got: {data}"
@@ -298,7 +306,7 @@ def step_json_should_contain_runs_array(context):
 @step("the JSON should contain the created app information")
 def step_json_should_contain_created_app_info(context):
     """Verify JSON contains created app information"""
-    data = json.loads(context.cli_output)
+    data = parse_cli_json(context)
 
     expected = IsPartialDict(
         result="success",
@@ -318,7 +326,7 @@ def step_json_should_contain_created_app_info(context):
 @step('the app name should be "{expected_name}"')
 def step_app_name_should_be(context, expected_name):
     """Verify app name matches expected value"""
-    data = json.loads(context.cli_output)
+    data = parse_cli_json(context)
     # Extract app name from response structure
     if "app" in data and "name" in data["app"]:
         actual_name = data["app"]["name"]
@@ -337,7 +345,7 @@ def step_app_name_should_be(context, expected_name):
 @step('the app description should be "{expected_description}"')
 def step_app_description_should_be(context, expected_description):
     """Verify app description matches expected value"""
-    data = json.loads(context.cli_output)
+    data = parse_cli_json(context)
     candidates = []
 
     if "app" in data:
