@@ -58,7 +58,7 @@ Typical development loop:
 
 ## OpenAPI SDK
 
-When the OpenAPI spec changes, regenerate the Python API client:
+If you need to get the latest OpenAPI SDK, you can run:
 
 ```bash
 ./scripts/generate-python-api-client.sh

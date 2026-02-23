@@ -1,14 +1,13 @@
 # Tower CLI
 
-The CLI and Python runtime for Tower - deploy AI-generated and hand-written Python to production in minutes.
-
-Built for teams shipping vertical AI services and SaaS.
+The CLI and Python runtime for Tower - deploy your AI and hand-written Python code to production in minutes.
 
 > Bridge the last mile from code to production.
 
 ![PyPI Version](https://img.shields.io/pypi/v/tower?style=flat&color=blue)
 ![License](https://img.shields.io/pypi/l/tower?style=flat&color=blue)
 [![Monthly Downloads](https://static.pepy.tech/personalized-badge/tower?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=blue&right_color=blue&left_text=monthly%20downloads)](https://pepy.tech/projects/tower)
+[![Discord](https://img.shields.io/badge/Discord-Tower.dev-blue?style=flat&logo=discord&logoColor=white)](https://discord.gg/7vjtmk2X5e)
 
 [![Tower demo](https://img.youtube.com/vi/r0TuiO7B-eQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=r0TuiO7B-eQ)
 
@@ -28,7 +27,7 @@ pip install -U tower
 
 ## Why Tower?
 
-Are you shipping AI-generated or hand-written Python but struggling to:
+Are you shipping your Python code to prod but struggling to:
 
 - Turn scripts into production services
 - Expose APIs for users and customers/tenants
@@ -51,7 +50,7 @@ Tower gives you:
    tower login
    ```
 
-2. **Clone the example repo** (includes a `Towerfile` and hello-world app):
+2. **Clone the example repo** (includes the hello-world app):
 
    ```bash
    git clone https://github.com/tower/tower-examples
@@ -61,12 +60,11 @@ Tower gives you:
 3. **Create an app and run it**:
 
    ```bash
-   tower apps create --name="hello-world"
    tower deploy
    tower run
    ```
 
-4. **Expected output** (after a run is scheduled):
+4. **Expected output**:
 
    ```
    ✔ Scheduling run... Done!
@@ -115,14 +113,14 @@ If that doesn't work, see the **[MCP Server reference](https://docs.tower.dev/do
 Using a different AI assistant like Zed, VS Code or Gemini? See the **[MCP Server reference](https://docs.tower.dev/docs/reference/mcp-server)** for setup instructions across all supported clients.
 
 
-If this saved you time, consider giving the repo a ⭐.
+If you find Tower useful, consider giving the repo a ⭐.
 
 ---
 
 ## Features
 
-- **Consistent execution environment everywhere** - `tower run` on Tower serverless or your own compute. Same execution environment.
-- **Deploy in under 30 seconds** - `tower deploy` packages and ships; code encrypted at rest.
+- **Consistent execution environment everywhere** - `tower run` on Tower serverless or your own compute.
+- **Deploy in under 30 seconds** - `tower deploy` packages and ships.
 - **Secrets** - CLI-managed; injected as env vars in runner only (E2E encrypted).
 - **Optional AI inference, Iceberg or dbt** - `tower[ai]`, `tower[iceberg]` or `tower[dbt]`; [details](INSTALL-AND-REFERENCE.md#optional-features).
 - **MCP server** - Deploy and launch runs from AI coding assistants; [details](https://docs.tower.dev/docs/reference/mcp-server).
@@ -138,7 +136,7 @@ If this saved you time, consider giving the repo a ⭐.
 ## Use Cases
 
 - **Data pipelines** - ELT, dbt Core, dltHub, batch jobs.
-- **Interactive apps and APIs** - Notebooks, marimo, endpoints, FastAPI.
+- **Interactive apps and APIs** - Marimo notebooks, FastAPI endpoints.
 - **Data agents** - Fresh, company-specific data, Tower apps as Agentic Tools, lakehouse as facts database.
 - **Platforms and SaaS** - Multi-tenant apps, headless data stacks.
 - **Sensitive data workloads / on-prem** - Self-hosted runners; data stays in your environment.
@@ -213,13 +211,12 @@ With an AI coding assistant (e.g. Claude, Cursor), the flow goes through the Tow
 
 PRs and issues are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md).
 
-If this helped you ship, consider giving the repo a ⭐.
+If you found Tower useful, consider giving the repo a ⭐.
 
 ---
 
-## License and maintenance
+## License
 
 - **License:** [MIT](LICENSE).
-- Actively maintained; issues responded to promptly.
 
-[Full install options and optional features →](INSTALL-AND-REFERENCE.md)
+[Full installation options and optional features →](INSTALL-AND-REFERENCE.md)
