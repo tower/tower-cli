@@ -29,7 +29,7 @@ If you have Nix installed with flakes enabled, you can install the latest versio
 #### Profile
 
 ```bash
-nix profile install github:tower/tower-cli#tower
+nix profile install github:tower/tower-cli
 ```
 
 #### NixOS / nix-darwin
