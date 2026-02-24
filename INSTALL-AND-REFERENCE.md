@@ -175,3 +175,68 @@ import pprint
 pprint.pprint(tower.get_available_features())
 print(tower.is_feature_enabled("ai"))
 ```
+
+## Packages API
+
+The `tower.packages` namespace provides utilities for building Tower packages
+programmatically.  These are **core** features included in every installation —
+no extras are required.
+
+### `tower.packages.build_package`
+
+Build a Tower package from a directory containing a `Towerfile`.
+
+```python
+tower.packages.build_package(dir: str, output: str) -> None
+```
+
+Compiles the application defined by the `Towerfile` in `dir` into a compressed
+`.tar.gz` archive and writes it to `output`.  The build pipeline runs natively
+via the `tower_package` Rust crate, so it is fast and does not require
+Python-side dependency resolution.
+
+#### How it works
+
+| Step | Description |
+|------|-------------|
+| **1. Towerfile Discovery** | Reads the `Towerfile` in `dir` to build a `PackageSpec` (app name, entry-point script, source globs, optional schedule, parameters, …). |
+| **2. Native Resolution** | The `tower_package` Rust crate resolves source-file globs and assembles the `MANIFEST` JSON, including a content checksum. |
+| **3. Tokio Runtime** | An embedded async Rust runtime handles concurrent file I/O and any network operations required during the build. |
+| **4. Artifact Generation** | Source files are staged in a temporary build directory, compressed into a `.tar.gz` archive, and copied to `output`. |
+
+#### Arguments
+
+| Argument | Type | Description |
+|----------|------|-------------|
+| `dir` | `str` | Path to the directory that contains your `Towerfile`. |
+| `output` | `str` | Destination path for the built `.tar.gz` package (e.g. `"./dist/app_v1.tar.gz"`). |
+
+#### Errors
+
+Raises `RuntimeError` if:
+
+- `dir` does not exist or does not contain a `Towerfile`
+- The `Towerfile` is invalid TOML or is missing required fields (e.g. `app.name`)
+- The native build pipeline fails for any other reason
+
+#### Example
+
+```python
+import tower
+
+try:
+    tower.packages.build_package(
+        dir="./projects/my-app",
+        output="./dist/app_v1.tar.gz",
+    )
+    print("Build successful!")
+except RuntimeError as e:
+    print(f"Build failed: {e}")
+```
+
+The generated archive is a standard `.tar.gz` file containing:
+
+- `Towerfile` — the original Towerfile
+- `MANIFEST` — JSON metadata (app name, entry point, version, checksum, …)
+- `app/<source files>` — all source files matched by the `source` glob(s) in
+  the Towerfile, with `__pycache__` directories excluded automatically
