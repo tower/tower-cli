@@ -2,6 +2,7 @@
 /.venv
 *.pyc
 __pycache__
+*.so
 
 
 # may contain sensitive data
@@ -24,3 +25,6 @@ pytest.ini
 
 # from nix builds
 /result
+
+# wheel build artifacts
+*.data/

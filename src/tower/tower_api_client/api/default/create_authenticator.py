@@ -1,12 +1,12 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_authenticator_params import CreateAuthenticatorParams
 from ...models.create_authenticator_response import CreateAuthenticatorResponse
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -21,9 +21,8 @@ def _get_kwargs(
         "url": "/authenticators",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -31,21 +30,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[CreateAuthenticatorResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CreateAuthenticatorResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = CreateAuthenticatorResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[CreateAuthenticatorResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[CreateAuthenticatorResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,7 +57,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateAuthenticatorParams,
-) -> Response[CreateAuthenticatorResponse]:
+) -> Response[CreateAuthenticatorResponse | ErrorModel]:
     """Create authenticator
 
      Associates an authenticator with your account, where the authenticator is identified by the URL with
@@ -72,7 +71,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateAuthenticatorResponse]
+        Response[CreateAuthenticatorResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -90,7 +89,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: CreateAuthenticatorParams,
-) -> Optional[CreateAuthenticatorResponse]:
+) -> CreateAuthenticatorResponse | ErrorModel | None:
     """Create authenticator
 
      Associates an authenticator with your account, where the authenticator is identified by the URL with
@@ -104,7 +103,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateAuthenticatorResponse
+        CreateAuthenticatorResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -117,7 +116,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateAuthenticatorParams,
-) -> Response[CreateAuthenticatorResponse]:
+) -> Response[CreateAuthenticatorResponse | ErrorModel]:
     """Create authenticator
 
      Associates an authenticator with your account, where the authenticator is identified by the URL with
@@ -131,7 +130,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateAuthenticatorResponse]
+        Response[CreateAuthenticatorResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -147,7 +146,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: CreateAuthenticatorParams,
-) -> Optional[CreateAuthenticatorResponse]:
+) -> CreateAuthenticatorResponse | ErrorModel | None:
     """Create authenticator
 
      Associates an authenticator with your account, where the authenticator is identified by the URL with
@@ -161,7 +160,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateAuthenticatorResponse
+        CreateAuthenticatorResponse | ErrorModel
     """
 
     return (

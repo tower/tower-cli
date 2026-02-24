@@ -1,17 +1,18 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.update_schedule_params import UpdateScheduleParams
 from ...models.update_schedule_response import UpdateScheduleResponse
 from ...types import Response
 
 
 def _get_kwargs(
-    id: str,
+    id_or_name: str,
     *,
     body: UpdateScheduleParams,
 ) -> dict[str, Any]:
@@ -19,14 +20,13 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/schedules/{id}".format(
-            id=id,
+        "url": "/schedules/{id_or_name}".format(
+            id_or_name=quote(str(id_or_name), safe=""),
         ),
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -34,21 +34,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UpdateScheduleResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | UpdateScheduleResponse:
     if response.status_code == 200:
         response_200 = UpdateScheduleResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[UpdateScheduleResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | UpdateScheduleResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,17 +58,17 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    id_or_name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateScheduleParams,
-) -> Response[UpdateScheduleResponse]:
+) -> Response[ErrorModel | UpdateScheduleResponse]:
     """Update schedule
 
      Update an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to update.
+        id_or_name (str): The ID or name of the schedule to update.
         body (UpdateScheduleParams):
 
     Raises:
@@ -76,11 +76,11 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateScheduleResponse]
+        Response[ErrorModel | UpdateScheduleResponse]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        id_or_name=id_or_name,
         body=body,
     )
 
@@ -92,17 +92,17 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    id_or_name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateScheduleParams,
-) -> Optional[UpdateScheduleResponse]:
+) -> ErrorModel | UpdateScheduleResponse | None:
     """Update schedule
 
      Update an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to update.
+        id_or_name (str): The ID or name of the schedule to update.
         body (UpdateScheduleParams):
 
     Raises:
@@ -110,28 +110,28 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateScheduleResponse
+        ErrorModel | UpdateScheduleResponse
     """
 
     return sync_detailed(
-        id=id,
+        id_or_name=id_or_name,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    id_or_name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateScheduleParams,
-) -> Response[UpdateScheduleResponse]:
+) -> Response[ErrorModel | UpdateScheduleResponse]:
     """Update schedule
 
      Update an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to update.
+        id_or_name (str): The ID or name of the schedule to update.
         body (UpdateScheduleParams):
 
     Raises:
@@ -139,11 +139,11 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[UpdateScheduleResponse]
+        Response[ErrorModel | UpdateScheduleResponse]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        id_or_name=id_or_name,
         body=body,
     )
 
@@ -153,17 +153,17 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    id_or_name: str,
     *,
     client: AuthenticatedClient,
     body: UpdateScheduleParams,
-) -> Optional[UpdateScheduleResponse]:
+) -> ErrorModel | UpdateScheduleResponse | None:
     """Update schedule
 
      Update an existing schedule for an app.
 
     Args:
-        id (str): The ID of the schedule to update.
+        id_or_name (str): The ID or name of the schedule to update.
         body (UpdateScheduleParams):
 
     Raises:
@@ -171,12 +171,12 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        UpdateScheduleResponse
+        ErrorModel | UpdateScheduleResponse
     """
 
     return (
         await asyncio_detailed(
-            id=id,
+            id_or_name=id_or_name,
             client=client,
             body=body,
         )

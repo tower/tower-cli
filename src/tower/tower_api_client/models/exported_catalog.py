@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
@@ -21,17 +23,17 @@ class ExportedCatalog:
         created_at (datetime.datetime):
         environment (str):
         name (str):
-        properties (list['ExportedCatalogProperty']):
+        properties (list[ExportedCatalogProperty]):
         type_ (str):
-        slug (Union[Unset, str]): This property is deprecated. Please use name instead.
+        slug (str | Unset): This property is deprecated. Use name instead.
     """
 
     created_at: datetime.datetime
     environment: str
     name: str
-    properties: list["ExportedCatalogProperty"]
+    properties: list[ExportedCatalogProperty]
     type_: str
-    slug: Union[Unset, str] = UNSET
+    slug: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
@@ -50,6 +52,7 @@ class ExportedCatalog:
         slug = self.slug
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "CreatedAt": created_at,

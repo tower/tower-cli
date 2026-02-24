@@ -15,10 +15,19 @@ path-guid = "CB5E6AA5-5ACF-4A2A-963E-CB9EE1769979"
 license = false
 eula = false
 
+[features]
+pyo3 = ["dep:pyo3"]
+
 [dependencies]
 tokio = { workspace = true }
 tower-cmd = { workspace = true }
 tower-api = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+tower-package = { workspace = true }
+config = { workspace = true }
+
+[lib]
+name = "_native"
 
 [[bin]]
 name = "tower"

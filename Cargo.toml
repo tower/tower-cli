@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.81"
 authors = ["Brad Heller <brad@tower.dev>"]
@@ -38,6 +38,7 @@ http = "1.1"
 indicatif = "0.17"
 nix = { version = "0.30", features = ["signal"] }
 pem = "3"
+pyo3 = { version = "0.28", features = ["extension-module"] }
 promptly = "0.3"
 rand = "0.8"
 regex = "1"

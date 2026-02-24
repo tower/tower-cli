@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -17,12 +19,12 @@ class CancelRunResponse:
     """
     Attributes:
         run (Run):
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CancelRunResponse.json.
     """
 
-    run: "Run"
-    schema: Union[Unset, str] = UNSET
+    run: Run
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         run = self.run.to_dict()
@@ -30,6 +32,7 @@ class CancelRunResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "run": run,

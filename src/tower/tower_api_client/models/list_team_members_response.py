@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.user import User
+    from ..models.team_membership import TeamMembership
 
 
 T = TypeVar("T", bound="ListTeamMembersResponse")
@@ -16,13 +18,13 @@ T = TypeVar("T", bound="ListTeamMembersResponse")
 class ListTeamMembersResponse:
     """
     Attributes:
-        team_members (list['User']): All of the members of a team
-        schema (Union[Unset, str]): A URL to the JSON Schema for this object. Example:
+        team_members (list[TeamMembership]): All of the members of a team
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/ListTeamMembersResponse.json.
     """
 
-    team_members: list["User"]
-    schema: Union[Unset, str] = UNSET
+    team_members: list[TeamMembership]
+    schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         team_members = []
@@ -33,6 +35,7 @@ class ListTeamMembersResponse:
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "team_members": team_members,
@@ -45,13 +48,13 @@ class ListTeamMembersResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.user import User
+        from ..models.team_membership import TeamMembership
 
         d = dict(src_dict)
         team_members = []
         _team_members = d.pop("team_members")
         for team_members_item_data in _team_members:
-            team_members_item = User.from_dict(team_members_item_data)
+            team_members_item = TeamMembership.from_dict(team_members_item_data)
 
             team_members.append(team_members_item)
 

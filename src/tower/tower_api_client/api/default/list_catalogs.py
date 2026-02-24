@@ -1,20 +1,20 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_catalogs_response import ListCatalogsResponse
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -38,21 +38,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListCatalogsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListCatalogsResponse:
     if response.status_code == 200:
         response_200 = ListCatalogsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListCatalogsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListCatalogsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -64,28 +64,28 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Response[ListCatalogsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> Response[ErrorModel | ListCatalogsResponse]:
     """List catalogs
 
      Lists all the catalogs associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all catalogs across all environments or only
-            for the current environment.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
+            current environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListCatalogsResponse]
+        Response[ErrorModel | ListCatalogsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -105,28 +105,28 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Optional[ListCatalogsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> ErrorModel | ListCatalogsResponse | None:
     """List catalogs
 
      Lists all the catalogs associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all catalogs across all environments or only
-            for the current environment.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
+            current environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListCatalogsResponse
+        ErrorModel | ListCatalogsResponse
     """
 
     return sync_detailed(
@@ -141,28 +141,28 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Response[ListCatalogsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> Response[ErrorModel | ListCatalogsResponse]:
     """List catalogs
 
      Lists all the catalogs associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all catalogs across all environments or only
-            for the current environment.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
+            current environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListCatalogsResponse]
+        Response[ErrorModel | ListCatalogsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -180,28 +180,28 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    environment: Union[Unset, str] = UNSET,
-    all_: Union[Unset, bool] = UNSET,
-) -> Optional[ListCatalogsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    environment: str | Unset = UNSET,
+    all_: bool | Unset = UNSET,
+) -> ErrorModel | ListCatalogsResponse | None:
     """List catalogs
 
      Lists all the catalogs associated with your current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        environment (Union[Unset, str]): The environment to filter by.
-        all_ (Union[Unset, bool]): Whether to fetch all catalogs across all environments or only
-            for the current environment.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        environment (str | Unset): The environment to filter by.
+        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
+            current environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListCatalogsResponse
+        ErrorModel | ListCatalogsResponse
     """
 
     return (

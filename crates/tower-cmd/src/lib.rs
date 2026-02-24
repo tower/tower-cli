@@ -23,6 +23,7 @@ pub use error::Error;
 pub struct App {
     session: Option<Session>,
     cmd: Command,
+    args: Option<Vec<String>>,
 }
 
 impl App {
@@ -38,7 +39,17 @@ impl App {
             Session::from_config_dir().ok()
         };
 
-        Self { cmd, session }
+        Self {
+            cmd,
+            session,
+            args: None,
+        }
+    }
+
+    pub fn new_from_args(args: Vec<String>) -> Self {
+        let mut app = Self::new();
+        app.args = Some(args);
+        app
     }
 
     async fn check_latest_version() -> Option<String> {
@@ -52,7 +63,10 @@ impl App {
 
     pub async fn run(self) {
         let mut cmd_clone = self.cmd.clone();
-        let matches = self.cmd.get_matches();
+        let matches = match self.args {
+            Some(args) => self.cmd.get_matches_from(args),
+            None => self.cmd.get_matches(),
+        };
 
         let config = Config::from_arg_matches(&matches);
 

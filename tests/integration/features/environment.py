@@ -45,6 +45,10 @@ def after_scenario(context, scenario):
 
 
 def _find_tower_binary():
+    if binary := os.environ.get("TOWER_CLI_BINARY"):
+        if Path(binary).exists():
+            return binary
+
     # Look for debug build first
     debug_path = (
         Path(__file__).parent.parent.parent.parent / "target" / "debug" / "tower"
@@ -58,5 +62,10 @@ def _find_tower_binary():
     )
     if release_path.exists():
         return str(release_path)
+
+    # Fall back to tower on PATH (e.g. installed via maturin develop or pip)
+    result = subprocess.run(["which", "tower"], capture_output=True, text=True)
+    if result.returncode == 0:
+        return result.stdout.strip()
 
     return None

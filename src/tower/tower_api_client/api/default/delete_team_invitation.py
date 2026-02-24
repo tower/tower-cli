@@ -1,12 +1,13 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_team_invitation_params import DeleteTeamInvitationParams
 from ...models.delete_team_invitation_response import DeleteTeamInvitationResponse
+from ...models.error_model import ErrorModel
 from ...types import Response
 
 
@@ -20,13 +21,12 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": "/teams/{name}/invites".format(
-            name=name,
+            name=quote(str(name), safe=""),
         ),
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -34,21 +34,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[DeleteTeamInvitationResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DeleteTeamInvitationResponse | ErrorModel:
     if response.status_code == 200:
         response_200 = DeleteTeamInvitationResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[DeleteTeamInvitationResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DeleteTeamInvitationResponse | ErrorModel]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -62,7 +62,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: DeleteTeamInvitationParams,
-) -> Response[DeleteTeamInvitationResponse]:
+) -> Response[DeleteTeamInvitationResponse | ErrorModel]:
     """Delete team invitation
 
      Delete a pending team invitation that you have previously sent
@@ -76,7 +76,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteTeamInvitationResponse]
+        Response[DeleteTeamInvitationResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -96,7 +96,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: DeleteTeamInvitationParams,
-) -> Optional[DeleteTeamInvitationResponse]:
+) -> DeleteTeamInvitationResponse | ErrorModel | None:
     """Delete team invitation
 
      Delete a pending team invitation that you have previously sent
@@ -110,7 +110,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteTeamInvitationResponse
+        DeleteTeamInvitationResponse | ErrorModel
     """
 
     return sync_detailed(
@@ -125,7 +125,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: DeleteTeamInvitationParams,
-) -> Response[DeleteTeamInvitationResponse]:
+) -> Response[DeleteTeamInvitationResponse | ErrorModel]:
     """Delete team invitation
 
      Delete a pending team invitation that you have previously sent
@@ -139,7 +139,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteTeamInvitationResponse]
+        Response[DeleteTeamInvitationResponse | ErrorModel]
     """
 
     kwargs = _get_kwargs(
@@ -157,7 +157,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: DeleteTeamInvitationParams,
-) -> Optional[DeleteTeamInvitationResponse]:
+) -> DeleteTeamInvitationResponse | ErrorModel | None:
     """Delete team invitation
 
      Delete a pending team invitation that you have previously sent
@@ -171,7 +171,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteTeamInvitationResponse
+        DeleteTeamInvitationResponse | ErrorModel
     """
 
     return (

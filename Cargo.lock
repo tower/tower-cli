@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "base64",
  "chrono",
@@ -598,7 +598,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypto"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -2240,6 +2240,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "pyo3"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcf3ccafdf54c050be48a3a086d372f77ba6615f5057211607cd30e5ac5cec6d"
+dependencies = [
+ "libc",
+ "once_cell",
+ "portable-atomic",
+ "pyo3-build-config",
+ "pyo3-ffi",
+ "pyo3-macros",
+]
+
+[[package]]
+name = "pyo3-build-config"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "972720a441c91fd9c49f212a1d2d74c6e3803b231ebc8d66c51efbd7ccab11c8"
+dependencies = [
+ "target-lexicon",
+]
+
+[[package]]
+name = "pyo3-ffi"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5994456d9dab8934d600d3867571b6410f24fbd6002570ad56356733eb54859b"
+dependencies = [
+ "libc",
+ "pyo3-build-config",
+]
+
+[[package]]
+name = "pyo3-macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11ce9cc8d81b3c4969748807604d92b4eef363c5bb82b1a1bdb34ec6f1093a18"
+dependencies = [
+ "proc-macro2",
+ "pyo3-macros-backend",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "pyo3-macros-backend"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaf4b60036a154d23282679b658e3cc7d88d3b8c9a40b43824785f232d2e1b98"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "pyo3-build-config",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3219,6 +3277,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "target-lexicon"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1dd07eb858a2067e2f3c7155d54e929265c264e6f37efe3ee7a8d1b5a1dd0ba"
+
+[[package]]
 name = "tempfile"
 version = "3.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3252,7 +3316,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "pem",
  "rsa",
@@ -3522,11 +3586,14 @@ checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "tower"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
+ "config",
+ "pyo3",
  "tokio",
  "tower-api",
  "tower-cmd",
+ "tower-package",
 ]
 
 [[package]]
@@ -3547,7 +3614,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "reqwest",
  "serde",
@@ -3559,7 +3626,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "axum",
  "bytes",
@@ -3629,7 +3696,7 @@ checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
 
 [[package]]
 name = "tower-package"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "async-compression",
  "config",
@@ -3647,7 +3714,7 @@ dependencies = [
 
 [[package]]
 name = "tower-runtime"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3670,7 +3737,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tower-telemetry"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "tracing",
  "tracing-appender",
@@ -3679,7 +3746,7 @@ dependencies = [
 
 [[package]]
 name = "tower-uv"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "async-compression",
  "async_zip",
@@ -3697,7 +3764,7 @@ dependencies = [
 
 [[package]]
 name = "tower-version"
-version = "0.3.48"
+version = "0.3.49-rc.3"
 dependencies = [
  "anyhow",
  "chrono",

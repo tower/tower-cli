@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -12,14 +14,14 @@ T = TypeVar("T", bound="ErrorDetail")
 class ErrorDetail:
     """
     Attributes:
-        location (Union[Unset, str]): Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
-        message (Union[Unset, str]): Error message text
-        value (Union[Unset, Any]): The value at the given location
+        location (str | Unset): Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
+        message (str | Unset): Error message text
+        value (Any | Unset): The value at the given location
     """
 
-    location: Union[Unset, str] = UNSET
-    message: Union[Unset, str] = UNSET
-    value: Union[Unset, Any] = UNSET
+    location: str | Unset = UNSET
+    message: str | Unset = UNSET
+    value: Any | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         location = self.location
@@ -29,6 +31,7 @@ class ErrorDetail:
         value = self.value
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update({})
         if location is not UNSET:
             field_dict["location"] = location

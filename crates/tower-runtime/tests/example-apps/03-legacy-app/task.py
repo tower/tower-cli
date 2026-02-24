@@ -1,3 +1,3 @@
-import dlt
+import requests
 
-print(dlt.version.__version__)
+print(requests.__version__)

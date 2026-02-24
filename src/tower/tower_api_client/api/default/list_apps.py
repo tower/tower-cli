@@ -1,10 +1,10 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
-from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.error_model import ErrorModel
 from ...models.list_apps_filter import ListAppsFilter
 from ...models.list_apps_response import ListAppsResponse
 from ...models.list_apps_sort import ListAppsSort
@@ -13,13 +13,13 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    query: Union[Unset, str] = UNSET,
-    num_runs: Union[Unset, int] = 20,
-    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
-    filter_: Union[Unset, ListAppsFilter] = UNSET,
-    environment: Union[Unset, str] = UNSET,
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    query: str | Unset = UNSET,
+    num_runs: int | Unset = 20,
+    sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
+    filter_: ListAppsFilter | Unset = UNSET,
+    environment: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -31,13 +31,13 @@ def _get_kwargs(
 
     params["num_runs"] = num_runs
 
-    json_sort: Union[Unset, str] = UNSET
+    json_sort: str | Unset = UNSET
     if not isinstance(sort, Unset):
         json_sort = sort.value
 
     params["sort"] = json_sort
 
-    json_filter_: Union[Unset, str] = UNSET
+    json_filter_: str | Unset = UNSET
     if not isinstance(filter_, Unset):
         json_filter_ = filter_.value
 
@@ -57,21 +57,21 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[ListAppsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorModel | ListAppsResponse:
     if response.status_code == 200:
         response_200 = ListAppsResponse.from_dict(response.json())
 
         return response_200
-    if client.raise_on_unexpected_status:
-        raise errors.UnexpectedStatus(response.status_code, response.content)
-    else:
-        return None
+
+    response_default = ErrorModel.from_dict(response.json())
+
+    return response_default
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[ListAppsResponse]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorModel | ListAppsResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -83,36 +83,35 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    query: Union[Unset, str] = UNSET,
-    num_runs: Union[Unset, int] = 20,
-    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
-    filter_: Union[Unset, ListAppsFilter] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListAppsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    query: str | Unset = UNSET,
+    num_runs: int | Unset = 20,
+    sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
+    filter_: ListAppsFilter | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListAppsResponse]:
     """List apps
 
      Get all the apps for the current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        query (Union[Unset, str]): The search query to filter apps by.
-        num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
-            20) Default: 20.
-        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
-            ListAppsSort.CREATED_AT.
-        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
-        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
-            apps for all environments will be returned.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        query (str | Unset): The search query to filter apps by.
+        num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
+            Default: 20.
+        sort (ListAppsSort | Unset): Sort order for the results. Default: ListAppsSort.CREATED_AT.
+        filter_ (ListAppsFilter | Unset): Filter to see apps with certain statuses.
+        environment (str | Unset): The environment to filter the apps by. If not provided, apps
+            for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListAppsResponse]
+        Response[ErrorModel | ListAppsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -135,36 +134,35 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    query: Union[Unset, str] = UNSET,
-    num_runs: Union[Unset, int] = 20,
-    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
-    filter_: Union[Unset, ListAppsFilter] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListAppsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    query: str | Unset = UNSET,
+    num_runs: int | Unset = 20,
+    sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
+    filter_: ListAppsFilter | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListAppsResponse | None:
     """List apps
 
      Get all the apps for the current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        query (Union[Unset, str]): The search query to filter apps by.
-        num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
-            20) Default: 20.
-        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
-            ListAppsSort.CREATED_AT.
-        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
-        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
-            apps for all environments will be returned.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        query (str | Unset): The search query to filter apps by.
+        num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
+            Default: 20.
+        sort (ListAppsSort | Unset): Sort order for the results. Default: ListAppsSort.CREATED_AT.
+        filter_ (ListAppsFilter | Unset): Filter to see apps with certain statuses.
+        environment (str | Unset): The environment to filter the apps by. If not provided, apps
+            for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListAppsResponse
+        ErrorModel | ListAppsResponse
     """
 
     return sync_detailed(
@@ -182,36 +180,35 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    query: Union[Unset, str] = UNSET,
-    num_runs: Union[Unset, int] = 20,
-    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
-    filter_: Union[Unset, ListAppsFilter] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Response[ListAppsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    query: str | Unset = UNSET,
+    num_runs: int | Unset = 20,
+    sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
+    filter_: ListAppsFilter | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> Response[ErrorModel | ListAppsResponse]:
     """List apps
 
      Get all the apps for the current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        query (Union[Unset, str]): The search query to filter apps by.
-        num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
-            20) Default: 20.
-        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
-            ListAppsSort.CREATED_AT.
-        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
-        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
-            apps for all environments will be returned.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        query (str | Unset): The search query to filter apps by.
+        num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
+            Default: 20.
+        sort (ListAppsSort | Unset): Sort order for the results. Default: ListAppsSort.CREATED_AT.
+        filter_ (ListAppsFilter | Unset): Filter to see apps with certain statuses.
+        environment (str | Unset): The environment to filter the apps by. If not provided, apps
+            for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListAppsResponse]
+        Response[ErrorModel | ListAppsResponse]
     """
 
     kwargs = _get_kwargs(
@@ -232,36 +229,35 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = 1,
-    page_size: Union[Unset, int] = 20,
-    query: Union[Unset, str] = UNSET,
-    num_runs: Union[Unset, int] = 20,
-    sort: Union[Unset, ListAppsSort] = ListAppsSort.CREATED_AT,
-    filter_: Union[Unset, ListAppsFilter] = UNSET,
-    environment: Union[Unset, str] = UNSET,
-) -> Optional[ListAppsResponse]:
+    page: int | Unset = 1,
+    page_size: int | Unset = 20,
+    query: str | Unset = UNSET,
+    num_runs: int | Unset = 20,
+    sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
+    filter_: ListAppsFilter | Unset = UNSET,
+    environment: str | Unset = UNSET,
+) -> ErrorModel | ListAppsResponse | None:
     """List apps
 
      Get all the apps for the current account.
 
     Args:
-        page (Union[Unset, int]): The page number to fetch. Default: 1.
-        page_size (Union[Unset, int]): The number of records to fetch on each page. Default: 20.
-        query (Union[Unset, str]): The search query to filter apps by.
-        num_runs (Union[Unset, int]): Number of recent runs to fetch (-1 for all runs, defaults to
-            20) Default: 20.
-        sort (Union[Unset, ListAppsSort]): Sort order for the results. Default:
-            ListAppsSort.CREATED_AT.
-        filter_ (Union[Unset, ListAppsFilter]): Filter to see apps with certain statuses.
-        environment (Union[Unset, str]): The environment to filter the apps by. If not provided,
-            apps for all environments will be returned.
+        page (int | Unset): The page number to fetch. Default: 1.
+        page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        query (str | Unset): The search query to filter apps by.
+        num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
+            Default: 20.
+        sort (ListAppsSort | Unset): Sort order for the results. Default: ListAppsSort.CREATED_AT.
+        filter_ (ListAppsFilter | Unset): Filter to see apps with certain statuses.
+        environment (str | Unset): The environment to filter the apps by. If not provided, apps
+            for all environments will be returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListAppsResponse
+        ErrorModel | ListAppsResponse
     """
 
     return (

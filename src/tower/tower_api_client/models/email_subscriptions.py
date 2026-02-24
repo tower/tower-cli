@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -12,14 +14,14 @@ T = TypeVar("T", bound="EmailSubscriptions")
 class EmailSubscriptions:
     """
     Attributes:
-        feature_updates (Union[Unset, bool]):
-        marketing_emails (Union[Unset, bool]):
-        tower_newsletter (Union[Unset, bool]):
+        feature_updates (bool | Unset):
+        marketing_emails (bool | Unset):
+        tower_newsletter (bool | Unset):
     """
 
-    feature_updates: Union[Unset, bool] = UNSET
-    marketing_emails: Union[Unset, bool] = UNSET
-    tower_newsletter: Union[Unset, bool] = UNSET
+    feature_updates: bool | Unset = UNSET
+    marketing_emails: bool | Unset = UNSET
+    tower_newsletter: bool | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         feature_updates = self.feature_updates
@@ -29,6 +31,7 @@ class EmailSubscriptions:
         tower_newsletter = self.tower_newsletter
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update({})
         if feature_updates is not UNSET:
             field_dict["feature_updates"] = feature_updates

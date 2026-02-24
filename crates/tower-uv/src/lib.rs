@@ -370,6 +370,13 @@ impl Uv {
                 .arg("install")
                 .arg("-r")
                 .arg(cwd.join("requirements.txt"))
+                // setuptools 82 removed pkg_resources, but many legacy packages
+                // still import it without declaring the dependency. Let's always install
+                // a version that includes pkg_resources for requirements.txt, on the
+                // basis that requirements.txt projects are probably not using the latest
+                // and greatest deps (then they'd likely be using pyproject.toml anyway)
+                // https://github.com/pypa/setuptools/issues/5174
+                .arg("setuptools<82")
                 .envs(env_vars);
 
             #[cfg(unix)]
