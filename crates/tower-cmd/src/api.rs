@@ -843,7 +843,7 @@ pub async fn create_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                secret: false,
+                hidden: false,
             })
             .collect()
     });
@@ -881,7 +881,7 @@ pub async fn update_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                secret: false,
+                hidden: false,
             })
             .collect()
     });

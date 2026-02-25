@@ -21,8 +21,8 @@ pub struct RunParameter {
     #[serde(rename = "value")]
     pub value: String,
     #[serde(default)]
-    #[serde(rename = "secret")]
-    pub secret: bool,
+    #[serde(rename = "hidden")]
+    pub hidden: bool,
 }
 
 impl RunParameter {
@@ -30,7 +30,7 @@ impl RunParameter {
         RunParameter {
             name,
             value,
-            secret: false,
+            hidden: false,
         }
     }
 }

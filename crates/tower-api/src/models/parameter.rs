@@ -24,8 +24,8 @@ pub struct Parameter {
     #[serde(rename = "name")]
     pub name: String,
     #[serde(default)]
-    #[serde(rename = "secret")]
-    pub secret: bool,
+    #[serde(rename = "hidden")]
+    pub hidden: bool,
 }
 
 impl Parameter {
@@ -34,7 +34,7 @@ impl Parameter {
             default,
             description,
             name,
-            secret: false,
+            hidden: false,
         }
     }
 }

@@ -14,7 +14,7 @@ pub struct Parameter {
     pub default: String,
 
     #[serde(default)]
-    pub secret: bool,
+    pub hidden: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -125,7 +125,7 @@ impl Towerfile {
             name,
             description,
             default,
-            secret: false,
+            hidden: false,
         });
     }
 }
@@ -276,7 +276,7 @@ mod test {
         assert_eq!(towerfile.parameters.len(), 2);
         assert_eq!(towerfile.parameters[0].name, "my_first_param");
         assert_eq!(towerfile.parameters[1].name, "my_second_param");
-        assert!(!towerfile.parameters[0].secret);
+        assert!(!towerfile.parameters[0].hidden);
     }
 
     #[test]
@@ -289,13 +289,13 @@ mod test {
 
             [[parameters]]
             name = "MY_PARAMETER"
-            secret = true
+            hidden = true
         "#;
 
         let towerfile = crate::Towerfile::from_toml(toml).unwrap();
         assert_eq!(towerfile.parameters.len(), 1);
         assert_eq!(towerfile.parameters[0].name, "MY_PARAMETER");
-        assert!(towerfile.parameters[0].secret);
+        assert!(towerfile.parameters[0].hidden);
     }
 
     #[test]
