@@ -12,6 +12,9 @@ pub struct Parameter {
 
     #[serde(default)]
     pub default: String,
+
+    #[serde(default)]
+    pub secret: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -122,6 +125,7 @@ impl Towerfile {
             name,
             description,
             default,
+            secret: false,
         });
     }
 }
@@ -272,6 +276,26 @@ mod test {
         assert_eq!(towerfile.parameters.len(), 2);
         assert_eq!(towerfile.parameters[0].name, "my_first_param");
         assert_eq!(towerfile.parameters[1].name, "my_second_param");
+        assert!(!towerfile.parameters[0].secret);
+    }
+
+    #[test]
+    fn test_parses_secret_parameters() {
+        let toml = r#"
+            [app]
+            name = "my-app"
+            script = "./script.py"
+            source = ["*.py"]
+
+            [[parameters]]
+            name = "MY_PARAMETER"
+            secret = true
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.parameters.len(), 1);
+        assert_eq!(towerfile.parameters[0].name, "MY_PARAMETER");
+        assert!(towerfile.parameters[0].secret);
     }
 
     #[test]

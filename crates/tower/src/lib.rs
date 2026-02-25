@@ -23,8 +23,8 @@ mod bindings {
 
         let spec = PackageSpec::from_towerfile(&towerfile);
 
-        let runtime = tokio::runtime::Runtime::new()
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let runtime =
+            tokio::runtime::Runtime::new().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         let output = PathBuf::from(output);
 
@@ -40,8 +40,7 @@ mod bindings {
                 .as_ref()
                 .ok_or_else(|| PyRuntimeError::new_err("package build produced no output file"))?;
 
-            std::fs::copy(src, &output)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+            std::fs::copy(src, &output).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
             Ok(())
         })
@@ -53,8 +52,8 @@ mod bindings {
     ///     args: Command line arguments (typically sys.argv).
     #[pyfunction]
     fn _run_cli(args: Vec<String>) -> PyResult<()> {
-        let runtime = tokio::runtime::Runtime::new()
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let runtime =
+            tokio::runtime::Runtime::new().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         // App::new_from_args() must run inside block_on because
         // Session::from_config_dir() requires an active tokio reactor.

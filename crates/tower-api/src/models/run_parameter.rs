@@ -20,10 +20,17 @@ pub struct RunParameter {
     #[serde_as(as = "DefaultOnNull")]
     #[serde(rename = "value")]
     pub value: String,
+    #[serde(default)]
+    #[serde(rename = "secret")]
+    pub secret: bool,
 }
 
 impl RunParameter {
     pub fn new(name: String, value: String) -> RunParameter {
-        RunParameter { name, value }
+        RunParameter {
+            name,
+            value,
+            secret: false,
+        }
     }
 }

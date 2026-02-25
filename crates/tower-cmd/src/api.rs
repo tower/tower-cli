@@ -840,7 +840,11 @@ pub async fn create_schedule(
     let run_parameters = parameters.map(|params| {
         params
             .into_iter()
-            .map(|(key, value)| RunParameter { name: key, value })
+            .map(|(key, value)| RunParameter {
+                name: key,
+                value,
+                secret: false,
+            })
             .collect()
     });
 
@@ -874,7 +878,11 @@ pub async fn update_schedule(
     let run_parameters = parameters.map(|params| {
         params
             .into_iter()
-            .map(|(key, value)| RunParameter { name: key, value })
+            .map(|(key, value)| RunParameter {
+                name: key,
+                value,
+                secret: false,
+            })
             .collect()
     });
 

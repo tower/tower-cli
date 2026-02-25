@@ -889,7 +889,22 @@ IMPORTANT REMINDERS:
     async fn tower_schedules_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_schedules(&self.config, None, None).await {
             Ok(response) => {
-                Self::json_success(serde_json::json!({"schedules": response.schedules}))
+                let schedules = response
+                    .schedules
+                    .into_iter()
+                    .map(|mut schedule| {
+                        if let Some(parameters) = schedule.parameters.as_mut() {
+                            for parameter in parameters {
+                                if parameter.secret {
+                                    parameter.value = "[hidden]".to_string();
+                                }
+                            }
+                        }
+                        schedule
+                    })
+                    .collect::<Vec<_>>();
+
+                Self::json_success(serde_json::json!({"schedules": schedules}))
             }
             Err(e) => Self::error_result("Failed to list schedules", e),
         }
