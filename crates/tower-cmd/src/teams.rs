@@ -1,4 +1,4 @@
-use clap::{ArgMatches, Command};
+use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
 use config::Config;
 
@@ -11,7 +11,13 @@ pub fn teams_cmd() -> Command {
         .subcommand(Command::new("list").about("List teams you belong to"))
         .subcommand(
             Command::new("switch")
-                .allow_external_subcommands(true)
+                .arg(
+                    Arg::new("team_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("Name of the team to switch to"),
+                )
                 .about("Switch context to a different team"),
         )
 }
@@ -82,18 +88,18 @@ pub async fn do_list(config: Config) {
 }
 
 pub async fn do_switch(config: Config, args: &ArgMatches) {
-    let name = extract_team_name("switch", args.subcommand());
+    let name = args.get_one::<String>("team_name").expect("team_name is required");
 
     // Refresh the session first to ensure we have the latest teams data
     let session = refresh_session(&config).await;
 
     // Check if the provided team name exists in the refreshed session
-    let team = session.teams.iter().find(|team| team.name == name);
+    let team = session.teams.iter().find(|team| team.name == *name);
 
     match team {
         Some(team) => {
             // Team found, set it as active
-            match config.set_active_team_by_name(&name) {
+            match config.set_active_team_by_name(name) {
                 Ok(_) => {
                     output::success(&format!("Switched to team: {}", team.name));
                 }
@@ -114,14 +120,3 @@ pub async fn do_switch(config: Config, args: &ArgMatches) {
     }
 }
 
-fn extract_team_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
-    if let Some((name, _)) = cmd {
-        return name.to_string();
-    }
-
-    let line = format!(
-        "Team name is required. Example: tower teams {} <team name>",
-        subcmd
-    );
-    output::die(&line);
-}
