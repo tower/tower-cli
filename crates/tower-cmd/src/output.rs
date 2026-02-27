@@ -298,7 +298,6 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
 
     match err.status {
         StatusCode::CONFLICT => {
-            error("There was a conflict while trying to do that!");
             output_full_error_details(&error_model);
         }
         StatusCode::UNPROCESSABLE_ENTITY => {
@@ -316,7 +315,10 @@ fn output_response_content_error<T>(err: ResponseContent<T>) {
             );
         }
         _ => {
-            error("The Tower API returned an error that the Tower CLI doesn't know what to do with! Maybe try again in a bit.");
+            if error_model.detail.is_none() && error_model.errors.is_none() {
+                error("The Tower API returned an error that the Tower CLI doesn't know what to do with! Maybe try again in a bit.");
+            }
+            output_full_error_details(&error_model);
         }
     }
 }
