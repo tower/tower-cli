@@ -980,3 +980,35 @@ impl ResponseEntity for tower_api::apis::default_api::DeleteScheduleSuccess {
         }
     }
 }
+
+pub async fn cancel_run(
+    config: &Config,
+    name: &str,
+    seq: i64,
+) -> Result<
+    tower_api::models::CancelRunResponse,
+    Error<tower_api::apis::default_api::CancelRunError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::CancelRunParams {
+        name: name.to_string(),
+        seq,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::cancel_run(
+        api_config, params,
+    ))
+    .await
+}
+
+impl ResponseEntity for tower_api::apis::default_api::CancelRunSuccess {
+    type Data = tower_api::models::CancelRunResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
