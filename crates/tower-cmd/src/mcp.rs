@@ -99,6 +99,12 @@ struct GenerateTowerfileRequest {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+struct CancelRunRequest {
+    name: String,
+    run_number: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 struct ScheduleRequest {
     app_name: String,
     environment: Option<String>,
@@ -478,6 +484,28 @@ impl TowerService {
         match api::delete_app(&self.config, &request.name).await {
             Ok(_) => Self::text_success(format!("Deleted app '{}'", request.name)),
             Err(e) => Self::error_result("Failed to delete app", e),
+        }
+    }
+
+    #[tool(description = "Cancel a running Tower app run")]
+    async fn tower_apps_cancel(
+        &self,
+        Parameters(request): Parameters<CancelRunRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let seq: i64 = request
+            .run_number
+            .parse()
+            .map_err(|_| McpError::invalid_params("run_number must be a number", None))?;
+
+        match api::cancel_run(&self.config, &request.name, seq).await {
+            Ok(response) => {
+                let status = format!("{:?}", response.run.status);
+                Self::text_success(format!(
+                    "Cancelled run #{} for '{}' (status: {})",
+                    seq, request.name, status
+                ))
+            }
+            Err(e) => Self::error_result("Failed to cancel run", e),
         }
     }
 
