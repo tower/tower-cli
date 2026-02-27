@@ -23,6 +23,9 @@ pub struct Parameter {
     #[serde_as(as = "DefaultOnNull")]
     #[serde(rename = "name")]
     pub name: String,
+    #[serde(default)]
+    #[serde(rename = "hidden")]
+    pub hidden: bool,
 }
 
 impl Parameter {
@@ -31,6 +34,7 @@ impl Parameter {
             default,
             description,
             name,
+            hidden: false,
         }
     }
 }

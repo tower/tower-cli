@@ -14,13 +14,29 @@ pub fn apps_cmd() -> Command {
         .subcommand(Command::new("list").about("List all of your apps"))
         .subcommand(
             Command::new("show")
-                .allow_external_subcommands(true)
-                .override_usage("tower apps show [OPTIONS] <APP_NAME>")
-                .after_help("Example: tower apps show hello-world")
+                .arg(
+                    Arg::new("app_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("Name of the app"),
+                )
                 .about("Show the details about an app in Tower"),
         )
         .subcommand(
             Command::new("logs")
+                .arg(
+                    Arg::new("app_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("app_name#run_number"),
+                )
+                .arg(
+                    Arg::new("run_number")
+                        .value_parser(value_parser!(i64))
+                        .index(2),
+                )
                 .arg(
                     Arg::new("follow")
                         .short('f')
@@ -28,9 +44,6 @@ pub fn apps_cmd() -> Command {
                         .help("Follow logs in real time")
                         .action(clap::ArgAction::SetTrue),
                 )
-                .allow_external_subcommands(true)
-                .override_usage("tower apps logs [OPTIONS] <APP_NAME>#<RUN_NUMBER>")
-                .after_help("Example: tower apps logs hello-world#11")
                 .about("Get the logs from a previous Tower app run"),
         )
         .subcommand(
@@ -54,15 +67,29 @@ pub fn apps_cmd() -> Command {
         )
         .subcommand(
             Command::new("delete")
-                .allow_external_subcommands(true)
-                .override_usage("tower apps delete [OPTIONS] <APP_NAME>")
-                .after_help("Example: tower apps delete hello-world")
+                .arg(
+                    Arg::new("app_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("Name of the app"),
+                )
                 .about("Delete an app in Tower"),
         )
 }
 
 pub async fn do_logs(config: Config, cmd: &ArgMatches) {
-    let (name, seq) = extract_app_name_and_run("logs", cmd.subcommand());
+    let app_name_raw = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let (name, seq) = if let Some((name, num_str)) = app_name_raw.split_once('#') {
+        let num = num_str.parse::<i64>().unwrap_or_else(|_| output::die("Run number must be a number"));
+        (name.to_string(), num)
+    } else {
+        let num = match cmd.get_one::<i64>("run_number").copied() {
+            Some(n) => n,
+            None => latest_run_number(&config, app_name_raw).await,
+        };
+        (app_name_raw.clone(), num)
+    };
     let follow = cmd.get_one::<bool>("follow").copied().unwrap_or(false);
 
     if follow {
@@ -78,7 +105,7 @@ pub async fn do_logs(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_show(config: Config, cmd: &ArgMatches) {
-    let name = extract_app_name("show", cmd.subcommand());
+    let name = cmd.get_one::<String>("app_name").expect("app_name is required");
 
     match api::describe_app(&config, &name).await {
         Ok(app_response) => {
@@ -191,46 +218,20 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, cmd: &ArgMatches) {
-    let name = extract_app_name("delete", cmd.subcommand());
+    let name = cmd.get_one::<String>("app_name").expect("app_name is required");
 
-    output::with_spinner("Deleting app", api::delete_app(&config, &name)).await;
+    output::with_spinner("Deleting app", api::delete_app(&config, name)).await;
 }
 
-/// Extract app name and run number from command
-fn extract_app_name_and_run(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> (String, i64) {
-    if let Some((name, _)) = cmd {
-        if let Some((name, num)) = name.split_once('#') {
-            return (
-                name.to_string(),
-                num.parse::<i64>().unwrap_or_else(|_| {
-                    output::die("Run number must be an actual number");
-                }),
-            );
-        }
-
-        let line = format!(
-            "Run number is required. Example: tower apps {} <app name>#<run number>",
-            subcmd
-        );
-        output::die(&line);
+async fn latest_run_number(config: &Config, name: &str) -> i64 {
+    match api::describe_app(config, name).await {
+        Ok(resp) => resp.runs
+            .iter()
+            .map(|r| r.number)
+            .max()
+            .unwrap_or_else(|| output::die(&format!("No runs found for app '{}'", name))),
+        Err(err) => output::tower_error_and_die(err, "Fetching app details failed"),
     }
-    let line = format!(
-        "App name is required. Example: tower apps {} <app name>#<run number>",
-        subcmd
-    );
-    output::die(&line)
-}
-
-fn extract_app_name(subcmd: &str, cmd: Option<(&str, &ArgMatches)>) -> String {
-    if let Some((name, _)) = cmd {
-        return name.to_string();
-    }
-
-    let line = format!(
-        "App name is required. Example: tower apps {} <app name>",
-        subcmd
-    );
-    output::die(&line);
 }
 
 const FOLLOW_BACKOFF_INITIAL: Duration = Duration::from_millis(500);
@@ -539,9 +540,24 @@ mod tests {
         assert_eq!(cmd, "logs");
         assert_eq!(sub_matches.get_one::<bool>("follow"), Some(&true));
         assert_eq!(
-            sub_matches.subcommand().map(|(name, _)| name),
+            sub_matches.get_one::<String>("app_name").map(|s| s.as_str()),
             Some("hello-world#11")
         );
+        assert_eq!(sub_matches.get_one::<i64>("run_number"), None);
+    }
+
+    #[test]
+    fn test_separate_run_number_parsing() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "logs", "hello-world", "11"])
+            .unwrap();
+        let (_, sub_matches) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            sub_matches.get_one::<String>("app_name").map(|s| s.as_str()),
+            Some("hello-world")
+        );
+        assert_eq!(sub_matches.get_one::<i64>("run_number"), Some(&11));
     }
 
     #[test]

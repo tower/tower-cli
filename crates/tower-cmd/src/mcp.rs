@@ -651,7 +651,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Run on Tower cloud. Prerequisites: Towerfile, tower_apps_create, tower_deploy."
+        description = "Run an app on Tower cloud. Pass parameters as a JSON object, e.g. {\"key\": \"value\"}. Prerequisites: Towerfile, tower_apps_create, tower_deploy."
     )]
     async fn tower_run_remote(
         &self,
@@ -889,7 +889,22 @@ IMPORTANT REMINDERS:
     async fn tower_schedules_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_schedules(&self.config, None, None).await {
             Ok(response) => {
-                Self::json_success(serde_json::json!({"schedules": response.schedules}))
+                let schedules = response
+                    .schedules
+                    .into_iter()
+                    .map(|mut schedule| {
+                        if let Some(parameters) = schedule.parameters.as_mut() {
+                            for parameter in parameters {
+                                if parameter.hidden {
+                                    parameter.value = "[hidden]".to_string();
+                                }
+                            }
+                        }
+                        schedule
+                    })
+                    .collect::<Vec<_>>();
+
+                Self::json_success(serde_json::json!({"schedules": schedules}))
             }
             Err(e) => Self::error_result("Failed to list schedules", e),
         }
@@ -968,6 +983,8 @@ Rules:
 - Use tower_file_update/add_parameter to modify Towerfiles (never edit TOML directly)
 - DO NOT add hatchling/setuptools to pyproject.toml - Tower handles deployment
 - Tower apps need: pyproject.toml (deps only), Python code, Towerfile
+- Pass run parameters as a JSON object {\"key\": \"value\"}, not as CLI flags
+- There is no --param or --params flag
 
 Use tower_workflow_help for the complete workflow.".to_string()),
         }
