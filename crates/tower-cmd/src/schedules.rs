@@ -73,23 +73,22 @@ pub fn schedules_cmd() -> Command {
             Command::new("delete")
                 .arg(
                     Arg::new("schedule_id")
-                        .required(true)
                         .value_parser(value_parser!(String))
-                        .help("The schedule ID to delete")
-                        .action(clap::ArgAction::Set),
+                        .index(1)
+                        .required(true)
+                        .help("The schedule ID to delete"),
                 )
-                .override_usage("tower schedules delete [OPTIONS] <SCHEDULE_ID>")
                 .after_help("Example: tower schedules delete 123")
                 .about("Delete a schedule"),
         )
         .subcommand(
             Command::new("update")
                 .arg(
-                    Arg::new("schedule_id")
-                        .required(true)
+                    Arg::new("id_or_name")
                         .value_parser(value_parser!(String))
-                        .help("The schedule ID to update")
-                        .action(clap::ArgAction::Set),
+                        .index(1)
+                        .required(true)
+                        .help("ID or name of the schedule to update"),
                 )
                 .arg(
                     Arg::new("cron")
@@ -106,7 +105,6 @@ pub fn schedules_cmd() -> Command {
                         .help("Parameters (key=value) to pass to the app")
                         .action(clap::ArgAction::Append),
                 )
-                .override_usage("tower schedules update [OPTIONS] <SCHEDULE_ID>")
                 .after_help("Example: tower schedules update 123 --cron \"*/15 * * * *\"")
                 .about("Update an existing schedule"),
         )
@@ -176,21 +174,21 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_update(config: Config, args: &ArgMatches) {
-    let schedule_id = args.get_one::<String>("schedule_id").unwrap();
+    let id_or_name = args.get_one::<String>("id_or_name").expect("id_or_name is required");
     let cron = args.get_one::<String>("cron");
     let parameters = parse_parameters(args);
 
     output::with_spinner(
         "Updating schedule",
-        api::update_schedule(&config, schedule_id, cron, parameters),
+        api::update_schedule(&config, id_or_name, cron, parameters),
     )
     .await;
 
-    output::success(&format!("Schedule {} updated", schedule_id));
+    output::success(&format!("Schedule {} updated", id_or_name));
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
-    let schedule_id = args.get_one::<String>("schedule_id").unwrap();
+    let schedule_id = args.get_one::<String>("schedule_id").expect("schedule_id is required");
 
     output::with_spinner(
         "Deleting schedule",
@@ -265,7 +263,7 @@ mod tests {
 
         assert_eq!(
             update_args
-                .get_one::<String>("schedule_id")
+                .get_one::<String>("id_or_name")
                 .map(String::as_str),
             Some("sch_123")
         );
@@ -301,7 +299,7 @@ mod tests {
 
         assert_eq!(
             update_args
-                .get_one::<String>("schedule_id")
+                .get_one::<String>("id_or_name")
                 .map(String::as_str),
             Some("sch_456")
         );

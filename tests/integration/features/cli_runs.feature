@@ -3,10 +3,10 @@ Feature: CLI Run Commands
   I want to run applications locally and remotely with proper feedback
   So that I can develop and deploy my applications effectively
 
-  Scenario: CLI remote run should show red error message when API fails
+  Scenario: CLI remote run should show helpful error when app not found
     Given I have a simple hello world application
     When I run "tower run" via CLI
-    Then the final crash status should show red "Error:"
+    Then the output should show "App not found" with guidance
 
   Scenario: CLI local run should have green timestamps and detect crashes
     Given I have a simple hello world application that exits with code 1

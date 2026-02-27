@@ -27,7 +27,19 @@ use tower_runtime::subprocess::SubprocessBackend;
 
 pub fn run_cmd() -> Command {
     Command::new("run")
-        .allow_external_subcommands(true)
+        .after_help(
+            "Examples:\n  \
+             tower run                        Run app from ./Towerfile (remote)\n  \
+             tower run --local                Run app from ./Towerfile (local)\n  \
+             tower run my-app                 Run a deployed app by name\n  \
+             tower run -p key=value           Pass a parameter to the run\n  \
+             tower run my-app -p key=value    Run a named app with parameters",
+        )
+        .arg(
+            Arg::new("app_name")
+                .help("Name of a deployed app to run (uses ./Towerfile if omitted)")
+                .index(1),
+        )
         .arg(
             Arg::new("dir")
                 .long("dir")
@@ -65,11 +77,26 @@ pub fn run_cmd() -> Command {
         .about("Run your code in Tower or locally")
 }
 
-pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMatches)>) {
-    if let Err(e) = do_run_inner(config, args, cmd).await {
+pub async fn do_run(config: Config, args: &ArgMatches) {
+    if let Err(e) = do_run_inner(config, args).await {
         match e {
-            Error::ApiRunError { source } => {
-                output::tower_error_and_die(source, "Scheduling run failed");
+            Error::ApiRunError { ref source } => {
+                let is_not_found = matches!(
+                    source,
+                    tower_api::apis::Error::ResponseError(resp) if resp.status == reqwest::StatusCode::NOT_FOUND
+                );
+                if is_not_found {
+                    output::error("App not found. It may not exist or hasn't been deployed yet.");
+                    output::write("\nTo fix this:\n");
+                    output::write("  1. Check your app exists:  tower apps list\n");
+                    output::write("  2. Deploy your app:        tower deploy\n");
+                    output::write("  3. Then run it:            tower run\n");
+                    std::process::exit(1);
+                }
+                if let Error::ApiRunError { source } = e {
+                    output::tower_error_and_die(source, "Scheduling run failed");
+                }
+                unreachable!();
             }
             _ => {
                 output::die(&e.to_string());
@@ -83,9 +110,8 @@ pub async fn do_run(config: Config, args: &ArgMatches, cmd: Option<(&str, &ArgMa
 pub async fn do_run_inner(
     config: Config,
     args: &ArgMatches,
-    cmd: Option<(&str, &ArgMatches)>,
 ) -> Result<(), Error> {
-    let res = get_run_parameters(args, cmd);
+    let res = get_run_parameters(args);
 
     // We always expect there to be an environment due to the fact that there is a
     // default value.
@@ -467,18 +493,15 @@ fn handle_run_completion(res: Result<Run, oneshot::error::RecvError>) -> Result<
     }
 }
 
-/// get_run_parameters takes care of all the hairy bits around digging about in the `clap`
-/// internals to figure out what the user is requesting. In the end, it determines if we are meant
-/// to do a local run or a remote run, and it determines the path to the relevant Towerfile that
-/// should be loaded.
+/// Extracts the local/remote flag, Towerfile directory, parameters, and optional app name
+/// from the parsed CLI args.
 fn get_run_parameters(
     args: &ArgMatches,
-    cmd: Option<(&str, &ArgMatches)>,
 ) -> Result<(bool, PathBuf, HashMap<String, String>, Option<String>), config::Error> {
     let local = *args.get_one::<bool>("local").unwrap();
     let path = resolve_path(args);
     let params = parse_parameters(args);
-    let app_name = get_app_name(cmd);
+    let app_name = args.get_one::<String>("app_name").cloned();
 
     Ok((local, path, params, app_name))
 }
@@ -525,14 +548,6 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
         PathBuf::from(dir)
     } else {
         PathBuf::from(".")
-    }
-}
-
-/// get_app_name is a helper function that will extract the app name from the `clap` arguments if
-fn get_app_name(cmd: Option<(&str, &ArgMatches)>) -> Option<String> {
-    match cmd {
-        Some((name, _)) if !name.is_empty() => Some(name.to_string()),
-        _ => None,
     }
 }
 
@@ -798,4 +813,63 @@ fn monitor_run_completion(config: &Config, run: &Run) -> oneshot::Receiver<Run> 
     });
 
     rx
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_cmd;
+
+    fn parse(args: &[&str]) -> Result<clap::ArgMatches, clap::Error> {
+        let mut full = vec!["run"];
+        full.extend_from_slice(args);
+        run_cmd().try_get_matches_from(full)
+    }
+
+    #[test]
+    fn app_name_parsed_as_positional_arg() {
+        let m = parse(&["my-app"]).unwrap();
+        assert_eq!(m.get_one::<String>("app_name").map(|s| s.as_str()), Some("my-app"));
+    }
+
+    #[test]
+    fn no_app_name_is_fine() {
+        let m = parse(&[]).unwrap();
+        assert_eq!(m.get_one::<String>("app_name"), None);
+    }
+
+    #[test]
+    fn unknown_flags_are_rejected() {
+        let err = parse(&["--param", "x=y"]).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("--param"), "should mention the bad flag: {msg}");
+        assert!(msg.contains("--parameter"), "should suggest the correct flag: {msg}");
+    }
+
+    #[test]
+    fn help_flag_is_not_swallowed_as_app_name() {
+        let err = parse(&["--help"]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::DisplayHelp);
+    }
+
+    #[test]
+    fn help_after_app_name_still_shows_help() {
+        let err = parse(&["my-app", "--help"]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::DisplayHelp);
+    }
+
+    #[test]
+    fn parameters_after_app_name() {
+        let m = parse(&["my-app", "-p", "key=val"]).unwrap();
+        assert_eq!(m.get_one::<String>("app_name").map(|s| s.as_str()), Some("my-app"));
+        let params: Vec<&String> = m.get_many::<String>("parameters").unwrap().collect();
+        assert_eq!(params, vec!["key=val"]);
+    }
+
+    #[test]
+    fn parameters_before_app_name() {
+        let m = parse(&["-p", "key=val", "my-app"]).unwrap();
+        assert_eq!(m.get_one::<String>("app_name").map(|s| s.as_str()), Some("my-app"));
+        let params: Vec<&String> = m.get_many::<String>("parameters").unwrap().collect();
+        assert_eq!(params, vec!["key=val"]);
+    }
 }
