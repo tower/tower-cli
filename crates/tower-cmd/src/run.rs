@@ -739,21 +739,24 @@ fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &st
     format!("PYICEBERG_CATALOG__{}__{}", catalog_name, property_name)
 }
 
+const RUN_START_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// wait_for_run_start waits for the run to enter a "running" state. It polls the API every 500ms to see
 /// if it's started yet.
 async fn wait_for_run_start(config: &Config, run: &Run) -> Result<(), Error> {
-    loop {
-        let res = api::describe_run(config, &run.app_name, run.number).await?;
+    timeout(RUN_START_TIMEOUT, async {
+        loop {
+            let res = api::describe_run(config, &run.app_name, run.number).await?;
 
-        if is_run_started(&res.run)? {
-            break;
-        } else {
-            // Wait half a second to to try again.
+            if is_run_started(&res.run)? {
+                return Ok(());
+            }
+
             sleep(Duration::from_millis(500)).await;
         }
-    }
-
-    Ok(())
+    })
+    .await
+    .map_err(|_| Error::RunStartTimeout)?
 }
 
 /// wait_for_run_completion waits for the run to enter an terminal state. It polls the API every
