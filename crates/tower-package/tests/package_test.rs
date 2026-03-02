@@ -12,7 +12,7 @@ use tokio_stream::*;
 
 use config::Towerfile;
 use tokio_tar::Archive;
-use tower_package::{Manifest, Package, PackageSpec};
+use tower_package::{Manifest, Package, PackageSpec, Parameter};
 use tower_telemetry::debug;
 
 macro_rules! make_path {
@@ -383,6 +383,54 @@ async fn building_package_spec_from_towerfile() {
 
     assert_eq!(spec.invoke, "./script.py");
     assert_eq!(spec.schedule, Some("0 0 * * *".to_string()));
+}
+
+#[tokio::test]
+async fn it_includes_hidden_parameters_in_manifest() {
+    let tmp_dir = TmpDir::new("hidden-params")
+        .await
+        .expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec!["*.py".to_string()],
+        parameters: vec![
+            Parameter {
+                name: "visible_param".to_string(),
+                description: Some("A visible parameter".to_string()),
+                default: "".to_string(),
+                hidden: false,
+            },
+            Parameter {
+                name: "hidden_param".to_string(),
+                description: Some("A hidden parameter".to_string()),
+                default: "secret".to_string(),
+                hidden: true,
+            },
+        ],
+        schedule: None,
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
+        .await
+        .expect("Manifest was not valid JSON");
+
+    assert_eq!(manifest.parameters.len(), 2);
+
+    let visible = manifest.parameters.iter().find(|p| p.name == "visible_param").unwrap();
+    assert!(!visible.hidden, "visible_param should not be hidden");
+
+    let hidden = manifest.parameters.iter().find(|p| p.name == "hidden_param").unwrap();
+    assert!(hidden.hidden, "hidden_param should be hidden");
+    assert_eq!(hidden.default, "secret");
 }
 
 // read_package_files reads the contents of a given package  and returns a map of the file paths to
