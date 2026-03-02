@@ -172,7 +172,7 @@ impl App {
             }
             Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
             Some(("package", args)) => package::do_package(sessionized_config, args).await,
-            Some(("run", args)) => run::do_run(sessionized_config, args, args.subcommand()).await,
+            Some(("run", args)) => run::do_run(sessionized_config, args).await,
             Some(("teams", sub_matches)) => {
                 let teams_command = sub_matches.subcommand();
 

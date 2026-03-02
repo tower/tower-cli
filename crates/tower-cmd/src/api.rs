@@ -840,7 +840,11 @@ pub async fn create_schedule(
     let run_parameters = parameters.map(|params| {
         params
             .into_iter()
-            .map(|(key, value)| RunParameter { name: key, value })
+            .map(|(key, value)| RunParameter {
+                name: key,
+                value,
+                hidden: false,
+            })
             .collect()
     });
 
@@ -874,14 +878,21 @@ pub async fn update_schedule(
     let run_parameters = parameters.map(|params| {
         params
             .into_iter()
-            .map(|(key, value)| RunParameter { name: key, value })
+            .map(|(key, value)| RunParameter {
+                name: key,
+                value,
+                hidden: false,
+            })
             .collect()
     });
 
     let params = tower_api::apis::default_api::UpdateScheduleParams {
         id_or_name: schedule_id.to_string(),
         update_schedule_params: tower_api::models::UpdateScheduleParams {
-            cron: cron.map(|s| s.clone()),
+            schema: None,
+            cron: cron.cloned(),
+            environment: None,
+            app_version: None,
             parameters: run_parameters,
             ..Default::default()
         },

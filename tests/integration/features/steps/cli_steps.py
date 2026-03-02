@@ -143,6 +143,21 @@ def step_final_crash_status_should_show_error(context):
     assert "Error:" in output, f"Expected 'Error:' in crash message, got: {output}"
 
 
+@step('the output should show "App not found" with guidance')
+def step_output_should_show_app_not_found_with_guidance(context):
+    """Verify 404 error shows helpful guidance instead of a bare error"""
+    output = context.cli_output
+    assert (
+        red_color_code in output
+    ), f"Expected red color codes in output, got: {output}"
+    assert (
+        "App not found" in output
+    ), f"Expected 'App not found' in output, got: {output}"
+    assert (
+        "tower deploy" in output
+    ), f"Expected 'tower deploy' guidance in output, got: {output}"
+
+
 @step('the final status should show "Your local run crashed!" in red')
 def step_final_status_should_show_crashed_in_red(context):
     """Verify local run shows 'Your local run crashed!' in red"""

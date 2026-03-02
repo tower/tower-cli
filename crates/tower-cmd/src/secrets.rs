@@ -73,9 +73,22 @@ pub fn secrets_cmd() -> Command {
         )
         .subcommand(
             Command::new("delete")
-                .allow_external_subcommands(true)
-                .override_usage("tower secrets delete [OPTIONS] <SECRET_NAME>")
-                .after_help("Example: tower secrets delete MY_API_KEY")
+                .arg(
+                    Arg::new("secret_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("secret name, or environment/secret_name"),
+                )
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .help("environment to delete the secret from")
+                        .action(clap::ArgAction::Set),
+                )
                 .about("Delete a secret in Tower"),
         )
 }
@@ -174,7 +187,13 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
-    let (environment, name) = extract_secret_environment_and_name("delete", args.subcommand());
+    let secret_name_arg = args.get_one::<String>("secret_name").expect("secret_name is required");
+    let (environment, name) = if let Some((env, name)) = secret_name_arg.split_once('/') {
+        (env.to_string(), name.to_string())
+    } else {
+        let env = args.get_one::<String>("environment").expect("environment has default");
+        (env.clone(), secret_name_arg.clone())
+    };
     debug!("deleting secret, environment={} name={}", environment, name);
 
     output::with_spinner(
@@ -224,22 +243,3 @@ async fn encrypt_and_create_secret(
         .map_err(SecretCreationError::CreateFailed)
 }
 
-fn extract_secret_environment_and_name(
-    subcmd: &str,
-    cmd: Option<(&str, &ArgMatches)>,
-) -> (String, String) {
-    if let Some((slug, _)) = cmd {
-        if let Some((env, name)) = slug.split_once('/') {
-            return (env.to_string(), name.to_string());
-        }
-
-        let line = format!(
-            "Secret name is required. Example: tower secrets {} <environment>/<secret name>",
-            subcmd
-        );
-        output::die(&line);
-    }
-
-    let line = format!("Secret name and environment is required. Example: tower secrets {} <environment>/<secret name>", subcmd);
-    output::die(&line);
-}

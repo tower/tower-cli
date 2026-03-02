@@ -46,6 +46,28 @@ impl OutputMode {
 static OUTPUT_MODE: OnceLock<OutputMode> = OnceLock::new();
 static CURRENT_SENDER: Mutex<Option<UnboundedSender<String>>> = Mutex::new(None);
 
+fn write_to_stdout(msg: &str) {
+    let mut stdout = io::stdout();
+    if let Err(err) = stdout.write_all(msg.as_bytes()) {
+        if err.kind() == io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        panic!("failed writing to stdout: {err}");
+    }
+    stdout.flush().ok();
+}
+
+fn write_to_stderr(msg: &str) {
+    let mut stderr = io::stderr();
+    if let Err(err) = stderr.write_all(msg.as_bytes()) {
+        if err.kind() == io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        panic!("failed writing to stderr: {err}");
+    }
+    stderr.flush().ok();
+}
+
 pub fn set_output_mode(mode: OutputMode) {
     OUTPUT_MODE.set(mode).ok();
     if mode.is_mcp() {
@@ -210,8 +232,7 @@ pub fn write(msg: &str) {
         let clean_msg = msg.trim_end().to_string();
         send_to_current_sender(clean_msg);
     } else {
-        io::stdout().write_all(msg.as_bytes()).unwrap();
-        io::stdout().flush().ok();
+        write_to_stdout(msg);
     }
 }
 
@@ -433,7 +454,12 @@ pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_da
             .separator(separator)
             .title(headers.iter().map(|h| h.yellow().to_string()));
 
-        print_stdout(table).unwrap();
+        if let Err(err) = print_stdout(table) {
+            if err.kind() == io::ErrorKind::BrokenPipe {
+                std::process::exit(0);
+            }
+            panic!("failed writing table to stdout: {err}");
+        }
     }
 }
 
@@ -513,8 +539,7 @@ pub fn write_update_available_message(latest: &str, current: &str) {
     );
 
     // Always write version check messages to stderr to avoid polluting stdout
-    use std::io::{self, Write};
-    io::stderr().write_all(line.as_bytes()).unwrap();
+    write_to_stderr(&line);
 }
 
 pub fn write_dev_version_message(current: &str, latest: &str) {
@@ -527,8 +552,7 @@ pub fn write_dev_version_message(current: &str, latest: &str) {
         .dimmed()
     );
 
-    use std::io::{self, Write};
-    io::stderr().write_all(line.as_bytes()).unwrap();
+    write_to_stderr(&line);
 }
 
 /// newline just outputs a newline. This is useful when you have a very specific formatting you
