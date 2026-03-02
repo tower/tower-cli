@@ -43,6 +43,9 @@ pub struct Parameter {
 
     #[serde(default)]
     pub default: String,
+    
+    #[serde(default)]
+    pub hidden: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -122,6 +125,7 @@ fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
             name: p.name.clone(),
             description: Some(p.description.clone()),
             default: p.default.clone(),
+            hidden: p.hidden,
         });
     }
     parameters
