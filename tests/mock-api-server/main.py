@@ -338,6 +338,24 @@ async def describe_run(name: str, seq: int):
     )
 
 
+@app.post("/v1/apps/{name}/runs/{seq}")
+async def cancel_run(name: str, seq: int):
+    """Mock endpoint for cancelling a run."""
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    for run_id, run_data in mock_runs_db.items():
+        if run_data["app_name"] == name and run_data["number"] == seq:
+            run_data["status"] = "cancelled"
+            run_data["status_group"] = "successful"
+            run_data["cancelled_at"] = now_iso()
+            return {"run": run_data}
+
+    raise HTTPException(
+        status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
+    )
+
+
 # Placeholder for /secrets endpoints
 @app.get("/v1/secrets")
 async def list_secrets():

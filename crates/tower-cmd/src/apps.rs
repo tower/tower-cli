@@ -76,6 +76,24 @@ pub fn apps_cmd() -> Command {
                 )
                 .about("Delete an app in Tower"),
         )
+        .subcommand(
+            Command::new("cancel")
+                .arg(
+                    Arg::new("app_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("Name of the app"),
+                )
+                .arg(
+                    Arg::new("run_number")
+                        .value_parser(value_parser!(i64))
+                        .index(2)
+                        .required(true)
+                        .help("Run number to cancel"),
+                )
+                .about("Cancel a running app run"),
+        )
 }
 
 pub async fn do_logs(config: Config, cmd: &ArgMatches) {
@@ -221,6 +239,26 @@ pub async fn do_delete(config: Config, cmd: &ArgMatches) {
     let name = cmd.get_one::<String>("app_name").expect("app_name is required");
 
     output::with_spinner("Deleting app", api::delete_app(&config, name)).await;
+}
+
+pub async fn do_cancel(config: Config, cmd: &ArgMatches) {
+    let name = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name should be required");
+    let seq = cmd
+        .get_one::<i64>("run_number")
+        .copied()
+        .expect("run_number should be required");
+
+    let response =
+        output::with_spinner("Cancelling run", api::cancel_run(&config, name, seq)).await;
+
+    let run = &response.run;
+    let status = format!("{:?}", run.status);
+    output::success_with_data(
+        &format!("Run #{} for '{}' cancelled (status: {})", seq, name, status),
+        Some(response),
+    );
 }
 
 async fn latest_run_number(config: &Config, name: &str) -> i64 {
@@ -714,5 +752,31 @@ mod tests {
         assert_eq!(last_line_num, Some(3));
         assert!(should_emit_line(&mut last_line_num, 4));
         assert_eq!(last_line_num, Some(4));
+    }
+
+    #[test]
+    fn test_cancel_args_parsing() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "cancel", "my-app", "42"])
+            .unwrap();
+        let (cmd, sub_matches) = matches.subcommand().unwrap();
+
+        assert_eq!(cmd, "cancel");
+        assert_eq!(
+            sub_matches
+                .get_one::<String>("app_name")
+                .map(|s| s.as_str()),
+            Some("my-app")
+        );
+        assert_eq!(sub_matches.get_one::<i64>("run_number"), Some(&42));
+    }
+
+    #[test]
+    fn test_cancel_requires_both_args() {
+        let result = apps_cmd().try_get_matches_from(["apps", "cancel", "my-app"]);
+        assert!(result.is_err());
+
+        let result = apps_cmd().try_get_matches_from(["apps", "cancel"]);
+        assert!(result.is_err());
     }
 }
