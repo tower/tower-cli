@@ -83,7 +83,18 @@ def is_cloud_run() -> bool:
     Returns:
         bool: True if running in Tower cloud, otherwise False.
     """
-    val = _get_runtime_env_variable("IS_TOWER_MANAGED", "")
+    val = _get_runtime_env_variable("IS_TOWER_MANAGED", "false")
+    return _strtobool(val)
+
+
+def is_local() -> bool:
+    """
+    Check if the current run is executing locally via the Tower CLI.
+
+    Returns:
+        bool: True if running locally, otherwise False.
+    """
+    val = _get_runtime_env_variable("IS_LOCAL", "false")
     return _strtobool(val)
 
 

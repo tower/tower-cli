@@ -184,6 +184,7 @@ where
     let session = config.session.as_ref().ok_or(Error::NoSession)?;
 
     env_vars.insert("TOWER_JWT".to_string(), session.token.jwt.to_string());
+    env_vars.insert("TOWER__RUNTIME__IS_LOCAL".to_string(), "true".to_string());
 
     // Load the Towerfile
     let towerfile_path = path.join("Towerfile");
