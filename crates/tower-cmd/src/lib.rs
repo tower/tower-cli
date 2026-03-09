@@ -124,6 +124,7 @@ impl App {
                     Some(("show", args)) => apps::do_show(sessionized_config, args).await,
                     Some(("logs", args)) => apps::do_logs(sessionized_config, args).await,
                     Some(("delete", args)) => apps::do_delete(sessionized_config, args).await,
+                    Some(("cancel", args)) => apps::do_cancel(sessionized_config, args).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
