@@ -1,4 +1,3 @@
-
 import pytest
 from tower import info
 
