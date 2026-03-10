@@ -386,6 +386,70 @@ async fn building_package_spec_from_towerfile() {
 }
 
 #[tokio::test]
+async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
+    // When a project contains sub-apps with their own Towerfiles, only the root Towerfile (the
+    // one used to build the package) should be excluded. Towerfiles belonging to sub-apps must
+    // be included so those apps can function correctly.
+    let tmp_dir = TmpDir::new("subapp-towerfile")
+        .await
+        .expect("Failed to create temp dir");
+
+    // Root app files
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "[app]\nname = \"root\"").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    // Sub-app with its own Towerfile
+    create_test_file(tmp_dir.to_path_buf(), "subapp/Towerfile", "[app]\nname = \"subapp\"").await;
+    create_test_file(tmp_dir.to_path_buf(), "subapp/main.py", "print('subapp')").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
+        file_globs: vec![],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    // Root Towerfile should NOT be in the app directory (it's added separately as "Towerfile")
+    assert!(
+        !files.contains_key("app/Towerfile"),
+        "files {:?} should not contain the root Towerfile under app/",
+        files
+    );
+
+    // The root Towerfile is still bundled at the top level for reference
+    assert!(
+        files.contains_key("Towerfile"),
+        "files {:?} should contain the root Towerfile at the top level",
+        files
+    );
+
+    // Sub-app's Towerfile MUST be included
+    assert!(
+        files.contains_key("app/subapp/Towerfile"),
+        "files {:?} should contain the sub-app Towerfile",
+        files
+    );
+
+    // Other files should be present
+    assert!(
+        files.contains_key("app/main.py"),
+        "files {:?} was missing main.py",
+        files
+    );
+    assert!(
+        files.contains_key("app/subapp/main.py"),
+        "files {:?} was missing subapp/main.py",
+        files
+    );
+}
+
+#[tokio::test]
 async fn it_includes_hidden_parameters_in_manifest() {
     let tmp_dir = TmpDir::new("hidden-params")
         .await
