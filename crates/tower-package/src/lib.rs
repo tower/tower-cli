@@ -29,6 +29,15 @@ pub use error::Error;
 // 3 - Change checksum algorithm to be cross-platform
 const CURRENT_PACKAGE_VERSION: i32 = 3;
 
+/// Converts a path to a forward-slash string suitable for use as a tar
+/// archive entry name or manifest path (POSIX convention, cross-platform).
+fn to_archive_path(p: &Path) -> String {
+    p.components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 // Maximum allowed size for a bundle package in bytes (50MB)
 // This limit ensures bundles remain manageable for deployment and storage.
 pub const MAX_BUNDLE_SIZE: u64 = 50 * 1024 * 1024;
@@ -224,6 +233,8 @@ impl Package {
         // less.
         let base_dir = spec.base_dir.canonicalize()?;
 
+        let resolver = FileResolver::new(base_dir.clone());
+
         let tmp_dir = TmpDir::new("tower-package").await?;
         let package_path = tmp_dir.to_path_buf().join("package.tar");
         debug!("building package at: {:?}", package_path);
@@ -253,7 +264,7 @@ impl Package {
 
         for file_glob in file_globs {
             let path = base_dir.join(file_glob);
-            resolve_glob_path(path, &base_dir, &mut file_paths).await;
+            resolver.resolve_glob(path, &mut file_paths).await;
         }
 
         // App code lives in the app dir
@@ -263,12 +274,13 @@ impl Package {
         for (physical_path, logical_path) in file_paths {
             // All of the app code goes into the "app" directory.
             let logical_path = app_dir.join(logical_path);
+            let archive_name = to_archive_path(&logical_path);
 
             let hash = compute_sha256_file(&physical_path).await?;
-            path_hashes.insert(logical_path.clone(), hash);
+            path_hashes.insert(PathBuf::from(&archive_name), hash);
 
             builder
-                .append_path_with_name(physical_path, logical_path)
+                .append_path_with_name(physical_path, &archive_name)
                 .await?;
         }
 
@@ -280,27 +292,27 @@ impl Package {
         for import_path in &spec.import_paths {
             // The import_path should always be relative to the base_path.
             let import_path = base_dir.join(import_path).canonicalize()?;
-            let parent = import_path.parent().unwrap();
 
             let mut file_paths = HashMap::new();
-            resolve_path(&import_path, parent, &mut file_paths).await;
+            resolver.resolve_path(&import_path, &mut file_paths).await;
 
             // The file_name should constitute the logical path
             let import_path = import_path.file_name().unwrap();
             let import_path = module_dir.join(import_path);
-            let import_path_str = import_path.into_os_string().into_string().unwrap();
+            let import_path_str = to_archive_path(&import_path);
             import_paths.push(import_path_str);
 
             // Now we write all of these paths to the modules directory.
             for (physical_path, logical_path) in file_paths {
                 let logical_path = module_dir.join(logical_path);
+                let archive_name = to_archive_path(&logical_path);
 
                 let hash = compute_sha256_file(&physical_path).await?;
-                path_hashes.insert(logical_path.clone(), hash);
+                path_hashes.insert(PathBuf::from(&archive_name), hash);
 
-                debug!("adding file {}", logical_path.display());
+                debug!("adding file {}", archive_name);
                 builder
-                    .append_path_with_name(physical_path, logical_path)
+                    .append_path_with_name(physical_path, &archive_name)
                     .await?;
             }
         }
@@ -440,73 +452,6 @@ async fn unpack_archive<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn resolve_glob_path(
-    path: PathBuf,
-    base_dir: &PathBuf,
-    file_paths: &mut HashMap<PathBuf, PathBuf>,
-) {
-    let path_str = extract_glob_path(path);
-    debug!("resolving glob pattern: {}", path_str);
-
-    for entry in glob(&path_str).unwrap() {
-        resolve_path(&entry.unwrap(), base_dir, file_paths).await;
-    }
-}
-
-async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<PathBuf, PathBuf>) {
-    let mut queue = VecDeque::new();
-    queue.push_back(path.to_path_buf());
-
-    while let Some(current_path) = queue.pop_front() {
-        let canonical_path = current_path.canonicalize();
-
-        if canonical_path.is_err() {
-            debug!(
-                " - skipping path {}: {}",
-                current_path.display(),
-                canonical_path.unwrap_err()
-            );
-            continue;
-        }
-
-        // We can safely unwrap this because we understand that it's not going to fail at this
-        // point.
-        let physical_path = canonical_path.unwrap();
-
-        if physical_path.is_dir() {
-            let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
-
-            while let Some(entry) = entries.next_entry().await.unwrap() {
-                queue.push_back(entry.path());
-            }
-        } else {
-            if !should_ignore_file(&physical_path) {
-                let cp = physical_path.clone();
-
-                match cp.strip_prefix(base_dir) {
-                    Err(err) => {
-                        debug!(
-                            " - skipping file {}: not in base directory {}: {:?}",
-                            physical_path.display(),
-                            base_dir.display(),
-                            err
-                        );
-                        continue;
-                    }
-                    Ok(logical_path) => {
-                        debug!(
-                            " - resolved path {} to logical path {}",
-                            physical_path.display(),
-                            logical_path.display()
-                        );
-                        file_paths.insert(physical_path, logical_path.to_path_buf());
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn is_in_dir(p: &PathBuf, dir: &str) -> bool {
     let mut comps = p.components();
     comps.any(|comp| {
@@ -526,37 +471,117 @@ fn is_file(p: &PathBuf, name: &str) -> bool {
     }
 }
 
-fn should_ignore_file(p: &PathBuf) -> bool {
-    // Ignore anything that is compiled python
-    if p.ends_with(".pyc") {
-        return true;
+struct FileResolver {
+    // base_dir is the directory from which logical paths are computed.
+    base_dir: PathBuf,
+}
+
+impl FileResolver {
+    fn new(base_dir: PathBuf) -> Self {
+        Self { base_dir }
     }
 
-    if is_file(p, "Towerfile") {
-        return true;
+    fn should_ignore(&self, p: &PathBuf) -> bool {
+        // Ignore anything that is compiled python
+        if p.ends_with(".pyc") {
+            return true;
+        }
+
+        // Only exclude the root Towerfile (base_dir/Towerfile). Since base_dir is already
+        // canonicalized, we can derive this path directly. Towerfiles in sub-directories are
+        // legitimate app content and must be preserved.
+        if p == &self.base_dir.join("Towerfile") {
+            return true;
+        }
+
+        // Ignore a .gitignore file
+        if is_file(p, ".gitignore") {
+            return true;
+        }
+
+        // Remove anything thats __pycache__
+        if is_in_dir(p, "__pycache__") {
+            return true;
+        }
+
+        // Ignore anything that lives within a .git directory
+        if is_in_dir(p, ".git") {
+            return true;
+        }
+
+        // Ignore anything that's in a virtualenv, too
+        if is_in_dir(p, ".venv") {
+            return true;
+        }
+
+        false
     }
 
-    // Ignore a .gitignore file
-    if is_file(p, ".gitignore") {
-        return true;
+    fn logical_path<'a>(&self, physical_path: &'a Path) -> Option<&'a Path> {
+        physical_path.strip_prefix(&self.base_dir).ok()
     }
 
-    // Remove anything thats __pycache__
-    if is_in_dir(p, "__pycache__") {
-        return true;
+    async fn resolve_glob(&self, path: PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
+        let path_str = extract_glob_path(path);
+        debug!("resolving glob pattern: {}", path_str);
+
+        for entry in glob(&path_str).unwrap() {
+            self.resolve_path(&entry.unwrap(), file_paths).await;
+        }
     }
 
-    // Ignore anything that lives within a .git directory
-    if is_in_dir(p, ".git") {
-        return true;
-    }
+    async fn resolve_path(&self, path: &PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
+        let mut queue = VecDeque::new();
+        queue.push_back(path.to_path_buf());
 
-    // Ignore anything that's in a virtualenv, too
-    if is_in_dir(p, ".venv") {
-        return true;
-    }
+        while let Some(current_path) = queue.pop_front() {
+            let canonical_path = current_path.canonicalize();
 
-    return false;
+            if canonical_path.is_err() {
+                debug!(
+                    " - skipping path {}: {}",
+                    current_path.display(),
+                    canonical_path.unwrap_err()
+                );
+                continue;
+            }
+
+            // We can safely unwrap this because we understand that it's not going to fail at this
+            // point.
+            let physical_path = canonical_path.unwrap();
+
+            if physical_path.is_dir() {
+                let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
+
+                while let Some(entry) = entries.next_entry().await.unwrap() {
+                    queue.push_back(entry.path());
+                }
+            } else {
+                if !self.should_ignore(&physical_path) {
+                    let cp = physical_path.clone();
+
+                    match self.logical_path(&cp) {
+                        None => {
+                            debug!(
+                                " - skipping file {}: not in base directory {}: ...",
+                                physical_path.display(),
+                                self.base_dir.display(),
+                            );
+                            continue;
+                        }
+                        Some(logical_path) => {
+                            debug!(
+                                " - resolved path {} to logical path {}",
+                                physical_path.display(),
+                                logical_path.display()
+                            );
+                            file_paths.insert(physical_path, logical_path.to_path_buf());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // normalize_path converts a Path to a normalized string with forward slashes as separators.
@@ -650,7 +675,6 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::HashMap;
     use std::path::PathBuf;
 
     #[tokio::test]

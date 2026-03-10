@@ -15,17 +15,6 @@ use tokio_tar::Archive;
 use tower_package::{Manifest, Package, PackageSpec, Parameter};
 use tower_telemetry::debug;
 
-macro_rules! make_path {
-    ($($component:expr),+ $(,)?) => {
-        {
-            let mut path = PathBuf::new();
-            $(
-                path.push($component);
-            )+
-            &path.to_string_lossy().to_string()
-        }
-    };
-}
 
 #[tokio::test]
 async fn it_creates_package() {
@@ -238,8 +227,8 @@ async fn it_packages_import_paths() {
         "print('Hello, world!')",
     )
     .await;
-    create_test_file(tmp_dir.to_path_buf(), "shared/module/__init__.py", "").await;
-    create_test_file(tmp_dir.to_path_buf(), "shared/module/test.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "app/shared/module/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "app/shared/module/test.py", "").await;
 
     let spec = PackageSpec {
         invoke: "main.py".to_string(),
@@ -249,10 +238,10 @@ async fn it_packages_import_paths() {
             .join("app")
             .join("Towerfile")
             .to_path_buf(),
-        file_globs: vec!["**/*.py".to_string()],
+        file_globs: vec!["*.py".to_string()],
         parameters: vec![],
         schedule: None,
-        import_paths: vec!["../shared".to_string()],
+        import_paths: vec!["shared".to_string()],
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
@@ -289,12 +278,11 @@ async fn it_packages_import_paths() {
         .await
         .expect("Manifest was not valid JSON");
 
-    // NOTE: These paths are joined by the OS so we need to be more specific about the expected
-    // path.
+    // Archive paths always use forward slashes regardless of the host OS.
     assert!(
         manifest
             .import_paths
-            .contains(make_path!("modules", "shared")),
+            .contains(&"modules/shared".to_string()),
         "Import paths {:?} did not contain expected path",
         manifest.import_paths
     );
@@ -386,6 +374,70 @@ async fn building_package_spec_from_towerfile() {
 }
 
 #[tokio::test]
+async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
+    // When a project contains sub-apps with their own Towerfiles, only the root Towerfile (the
+    // one used to build the package) should be excluded. Towerfiles belonging to sub-apps must
+    // be included so those apps can function correctly.
+    let tmp_dir = TmpDir::new("subapp-towerfile")
+        .await
+        .expect("Failed to create temp dir");
+
+    // Root app files
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "[app]\nname = \"root\"").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    // Sub-app with its own Towerfile
+    create_test_file(tmp_dir.to_path_buf(), "subapp/Towerfile", "[app]\nname = \"subapp\"").await;
+    create_test_file(tmp_dir.to_path_buf(), "subapp/main.py", "print('subapp')").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
+        file_globs: vec![],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    // Root Towerfile should NOT be in the app directory (it's added separately as "Towerfile")
+    assert!(
+        !files.contains_key("app/Towerfile"),
+        "files {:?} should not contain the root Towerfile under app/",
+        files
+    );
+
+    // The root Towerfile is still bundled at the top level for reference
+    assert!(
+        files.contains_key("Towerfile"),
+        "files {:?} should contain the root Towerfile at the top level",
+        files
+    );
+
+    // Sub-app's Towerfile MUST be included
+    assert!(
+        files.contains_key("app/subapp/Towerfile"),
+        "files {:?} should contain the sub-app Towerfile",
+        files
+    );
+
+    // Other files should be present
+    assert!(
+        files.contains_key("app/main.py"),
+        "files {:?} was missing main.py",
+        files
+    );
+    assert!(
+        files.contains_key("app/subapp/main.py"),
+        "files {:?} was missing subapp/main.py",
+        files
+    );
+}
+
+#[tokio::test]
 async fn it_includes_hidden_parameters_in_manifest() {
     let tmp_dir = TmpDir::new("hidden-params")
         .await
@@ -431,6 +483,79 @@ async fn it_includes_hidden_parameters_in_manifest() {
     let hidden = manifest.parameters.iter().find(|p| p.name == "hidden_param").unwrap();
     assert!(hidden.hidden, "hidden_param should be hidden");
     assert_eq!(hidden.default, "secret");
+}
+
+// it_packages_import_paths_nested_within_base_dir verifies that when an import path contains a
+// directory separator (e.g. "subpackages/shared"), the resulting manifest import_paths entry
+// always uses forward slashes (POSIX convention), never the OS-native backslash separator.
+#[tokio::test]
+async fn it_packages_import_paths_nested_within_base_dir() {
+    let tmp_dir = TmpDir::new("example")
+        .await
+        .expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "app/Towerfile", "").await;
+    create_test_file(
+        tmp_dir.to_path_buf(),
+        "app/main.py",
+        "print('Hello, world!')",
+    )
+    .await;
+    // The shared module lives in a subdirectory: app/subpackages/shared/
+    create_test_file(tmp_dir.to_path_buf(), "app/subpackages/shared/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "app/subpackages/shared/utils.py", "").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf().join("app"),
+        towerfile_path: tmp_dir
+            .to_path_buf()
+            .join("app")
+            .join("Towerfile")
+            .to_path_buf(),
+        file_globs: vec!["*.py".to_string()],
+        parameters: vec![],
+        schedule: None,
+        // The import path contains a directory separator: "subpackages/shared"
+        import_paths: vec!["subpackages/shared".to_string()],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+
+    let files = read_package_files(package).await;
+
+    assert!(
+        files.contains_key("MANIFEST"),
+        "files {:?} was missing MANIFEST",
+        files
+    );
+
+    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
+        .await
+        .expect("Manifest was not valid JSON");
+
+    // Regardless of the host OS, the import path in the manifest must use forward slashes.
+    // On Windows, PathBuf::join would produce "modules\shared" without the fix.
+    assert!(
+        manifest
+            .import_paths
+            .contains(&"modules/shared".to_string()),
+        "Import paths {:?} did not contain 'modules/shared' (forward slash required, no backslashes)",
+        manifest.import_paths
+    );
+
+    // Verify no import path entry contains a backslash (the Windows regression).
+    for import_path in &manifest.import_paths {
+        assert!(
+            !import_path.contains('\\'),
+            "Import path {:?} contains a backslash; expected forward slashes only",
+            import_path
+        );
+    }
+
+    assert!(
+        !manifest.checksum.is_empty(),
+        "Manifest integrity check was not set"
+    );
 }
 
 // read_package_files reads the contents of a given package  and returns a map of the file paths to
