@@ -307,6 +307,63 @@ async fn it_packages_import_paths() {
 }
 
 #[tokio::test]
+async fn it_packages_import_paths_nested_within_base_dir() {
+    // When an import path lives inside base_dir (e.g. libs/shared), module files must
+    // still be placed under modules/<dir_name>/... (not modules/libs/shared/...) so that
+    // the package structure matches the manifest's PYTHONPATH entry.
+    let tmp_dir = TmpDir::new("nested-import")
+        .await
+        .expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello')").await;
+    create_test_file(tmp_dir.to_path_buf(), "libs/shared/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "libs/shared/util.py", "# util").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
+        file_globs: vec!["main.py".to_string()],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec!["libs/shared".to_string()],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    // Module files should be under modules/shared/..., NOT modules/libs/shared/...
+    assert!(
+        files.contains_key(make_path!("modules", "shared", "__init__.py")),
+        "files {:?} was missing modules/shared/__init__.py",
+        files
+    );
+    assert!(
+        files.contains_key(make_path!("modules", "shared", "util.py")),
+        "files {:?} was missing modules/shared/util.py",
+        files
+    );
+    assert!(
+        !files.contains_key(make_path!("modules", "libs", "shared", "__init__.py")),
+        "files {:?} should NOT contain modules/libs/shared/__init__.py",
+        files
+    );
+
+    // Verify the manifest import_paths entry matches the actual package structure.
+    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
+        .await
+        .expect("Manifest was not valid JSON");
+
+    assert!(
+        manifest
+            .import_paths
+            .contains(make_path!("modules", "shared")),
+        "Import paths {:?} did not contain expected path modules/shared",
+        manifest.import_paths
+    );
+}
+
+#[tokio::test]
 async fn it_excludes_various_content_that_should_not_be_there() {
     let tmp_dir = TmpDir::new("example")
         .await

@@ -262,7 +262,7 @@ impl Package {
 
         for file_glob in file_globs {
             let path = base_dir.join(file_glob);
-            resolver.resolve_glob(path, &mut file_paths).await;
+            resolver.resolve_glob(path, &mut file_paths).await?;
         }
 
         // App code lives in the app dir
@@ -291,6 +291,13 @@ impl Package {
             let mut file_paths = HashMap::new();
             resolver.resolve_path(&import_path, &mut file_paths).await;
 
+            // Resolve module files relative to the import path's parent so that the
+            // directory structure inside the package matches the manifest entry. Without
+            // this, an import path that lives inside base_dir (e.g. libs/shared) would be
+            // resolved relative to base_dir by logical_path(), producing
+            // modules/libs/shared/... while the manifest entry is modules/shared.
+            let import_parent = import_path.parent().unwrap_or(import_path.as_path());
+
             // The file_name should constitute the logical path
             let import_path = import_path.file_name().unwrap();
             let import_path = module_dir.join(import_path);
@@ -298,8 +305,11 @@ impl Package {
             import_paths.push(import_path_str);
 
             // Now we write all of these paths to the modules directory.
-            for (physical_path, logical_path) in file_paths {
-                let logical_path = module_dir.join(logical_path);
+            for (physical_path, _) in file_paths {
+                let logical_path = match physical_path.strip_prefix(import_parent) {
+                    Ok(p) => module_dir.join(p),
+                    Err(_) => continue,
+                };
 
                 let hash = compute_sha256_file(&physical_path).await?;
                 path_hashes.insert(logical_path.clone(), hash);
@@ -484,7 +494,7 @@ impl FileResolver {
 
     fn should_ignore(&self, p: &PathBuf) -> bool {
         // Ignore anything that is compiled python
-        if p.ends_with(".pyc") {
+        if p.extension().map(|ext| ext == "pyc").unwrap_or(false) {
             return true;
         }
 
@@ -537,13 +547,28 @@ impl FileResolver {
         None
     }
 
-    async fn resolve_glob(&self, path: PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
+    async fn resolve_glob(
+        &self,
+        path: PathBuf,
+        file_paths: &mut HashMap<PathBuf, PathBuf>,
+    ) -> Result<(), Error> {
         let path_str = extract_glob_path(path);
         debug!("resolving glob pattern: {}", path_str);
 
-        for entry in glob(&path_str).unwrap() {
-            self.resolve_path(&entry.unwrap(), file_paths).await;
+        let entries = glob(&path_str).map_err(|e| Error::InvalidGlob {
+            message: format!("{}: {}", path_str, e),
+        })?;
+
+        for entry in entries {
+            match entry {
+                Ok(path) => self.resolve_path(&path, file_paths).await,
+                Err(e) => {
+                    debug!("skipping glob entry: {}", e);
+                }
+            }
         }
+
+        Ok(())
     }
 
     async fn resolve_path(&self, path: &PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
@@ -692,6 +717,20 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
 mod test {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn test_should_ignore_pyc_files() {
+        let resolver = FileResolver::new(PathBuf::from("/project"), vec![]);
+
+        // A .pyc file should be ignored
+        assert!(resolver.should_ignore(&PathBuf::from("/project/module.pyc")));
+
+        // A .pyc file in a subdirectory should be ignored
+        assert!(resolver.should_ignore(&PathBuf::from("/project/sub/module.pyc")));
+
+        // A .py file should not be ignored
+        assert!(!resolver.should_ignore(&PathBuf::from("/project/module.py")));
+    }
 
     #[tokio::test]
     async fn test_normalize_path() {

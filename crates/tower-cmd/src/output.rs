@@ -164,6 +164,9 @@ pub fn package_error(err: tower_package::Error) {
             "There was a problem determining exactly where your Towerfile was stored on disk"
                 .to_string()
         }
+        tower_package::Error::InvalidGlob { message } => {
+            format!("Invalid file glob pattern: {}", message)
+        }
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
