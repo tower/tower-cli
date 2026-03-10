@@ -38,6 +38,9 @@ pub enum Error {
     #[snafu(display("Run was cancelled"))]
     RunCancelled,
 
+    #[snafu(display("Timed out waiting for run to start. The runner may be unavailable."))]
+    RunStartTimeout,
+
     #[snafu(display("App crashed during local execution"))]
     AppCrashed,
 
