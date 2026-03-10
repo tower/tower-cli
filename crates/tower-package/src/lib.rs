@@ -224,7 +224,14 @@ impl Package {
         // less.
         let base_dir = spec.base_dir.canonicalize()?;
 
-        let resolver = FileResolver::new(base_dir.clone());
+        // Canonicalize import paths upfront so the resolver can whitelist files within them.
+        let canonical_import_paths: Vec<PathBuf> = spec
+            .import_paths
+            .iter()
+            .map(|p| base_dir.join(p).canonicalize())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let resolver = FileResolver::new(base_dir.clone(), canonical_import_paths.clone());
 
         let tmp_dir = TmpDir::new("tower-package").await?;
         let package_path = tmp_dir.to_path_buf().join("package.tar");
@@ -279,9 +286,7 @@ impl Package {
         let mut import_paths = vec![];
 
         // Now we need to package up all the modules to include in the code base too.
-        for import_path in &spec.import_paths {
-            // The import_path should always be relative to the base_path.
-            let import_path = base_dir.join(import_path).canonicalize()?;
+        for import_path in &canonical_import_paths {
 
             let mut file_paths = HashMap::new();
             resolver.resolve_path(&import_path, &mut file_paths).await;
@@ -463,11 +468,18 @@ fn is_file(p: &PathBuf, name: &str) -> bool {
 struct FileResolver {
     // base_dir is the directory from which logical paths are computed.
     base_dir: PathBuf,
+
+    // import_paths are canonicalized paths to imported directories. Files within these directories
+    // are also allowed, with logical paths computed relative to each import path's parent.
+    import_paths: Vec<PathBuf>,
 }
 
 impl FileResolver {
-    fn new(base_dir: PathBuf) -> Self {
-        Self { base_dir }
+    fn new(base_dir: PathBuf, import_paths: Vec<PathBuf>) -> Self {
+        Self {
+            base_dir,
+            import_paths,
+        }
     }
 
     fn should_ignore(&self, p: &PathBuf) -> bool {
@@ -507,7 +519,22 @@ impl FileResolver {
     }
 
     fn logical_path<'a>(&self, physical_path: &'a Path) -> Option<&'a Path> {
-        physical_path.strip_prefix(&self.base_dir).ok()
+        if let Ok(p) = physical_path.strip_prefix(&self.base_dir) {
+            return Some(p);
+        }
+
+        // Try each import path's parent as a prefix. This allows files within import paths
+        // (which may live outside base_dir) to be resolved with logical paths that preserve
+        // the import directory name (e.g. "shared_lib/foo.py").
+        for import_path in &self.import_paths {
+            if let Some(parent) = import_path.parent() {
+                if let Ok(p) = physical_path.strip_prefix(parent) {
+                    return Some(p);
+                }
+            }
+        }
+
+        None
     }
 
     async fn resolve_glob(&self, path: PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {

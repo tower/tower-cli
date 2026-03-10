@@ -238,8 +238,8 @@ async fn it_packages_import_paths() {
         "print('Hello, world!')",
     )
     .await;
-    create_test_file(tmp_dir.to_path_buf(), "app/shared/module/__init__.py", "").await;
-    create_test_file(tmp_dir.to_path_buf(), "app/shared/module/test.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "shared/module/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "shared/module/test.py", "").await;
 
     let spec = PackageSpec {
         invoke: "main.py".to_string(),
@@ -249,10 +249,10 @@ async fn it_packages_import_paths() {
             .join("app")
             .join("Towerfile")
             .to_path_buf(),
-        file_globs: vec!["*.py".to_string()],
+        file_globs: vec!["**/*.py".to_string()],
         parameters: vec![],
         schedule: None,
-        import_paths: vec!["shared".to_string()],
+        import_paths: vec!["../shared".to_string()],
     };
 
     let package = Package::build(spec).await.expect("Failed to build package");
