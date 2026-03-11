@@ -293,6 +293,9 @@ async fn execute_local_app(
             return Err(Error::Cancelled);
         }
 
+        let balloon_path = working_dir.join(".tower-disk-reserve");
+        create_balloon_file(&balloon_path).await;
+
         let mut child = uv.run(&working_dir, &program_path, &env_vars).await?;
 
         // Drain the logs to the output channel.
@@ -312,7 +315,9 @@ async fn execute_local_app(
             BufReader::new(stderr),
         ));
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        let code = wait_for_process(ctx.clone(), &cancel_token, child).await;
+        let _ = tokio::fs::remove_file(&balloon_path).await;
+        let _ = sx.send(code);
     }
 
     // Everything was properly executed I suppose.
@@ -593,6 +598,13 @@ async fn drain_output<R: AsyncRead + Unpin>(
 
 fn is_bash_package(package: &Package) -> bool {
     return package.manifest.invoke.ends_with(".sh");
+}
+
+const BALLOON_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+
+async fn create_balloon_file(path: &PathBuf) {
+    let data = vec![0u8; BALLOON_SIZE];
+    let _ = tokio::fs::write(path, &data).await;
 }
 
 #[cfg(test)]

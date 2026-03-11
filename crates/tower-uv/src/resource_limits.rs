@@ -1,4 +1,5 @@
 /// Subtracted from the detected limit before applying RLIMIT_AS to the child.
+#[cfg(unix)]
 const HEADROOM_BYTES: u64 = 5 * 1024 * 1024;
 
 /// Detect the effective memory limit for this environment.
