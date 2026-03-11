@@ -548,7 +548,17 @@ async fn wait_for_process(
 
         if let Ok(res) = timeout {
             if let Ok(status) = res {
-                break status.code().expect("no status code");
+                break status.code().unwrap_or_else(|| {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::process::ExitStatusExt;
+                        status.signal().map(|s| -(s as i32)).unwrap_or(-1)
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        -1
+                    }
+                });
             } else {
                 // something went wrong.
                 debug!(ctx: &ctx, "failed to get status due to some kind of IO error: {}" , res.err().expect("no error somehow"));
@@ -583,4 +593,34 @@ async fn drain_output<R: AsyncRead + Unpin>(
 
 fn is_bash_package(package: &Package) -> bool {
     return package.manifest.invoke.ends_with(".sh");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_signal_killed_process_returns_negative_code() {
+        use nix::sys::signal::{kill, Signal};
+        use nix::unistd::Pid;
+
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("failed to spawn sleep");
+
+        let pid = child.id().expect("no pid") as i32;
+        let cancel_token = CancellationToken::new();
+        let ctx = tower_telemetry::Context::new("test".to_string());
+
+        // Kill the child with SIGKILL before waiting
+        kill(Pid::from_raw(pid), Signal::SIGKILL).expect("failed to send SIGKILL");
+
+        let code = wait_for_process(ctx, &cancel_token, child).await;
+        assert_eq!(code, -9, "SIGKILL should produce exit code -9");
+    }
 }
