@@ -19,3 +19,4 @@ seahash = { workspace = true }
 tokio = { workspace = true }
 tokio-tar = { workspace = true }
 tower-telemetry = { workspace = true }
+nix = { workspace = true }

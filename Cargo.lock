@@ -3754,6 +3754,7 @@ dependencies = [
  "fs2",
  "futures-lite",
  "hex",
+ "nix 0.30.1",
  "regex",
  "reqwest",
  "seahash",

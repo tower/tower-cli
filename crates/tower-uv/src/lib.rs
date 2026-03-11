@@ -11,6 +11,7 @@ use tokio::process::{Child, Command};
 use tower_telemetry::debug;
 
 pub mod install;
+mod resource_limits;
 
 // UV_VERSION is the version of UV to download and install when setting up a local UV deployment.
 pub const UV_VERSION: &str = "0.9.27";
@@ -427,6 +428,17 @@ impl Uv {
         #[cfg(unix)]
         {
             cmd.process_group(0);
+
+            if let Some(limit) = resource_limits::detect_memory_limit() {
+                unsafe {
+                    cmd.pre_exec(move || {
+                        use nix::sys::resource::{setrlimit, Resource};
+                        let rlim = nix::sys::resource::rlim_t::from(limit);
+                        setrlimit(Resource::RLIMIT_AS, rlim, rlim)
+                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+                    });
+                }
+            }
         }
 
         if self.protected_mode {
