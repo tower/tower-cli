@@ -224,6 +224,15 @@ impl Package {
         // less.
         let base_dir = spec.base_dir.canonicalize()?;
 
+        // Canonicalize import paths upfront so the resolver can whitelist files within them.
+        let canonical_import_paths: Vec<PathBuf> = spec
+            .import_paths
+            .iter()
+            .map(|p| base_dir.join(p).canonicalize())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let resolver = FileResolver::new(base_dir.clone(), canonical_import_paths.clone());
+
         let tmp_dir = TmpDir::new("tower-package").await?;
         let package_path = tmp_dir.to_path_buf().join("package.tar");
         debug!("building package at: {:?}", package_path);
@@ -253,7 +262,7 @@ impl Package {
 
         for file_glob in file_globs {
             let path = base_dir.join(file_glob);
-            resolve_glob_path(path, &base_dir, &mut file_paths).await;
+            resolver.resolve_glob(path, &mut file_paths).await?;
         }
 
         // App code lives in the app dir
@@ -263,12 +272,15 @@ impl Package {
         for (physical_path, logical_path) in file_paths {
             // All of the app code goes into the "app" directory.
             let logical_path = app_dir.join(logical_path);
+            // Normalize to forward slashes so archive entry names are POSIX-compatible
+            // on all platforms (Windows PathBuf uses backslashes).
+            let archive_name = normalize_path(&logical_path)?;
 
             let hash = compute_sha256_file(&physical_path).await?;
-            path_hashes.insert(logical_path.clone(), hash);
+            path_hashes.insert(PathBuf::from(&archive_name), hash);
 
             builder
-                .append_path_with_name(physical_path, logical_path)
+                .append_path_with_name(physical_path, &archive_name)
                 .await?;
         }
 
@@ -277,30 +289,41 @@ impl Package {
         let mut import_paths = vec![];
 
         // Now we need to package up all the modules to include in the code base too.
-        for import_path in &spec.import_paths {
-            // The import_path should always be relative to the base_path.
-            let import_path = base_dir.join(import_path).canonicalize()?;
-            let parent = import_path.parent().unwrap();
+        for import_path in &canonical_import_paths {
 
             let mut file_paths = HashMap::new();
-            resolve_path(&import_path, parent, &mut file_paths).await;
+            resolver.resolve_path(&import_path, &mut file_paths).await;
+
+            // Resolve module files relative to the import path's parent so that the
+            // directory structure inside the package matches the manifest entry. Without
+            // this, an import path that lives inside base_dir (e.g. libs/shared) would be
+            // resolved relative to base_dir by logical_path(), producing
+            // modules/libs/shared/... while the manifest entry is modules/shared.
+            let import_parent = import_path.parent().unwrap_or(import_path.as_path());
 
             // The file_name should constitute the logical path
             let import_path = import_path.file_name().unwrap();
             let import_path = module_dir.join(import_path);
-            let import_path_str = import_path.into_os_string().into_string().unwrap();
+            // Normalize to forward slashes for the manifest (POSIX, cross-platform).
+            let import_path_str = normalize_path(&import_path)?;
             import_paths.push(import_path_str);
 
             // Now we write all of these paths to the modules directory.
-            for (physical_path, logical_path) in file_paths {
-                let logical_path = module_dir.join(logical_path);
+            for (physical_path, _) in file_paths {
+                let logical_path = match physical_path.strip_prefix(import_parent) {
+                    Ok(p) => module_dir.join(p),
+                    Err(_) => continue,
+                };
+                // Normalize to forward slashes so archive entry names are POSIX-compatible
+                // on all platforms (Windows PathBuf uses backslashes).
+                let archive_name = normalize_path(&logical_path)?;
 
                 let hash = compute_sha256_file(&physical_path).await?;
-                path_hashes.insert(logical_path.clone(), hash);
+                path_hashes.insert(PathBuf::from(&archive_name), hash);
 
                 debug!("adding file {}", logical_path.display());
                 builder
-                    .append_path_with_name(physical_path, logical_path)
+                    .append_path_with_name(physical_path, &archive_name)
                     .await?;
             }
         }
@@ -440,73 +463,6 @@ async fn unpack_archive<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn resolve_glob_path(
-    path: PathBuf,
-    base_dir: &PathBuf,
-    file_paths: &mut HashMap<PathBuf, PathBuf>,
-) {
-    let path_str = extract_glob_path(path);
-    debug!("resolving glob pattern: {}", path_str);
-
-    for entry in glob(&path_str).unwrap() {
-        resolve_path(&entry.unwrap(), base_dir, file_paths).await;
-    }
-}
-
-async fn resolve_path(path: &PathBuf, base_dir: &Path, file_paths: &mut HashMap<PathBuf, PathBuf>) {
-    let mut queue = VecDeque::new();
-    queue.push_back(path.to_path_buf());
-
-    while let Some(current_path) = queue.pop_front() {
-        let canonical_path = current_path.canonicalize();
-
-        if canonical_path.is_err() {
-            debug!(
-                " - skipping path {}: {}",
-                current_path.display(),
-                canonical_path.unwrap_err()
-            );
-            continue;
-        }
-
-        // We can safely unwrap this because we understand that it's not going to fail at this
-        // point.
-        let physical_path = canonical_path.unwrap();
-
-        if physical_path.is_dir() {
-            let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
-
-            while let Some(entry) = entries.next_entry().await.unwrap() {
-                queue.push_back(entry.path());
-            }
-        } else {
-            if !should_ignore_file(&physical_path) {
-                let cp = physical_path.clone();
-
-                match cp.strip_prefix(base_dir) {
-                    Err(err) => {
-                        debug!(
-                            " - skipping file {}: not in base directory {}: {:?}",
-                            physical_path.display(),
-                            base_dir.display(),
-                            err
-                        );
-                        continue;
-                    }
-                    Ok(logical_path) => {
-                        debug!(
-                            " - resolved path {} to logical path {}",
-                            physical_path.display(),
-                            logical_path.display()
-                        );
-                        file_paths.insert(physical_path, logical_path.to_path_buf());
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn is_in_dir(p: &PathBuf, dir: &str) -> bool {
     let mut comps = p.components();
     comps.any(|comp| {
@@ -526,37 +482,154 @@ fn is_file(p: &PathBuf, name: &str) -> bool {
     }
 }
 
-fn should_ignore_file(p: &PathBuf) -> bool {
-    // Ignore anything that is compiled python
-    if p.ends_with(".pyc") {
-        return true;
+struct FileResolver {
+    // base_dir is the directory from which logical paths are computed.
+    base_dir: PathBuf,
+
+    // import_paths are canonicalized paths to imported directories. Files within these directories
+    // are also allowed, with logical paths computed relative to each import path's parent.
+    import_paths: Vec<PathBuf>,
+}
+
+impl FileResolver {
+    fn new(base_dir: PathBuf, import_paths: Vec<PathBuf>) -> Self {
+        Self {
+            base_dir,
+            import_paths,
+        }
     }
 
-    if is_file(p, "Towerfile") {
-        return true;
+    fn should_ignore(&self, p: &PathBuf) -> bool {
+        // Ignore anything that is compiled python
+        if p.extension().map(|ext| ext == "pyc").unwrap_or(false) {
+            return true;
+        }
+
+        // Only exclude the root Towerfile (base_dir/Towerfile). Since base_dir is already
+        // canonicalized, we can derive this path directly. Towerfiles in sub-directories are
+        // legitimate app content and must be preserved.
+        if p == &self.base_dir.join("Towerfile") {
+            return true;
+        }
+
+        // Ignore a .gitignore file
+        if is_file(p, ".gitignore") {
+            return true;
+        }
+
+        // Remove anything thats __pycache__
+        if is_in_dir(p, "__pycache__") {
+            return true;
+        }
+
+        // Ignore anything that lives within a .git directory
+        if is_in_dir(p, ".git") {
+            return true;
+        }
+
+        // Ignore anything that's in a virtualenv, too
+        if is_in_dir(p, ".venv") {
+            return true;
+        }
+
+        false
     }
 
-    // Ignore a .gitignore file
-    if is_file(p, ".gitignore") {
-        return true;
+    fn logical_path<'a>(&self, physical_path: &'a Path) -> Option<&'a Path> {
+        if let Ok(p) = physical_path.strip_prefix(&self.base_dir) {
+            return Some(p);
+        }
+
+        // Try each import path's parent as a prefix. This allows files within import paths
+        // (which may live outside base_dir) to be resolved with logical paths that preserve
+        // the import directory name (e.g. "shared_lib/foo.py").
+        for import_path in &self.import_paths {
+            if let Some(parent) = import_path.parent() {
+                if let Ok(p) = physical_path.strip_prefix(parent) {
+                    return Some(p);
+                }
+            }
+        }
+
+        None
     }
 
-    // Remove anything thats __pycache__
-    if is_in_dir(p, "__pycache__") {
-        return true;
+    async fn resolve_glob(
+        &self,
+        path: PathBuf,
+        file_paths: &mut HashMap<PathBuf, PathBuf>,
+    ) -> Result<(), Error> {
+        let path_str = extract_glob_path(path);
+        debug!("resolving glob pattern: {}", path_str);
+
+        let entries = glob(&path_str).map_err(|e| Error::InvalidGlob {
+            message: format!("{}: {}", path_str, e),
+        })?;
+
+        for entry in entries {
+            match entry {
+                Ok(path) => self.resolve_path(&path, file_paths).await,
+                Err(e) => {
+                    debug!("skipping glob entry: {}", e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
-    // Ignore anything that lives within a .git directory
-    if is_in_dir(p, ".git") {
-        return true;
-    }
+    async fn resolve_path(&self, path: &PathBuf, file_paths: &mut HashMap<PathBuf, PathBuf>) {
+        let mut queue = VecDeque::new();
+        queue.push_back(path.to_path_buf());
 
-    // Ignore anything that's in a virtualenv, too
-    if is_in_dir(p, ".venv") {
-        return true;
-    }
+        while let Some(current_path) = queue.pop_front() {
+            let canonical_path = current_path.canonicalize();
 
-    return false;
+            if canonical_path.is_err() {
+                debug!(
+                    " - skipping path {}: {}",
+                    current_path.display(),
+                    canonical_path.unwrap_err()
+                );
+                continue;
+            }
+
+            // We can safely unwrap this because we understand that it's not going to fail at this
+            // point.
+            let physical_path = canonical_path.unwrap();
+
+            if physical_path.is_dir() {
+                let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
+
+                while let Some(entry) = entries.next_entry().await.unwrap() {
+                    queue.push_back(entry.path());
+                }
+            } else {
+                if !self.should_ignore(&physical_path) {
+                    let cp = physical_path.clone();
+
+                    match self.logical_path(&cp) {
+                        None => {
+                            debug!(
+                                " - skipping file {}: not in base directory {}: ...",
+                                physical_path.display(),
+                                self.base_dir.display(),
+                            );
+                            continue;
+                        }
+                        Some(logical_path) => {
+                            debug!(
+                                " - resolved path {} to logical path {}",
+                                physical_path.display(),
+                                logical_path.display()
+                            );
+                            file_paths.insert(physical_path, logical_path.to_path_buf());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // normalize_path converts a Path to a normalized string with forward slashes as separators.
@@ -650,8 +723,21 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::HashMap;
     use std::path::PathBuf;
+
+    #[test]
+    fn test_should_ignore_pyc_files() {
+        let resolver = FileResolver::new(PathBuf::from("/project"), vec![]);
+
+        // A .pyc file should be ignored
+        assert!(resolver.should_ignore(&PathBuf::from("/project/module.pyc")));
+
+        // A .pyc file in a subdirectory should be ignored
+        assert!(resolver.should_ignore(&PathBuf::from("/project/sub/module.pyc")));
+
+        // A .py file should not be ignored
+        assert!(!resolver.should_ignore(&PathBuf::from("/project/module.py")));
+    }
 
     #[tokio::test]
     async fn test_normalize_path() {

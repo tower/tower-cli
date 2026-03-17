@@ -15,17 +15,7 @@ use tokio_tar::Archive;
 use tower_package::{Manifest, Package, PackageSpec, Parameter};
 use tower_telemetry::debug;
 
-macro_rules! make_path {
-    ($($component:expr),+ $(,)?) => {
-        {
-            let mut path = PathBuf::new();
-            $(
-                path.push($component);
-            )+
-            &path.to_string_lossy().to_string()
-        }
-    };
-}
+
 
 #[tokio::test]
 async fn it_creates_package() {
@@ -289,12 +279,9 @@ async fn it_packages_import_paths() {
         .await
         .expect("Manifest was not valid JSON");
 
-    // NOTE: These paths are joined by the OS so we need to be more specific about the expected
-    // path.
+    // Archive paths are always normalized to forward slashes regardless of OS.
     assert!(
-        manifest
-            .import_paths
-            .contains(make_path!("modules", "shared")),
+        manifest.import_paths.contains(&"modules/shared".to_string()),
         "Import paths {:?} did not contain expected path",
         manifest.import_paths
     );
@@ -303,6 +290,62 @@ async fn it_packages_import_paths() {
     assert!(
         !manifest.checksum.is_empty(),
         "Manifest integrity check was not set"
+    );
+}
+
+#[tokio::test]
+async fn it_packages_import_paths_nested_within_base_dir() {
+    // When an import path lives inside base_dir (e.g. libs/shared), module files must
+    // still be placed under modules/<dir_name>/... (not modules/libs/shared/...) so that
+    // the package structure matches the manifest's PYTHONPATH entry.
+    let tmp_dir = TmpDir::new("nested-import")
+        .await
+        .expect("Failed to create temp dir");
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello')").await;
+    create_test_file(tmp_dir.to_path_buf(), "libs/shared/__init__.py", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "libs/shared/util.py", "# util").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
+        file_globs: vec!["main.py".to_string()],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec!["libs/shared".to_string()],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    // Module files should be under modules/shared/..., NOT modules/libs/shared/...
+    // Archive paths are always normalized to forward slashes regardless of OS.
+    assert!(
+        files.contains_key("modules/shared/__init__.py"),
+        "files {:?} was missing modules/shared/__init__.py",
+        files
+    );
+    assert!(
+        files.contains_key("modules/shared/util.py"),
+        "files {:?} was missing modules/shared/util.py",
+        files
+    );
+    assert!(
+        !files.contains_key("modules/libs/shared/__init__.py"),
+        "files {:?} should NOT contain modules/libs/shared/__init__.py",
+        files
+    );
+
+    // Verify the manifest import_paths entry matches the actual package structure.
+    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
+        .await
+        .expect("Manifest was not valid JSON");
+
+    assert!(
+        manifest.import_paths.contains(&"modules/shared".to_string()),
+        "Import paths {:?} did not contain expected path modules/shared",
+        manifest.import_paths
     );
 }
 
@@ -383,6 +426,70 @@ async fn building_package_spec_from_towerfile() {
 
     assert_eq!(spec.invoke, "./script.py");
     assert_eq!(spec.schedule, Some("0 0 * * *".to_string()));
+}
+
+#[tokio::test]
+async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
+    // When a project contains sub-apps with their own Towerfiles, only the root Towerfile (the
+    // one used to build the package) should be excluded. Towerfiles belonging to sub-apps must
+    // be included so those apps can function correctly.
+    let tmp_dir = TmpDir::new("subapp-towerfile")
+        .await
+        .expect("Failed to create temp dir");
+
+    // Root app files
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "[app]\nname = \"root\"").await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    // Sub-app with its own Towerfile
+    create_test_file(tmp_dir.to_path_buf(), "subapp/Towerfile", "[app]\nname = \"subapp\"").await;
+    create_test_file(tmp_dir.to_path_buf(), "subapp/main.py", "print('subapp')").await;
+
+    let spec = PackageSpec {
+        invoke: "main.py".to_string(),
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
+        file_globs: vec![],
+        parameters: vec![],
+        schedule: None,
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    // Root Towerfile should NOT be in the app directory (it's added separately as "Towerfile")
+    assert!(
+        !files.contains_key("app/Towerfile"),
+        "files {:?} should not contain the root Towerfile under app/",
+        files
+    );
+
+    // The root Towerfile is still bundled at the top level for reference
+    assert!(
+        files.contains_key("Towerfile"),
+        "files {:?} should contain the root Towerfile at the top level",
+        files
+    );
+
+    // Sub-app's Towerfile MUST be included
+    assert!(
+        files.contains_key("app/subapp/Towerfile"),
+        "files {:?} should contain the sub-app Towerfile",
+        files
+    );
+
+    // Other files should be present
+    assert!(
+        files.contains_key("app/main.py"),
+        "files {:?} was missing main.py",
+        files
+    );
+    assert!(
+        files.contains_key("app/subapp/main.py"),
+        "files {:?} was missing subapp/main.py",
+        files
+    );
 }
 
 #[tokio::test]

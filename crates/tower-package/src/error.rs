@@ -11,6 +11,9 @@ pub enum Error {
 
     #[snafu(display("Invalid path"))]
     InvalidPath,
+
+    #[snafu(display("Invalid glob pattern: {message}"))]
+    InvalidGlob { message: String },
 }
 
 impl From<std::io::Error> for Error {
