@@ -272,12 +272,15 @@ impl Package {
         for (physical_path, logical_path) in file_paths {
             // All of the app code goes into the "app" directory.
             let logical_path = app_dir.join(logical_path);
+            // Normalize to forward slashes so archive entry names are POSIX-compatible
+            // on all platforms (Windows PathBuf uses backslashes).
+            let archive_name = normalize_path(&logical_path)?;
 
             let hash = compute_sha256_file(&physical_path).await?;
-            path_hashes.insert(logical_path.clone(), hash);
+            path_hashes.insert(PathBuf::from(&archive_name), hash);
 
             builder
-                .append_path_with_name(physical_path, logical_path)
+                .append_path_with_name(physical_path, &archive_name)
                 .await?;
         }
 
@@ -301,7 +304,8 @@ impl Package {
             // The file_name should constitute the logical path
             let import_path = import_path.file_name().unwrap();
             let import_path = module_dir.join(import_path);
-            let import_path_str = import_path.into_os_string().into_string().unwrap();
+            // Normalize to forward slashes for the manifest (POSIX, cross-platform).
+            let import_path_str = normalize_path(&import_path)?;
             import_paths.push(import_path_str);
 
             // Now we write all of these paths to the modules directory.
@@ -310,13 +314,16 @@ impl Package {
                     Ok(p) => module_dir.join(p),
                     Err(_) => continue,
                 };
+                // Normalize to forward slashes so archive entry names are POSIX-compatible
+                // on all platforms (Windows PathBuf uses backslashes).
+                let archive_name = normalize_path(&logical_path)?;
 
                 let hash = compute_sha256_file(&physical_path).await?;
-                path_hashes.insert(logical_path.clone(), hash);
+                path_hashes.insert(PathBuf::from(&archive_name), hash);
 
                 debug!("adding file {}", logical_path.display());
                 builder
-                    .append_path_with_name(physical_path, logical_path)
+                    .append_path_with_name(physical_path, &archive_name)
                     .await?;
             }
         }

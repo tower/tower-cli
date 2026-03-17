@@ -15,17 +15,7 @@ use tokio_tar::Archive;
 use tower_package::{Manifest, Package, PackageSpec, Parameter};
 use tower_telemetry::debug;
 
-macro_rules! make_path {
-    ($($component:expr),+ $(,)?) => {
-        {
-            let mut path = PathBuf::new();
-            $(
-                path.push($component);
-            )+
-            &path.to_string_lossy().to_string()
-        }
-    };
-}
+
 
 #[tokio::test]
 async fn it_creates_package() {
@@ -289,12 +279,9 @@ async fn it_packages_import_paths() {
         .await
         .expect("Manifest was not valid JSON");
 
-    // NOTE: These paths are joined by the OS so we need to be more specific about the expected
-    // path.
+    // Archive paths are always normalized to forward slashes regardless of OS.
     assert!(
-        manifest
-            .import_paths
-            .contains(make_path!("modules", "shared")),
+        manifest.import_paths.contains(&"modules/shared".to_string()),
         "Import paths {:?} did not contain expected path",
         manifest.import_paths
     );
@@ -333,18 +320,19 @@ async fn it_packages_import_paths_nested_within_base_dir() {
     let files = read_package_files(package).await;
 
     // Module files should be under modules/shared/..., NOT modules/libs/shared/...
+    // Archive paths are always normalized to forward slashes regardless of OS.
     assert!(
-        files.contains_key(make_path!("modules", "shared", "__init__.py")),
+        files.contains_key("modules/shared/__init__.py"),
         "files {:?} was missing modules/shared/__init__.py",
         files
     );
     assert!(
-        files.contains_key(make_path!("modules", "shared", "util.py")),
+        files.contains_key("modules/shared/util.py"),
         "files {:?} was missing modules/shared/util.py",
         files
     );
     assert!(
-        !files.contains_key(make_path!("modules", "libs", "shared", "__init__.py")),
+        !files.contains_key("modules/libs/shared/__init__.py"),
         "files {:?} should NOT contain modules/libs/shared/__init__.py",
         files
     );
@@ -355,9 +343,7 @@ async fn it_packages_import_paths_nested_within_base_dir() {
         .expect("Manifest was not valid JSON");
 
     assert!(
-        manifest
-            .import_paths
-            .contains(make_path!("modules", "shared")),
+        manifest.import_paths.contains(&"modules/shared".to_string()),
         "Import paths {:?} did not contain expected path modules/shared",
         manifest.import_paths
     );
