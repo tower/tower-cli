@@ -22,7 +22,7 @@ jobs:
           sha256sum dist/collide.whl
       - uses: actions/upload-artifact@v6
         with:
-          name: wheels-aaa-large
+          name: wheels-zzz-large
           path: dist
 
   # Produces a SMALLER wheel with a different marker
@@ -40,7 +40,7 @@ jobs:
           sha256sum dist/collide.whl
       - uses: actions/upload-artifact@v6
         with:
-          name: wheels-zzz-small
+          name: wheels-aaa-small
           path: dist
 
   merge-and-check:
