@@ -24,12 +24,13 @@ jobs:
       # For PyPI's trusted publishing.
       id-token: write
     steps:
-      - name: "Install uv"
-        uses: astral-sh/setup-uv@v6
       - uses: actions/download-artifact@v7
         with:
           pattern: wheels-*
           path: wheels
           merge-multiple: true
-      - name: Publish to PyPi
-        run: uv publish -v wheels/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: wheels/
+          verbose: true
