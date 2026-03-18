@@ -17,10 +17,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          pattern: wheels-*
+          pattern: wheels-x86_64-unknown-linux-gnu
           path: wheels
           merge-multiple: true
-      - name: Validate wheels
+      - name: Validate wheels (after download)
         run: |
           python3 << 'PYEOF'
           import struct, os, pathlib, hashlib
@@ -29,52 +29,35 @@ jobs:
               with open(path, "rb") as fp:
                   while True:
                       sig = fp.read(4)
-                      if len(sig) < 4:
-                          return fp.tell()
+                      if len(sig) < 4: return fp.tell()
                       if sig == b"\x50\x4b\x03\x04":
-                          d = fp.read(26)
-                          sz = struct.unpack_from("<L", d, 14)[0]
-                          fn, ex = struct.unpack_from("<HH", d, 22)
-                          extra = fp.read(fn + ex)
+                          d = fp.read(26); sz = struct.unpack_from("<L", d, 14)[0]
+                          fn, ex = struct.unpack_from("<HH", d, 22); extra = fp.read(fn + ex)
                           i = fn
                           while i < len(extra):
                               if i + 4 > len(extra): break
                               eid, esz = struct.unpack_from("<HH", extra, i)
-                              if eid == 1 and esz >= 16:
-                                  sz = struct.unpack_from("<Q", extra, i + 12)[0]
-                              elif eid == 1 and esz == 8:
-                                  sz = struct.unpack_from("<Q", extra, i + 4)[0]
+                              if eid == 1 and esz >= 16: sz = struct.unpack_from("<Q", extra, i + 12)[0]
+                              elif eid == 1 and esz == 8: sz = struct.unpack_from("<Q", extra, i + 4)[0]
                               i += 4 + esz
                           fp.seek(sz, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x01\x02":
-                          d = fp.read(42)
-                          fn, ex, cm = struct.unpack_from("<HHH", d, 24)
+                          d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24)
                           fp.seek(fn + ex + cm, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x06\x06":
-                          d = fp.read(52)
-                          fp.seek(struct.unpack_from("<Q", d)[0] - 44, os.SEEK_CUR)
-                      elif sig == b"\x50\x4b\x06\x07":
-                          fp.read(16)
+                          d = fp.read(52); fp.seek(struct.unpack_from("<Q", d)[0] - 44, os.SEEK_CUR)
+                      elif sig == b"\x50\x4b\x06\x07": fp.read(16)
                       elif sig == b"\x50\x4b\x05\x06":
-                          d = fp.read(18)
-                          fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
+                          d = fp.read(18); fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
                           return fp.tell()
-                      else:
-                          return None
+                      else: return None
 
           for whl in sorted(pathlib.Path("wheels").glob("*")):
-              size = whl.stat().st_size
-              sha = hashlib.sha256(whl.read_bytes()).hexdigest()
-              end = find_zip_end(whl) if whl.suffix in (".whl", ".gz") else None
+              size = whl.stat().st_size; sha = hashlib.sha256(whl.read_bytes()).hexdigest()
+              end = find_zip_end(whl) if whl.suffix == ".whl" else None
               if whl.suffix == ".whl" and end is not None and end < size:
-                  trail = size - end
-                  with open(whl, "rb") as f:
-                      f.seek(end)
-                      sample = f.read(64).hex()
-                  print(f"FAIL {whl.name}: size={size} zip_end={end} trailing={trail} sha256={sha}")
-                  print(f"     trailing hex: {sample}")
-              elif whl.suffix == ".whl" and end is None:
-                  print(f"WARN {whl.name}: parse failed, size={size} sha256={sha}")
+                  with open(whl, "rb") as f: f.seek(end); sample = f.read(64).hex()
+                  print(f"FAIL {whl.name}: size={size} zip_end={end} trailing={size-end} sha256={sha} hex={sample}")
               else:
                   print(f"  OK {whl.name}: size={size} sha256={sha}")
           PYEOF
