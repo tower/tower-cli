@@ -293,6 +293,8 @@ async fn execute_local_app(
             return Err(Error::Cancelled);
         }
 
+        // Pre-allocate disk space that we can free if the app fills the disk,
+        // so the runner still has room to report the failure.
         let balloon_path = working_dir.join(".tower-disk-reserve");
         create_balloon_file(&balloon_path).await;
 
@@ -553,6 +555,9 @@ async fn wait_for_process(
 
         if let Ok(res) = timeout {
             if let Ok(status) = res {
+                // On Unix, a process killed by a signal has no exit code.
+                // Return the negative signal number (e.g. -9 for SIGKILL)
+                // instead of panicking.
                 break status.code().unwrap_or_else(|| {
                     #[cfg(unix)]
                     {

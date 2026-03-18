@@ -429,6 +429,8 @@ impl Uv {
         {
             cmd.process_group(0);
 
+            // Cap the child's virtual memory so an OOM in the app kills the
+            // child but leaves the runner alive to report the failure.
             if let Some(limit) = resource_limits::detect_memory_limit() {
                 unsafe {
                     cmd.pre_exec(move || {
