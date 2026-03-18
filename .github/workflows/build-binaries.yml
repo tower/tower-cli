@@ -213,6 +213,7 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1.50.1
         with:
+          target: ${{ matrix.target }}
           manylinux: auto
           args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
           before-script-linux: |
@@ -223,7 +224,7 @@ jobs:
                 # If we're running on i686 we need to symlink libatomic
                 # in order to build openssl with -latomic flag.
                 if [[ ! -d "/usr/lib64" ]]; then
-                    sudo ln -s /usr/lib/libatomic.so.1 /usr/lib/libatomic.so
+                    ln -s /usr/lib/libatomic.so.1 /usr/lib/libatomic.so
                 fi
             else
                 # If we're running on debian-based system.
