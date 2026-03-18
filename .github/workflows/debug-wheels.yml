@@ -6,7 +6,7 @@ on:
       - chore/debug-wheels
 
 jobs:
-  # Produces a LARGER wheel with a known marker
+  # Produces a LARGER wheel (like the real x86_64 artifact)
   artifact-large:
     runs-on: ubuntu-latest
     steps:
@@ -14,18 +14,21 @@ jobs:
           mkdir dist
           python3 -c "
           import zipfile
-          with zipfile.ZipFile('dist/collide.whl', 'w') as zf:
-              zf.writestr('marker.txt', 'LARGE_ARTIFACT')
-              zf.writestr('padding.txt', 'X' * 5000)
+          with zipfile.ZipFile('dist/collide.whl', 'w', zipfile.ZIP_STORED) as zf:
+              zf.writestr('marker.txt', 'LARGE')
+              # ~8MB of data to match real wheel size
+              zf.writestr('big.bin', b'\x00' * (8 * 1024 * 1024))
+              # 3 extra bytes vs the small version
+              zf.writestr('extra.txt', 'XYZ')
           "
           stat -c '%s' dist/collide.whl
           sha256sum dist/collide.whl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
-          name: wheels-zzz-large
+          name: wheels-x86_64-unknown-linux-gnu
           path: dist
 
-  # Produces a SMALLER wheel with a different marker
+  # Produces a SMALLER wheel (like the real i686 artifact building x86_64 by mistake)
   artifact-small:
     runs-on: ubuntu-latest
     steps:
@@ -33,17 +36,19 @@ jobs:
           mkdir dist
           python3 -c "
           import zipfile
-          with zipfile.ZipFile('dist/collide.whl', 'w') as zf:
-              zf.writestr('marker.txt', 'SMALL_ARTIFACT')
+          with zipfile.ZipFile('dist/collide.whl', 'w', zipfile.ZIP_STORED) as zf:
+              zf.writestr('marker.txt', 'SMALL')
+              # Same ~8MB of data
+              zf.writestr('big.bin', b'\x00' * (8 * 1024 * 1024))
+              # No extra.txt - this file is smaller
           "
           stat -c '%s' dist/collide.whl
           sha256sum dist/collide.whl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
-          name: wheels-aaa-small
+          name: wheels-i686-unknown-linux-gnu
           path: dist
 
-  # Test with v4 download (what v0.3.53 used)
   merge-v4:
     needs: [artifact-large, artifact-small]
     runs-on: ubuntu-latest
@@ -53,7 +58,7 @@ jobs:
           pattern: wheels-*
           path: out
           merge-multiple: true
-      - name: Inspect merged file (v4)
+      - name: Inspect (v4)
         run: |
           echo "=== download-artifact v4 ==="
           stat -c 'size=%s' out/collide.whl
@@ -70,15 +75,11 @@ jobs:
                       if len(sig) < 4: return fp.tell()
                       if sig == b"\x50\x4b\x03\x04":
                           d = fp.read(26); sz = struct.unpack_from("<L", d, 14)[0]
-                          fn, ex = struct.unpack_from("<HH", d, 22)
-                          fp.seek(fn + ex + sz, os.SEEK_CUR)
+                          fn, ex = struct.unpack_from("<HH", d, 22); fp.seek(fn + ex + sz, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x01\x02":
-                          d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24)
-                          fp.seek(fn + ex + cm, os.SEEK_CUR)
+                          d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24); fp.seek(fn + ex + cm, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x05\x06":
-                          d = fp.read(18)
-                          fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
-                          return fp.tell()
+                          d = fp.read(18); fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR); return fp.tell()
                       else: return None
           size = os.path.getsize("out/collide.whl")
           end = find_zip_end("out/collide.whl")
@@ -88,7 +89,6 @@ jobs:
                   f.seek(end); print(f"trailing bytes: {f.read()!r}")
           PYEOF
 
-  # Test with v7 download (what v0.3.54 used)
   merge-v7:
     needs: [artifact-large, artifact-small]
     runs-on: ubuntu-latest
@@ -98,7 +98,7 @@ jobs:
           pattern: wheels-*
           path: out
           merge-multiple: true
-      - name: Inspect merged file (v7)
+      - name: Inspect (v7)
         run: |
           echo "=== download-artifact v7 ==="
           stat -c 'size=%s' out/collide.whl
@@ -115,15 +115,11 @@ jobs:
                       if len(sig) < 4: return fp.tell()
                       if sig == b"\x50\x4b\x03\x04":
                           d = fp.read(26); sz = struct.unpack_from("<L", d, 14)[0]
-                          fn, ex = struct.unpack_from("<HH", d, 22)
-                          fp.seek(fn + ex + sz, os.SEEK_CUR)
+                          fn, ex = struct.unpack_from("<HH", d, 22); fp.seek(fn + ex + sz, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x01\x02":
-                          d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24)
-                          fp.seek(fn + ex + cm, os.SEEK_CUR)
+                          d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24); fp.seek(fn + ex + cm, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x05\x06":
-                          d = fp.read(18)
-                          fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
-                          return fp.tell()
+                          d = fp.read(18); fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR); return fp.tell()
                       else: return None
           size = os.path.getsize("out/collide.whl")
           end = find_zip_end("out/collide.whl")
