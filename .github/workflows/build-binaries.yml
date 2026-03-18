@@ -39,15 +39,15 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build sdist"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           command: sdist
           args: --out dist
@@ -57,7 +57,7 @@ jobs:
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload sdist"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-sdist
           path: dist
@@ -71,21 +71,21 @@ jobs:
         # which is not available on macos-15 runners
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
       - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: x86_64
           args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-macos-x86_64-py${{ matrix.python-version }}
           path: dist
@@ -99,16 +99,16 @@ jobs:
         # which is not available on macos-15 runners
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           architecture: arm64
       - name: "Build wheels - aarch64"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: aarch64
           args: --release --locked --out dist -i python${{ matrix.python-version }}
@@ -118,7 +118,7 @@ jobs:
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-aarch64-apple-darwin-py${{ matrix.python-version }}
           path: dist
@@ -136,16 +136,16 @@ jobs:
           #  arch: x86
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.platform.arch }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist -i python${{ matrix.python-version }}
@@ -156,7 +156,7 @@ jobs:
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
@@ -169,15 +169,15 @@ jobs:
         # Python ARM64 Windows builds started with 3.11
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: aarch64-pc-windows-msvc
           args: --release --locked --out dist -i python${{ matrix.python-version }}
@@ -188,7 +188,7 @@ jobs:
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-aarch64-pc-windows-msvc-py${{ matrix.python-version }}
           path: dist
@@ -202,16 +202,16 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           manylinux: auto
           args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
@@ -238,7 +238,7 @@ jobs:
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.target }}
           path: dist
@@ -256,15 +256,15 @@ jobs:
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16 -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -299,7 +299,7 @@ jobs:
             pip3 install dist/*-${PYTAG}-*.whl --force-reinstall
             ${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -313,16 +313,16 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Install OpenSSL"
         run: sudo apt-get update && sudo apt-get install libssl-dev openssl
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
@@ -340,7 +340,7 @@ jobs:
             .venv/bin/pip3 install dist/*-${PYTAG}-*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.target }}
           path: dist
@@ -354,14 +354,14 @@ jobs:
           - target: aarch64-unknown-linux-musl
             arch: aarch64
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - uses: actions/setup-python@v5.5.0
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.49.1
+        uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
@@ -380,7 +380,7 @@ jobs:
             .venv/bin/pip3 install dist/*-${PYTAG}-*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
