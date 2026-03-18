@@ -20,7 +20,7 @@ jobs:
           "
           stat -c '%s' dist/collide.whl
           sha256sum dist/collide.whl
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels-zzz-large
           path: dist
@@ -38,37 +38,31 @@ jobs:
           "
           stat -c '%s' dist/collide.whl
           sha256sum dist/collide.whl
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels-aaa-small
           path: dist
 
-  merge-and-check:
+  # Test with v4 download (what v0.3.53 used)
+  merge-v4:
     needs: [artifact-large, artifact-small]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
           path: out
           merge-multiple: true
-      - name: Inspect merged file
+      - name: Inspect merged file (v4)
         run: |
-          echo "=== file size ==="
-          stat -c '%s' out/collide.whl
-          echo "=== sha256 ==="
+          echo "=== download-artifact v4 ==="
+          stat -c 'size=%s' out/collide.whl
           sha256sum out/collide.whl
-          echo "=== which marker won? ==="
-          python3 -c "
-          import zipfile
-          with zipfile.ZipFile('out/collide.whl') as zf:
-              print('marker:', zf.read('marker.txt'))
-              print('namelist:', zf.namelist())
-          "
-          echo "=== trailing data check ==="
           python3 << 'PYEOF'
-          import struct, os
-
+          import zipfile, struct, os
+          with zipfile.ZipFile("out/collide.whl") as zf:
+              print("marker:", zf.read("marker.txt"))
+              print("namelist:", zf.namelist())
           def find_zip_end(path):
               with open(path, "rb") as fp:
                   while True:
@@ -86,13 +80,55 @@ jobs:
                           fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
                           return fp.tell()
                       else: return None
-
-          path = "out/collide.whl"
-          size = os.path.getsize(path)
-          end = find_zip_end(path)
+          size = os.path.getsize("out/collide.whl")
+          end = find_zip_end("out/collide.whl")
           print(f"file_size={size} zip_end={end} trailing={size - end if end else '?'}")
           if end and end < size:
-              with open(path, "rb") as f:
-                  f.seek(end)
-                  print(f"trailing bytes: {f.read()!r}")
+              with open("out/collide.whl", "rb") as f:
+                  f.seek(end); print(f"trailing bytes: {f.read()!r}")
+          PYEOF
+
+  # Test with v7 download (what v0.3.54 used)
+  merge-v7:
+    needs: [artifact-large, artifact-small]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheels-*
+          path: out
+          merge-multiple: true
+      - name: Inspect merged file (v7)
+        run: |
+          echo "=== download-artifact v7 ==="
+          stat -c 'size=%s' out/collide.whl
+          sha256sum out/collide.whl
+          python3 << 'PYEOF'
+          import zipfile, struct, os
+          with zipfile.ZipFile("out/collide.whl") as zf:
+              print("marker:", zf.read("marker.txt"))
+              print("namelist:", zf.namelist())
+          def find_zip_end(path):
+              with open(path, "rb") as fp:
+                  while True:
+                      sig = fp.read(4)
+                      if len(sig) < 4: return fp.tell()
+                      if sig == b"\x50\x4b\x03\x04":
+                          d = fp.read(26); sz = struct.unpack_from("<L", d, 14)[0]
+                          fn, ex = struct.unpack_from("<HH", d, 22)
+                          fp.seek(fn + ex + sz, os.SEEK_CUR)
+                      elif sig == b"\x50\x4b\x01\x02":
+                          d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24)
+                          fp.seek(fn + ex + cm, os.SEEK_CUR)
+                      elif sig == b"\x50\x4b\x05\x06":
+                          d = fp.read(18)
+                          fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
+                          return fp.tell()
+                      else: return None
+          size = os.path.getsize("out/collide.whl")
+          end = find_zip_end("out/collide.whl")
+          print(f"file_size={size} zip_end={end} trailing={size - end if end else '?'}")
+          if end and end < size:
+              with open("out/collide.whl", "rb") as f:
+                  f.seek(end); print(f"trailing bytes: {f.read()!r}")
           PYEOF
