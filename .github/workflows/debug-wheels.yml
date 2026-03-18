@@ -6,24 +6,68 @@ on:
       - chore/debug-wheels
 
 jobs:
-  build:
-    uses: ./.github/workflows/build-binaries.yml
-    with:
-      plan: "{}"
+  # Produces a LARGER wheel with a known marker
+  artifact-large:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir dist
+          python3 -c "
+          import zipfile
+          with zipfile.ZipFile('dist/collide.whl', 'w') as zf:
+              zf.writestr('marker.txt', 'LARGE_ARTIFACT')
+              zf.writestr('padding.txt', 'X' * 5000)
+          "
+          stat -c '%s' dist/collide.whl
+          sha256sum dist/collide.whl
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-aaa-large
+          path: dist
 
-  validate:
-    needs: build
+  # Produces a SMALLER wheel with a different marker
+  artifact-small:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir dist
+          python3 -c "
+          import zipfile
+          with zipfile.ZipFile('dist/collide.whl', 'w') as zf:
+              zf.writestr('marker.txt', 'SMALL_ARTIFACT')
+          "
+          stat -c '%s' dist/collide.whl
+          sha256sum dist/collide.whl
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-zzz-small
+          path: dist
+
+  merge-and-check:
+    needs: [artifact-large, artifact-small]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v7
         with:
-          pattern: wheels-x86_64-unknown-linux-gnu
-          path: wheels
+          pattern: wheels-*
+          path: out
           merge-multiple: true
-      - name: Validate wheels (after download)
+      - name: Inspect merged file
         run: |
+          echo "=== file size ==="
+          stat -c '%s' out/collide.whl
+          echo "=== sha256 ==="
+          sha256sum out/collide.whl
+          echo "=== which marker won? ==="
+          python3 -c "
+          import zipfile
+          with zipfile.ZipFile('out/collide.whl') as zf:
+              print('marker:', zf.read('marker.txt'))
+              print('namelist:', zf.namelist())
+          "
+          echo "=== trailing data check ==="
           python3 << 'PYEOF'
-          import struct, os, pathlib, hashlib
+          import struct, os
 
           def find_zip_end(path):
               with open(path, "rb") as fp:
@@ -32,32 +76,23 @@ jobs:
                       if len(sig) < 4: return fp.tell()
                       if sig == b"\x50\x4b\x03\x04":
                           d = fp.read(26); sz = struct.unpack_from("<L", d, 14)[0]
-                          fn, ex = struct.unpack_from("<HH", d, 22); extra = fp.read(fn + ex)
-                          i = fn
-                          while i < len(extra):
-                              if i + 4 > len(extra): break
-                              eid, esz = struct.unpack_from("<HH", extra, i)
-                              if eid == 1 and esz >= 16: sz = struct.unpack_from("<Q", extra, i + 12)[0]
-                              elif eid == 1 and esz == 8: sz = struct.unpack_from("<Q", extra, i + 4)[0]
-                              i += 4 + esz
-                          fp.seek(sz, os.SEEK_CUR)
+                          fn, ex = struct.unpack_from("<HH", d, 22)
+                          fp.seek(fn + ex + sz, os.SEEK_CUR)
                       elif sig == b"\x50\x4b\x01\x02":
                           d = fp.read(42); fn, ex, cm = struct.unpack_from("<HHH", d, 24)
                           fp.seek(fn + ex + cm, os.SEEK_CUR)
-                      elif sig == b"\x50\x4b\x06\x06":
-                          d = fp.read(52); fp.seek(struct.unpack_from("<Q", d)[0] - 44, os.SEEK_CUR)
-                      elif sig == b"\x50\x4b\x06\x07": fp.read(16)
                       elif sig == b"\x50\x4b\x05\x06":
-                          d = fp.read(18); fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
+                          d = fp.read(18)
+                          fp.seek(struct.unpack_from("<H", d, 16)[0], os.SEEK_CUR)
                           return fp.tell()
                       else: return None
 
-          for whl in sorted(pathlib.Path("wheels").glob("*")):
-              size = whl.stat().st_size; sha = hashlib.sha256(whl.read_bytes()).hexdigest()
-              end = find_zip_end(whl) if whl.suffix == ".whl" else None
-              if whl.suffix == ".whl" and end is not None and end < size:
-                  with open(whl, "rb") as f: f.seek(end); sample = f.read(64).hex()
-                  print(f"FAIL {whl.name}: size={size} zip_end={end} trailing={size-end} sha256={sha} hex={sample}")
-              else:
-                  print(f"  OK {whl.name}: size={size} sha256={sha}")
+          path = "out/collide.whl"
+          size = os.path.getsize(path)
+          end = find_zip_end(path)
+          print(f"file_size={size} zip_end={end} trailing={size - end if end else '?'}")
+          if end and end < size:
+              with open(path, "rb") as f:
+                  f.seek(end)
+                  print(f"trailing bytes: {f.read()!r}")
           PYEOF
