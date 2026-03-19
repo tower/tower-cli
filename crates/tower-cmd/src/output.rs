@@ -200,8 +200,9 @@ pub fn paragraph(msg: &str) -> String {
 
 pub fn config_error(err: config::Error) {
     let msg = match err {
-        config::Error::ConfigDirNotFound => "No home directory found".to_string(),
+        config::Error::ConfigDirNotFound => "Config directory not found".to_string(),
         config::Error::NoHomeDir => "No home directory found".to_string(),
+        config::Error::Io { ref source } => format!("IO error: {}", source),
         config::Error::NoSession => "No session".to_string(),
         config::Error::InvalidTowerfile => {
             "Couldn't read the Towerfile in this directory".to_string()
