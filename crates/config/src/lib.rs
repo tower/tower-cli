@@ -9,7 +9,7 @@ mod towerfile;
 
 pub use error::Error;
 pub use session::{default_tower_url, Session, Team, Token, User};
-pub use towerfile::Towerfile;
+pub use towerfile::{Parameter, Towerfile};
 
 pub use session::{get_last_version_check_timestamp, set_last_version_check_timestamp};
 

@@ -119,14 +119,21 @@ impl Towerfile {
         Ok(())
     }
 
-    /// add_parameter adds a new parameter to the Towerfile
-    pub fn add_parameter(&mut self, name: String, description: String, default: String) {
-        self.parameters.push(Parameter {
-            name,
-            description,
-            default,
-            hidden: false,
-        });
+    /// set_parameter upserts a parameter by lookup name. If a parameter with the given name
+    /// exists, it is replaced. Otherwise, the parameter is appended.
+    pub fn set_parameter(&mut self, lookup_name: &str, param: Parameter) {
+        if let Some(existing) = self.parameters.iter_mut().find(|p| p.name == lookup_name) {
+            *existing = param;
+        } else {
+            self.parameters.push(param);
+        }
+    }
+
+    /// remove_parameter removes a parameter by name, returning true if it was found
+    pub fn remove_parameter(&mut self, name: &str) -> bool {
+        let len_before = self.parameters.len();
+        self.parameters.retain(|p| p.name != name);
+        self.parameters.len() < len_before
     }
 }
 
@@ -299,20 +306,48 @@ mod test {
     }
 
     #[test]
-    fn test_add_parameter() {
+    fn test_set_parameter() {
         let mut towerfile = crate::Towerfile::default();
         assert_eq!(towerfile.parameters.len(), 0);
 
-        towerfile.add_parameter(
-            "test-param".to_string(),
-            "A test parameter".to_string(),
-            "default-value".to_string(),
-        );
+        towerfile.set_parameter("test-param", crate::Parameter {
+            name: "test-param".to_string(),
+            description: "A test parameter".to_string(),
+            default: "default-value".to_string(),
+            hidden: false,
+        });
 
         assert_eq!(towerfile.parameters.len(), 1);
         assert_eq!(towerfile.parameters[0].name, "test-param");
         assert_eq!(towerfile.parameters[0].description, "A test parameter");
         assert_eq!(towerfile.parameters[0].default, "default-value");
+        assert!(!towerfile.parameters[0].hidden);
+
+        // upsert should replace, not duplicate
+        towerfile.set_parameter("test-param", crate::Parameter {
+            name: "test-param".to_string(),
+            description: "Updated".to_string(),
+            default: "new-value".to_string(),
+            hidden: false,
+        });
+
+        assert_eq!(towerfile.parameters.len(), 1);
+        assert_eq!(towerfile.parameters[0].description, "Updated");
+    }
+
+    #[test]
+    fn test_remove_parameter() {
+        let mut towerfile = crate::Towerfile::default();
+        towerfile.set_parameter("param1", crate::Parameter {
+            name: "param1".to_string(),
+            description: "".to_string(),
+            default: "".to_string(),
+            hidden: false,
+        });
+
+        assert!(towerfile.remove_parameter("param1"));
+        assert_eq!(towerfile.parameters.len(), 0);
+        assert!(!towerfile.remove_parameter("param1"));
     }
 
     #[test]
