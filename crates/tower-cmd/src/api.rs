@@ -357,6 +357,22 @@ pub async fn refresh_session(
     .await
 }
 
+pub async fn list_teams(
+    config: &Config,
+) -> Result<
+    tower_api::models::ListTeamsResponse,
+    Error<tower_api::apis::default_api::ListTeamsError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListTeamsParams {
+        page: None,
+        page_size: None,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_teams(api_config, params)).await
+}
+
 pub enum LogStreamEvent {
     EventLog(tower_api::models::RunLogLine),
     EventWarning(tower_api::models::EventWarning),
@@ -605,6 +621,17 @@ impl ResponseEntity for tower_api::apis::default_api::CreateSecretSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::DescribeSecretsKeySuccess {
     type Data = tower_api::models::DescribeSecretsKeyResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::ListTeamsSuccess {
+    type Data = tower_api::models::ListTeamsResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
