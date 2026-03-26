@@ -100,7 +100,9 @@ def step_run_cli_command_with_api_key(context, command):
 def step_no_session_json(context):
     """Verify that API key auth did not create a session.json file"""
     session_path = Path(context.temp_dir) / ".config" / "tower" / "session.json"
-    assert not session_path.exists(), f"session.json should not exist but found at {session_path}"
+    assert (
+        not session_path.exists()
+    ), f"session.json should not exist but found at {session_path}"
 
 
 @step('I run "{command}" via CLI using created app name')
