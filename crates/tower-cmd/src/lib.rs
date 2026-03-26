@@ -30,10 +30,12 @@ impl App {
     pub fn new() -> Self {
         let cmd = root_cmd();
 
-        // In certain scenarios, we want to load a session from a JWT token supplied as an
-        // environment variable. This is for programmatic use cases where we want to test the CLI
-        // in automated environments, for instance.
-        let session = if let Ok(token) = std::env::var("TOWER_JWT") {
+        // When TOWER_API_KEY is set, skip session entirely — the API key is self-contained
+        // and authenticates via X-API-Key header rather than Bearer JWT.
+        let session = if std::env::var("TOWER_API_KEY").is_ok() {
+            None
+        } else if let Ok(token) = std::env::var("TOWER_JWT") {
+            // Load session from a JWT token for programmatic use cases
             Session::from_jwt(&token).ok()
         } else {
             Session::from_config_dir().ok()
