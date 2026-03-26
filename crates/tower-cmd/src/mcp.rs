@@ -334,6 +334,23 @@ impl TowerService {
             })
     }
 
+    async fn list_teams_via_api(&self) -> Result<CallToolResult, McpError> {
+        let response = api::list_teams(&self.config).await.map_err(|e| {
+            McpError::internal_error(
+                "Failed to list teams",
+                Some(json!({"error": e.to_string()})),
+            )
+        })?;
+
+        let teams: Vec<Value> = response
+            .teams
+            .into_iter()
+            .map(|team| json!({"name": team.name}))
+            .collect();
+
+        Self::json_success(json!({"teams": teams}))
+    }
+
     fn extract_api_error_message(error: &crate::Error) -> String {
         let crate::Error::ApiRunError { source } = error else {
             return error.to_string();
@@ -640,6 +657,10 @@ impl TowerService {
 
     #[tool(description = "List teams you belong to")]
     async fn tower_teams_list(&self) -> Result<CallToolResult, McpError> {
+        if self.config.api_key.is_some() {
+            return self.list_teams_via_api().await;
+        }
+
         let response = api::refresh_session(&self.config).await.map_err(|e| {
             McpError::internal_error(
                 "Failed to refresh session",
