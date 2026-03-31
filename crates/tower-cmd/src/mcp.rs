@@ -831,6 +831,22 @@ impl TowerService {
         if request.hidden && request.default.is_some() {
             return Self::text_error("hidden and default are mutually exclusive".into());
         }
+        if !request.hidden {
+            if request
+                .description
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or("")
+                .is_empty()
+            {
+                return Self::text_error(
+                    "description is required when hidden=false".into(),
+                );
+            }
+            if request.default.is_none() {
+                return Self::text_error("default is required when hidden=false".into());
+            }
+        }
         let name = request.name.clone();
         Self::modify_towerfile(&request.common, |tf| {
             tf.set_parameter(&name, Parameter {
@@ -854,8 +870,15 @@ impl TowerService {
         Self::modify_towerfile(&request.common, |tf| {
             let existing = tf.parameters.iter().find(|p| p.name == name)
                 .ok_or_else(|| format!("Parameter '{name}' not found"))?;
+            let target_name = request
+                .new_name
+                .clone()
+                .unwrap_or_else(|| existing.name.clone());
+            if target_name != name && tf.parameters.iter().any(|p| p.name == target_name) {
+                return Err(format!("Parameter '{}' already exists", target_name));
+            }
             let param = Parameter {
-                name: request.new_name.unwrap_or_else(|| existing.name.clone()),
+                name: target_name,
                 description: request.description.unwrap_or_else(|| existing.description.clone()),
                 default: request.default.unwrap_or_else(|| existing.default.clone()),
                 hidden: request.hidden.unwrap_or(existing.hidden),

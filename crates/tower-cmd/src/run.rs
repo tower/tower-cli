@@ -254,6 +254,16 @@ where
             output::error(&format!("Your local run crashed with exit code: {}", code));
             return Err(Error::AppCrashed);
         }
+        Status::Failed {
+            error_code,
+            error_message,
+        } => {
+            output::error(&format!(
+                "Your local run failed due to a platform error (code: {}, message: {})",
+                error_code, error_message
+            ));
+            return Err(Error::AppCrashed);
+        }
         _ => {
             debug!("Unexpected status after monitoring: {:?}", status_result);
             output::error("An unexpected error occurred while monitoring your local run status!");
@@ -701,6 +711,10 @@ async fn monitor_cli_status(
                     }
                     Status::Crashed { .. } => {
                         debug!("Run crashed, stopping status monitoring");
+                        return status;
+                    }
+                    Status::Failed { .. } => {
+                        debug!("Run failed at platform layer, stopping status monitoring");
                         return status;
                     }
                     _ => {
