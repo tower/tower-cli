@@ -48,8 +48,8 @@ pub enum Status {
     /// A platform-level failure (not the user's app). For example, pod scheduling
     /// failures, image pull errors, or other infrastructure issues.
     Failed {
-        error_code: Option<String>,
-        error_message: Option<String>,
+        error_code: String,
+        error_message: String,
     },
 }
 
