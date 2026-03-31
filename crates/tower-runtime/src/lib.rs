@@ -37,18 +37,26 @@ pub struct Output {
     pub line: String,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     None,
     Running,
     Exited,
-    Crashed { code: i32 },
+    Crashed {
+        code: i32,
+    },
+    /// A platform-level failure (not the user's app). For example, pod scheduling
+    /// failures, image pull errors, or other infrastructure issues.
+    Failed {
+        error_code: Option<String>,
+        error_message: Option<String>,
+    },
 }
 
 impl Status {
     /// Returns true if this status represents a terminal state (run is finished)
     pub fn is_terminal(&self) -> bool {
-        matches!(self, Status::Exited | Status::Crashed { .. })
+        matches!(self, Status::Exited | Status::Crashed { .. } | Status::Failed { .. })
     }
 }
 

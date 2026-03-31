@@ -113,7 +113,7 @@ mod tests {
         }
 
         async fn status(&self) -> Result<Status, Error> {
-            Ok(*self.status.lock().await)
+            Ok(self.status.lock().await.clone())
         }
     }
 
