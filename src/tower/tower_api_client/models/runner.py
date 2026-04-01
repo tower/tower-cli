@@ -25,6 +25,7 @@ class Runner:
         num_runs (int):
         status (str):
         last_health_check_at (str | Unset):
+        name (str | Unset): Optional human-readable name for the runner
     """
 
     active_runs: list[Run]
@@ -34,6 +35,7 @@ class Runner:
     num_runs: int
     status: str
     last_health_check_at: str | Unset = UNSET
+    name: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         active_runs = []
@@ -53,6 +55,8 @@ class Runner:
 
         last_health_check_at = self.last_health_check_at
 
+        name = self.name
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -67,6 +71,8 @@ class Runner:
         )
         if last_health_check_at is not UNSET:
             field_dict["last_health_check_at"] = last_health_check_at
+        if name is not UNSET:
+            field_dict["name"] = name
 
         return field_dict
 
@@ -94,6 +100,8 @@ class Runner:
 
         last_health_check_at = d.pop("last_health_check_at", UNSET)
 
+        name = d.pop("name", UNSET)
+
         runner = cls(
             active_runs=active_runs,
             created_at=created_at,
@@ -102,6 +110,7 @@ class Runner:
             num_runs=num_runs,
             status=status,
             last_health_check_at=last_health_check_at,
+            name=name,
         )
 
         return runner

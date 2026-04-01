@@ -5,6 +5,8 @@ from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="Parameter")
 
 
@@ -15,11 +17,13 @@ class Parameter:
         default (str):
         description (str):
         name (str):
+        hidden (bool | Unset): Whether this parameter is hidden/secret. Defaults to false. Default: False.
     """
 
     default: str
     description: str
     name: str
+    hidden: bool | Unset = False
 
     def to_dict(self) -> dict[str, Any]:
         default = self.default
@@ -27,6 +31,8 @@ class Parameter:
         description = self.description
 
         name = self.name
+
+        hidden = self.hidden
 
         field_dict: dict[str, Any] = {}
 
@@ -37,6 +43,8 @@ class Parameter:
                 "name": name,
             }
         )
+        if hidden is not UNSET:
+            field_dict["hidden"] = hidden
 
         return field_dict
 
@@ -49,10 +57,13 @@ class Parameter:
 
         name = d.pop("name")
 
+        hidden = d.pop("hidden", UNSET)
+
         parameter = cls(
             default=default,
             description=description,
             name=name,
+            hidden=hidden,
         )
 
         return parameter

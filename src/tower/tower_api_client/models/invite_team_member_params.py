@@ -5,6 +5,7 @@ from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..models.invite_team_member_params_role import InviteTeamMemberParamsRole
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="InviteTeamMemberParams")
@@ -16,17 +17,22 @@ class InviteTeamMemberParams:
     Attributes:
         emails (str): The email addresses of the people to invite. It can be a list in any format (comma separated,
             newline separated, etc.) and it will be parsed into individual addresses
+        role (InviteTeamMemberParamsRole): The role to assign to the invitations Default:
+            InviteTeamMemberParamsRole.DEVELOPER.
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/InviteTeamMemberParams.json.
         message (str | Unset): Optional message to include in the invite email
     """
 
     emails: str
+    role: InviteTeamMemberParamsRole = InviteTeamMemberParamsRole.DEVELOPER
     schema: str | Unset = UNSET
     message: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         emails = self.emails
+
+        role = self.role.value
 
         schema = self.schema
 
@@ -37,6 +43,7 @@ class InviteTeamMemberParams:
         field_dict.update(
             {
                 "emails": emails,
+                "role": role,
             }
         )
         if schema is not UNSET:
@@ -51,12 +58,15 @@ class InviteTeamMemberParams:
         d = dict(src_dict)
         emails = d.pop("emails")
 
+        role = InviteTeamMemberParamsRole(d.pop("role"))
+
         schema = d.pop("$schema", UNSET)
 
         message = d.pop("message", UNSET)
 
         invite_team_member_params = cls(
             emails=emails,
+            role=role,
             schema=schema,
             message=message,
         )

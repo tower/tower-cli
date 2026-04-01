@@ -12,8 +12,10 @@ from ..models.run_status_group import RunStatusGroup
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.run_attempt import RunAttempt
     from ..models.run_initiator import RunInitiator
     from ..models.run_parameter import RunParameter
+    from ..models.run_retry_policy import RunRetryPolicy
 
 
 T = TypeVar("T", bound="Run")
@@ -34,6 +36,7 @@ class Run:
         initiator (RunInitiator):
         is_scheduled (bool): Whether this run was triggered by a schedule (true) or on-demand (false). Historical
             records default to false.
+        num_attempts (int): Number of attempts for this run (1 = original, 2+ = retries).
         number (int):
         parameters (list[RunParameter]): Parameters used to invoke this run.
         run_id (str):
@@ -42,7 +45,9 @@ class Run:
         status (RunStatus):
         status_group (RunStatusGroup):
         app_slug (str | Unset): This property is deprecated. Use app_name instead.
+        attempts (list[RunAttempt] | Unset): Previous attempt details. Populated on describe, omitted on list.
         hostname (str | Unset): hostname is deprecated, use subdomain
+        retry_policy (RunRetryPolicy | Unset):
         subdomain (None | str | Unset): If app is externally accessible, then you can access this run with this
             hostname.
     """
@@ -57,6 +62,7 @@ class Run:
     exit_code: int | None
     initiator: RunInitiator
     is_scheduled: bool
+    num_attempts: int
     number: int
     parameters: list[RunParameter]
     run_id: str
@@ -65,7 +71,9 @@ class Run:
     status: RunStatus
     status_group: RunStatusGroup
     app_slug: str | Unset = UNSET
+    attempts: list[RunAttempt] | Unset = UNSET
     hostname: str | Unset = UNSET
+    retry_policy: RunRetryPolicy | Unset = UNSET
     subdomain: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -98,6 +106,8 @@ class Run:
 
         is_scheduled = self.is_scheduled
 
+        num_attempts = self.num_attempts
+
         number = self.number
 
         parameters = []
@@ -121,7 +131,18 @@ class Run:
 
         app_slug = self.app_slug
 
+        attempts: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.attempts, Unset):
+            attempts = []
+            for attempts_item_data in self.attempts:
+                attempts_item = attempts_item_data.to_dict()
+                attempts.append(attempts_item)
+
         hostname = self.hostname
+
+        retry_policy: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.retry_policy, Unset):
+            retry_policy = self.retry_policy.to_dict()
 
         subdomain: None | str | Unset
         if isinstance(self.subdomain, Unset):
@@ -143,6 +164,7 @@ class Run:
                 "exit_code": exit_code,
                 "initiator": initiator,
                 "is_scheduled": is_scheduled,
+                "num_attempts": num_attempts,
                 "number": number,
                 "parameters": parameters,
                 "run_id": run_id,
@@ -154,8 +176,12 @@ class Run:
         )
         if app_slug is not UNSET:
             field_dict["app_slug"] = app_slug
+        if attempts is not UNSET:
+            field_dict["attempts"] = attempts
         if hostname is not UNSET:
             field_dict["hostname"] = hostname
+        if retry_policy is not UNSET:
+            field_dict["retry_policy"] = retry_policy
         if subdomain is not UNSET:
             field_dict["subdomain"] = subdomain
 
@@ -163,8 +189,10 @@ class Run:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.run_attempt import RunAttempt
         from ..models.run_initiator import RunInitiator
         from ..models.run_parameter import RunParameter
+        from ..models.run_retry_policy import RunRetryPolicy
 
         d = dict(src_dict)
         link = d.pop("$link")
@@ -218,6 +246,8 @@ class Run:
 
         is_scheduled = d.pop("is_scheduled")
 
+        num_attempts = d.pop("num_attempts")
+
         number = d.pop("number")
 
         parameters = []
@@ -252,7 +282,23 @@ class Run:
 
         app_slug = d.pop("app_slug", UNSET)
 
+        _attempts = d.pop("attempts", UNSET)
+        attempts: list[RunAttempt] | Unset = UNSET
+        if _attempts is not UNSET:
+            attempts = []
+            for attempts_item_data in _attempts:
+                attempts_item = RunAttempt.from_dict(attempts_item_data)
+
+                attempts.append(attempts_item)
+
         hostname = d.pop("hostname", UNSET)
+
+        _retry_policy = d.pop("retry_policy", UNSET)
+        retry_policy: RunRetryPolicy | Unset
+        if isinstance(_retry_policy, Unset):
+            retry_policy = UNSET
+        else:
+            retry_policy = RunRetryPolicy.from_dict(_retry_policy)
 
         def _parse_subdomain(data: object) -> None | str | Unset:
             if data is None:
@@ -274,6 +320,7 @@ class Run:
             exit_code=exit_code,
             initiator=initiator,
             is_scheduled=is_scheduled,
+            num_attempts=num_attempts,
             number=number,
             parameters=parameters,
             run_id=run_id,
@@ -282,7 +329,9 @@ class Run:
             status=status,
             status_group=status_group,
             app_slug=app_slug,
+            attempts=attempts,
             hostname=hostname,
+            retry_policy=retry_policy,
             subdomain=subdomain,
         )
 

@@ -67,6 +67,7 @@ mock_apps_db["predeployed-test-app"] = {
         "errored": 0,
         "exited": 0,
         "pending": 0,
+        "retrying": 0,
         "running": 0,
     },
     "subdomain": None,
@@ -96,6 +97,7 @@ def create_schedule_object(
         "environment": environment,
         "overlap_policy": "skip",
         "status": "active",
+        "timezone": "UTC",
         "created_at": now_iso(),
         "updated_at": now_iso(),
         "parameters": parameters or [],
@@ -156,6 +158,7 @@ async def create_app(app_data: Dict[str, Any]):
             "errored": 0,
             "exited": 0,
             "pending": 0,
+            "retrying": 0,
             "running": 0,
         },
         "schedule": None,
@@ -283,6 +286,7 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         "started_at": datetime.datetime.now().isoformat(),
         "ended_at": None,
         "app_version": mock_apps_db[name].get("version", "1.0.0"),
+        "num_attempts": 1,
         "subdomain": None,
         "is_scheduled": True,
         "initiator": {
@@ -328,7 +332,9 @@ async def describe_run(name: str, seq: int):
                 "run": run_data,
                 "$links": {
                     "next": None,
+                    "next_number": None,
                     "prev": None,
+                    "prev_number": None,
                     "self": run_data.get("$link"),
                 },
             }
@@ -542,6 +548,7 @@ NORMAL_LOG_ENTRIES = [
 
 def make_log_data(seq: int, line_num: int, content: str, timestamp: str):
     return {
+        "attempt_seq": 1,
         "channel": "program",
         "content": content,
         "line_num": line_num,

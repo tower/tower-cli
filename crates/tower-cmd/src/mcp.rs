@@ -1004,7 +1004,7 @@ IMPORTANT REMINDERS:
                     .map(|mut schedule| {
                         if let Some(parameters) = schedule.parameters.as_mut() {
                             for parameter in parameters {
-                                if parameter.hidden {
+                                if parameter.hidden.unwrap_or(false) {
                                     parameter.value = "[hidden]".to_string();
                                 }
                             }

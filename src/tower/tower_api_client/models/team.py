@@ -18,19 +18,27 @@ T = TypeVar("T", bound="Team")
 class Team:
     """
     Attributes:
+        execution_region (str):
         name (str):
+        organization (str): The name of the organization this team belongs to.
         type_ (str): The type of team, either 'personal' or 'team'.
         slug (str | Unset): This property is deprecated. Use name instead.
         token (Token | Unset):
     """
 
+    execution_region: str
     name: str
+    organization: str
     type_: str
     slug: str | Unset = UNSET
     token: Token | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        execution_region = self.execution_region
+
         name = self.name
+
+        organization = self.organization
 
         type_ = self.type_
 
@@ -44,7 +52,9 @@ class Team:
 
         field_dict.update(
             {
+                "execution_region": execution_region,
                 "name": name,
+                "organization": organization,
                 "type": type_,
             }
         )
@@ -60,7 +70,11 @@ class Team:
         from ..models.token import Token
 
         d = dict(src_dict)
+        execution_region = d.pop("execution_region")
+
         name = d.pop("name")
+
+        organization = d.pop("organization")
 
         type_ = d.pop("type")
 
@@ -74,7 +88,9 @@ class Team:
             token = Token.from_dict(_token)
 
         team = cls(
+            execution_region=execution_region,
             name=name,
+            organization=organization,
             type_=type_,
             slug=slug,
             token=token,
