@@ -157,6 +157,7 @@ pub async fn run_app(
             parameters: params,
             parent_run_id: None,
             initiator: None,
+            retry_policy: None,
         },
     };
 
@@ -843,7 +844,7 @@ pub async fn create_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                hidden: false,
+                hidden: None,
             })
             .collect()
     });
@@ -881,7 +882,7 @@ pub async fn update_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                hidden: false,
+                hidden: None,
             })
             .collect()
     });
