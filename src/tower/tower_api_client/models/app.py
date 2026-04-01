@@ -14,6 +14,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.run import Run
     from ..models.run_results import RunResults
+    from ..models.run_retry_policy import RunRetryPolicy
 
 
 T = TypeVar("T", bound="App")
@@ -37,6 +38,7 @@ class App:
         short_description (str): A short description of the app. Can be empty.
         version (None | str): The current version of this app, null if none.
         last_run (Run | Unset):
+        retry_policy (RunRetryPolicy | Unset):
         run_results (RunResults | Unset):
         slug (str | Unset): This property is deprecated. Use name instead.
         status (AppStatus | Unset): The status of the app.
@@ -55,6 +57,7 @@ class App:
     pending_timeout: int = 600
     running_timeout: int = 0
     last_run: Run | Unset = UNSET
+    retry_policy: RunRetryPolicy | Unset = UNSET
     run_results: RunResults | Unset = UNSET
     slug: str | Unset = UNSET
     status: AppStatus | Unset = UNSET
@@ -93,6 +96,10 @@ class App:
         if not isinstance(self.last_run, Unset):
             last_run = self.last_run.to_dict()
 
+        retry_policy: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.retry_policy, Unset):
+            retry_policy = self.retry_policy.to_dict()
+
         run_results: dict[str, Any] | Unset = UNSET
         if not isinstance(self.run_results, Unset):
             run_results = self.run_results.to_dict()
@@ -124,6 +131,8 @@ class App:
         )
         if last_run is not UNSET:
             field_dict["last_run"] = last_run
+        if retry_policy is not UNSET:
+            field_dict["retry_policy"] = retry_policy
         if run_results is not UNSET:
             field_dict["run_results"] = run_results
         if slug is not UNSET:
@@ -139,6 +148,7 @@ class App:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run import Run
         from ..models.run_results import RunResults
+        from ..models.run_retry_policy import RunRetryPolicy
 
         d = dict(src_dict)
         created_at = isoparse(d.pop("created_at"))
@@ -193,6 +203,13 @@ class App:
         else:
             last_run = Run.from_dict(_last_run)
 
+        _retry_policy = d.pop("retry_policy", UNSET)
+        retry_policy: RunRetryPolicy | Unset
+        if isinstance(_retry_policy, Unset):
+            retry_policy = UNSET
+        else:
+            retry_policy = RunRetryPolicy.from_dict(_retry_policy)
+
         _run_results = d.pop("run_results", UNSET)
         run_results: RunResults | Unset
         if isinstance(_run_results, Unset):
@@ -224,6 +241,7 @@ class App:
             short_description=short_description,
             version=version,
             last_run=last_run,
+            retry_policy=retry_policy,
             run_results=run_results,
             slug=slug,
             status=status,

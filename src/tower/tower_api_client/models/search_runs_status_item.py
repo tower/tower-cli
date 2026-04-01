@@ -7,6 +7,7 @@ class SearchRunsStatusItem(str, Enum):
     ERRORED = "errored"
     EXITED = "exited"
     PENDING = "pending"
+    RETRYING = "retrying"
     RUNNING = "running"
 
     def __str__(self) -> str:

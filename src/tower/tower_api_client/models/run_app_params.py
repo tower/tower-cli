@@ -10,6 +10,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.run_app_initiator_data import RunAppInitiatorData
     from ..models.run_app_params_parameters import RunAppParamsParameters
+    from ..models.run_retry_policy import RunRetryPolicy
 
 
 T = TypeVar("T", bound="RunAppParams")
@@ -26,6 +27,7 @@ class RunAppParams:
         initiator (RunAppInitiatorData | Unset):
         parent_run_id (None | str | Unset): The ID of the run that invoked this run, if relevant. Should be null, if
             none.
+        retry_policy (RunRetryPolicy | Unset):
     """
 
     environment: str
@@ -33,6 +35,7 @@ class RunAppParams:
     schema: str | Unset = UNSET
     initiator: RunAppInitiatorData | Unset = UNSET
     parent_run_id: None | str | Unset = UNSET
+    retry_policy: RunRetryPolicy | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         environment = self.environment
@@ -51,6 +54,10 @@ class RunAppParams:
         else:
             parent_run_id = self.parent_run_id
 
+        retry_policy: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.retry_policy, Unset):
+            retry_policy = self.retry_policy.to_dict()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -65,6 +72,8 @@ class RunAppParams:
             field_dict["initiator"] = initiator
         if parent_run_id is not UNSET:
             field_dict["parent_run_id"] = parent_run_id
+        if retry_policy is not UNSET:
+            field_dict["retry_policy"] = retry_policy
 
         return field_dict
 
@@ -72,6 +81,7 @@ class RunAppParams:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_app_initiator_data import RunAppInitiatorData
         from ..models.run_app_params_parameters import RunAppParamsParameters
+        from ..models.run_retry_policy import RunRetryPolicy
 
         d = dict(src_dict)
         environment = d.pop("environment")
@@ -96,12 +106,20 @@ class RunAppParams:
 
         parent_run_id = _parse_parent_run_id(d.pop("parent_run_id", UNSET))
 
+        _retry_policy = d.pop("retry_policy", UNSET)
+        retry_policy: RunRetryPolicy | Unset
+        if isinstance(_retry_policy, Unset):
+            retry_policy = UNSET
+        else:
+            retry_policy = RunRetryPolicy.from_dict(_retry_policy)
+
         run_app_params = cls(
             environment=environment,
             parameters=parameters,
             schema=schema,
             initiator=initiator,
             parent_run_id=parent_run_id,
+            retry_policy=retry_policy,
         )
 
         return run_app_params
