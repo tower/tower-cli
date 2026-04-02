@@ -2,7 +2,7 @@ use std::future::Future;
 
 use axum::Router;
 use clap::Command;
-use config::{Session, Towerfile};
+use config::{Parameter, Session, Towerfile};
 use crypto;
 use rmcp::{
     handler::server::tool::{Parameters, ToolRouter},
@@ -87,8 +87,37 @@ struct AddParameterRequest {
     #[serde(flatten)]
     common: CommonParams,
     name: String,
-    description: String,
-    default: String,
+    /// Description of the parameter. Required for regular parameters, omit for hidden parameters.
+    description: Option<String>,
+    /// Default value for the parameter. Mutually exclusive with hidden.
+    default: Option<String>,
+    /// Whether the parameter is hidden (value comes from secrets). Mutually exclusive with default.
+    #[serde(default)]
+    hidden: bool,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct EditParameterRequest {
+    #[serde(flatten)]
+    common: CommonParams,
+    /// The name of the existing parameter to edit
+    name: String,
+    /// New name for the parameter
+    new_name: Option<String>,
+    /// New description for the parameter
+    description: Option<String>,
+    /// New default value for the parameter. Mutually exclusive with hidden.
+    default: Option<String>,
+    /// Set to true to make hidden, or false to make visible. Mutually exclusive with default.
+    hidden: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct RemoveParameterRequest {
+    #[serde(flatten)]
+    common: CommonParams,
+    /// The name of the parameter to remove
+    name: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -259,6 +288,10 @@ impl TowerService {
         Ok(CallToolResult::success(vec![Content::text(message)]))
     }
 
+    fn text_error(message: String) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::error(vec![Content::text(message)]))
+    }
+
     fn error_result(
         prefix: &str,
         error: impl std::fmt::Display + std::fmt::Debug,
@@ -269,6 +302,28 @@ impl TowerService {
         ))]))
     }
 
+    fn modify_towerfile(
+        common: &CommonParams,
+        f: impl FnOnce(&mut Towerfile) -> Result<String, String>,
+    ) -> Result<CallToolResult, McpError> {
+        let working_dir = Self::resolve_working_directory(common);
+        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
+            Ok(tf) => tf,
+            Err(e) => return Self::error_result("Failed to read Towerfile", e),
+        };
+
+        let message = match f(&mut towerfile) {
+            Ok(msg) => msg,
+            Err(msg) => return Self::text_error(msg),
+        };
+
+        let towerfile_path = working_dir.join("Towerfile");
+        match towerfile.save(Some(&towerfile_path)) {
+            Ok(_) => Self::text_success(message),
+            Err(e) => Self::error_result("Failed to save Towerfile", e),
+        }
+    }
+
     fn resolve_working_directory(common: &CommonParams) -> std::path::PathBuf {
         common
             .working_directory
@@ -277,6 +332,23 @@ impl TowerService {
             .unwrap_or_else(|| {
                 std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
             })
+    }
+
+    async fn list_teams_via_api(&self) -> Result<CallToolResult, McpError> {
+        let response = api::list_teams(&self.config).await.map_err(|e| {
+            McpError::internal_error(
+                "Failed to list teams",
+                Some(json!({"error": e.to_string()})),
+            )
+        })?;
+
+        let teams: Vec<Value> = response
+            .teams
+            .into_iter()
+            .map(|team| json!({"name": team.name}))
+            .collect();
+
+        Self::json_success(json!({"teams": teams}))
     }
 
     fn extract_api_error_message(error: &crate::Error) -> String {
@@ -585,6 +657,10 @@ impl TowerService {
 
     #[tool(description = "List teams you belong to")]
     async fn tower_teams_list(&self) -> Result<CallToolResult, McpError> {
+        if self.config.api_key.is_some() {
+            return self.list_teams_via_api().await;
+        }
+
         let response = api::refresh_session(&self.config).await.map_err(|e| {
             McpError::internal_error(
                 "Failed to refresh session",
@@ -749,59 +825,92 @@ impl TowerService {
         &self,
         Parameters(request): Parameters<UpdateTowerfileRequest>,
     ) -> Result<CallToolResult, McpError> {
-        let working_dir = Self::resolve_working_directory(&request.common);
-        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
-            Ok(tf) => tf,
-            Err(e) => return Self::error_result("Failed to read Towerfile", e),
-        };
-
-        if let Some(name) = request.app_name {
-            towerfile.app.name = name;
-        }
-        if let Some(script) = request.script {
-            towerfile.app.script = script;
-        }
-        if let Some(description) = request.description {
-            towerfile.app.description = Some(description);
-        }
-        if let Some(source) = request.source {
-            towerfile.app.source = source;
-        }
-
-        let towerfile_path = working_dir.join("Towerfile");
-        match towerfile.save(Some(&towerfile_path)) {
-            Ok(_) => {
-                Self::text_success(format!("Towerfile updated at {}", towerfile_path.display()))
+        Self::modify_towerfile(&request.common, |tf| {
+            if let Some(name) = request.app_name {
+                tf.app.name = name;
             }
-            Err(e) => Self::error_result("Failed to save Towerfile", e),
-        }
+            if let Some(script) = request.script {
+                tf.app.script = script;
+            }
+            if let Some(description) = request.description {
+                tf.app.description = Some(description);
+            }
+            if let Some(source) = request.source {
+                tf.app.source = source;
+            }
+            Ok("Towerfile updated".into())
+        })
     }
 
     #[tool(
-        description = "Add parameter to Towerfile. Use this instead of editing TOML. Optional: working_directory."
+        description = "Add parameter to Towerfile. For regular params provide description and default. For hidden params set hidden=true (no default). Optional: working_directory."
     )]
     async fn tower_file_add_parameter(
         &self,
         Parameters(request): Parameters<AddParameterRequest>,
     ) -> Result<CallToolResult, McpError> {
-        let working_dir = Self::resolve_working_directory(&request.common);
-        let mut towerfile = match Towerfile::from_dir_str(working_dir.to_str().unwrap()) {
-            Ok(tf) => tf,
-            Err(e) => return Self::error_result("Failed to read Towerfile", e),
-        };
-
-        let param_name = request.name.clone();
-        towerfile.add_parameter(request.name, request.description, request.default);
-
-        let towerfile_path = working_dir.join("Towerfile");
-        match towerfile.save(Some(&towerfile_path)) {
-            Ok(_) => Self::text_success(format!(
-                "Added parameter '{}' to {}",
-                param_name,
-                towerfile_path.display()
-            )),
-            Err(e) => Self::error_result("Failed to save Towerfile", e),
+        if request.hidden && request.default.is_some() {
+            return Self::text_error("hidden and default are mutually exclusive".into());
         }
+        let name = request.name.clone();
+        Self::modify_towerfile(&request.common, |tf| {
+            tf.set_parameter(&name, Parameter {
+                name: name.clone(),
+                description: request.description.unwrap_or_default(),
+                default: request.default.unwrap_or_default(),
+                hidden: request.hidden,
+            });
+            Ok(format!("Added parameter '{name}'"))
+        })
+    }
+
+    #[tool(
+        description = "Edit an existing parameter in the Towerfile. Provide only the fields to change. hidden and default are mutually exclusive. Optional: working_directory."
+    )]
+    async fn tower_file_edit_parameter(
+        &self,
+        Parameters(request): Parameters<EditParameterRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let name = request.name.clone();
+        Self::modify_towerfile(&request.common, |tf| {
+            let existing = tf.parameters.iter().find(|p| p.name == name)
+                .ok_or_else(|| format!("Parameter '{name}' not found"))?;
+            let target_name = request
+                .new_name
+                .clone()
+                .unwrap_or_else(|| existing.name.clone());
+            if target_name != name && tf.parameters.iter().any(|p| p.name == target_name) {
+                return Err(format!("Parameter '{}' already exists", target_name));
+            }
+            let param = Parameter {
+                name: target_name,
+                description: request.description.unwrap_or_else(|| existing.description.clone()),
+                default: request.default.unwrap_or_else(|| existing.default.clone()),
+                hidden: request.hidden.unwrap_or(existing.hidden),
+            };
+            if param.hidden && !param.default.is_empty() {
+                return Err("hidden and default are mutually exclusive".into());
+            }
+            tf.set_parameter(&name, param);
+            Ok(format!("Updated parameter '{name}'"))
+        })
+    }
+
+    #[tool(
+        description = "Remove a parameter from the Towerfile. Optional: working_directory."
+    )]
+    async fn tower_file_remove_parameter(
+        &self,
+        Parameters(request): Parameters<RemoveParameterRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let name = request.name.clone();
+        Self::modify_towerfile(&request.common, |tf| {
+            if tf.remove_parameter(&name) {
+                Ok(format!("Removed parameter '{name}'"))
+            } else {
+                Err(format!("Parameter '{name}' not found"))
+            }
+        })
     }
 
     #[tool(description = "Validate Towerfile configuration. Optional: working_directory.")]
@@ -870,8 +979,8 @@ All tools accept optional working_directory parameter to specify which project t
    Skip this step if project with pyproject.toml already exists
 
 1. TOWERFILE (required for all Tower operations):
-   tower_file_generate → tower_file_update → tower_file_add_parameter → tower_file_validate
-   CRITICAL: Always use tower_file_update or tower_file_add_parameter to modify
+   tower_file_generate → tower_file_update → tower_file_add/edit/remove_parameter → tower_file_validate
+   CRITICAL: Always use tower_file_update or tower_file_add/edit/remove_parameter to modify
    NEVER edit Towerfile TOML directly
 
 2. LOCAL DEVELOPMENT (preferred during development):
@@ -923,7 +1032,7 @@ IMPORTANT REMINDERS:
                     .map(|mut schedule| {
                         if let Some(parameters) = schedule.parameters.as_mut() {
                             for parameter in parameters {
-                                if parameter.hidden {
+                                if parameter.hidden.unwrap_or(false) {
                                     parameter.value = "[hidden]".to_string();
                                 }
                             }
@@ -1008,7 +1117,7 @@ impl ServerHandler for TowerService {
 
 Rules:
 - MCP tools are the authoritative Tower interface (not wrappers)
-- Use tower_file_update/add_parameter to modify Towerfiles (never edit TOML directly)
+- Use tower_file_update/add/edit/remove_parameter to modify Towerfiles (never edit TOML directly)
 - DO NOT add hatchling/setuptools to pyproject.toml - Tower handles deployment
 - Tower apps need: pyproject.toml (deps only), Python code, Towerfile
 - Pass run parameters as a JSON object {\"key\": \"value\"}, not as CLI flags

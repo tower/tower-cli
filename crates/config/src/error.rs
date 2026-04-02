@@ -9,6 +9,9 @@ pub enum Error {
     #[snafu(display("No home directory found"))]
     NoHomeDir,
 
+    #[snafu(display("IO error: {}", source))]
+    Io { source: std::io::Error },
+
     #[snafu(display("No session file found"))]
     NoSession,
 
@@ -33,8 +36,8 @@ pub enum Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
-        Error::ConfigDirNotFound
+    fn from(source: std::io::Error) -> Self {
+        Error::Io { source }
     }
 }
 

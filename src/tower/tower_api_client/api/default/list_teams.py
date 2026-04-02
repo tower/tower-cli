@@ -63,7 +63,7 @@ def sync_detailed(
 ) -> Response[ErrorModel | ListTeamsResponse]:
     """List teams
 
-     List all the teams that the user is a member of.
+     List all the teams that you are a member of.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
@@ -97,7 +97,7 @@ def sync(
 ) -> ErrorModel | ListTeamsResponse | None:
     """List teams
 
-     List all the teams that the user is a member of.
+     List all the teams that you are a member of.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
@@ -126,7 +126,7 @@ async def asyncio_detailed(
 ) -> Response[ErrorModel | ListTeamsResponse]:
     """List teams
 
-     List all the teams that the user is a member of.
+     List all the teams that you are a member of.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
@@ -158,7 +158,7 @@ async def asyncio(
 ) -> ErrorModel | ListTeamsResponse | None:
     """List teams
 
-     List all the teams that the user is a member of.
+     List all the teams that you are a member of.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.

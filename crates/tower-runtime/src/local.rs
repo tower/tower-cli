@@ -368,7 +368,7 @@ impl App for LocalApp {
     async fn status(&self) -> Result<Status, Error> {
         let mut status = self.status.lock().await;
 
-        if let Some(status) = *status {
+        if let Some(status) = status.clone() {
             Ok(status)
         } else {
             let mut waiter = self.waiter.lock().await;
@@ -384,7 +384,7 @@ impl App for LocalApp {
                         Ok(Status::Exited)
                     } else {
                         let next_status = Status::Crashed { code: t };
-                        *status = Some(next_status);
+                        *status = Some(next_status.clone());
                         Ok(next_status)
                     }
                 }

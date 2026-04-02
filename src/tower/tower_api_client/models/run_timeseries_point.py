@@ -20,6 +20,7 @@ class RunTimeseriesPoint:
         exited (int):
         pending (int):
         period (datetime.datetime): The period of the timeseries point, typically the start of the period.
+        retrying (int):
         running (int):
         scheduled (int):
     """
@@ -30,6 +31,7 @@ class RunTimeseriesPoint:
     exited: int
     pending: int
     period: datetime.datetime
+    retrying: int
     running: int
     scheduled: int
 
@@ -46,6 +48,8 @@ class RunTimeseriesPoint:
 
         period = self.period.isoformat()
 
+        retrying = self.retrying
+
         running = self.running
 
         scheduled = self.scheduled
@@ -60,6 +64,7 @@ class RunTimeseriesPoint:
                 "exited": exited,
                 "pending": pending,
                 "period": period,
+                "retrying": retrying,
                 "running": running,
                 "scheduled": scheduled,
             }
@@ -82,6 +87,8 @@ class RunTimeseriesPoint:
 
         period = isoparse(d.pop("period"))
 
+        retrying = d.pop("retrying")
+
         running = d.pop("running")
 
         scheduled = d.pop("scheduled")
@@ -93,6 +100,7 @@ class RunTimeseriesPoint:
             exited=exited,
             pending=pending,
             period=period,
+            retrying=retrying,
             running=running,
             scheduled=scheduled,
         )

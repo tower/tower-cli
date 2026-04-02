@@ -157,6 +157,7 @@ pub async fn run_app(
             parameters: params,
             parent_run_id: None,
             initiator: None,
+            retry_policy: None,
         },
     };
 
@@ -355,6 +356,22 @@ pub async fn refresh_session(
         api_config, params,
     ))
     .await
+}
+
+pub async fn list_teams(
+    config: &Config,
+) -> Result<
+    tower_api::models::ListTeamsResponse,
+    Error<tower_api::apis::default_api::ListTeamsError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListTeamsParams {
+        page: None,
+        page_size: None,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_teams(api_config, params)).await
 }
 
 pub enum LogStreamEvent {
@@ -614,6 +631,17 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeSecretsKeySuccess 
     }
 }
 
+impl ResponseEntity for tower_api::apis::default_api::ListTeamsSuccess {
+    type Data = tower_api::models::ListTeamsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
 impl ResponseEntity for tower_api::apis::default_api::ListAppsSuccess {
     type Data = tower_api::models::ListAppsResponse;
 
@@ -843,7 +871,7 @@ pub async fn create_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                hidden: false,
+                hidden: None,
             })
             .collect()
     });
@@ -881,7 +909,7 @@ pub async fn update_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                hidden: false,
+                hidden: None,
             })
             .collect()
     });

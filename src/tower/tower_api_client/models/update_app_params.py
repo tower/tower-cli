@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.run_retry_policy import RunRetryPolicy
+
 
 T = TypeVar("T", bound="UpdateAppParams")
 
@@ -21,6 +25,7 @@ class UpdateAppParams:
             its runs should get a hostname assigned to it.
         pending_timeout (int | None | Unset): The amount of time in seconds that runs of this app can stay in pending
             state before being marked as failed.
+        retry_policy (RunRetryPolicy | Unset):
         running_timeout (int | None | Unset): The amount of time in seconds that runs of this app can stay in running
             state before being marked as failed.
         status (None | str | Unset): New status for the App
@@ -32,6 +37,7 @@ class UpdateAppParams:
     description: None | str | Unset = UNSET
     is_externally_accessible: bool | None | Unset = UNSET
     pending_timeout: int | None | Unset = UNSET
+    retry_policy: RunRetryPolicy | Unset = UNSET
     running_timeout: int | None | Unset = UNSET
     status: None | str | Unset = UNSET
     subdomain: None | str | Unset = UNSET
@@ -56,6 +62,10 @@ class UpdateAppParams:
             pending_timeout = UNSET
         else:
             pending_timeout = self.pending_timeout
+
+        retry_policy: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.retry_policy, Unset):
+            retry_policy = self.retry_policy.to_dict()
 
         running_timeout: int | None | Unset
         if isinstance(self.running_timeout, Unset):
@@ -86,6 +96,8 @@ class UpdateAppParams:
             field_dict["is_externally_accessible"] = is_externally_accessible
         if pending_timeout is not UNSET:
             field_dict["pending_timeout"] = pending_timeout
+        if retry_policy is not UNSET:
+            field_dict["retry_policy"] = retry_policy
         if running_timeout is not UNSET:
             field_dict["running_timeout"] = running_timeout
         if status is not UNSET:
@@ -97,6 +109,8 @@ class UpdateAppParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.run_retry_policy import RunRetryPolicy
+
         d = dict(src_dict)
         schema = d.pop("$schema", UNSET)
 
@@ -128,6 +142,13 @@ class UpdateAppParams:
             return cast(int | None | Unset, data)
 
         pending_timeout = _parse_pending_timeout(d.pop("pending_timeout", UNSET))
+
+        _retry_policy = d.pop("retry_policy", UNSET)
+        retry_policy: RunRetryPolicy | Unset
+        if isinstance(_retry_policy, Unset):
+            retry_policy = UNSET
+        else:
+            retry_policy = RunRetryPolicy.from_dict(_retry_policy)
 
         def _parse_running_timeout(data: object) -> int | None | Unset:
             if data is None:
@@ -161,6 +182,7 @@ class UpdateAppParams:
             description=description,
             is_externally_accessible=is_externally_accessible,
             pending_timeout=pending_timeout,
+            retry_policy=retry_policy,
             running_timeout=running_timeout,
             status=status,
             subdomain=subdomain,

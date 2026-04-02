@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tower_api::apis::configuration::Configuration;
+use tower_api::apis::configuration::{ApiKey, Configuration};
 use url::Url;
 
 mod error;
@@ -9,7 +9,7 @@ mod towerfile;
 
 pub use error::Error;
 pub use session::{default_tower_url, Session, Team, Token, User};
-pub use towerfile::Towerfile;
+pub use towerfile::{Parameter, Towerfile};
 
 pub use session::{get_last_version_check_timestamp, set_last_version_check_timestamp};
 
@@ -22,6 +22,9 @@ pub struct Config {
     #[serde(skip_serializing, skip_deserializing)]
     pub session: Option<Session>,
 
+    #[serde(skip_serializing, skip_deserializing)]
+    pub api_key: Option<String>,
+
     // cache_dir is the directory that we should cache uv artifacts within.
     pub cache_dir: Option<PathBuf>,
 }
@@ -33,6 +36,7 @@ impl Config {
             tower_url: default_tower_url(),
             json: false,
             session: None,
+            api_key: None,
             cache_dir: Some(default_cache_dir()),
         }
     }
@@ -44,12 +48,14 @@ impl Config {
         } else {
             default_tower_url()
         };
+        let api_key = std::env::var("TOWER_API_KEY").ok();
 
         Self {
             debug,
             tower_url,
             json: false,
             session: None,
+            api_key,
             cache_dir: Some(default_cache_dir()),
         }
     }
@@ -78,6 +84,7 @@ impl Config {
             tower_url: sess.tower_url.clone(),
             json: self.json,
             session: Some(sess),
+            api_key: self.api_key,
             cache_dir: Some(default_cache_dir()),
         }
     }
@@ -180,6 +187,15 @@ impl Config {
         base_path.set_path("/v1");
 
         configuration.base_path = base_path.to_string();
+
+        // API key takes precedence over session-based auth
+        if let Some(ref key) = self.api_key {
+            configuration.api_key = Some(ApiKey {
+                prefix: None,
+                key: key.clone(),
+            });
+            return configuration;
+        }
 
         // Always read from disk to pick up team switches
         if let Ok(session) = Session::from_config_dir() {

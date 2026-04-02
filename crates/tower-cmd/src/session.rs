@@ -1,5 +1,6 @@
 use crate::output;
 use clap::{Arg, ArgMatches, Command};
+use colored::Colorize;
 use config::{Config, Session};
 use tokio::{time, time::Duration};
 use tower_api::models::CreateDeviceLoginTicketResponse;
@@ -21,6 +22,22 @@ pub fn login_cmd() -> Command {
 
 pub async fn do_login(config: Config, args: &ArgMatches) {
     output::banner();
+
+    if std::env::var("TOWER_API_KEY").is_ok() {
+        output::write(&format!(
+            "{} TOWER_API_KEY is set. As long as this environment variable is present, \
+             the CLI will authenticate using the API key and ignore the session \
+             created by this login flow.\n",
+            "Warning:".yellow(),
+        ));
+
+        eprint!("Do you want to continue? [y/N] ");
+        let mut input = String::new();
+        if std::io::stdin().read_line(&mut input).is_err() || !input.trim().eq_ignore_ascii_case("y")
+        {
+            return;
+        }
+    }
 
     // Open a browser by default, unless the --no-browser flag is set.
     let open_browser = !args.get_flag("no-browser");

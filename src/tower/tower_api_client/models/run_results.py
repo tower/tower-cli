@@ -17,6 +17,7 @@ class RunResults:
         errored (int):
         exited (int):
         pending (int):
+        retrying (int):
         running (int):
     """
 
@@ -25,6 +26,7 @@ class RunResults:
     errored: int
     exited: int
     pending: int
+    retrying: int
     running: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,6 +40,8 @@ class RunResults:
 
         pending = self.pending
 
+        retrying = self.retrying
+
         running = self.running
 
         field_dict: dict[str, Any] = {}
@@ -49,6 +53,7 @@ class RunResults:
                 "errored": errored,
                 "exited": exited,
                 "pending": pending,
+                "retrying": retrying,
                 "running": running,
             }
         )
@@ -68,6 +73,8 @@ class RunResults:
 
         pending = d.pop("pending")
 
+        retrying = d.pop("retrying")
+
         running = d.pop("running")
 
         run_results = cls(
@@ -76,6 +83,7 @@ class RunResults:
             errored=errored,
             exited=exited,
             pending=pending,
+            retrying=retrying,
             running=running,
         )
 

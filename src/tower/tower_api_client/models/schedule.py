@@ -32,6 +32,8 @@ class Schedule:
         name (str): The name of this schedule
         overlap_policy (ScheduleOverlapPolicy): The policy for handling overlapping runs
         status (ScheduleStatus): The status of the schedule
+        timezone (str): The IANA timezone identifier that the cron expression is evaluated in (e.g., 'America/New_York',
+            'Europe/London'). Defaults to 'UTC'.
         updated_at (datetime.datetime): The timestamp when the schedule was last updated
         app_version (str | Unset): The specific app version to run, or null for the default version
         parameters (list[RunParameter] | Unset): The parameters to pass when running the app
@@ -46,6 +48,7 @@ class Schedule:
     name: str
     overlap_policy: ScheduleOverlapPolicy
     status: ScheduleStatus
+    timezone: str
     updated_at: datetime.datetime
     app_version: str | Unset = UNSET
     parameters: list[RunParameter] | Unset = UNSET
@@ -68,6 +71,8 @@ class Schedule:
         overlap_policy = self.overlap_policy.value
 
         status = self.status.value
+
+        timezone = self.timezone
 
         updated_at = self.updated_at.isoformat()
 
@@ -93,6 +98,7 @@ class Schedule:
                 "name": name,
                 "overlap_policy": overlap_policy,
                 "status": status,
+                "timezone": timezone,
                 "updated_at": updated_at,
             }
         )
@@ -126,6 +132,8 @@ class Schedule:
 
         status = ScheduleStatus(d.pop("status"))
 
+        timezone = d.pop("timezone")
+
         updated_at = isoparse(d.pop("updated_at"))
 
         app_version = d.pop("app_version", UNSET)
@@ -149,6 +157,7 @@ class Schedule:
             name=name,
             overlap_policy=overlap_policy,
             status=status,
+            timezone=timezone,
             updated_at=updated_at,
             app_version=app_version,
             parameters=parameters,

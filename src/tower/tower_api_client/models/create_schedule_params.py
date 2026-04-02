@@ -35,6 +35,8 @@ class CreateScheduleParams:
             CreateScheduleParamsOverlapPolicy.ALLOW.
         parameters (list[RunParameter] | Unset): Parameters to pass when running the app
         status (CreateScheduleParamsStatus | Unset): The status of the schedule (defaults to active)
+        timezone (None | str | Unset): The IANA timezone identifier that the cron expression should be evaluated in
+            (e.g., 'America/New_York', 'Europe/London'). Defaults to 'UTC'. Default: 'UTC'.
     """
 
     app_name: str
@@ -48,6 +50,7 @@ class CreateScheduleParams:
     )
     parameters: list[RunParameter] | Unset = UNSET
     status: CreateScheduleParamsStatus | Unset = UNSET
+    timezone: None | str | Unset = "UTC"
 
     def to_dict(self) -> dict[str, Any]:
         app_name = self.app_name
@@ -85,6 +88,12 @@ class CreateScheduleParams:
         if not isinstance(self.status, Unset):
             status = self.status.value
 
+        timezone: None | str | Unset
+        if isinstance(self.timezone, Unset):
+            timezone = UNSET
+        else:
+            timezone = self.timezone
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -107,6 +116,8 @@ class CreateScheduleParams:
             field_dict["parameters"] = parameters
         if status is not UNSET:
             field_dict["status"] = status
+        if timezone is not UNSET:
+            field_dict["timezone"] = timezone
 
         return field_dict
 
@@ -164,6 +175,15 @@ class CreateScheduleParams:
         else:
             status = CreateScheduleParamsStatus(_status)
 
+        def _parse_timezone(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        timezone = _parse_timezone(d.pop("timezone", UNSET))
+
         create_schedule_params = cls(
             app_name=app_name,
             cron=cron,
@@ -174,6 +194,7 @@ class CreateScheduleParams:
             overlap_policy=overlap_policy,
             parameters=parameters,
             status=status,
+            timezone=timezone,
         )
 
         return create_schedule_params
