@@ -831,22 +831,6 @@ impl TowerService {
         if request.hidden && request.default.is_some() {
             return Self::text_error("hidden and default are mutually exclusive".into());
         }
-        if !request.hidden {
-            if request
-                .description
-                .as_deref()
-                .map(str::trim)
-                .unwrap_or("")
-                .is_empty()
-            {
-                return Self::text_error(
-                    "description is required when hidden=false".into(),
-                );
-            }
-            if request.default.is_none() {
-                return Self::text_error("default is required when hidden=false".into());
-            }
-        }
         let name = request.name.clone();
         Self::modify_towerfile(&request.common, |tf| {
             tf.set_parameter(&name, Parameter {
