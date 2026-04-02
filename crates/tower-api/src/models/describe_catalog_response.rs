@@ -13,20 +13,20 @@ use serde_with::{serde_as, DefaultOnNull};
 
 #[serde_as]
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CreateEnvironmentResponse {
+pub struct DescribeCatalogResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde_as(as = "DefaultOnNull")]
-    #[serde(rename = "environment")]
-    pub environment: models::Environment,
+    #[serde(rename = "catalog")]
+    pub catalog: models::Catalog,
 }
 
-impl CreateEnvironmentResponse {
-    pub fn new(environment: models::Environment) -> CreateEnvironmentResponse {
-        CreateEnvironmentResponse {
+impl DescribeCatalogResponse {
+    pub fn new(catalog: models::Catalog) -> DescribeCatalogResponse {
+        DescribeCatalogResponse {
             schema: None,
-            environment,
+            catalog,
         }
     }
 }
