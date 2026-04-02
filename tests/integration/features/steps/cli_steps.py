@@ -57,6 +57,54 @@ def step_run_cli_command(context, command):
         raise
 
 
+@step('I run "{command}" via CLI with API key')
+def step_run_cli_command_with_api_key(context, command):
+    """Run a Tower CLI command authenticating via TOWER_API_KEY instead of session.json"""
+    cli_path = context.tower_binary
+
+    cmd_parts = shlex.split(command)
+    full_command = [cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
+
+    try:
+        test_env = os.environ.copy()
+        test_env["FORCE_COLOR"] = "1"
+        test_env["CLICOLOR_FORCE"] = "1"
+        test_env["TOWER_URL"] = context.tower_url
+        test_env["TOWER_API_KEY"] = "sk-test-api-key"
+
+        # Use a temp HOME with no session.json to prove API key auth works standalone
+        test_env["HOME"] = context.temp_dir
+
+        result = subprocess.run(
+            full_command,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=test_env,
+        )
+        context.cli_output = result.stdout + result.stderr
+        context.cli_stdout = result.stdout
+        context.cli_return_code = result.returncode
+    except subprocess.TimeoutExpired:
+        context.cli_output = "Command timed out"
+        context.cli_stdout = ""
+        context.cli_return_code = 124
+    except Exception as e:
+        print(f"DEBUG: Exception in CLI command: {type(e).__name__}: {e}")
+        print(f"DEBUG: Command was: {full_command}")
+        print(f"DEBUG: Working directory: {os.getcwd()}")
+        raise
+
+
+@step("no session.json should exist in the temp home")
+def step_no_session_json(context):
+    """Verify that API key auth did not create a session.json file"""
+    session_path = Path(context.temp_dir) / ".config" / "tower" / "session.json"
+    assert (
+        not session_path.exists()
+    ), f"session.json should not exist but found at {session_path}"
+
+
 @step('I run "{command}" via CLI using created app name')
 def step_run_cli_command_with_app_name(context, command):
     """Run a Tower CLI command with the generated app name injected."""
