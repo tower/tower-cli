@@ -28,3 +28,6 @@ pytest.ini
 
 # wheel build artifacts
 *.data/
+
+# local MCP overrides (e.g. internal tooling with secrets)
+.mcp.json.local
