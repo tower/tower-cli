@@ -13,6 +13,7 @@ mod run;
 mod schedules;
 mod secrets;
 mod session;
+mod skill;
 mod teams;
 mod towerfile_gen;
 mod util;
@@ -188,6 +189,13 @@ impl App {
                     }
                 }
             }
+            Some(("skill", sub_matches)) => match sub_matches.subcommand() {
+                Some(("generate", _)) => skill::do_skill_generate(root_cmd()).await,
+                _ => {
+                    skill::skill_cmd().print_help().unwrap();
+                    std::process::exit(2);
+                }
+            },
             Some(("mcp-server", args)) => mcp::do_mcp_server(sessionized_config, args)
                 .await
                 .unwrap_or_else(|e| {
@@ -241,4 +249,5 @@ fn root_cmd() -> Command {
         .subcommand(version::version_cmd())
         .subcommand(teams::teams_cmd())
         .subcommand(mcp::mcp_cmd())
+        .subcommand(skill::skill_cmd())
 }
