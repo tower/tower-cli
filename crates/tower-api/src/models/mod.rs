@@ -138,6 +138,8 @@ pub mod describe_app_version_response;
 pub use self::describe_app_version_response::DescribeAppVersionResponse;
 pub mod describe_authentication_context_body;
 pub use self::describe_authentication_context_body::DescribeAuthenticationContextBody;
+pub mod describe_catalog_response;
+pub use self::describe_catalog_response::DescribeCatalogResponse;
 pub mod describe_device_login_session_response;
 pub use self::describe_device_login_session_response::DescribeDeviceLoginSessionResponse;
 pub mod describe_email_preferences_body;

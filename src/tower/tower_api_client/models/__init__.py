@@ -75,6 +75,7 @@ from .describe_account_body import DescribeAccountBody
 from .describe_app_response import DescribeAppResponse
 from .describe_app_version_response import DescribeAppVersionResponse
 from .describe_authentication_context_body import DescribeAuthenticationContextBody
+from .describe_catalog_response import DescribeCatalogResponse
 from .describe_device_login_session_response import DescribeDeviceLoginSessionResponse
 from .describe_email_preferences_body import DescribeEmailPreferencesBody
 from .describe_plan_response import DescribePlanResponse
@@ -316,6 +317,7 @@ __all__ = (
     "DescribeAppResponse",
     "DescribeAppVersionResponse",
     "DescribeAuthenticationContextBody",
+    "DescribeCatalogResponse",
     "DescribeDeviceLoginSessionResponse",
     "DescribeEmailPreferencesBody",
     "DescribePlanResponse",
