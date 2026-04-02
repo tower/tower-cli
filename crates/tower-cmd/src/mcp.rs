@@ -854,8 +854,15 @@ impl TowerService {
         Self::modify_towerfile(&request.common, |tf| {
             let existing = tf.parameters.iter().find(|p| p.name == name)
                 .ok_or_else(|| format!("Parameter '{name}' not found"))?;
+            let target_name = request
+                .new_name
+                .clone()
+                .unwrap_or_else(|| existing.name.clone());
+            if target_name != name && tf.parameters.iter().any(|p| p.name == target_name) {
+                return Err(format!("Parameter '{}' already exists", target_name));
+            }
             let param = Parameter {
-                name: request.new_name.unwrap_or_else(|| existing.name.clone()),
+                name: target_name,
                 description: request.description.unwrap_or_else(|| existing.description.clone()),
                 default: request.default.unwrap_or_else(|| existing.default.clone()),
                 hidden: request.hidden.unwrap_or(existing.hidden),
