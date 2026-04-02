@@ -132,8 +132,12 @@ fn finalize_session(
 ) {
     let mut session = Session::from_api_session(&session_response.session);
 
-    // we have to copy in the tower URL so that we save it for later on!
-    session.tower_url = config.tower_url.clone();
+    let mut url = config.tower_url.clone();
+    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"));
+    if url.scheme() == "http" && !local {
+        let _ = url.set_scheme("https");
+    }
+    session.tower_url = url;
 
     if let Err(err) = session.save() {
         spinner.failure();
