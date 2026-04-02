@@ -3,6 +3,7 @@ use config::{Config, Session};
 
 pub mod api;
 mod apps;
+mod catalogs;
 mod deploy;
 mod environments;
 pub mod error;
@@ -133,6 +134,18 @@ impl App {
                     }
                 }
             }
+            Some(("catalogs", sub_matches)) => {
+                let catalogs_command = sub_matches.subcommand();
+
+                match catalogs_command {
+                    Some(("list", args)) => catalogs::do_list(sessionized_config, args).await,
+                    Some(("show", args)) => catalogs::do_show(sessionized_config, args).await,
+                    _ => {
+                        catalogs::catalogs_cmd().print_help().unwrap();
+                        std::process::exit(2);
+                    }
+                }
+            }
             Some(("secrets", sub_matches)) => {
                 let secrets_command = sub_matches.subcommand();
 
@@ -232,6 +245,7 @@ fn root_cmd() -> Command {
         .arg_required_else_help(false)
         .subcommand(session::login_cmd())
         .subcommand(apps::apps_cmd())
+        .subcommand(catalogs::catalogs_cmd())
         .subcommand(schedules::schedules_cmd())
         .subcommand(secrets::secrets_cmd())
         .subcommand(environments::environments_cmd())
