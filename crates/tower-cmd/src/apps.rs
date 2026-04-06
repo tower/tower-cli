@@ -145,7 +145,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 
             let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
                 .into_iter()
-                .map(|h| h.to_string())
+                .map(str::to_string)
                 .collect();
 
             let rows = runs

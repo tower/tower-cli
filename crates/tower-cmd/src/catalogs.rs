@@ -57,11 +57,10 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let list_response =
         output::with_spinner("Listing catalogs", api::list_catalogs(&config, &env, all)).await;
 
-    let headers = vec![
-        "Name".bold().yellow().to_string(),
-        "Type".bold().yellow().to_string(),
-        "Environment".bold().yellow().to_string(),
-    ];
+    let headers = vec!["Name", "Type", "Environment"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     let data = list_response
         .catalogs
         .iter()
@@ -99,10 +98,10 @@ pub async fn do_show(config: Config, args: &ArgMatches) {
                 output::newline();
                 output::header("Properties");
 
-                let headers = vec![
-                    "Name".bold().yellow().to_string(),
-                    "Preview".bold().yellow().to_string(),
-                ];
+                let headers = vec!["Name", "Preview"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect();
                 let data = catalog
                     .properties
                     .iter()

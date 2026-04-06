@@ -58,10 +58,7 @@ pub async fn do_list(config: Config) {
 async fn do_list_via_api(config: &Config) {
     let resp = output::with_spinner("Fetching teams", api::list_teams(config)).await;
 
-    let headers = vec!["Name"]
-        .into_iter()
-        .map(|h| h.yellow().to_string())
-        .collect();
+    let headers = vec!["Name".to_string()];
 
     let teams_data: Vec<Vec<String>> = resp
         .teams
@@ -83,10 +80,7 @@ async fn do_list_via_session(config: &Config) {
     let active_team_name = active_team.map(|team| team.name.clone());
 
     // Create headers for the table
-    let headers = vec!["", "Name"]
-        .into_iter()
-        .map(|h| h.yellow().to_string())
-        .collect();
+    let headers = vec!["".to_string(), "Name".to_string()];
 
     // Format the teams data for the table
     let teams = session.teams.clone();
