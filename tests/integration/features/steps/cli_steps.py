@@ -314,12 +314,12 @@ def step_output_should_show_header_in_green_bold(context, header):
 
 @step("the table headers should be yellow colored")
 def step_table_headers_should_be_yellow(context):
-    """Verify table headers appear in yellow"""
+    """Verify table headers appear in bold yellow"""
     output = context.cli_output
-    yellow_code = "\x1b[33m"  # Yellow text
+    yellow_bold_code = "\x1b[1;33m"
     assert (
-        yellow_code in output
-    ), f"Expected yellow color codes in table headers, got: {output}"
+        yellow_bold_code in output
+    ), f"Expected bold yellow color codes in table headers, got: {output}"
 
 
 @step('the table should show columns "{column_list}"')
