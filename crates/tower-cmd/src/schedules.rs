@@ -125,13 +125,10 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         return;
     }
 
-    let headers = vec![
-        "ID".yellow().to_string(),
-        "App".yellow().to_string(),
-        "Environment".yellow().to_string(),
-        "Cron".yellow().to_string(),
-        "Status".yellow().to_string(),
-    ];
+    let headers = vec!["ID", "App", "Environment", "Cron", "Status"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
 
     let rows: Vec<Vec<String>> = response
         .schedules

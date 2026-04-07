@@ -458,7 +458,7 @@ pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_da
             .table()
             .border(Border::builder().build())
             .separator(separator)
-            .title(headers.iter().map(|h| h.yellow().to_string()));
+            .title(headers.iter().map(|h| h.bold().yellow().to_string()));
 
         if let Err(err) = print_stdout(table) {
             if err.kind() == io::ErrorKind::BrokenPipe {

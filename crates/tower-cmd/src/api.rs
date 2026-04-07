@@ -220,6 +220,50 @@ pub async fn export_catalogs(
     .await
 }
 
+pub async fn list_catalogs(
+    config: &Config,
+    env: &str,
+    all: bool,
+) -> Result<
+    tower_api::models::ListCatalogsResponse,
+    Error<tower_api::apis::default_api::ListCatalogsError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListCatalogsParams {
+        environment: Some(env.to_string()),
+        all: Some(all),
+        page: None,
+        page_size: None,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_catalogs(
+        api_config, params,
+    ))
+    .await
+}
+
+pub async fn describe_catalog(
+    config: &Config,
+    name: &str,
+    env: &str,
+) -> Result<
+    tower_api::models::DescribeCatalogResponse,
+    Error<tower_api::apis::default_api::DescribeCatalogError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeCatalogParams {
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::describe_catalog(
+        api_config, params,
+    ))
+    .await
+}
+
 pub async fn list_secrets(
     config: &Config,
     env: &str,
@@ -600,6 +644,28 @@ impl ResponseEntity for tower_api::apis::default_api::ExportSecretsSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::ExportCatalogsSuccess {
     type Data = tower_api::models::ExportCatalogsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::ListCatalogsSuccess {
+    type Data = tower_api::models::ListCatalogsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeCatalogSuccess {
+    type Data = tower_api::models::DescribeCatalogResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
