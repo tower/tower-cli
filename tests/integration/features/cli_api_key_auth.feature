@@ -13,6 +13,6 @@ Feature: API Key Authentication
     Then no session.json should exist in the temp home
 
   Scenario: Login warns when API key is set
-    When I run "tower login --no-browser" via CLI with API key
+    When I run "tower login --no-browser" via CLI with API key and input "y\n"
     Then the output should show "TOWER_API_KEY is set"
     And the output should show "ignore the session"

@@ -19,7 +19,7 @@ def before_scenario(context, scenario):
     # Create a temporary working directory for this scenario
     context.temp_dir = tempfile.mkdtemp(prefix="tower_test_")
     context.original_cwd = os.getcwd()
-    context.api_key = os.environ.get("TOWER_API_KEY", "sk-test-api-key")
+    context.api_key = os.environ.get("TOWER_TEST_API_KEY", "sk-test-api-key")
     os.chdir(context.temp_dir)
 
 
