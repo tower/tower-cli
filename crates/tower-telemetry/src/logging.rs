@@ -135,6 +135,7 @@ macro_rules! error {
 }
 
 /// LogLevel describes the various log levels that can be used in the application.
+#[derive(PartialEq, PartialOrd)]
 pub enum LogLevel {
     Debug,
     Info,
@@ -178,8 +179,9 @@ fn should_use_color(destination: &LogDestination) -> bool {
     }
 }
 
-fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtLayer {
+fn create_fmt_layer(level: &LogLevel, format: LogFormat, destination: LogDestination) -> BoxedFmtLayer {
     let use_color = should_use_color(&destination);
+    let with_target = *level < LogLevel::Warn;
 
     match destination {
         LogDestination::Stdout => match format {
@@ -187,7 +189,7 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
                 fmt::layer().event_format(
                     fmt::format()
                         .pretty()
-                        .with_target(false)
+                        .with_target(with_target)
                         .with_file(false)
                         .with_line_number(false)
                         .with_ansi(use_color),
@@ -197,7 +199,7 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
                 fmt::layer().event_format(
                     fmt::format()
                         .json()
-                        .with_target(false)
+                        .with_target(with_target)
                         .with_file(false)
                         .with_line_number(false)
                         .with_ansi(use_color),
@@ -212,7 +214,7 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
                         .event_format(
                             fmt::format()
                                 .pretty()
-                                .with_target(false)
+                                .with_target(with_target)
                                 .with_file(false)
                                 .with_line_number(false)
                                 .with_ansi(use_color),
@@ -224,7 +226,7 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
                         .event_format(
                             fmt::format()
                                 .json()
-                                .with_target(false)
+                                .with_target(with_target)
                                 .with_file(false)
                                 .with_line_number(false)
                                 .with_ansi(use_color),
@@ -237,13 +239,13 @@ fn create_fmt_layer(format: LogFormat, destination: LogDestination) -> BoxedFmtL
 }
 
 pub fn enable_logging(level: LogLevel, format: LogFormat, destination: LogDestination) {
-    let filter = EnvFilter::new(level)
+    let filter = EnvFilter::new(&level)
         .add_directive("h2=off".parse().unwrap())
         .add_directive("tower::buffer=off".parse().unwrap())
         .add_directive("hyper_util=off".parse().unwrap());
 
     let subscriber = tracing_subscriber::registry()
-        .with(create_fmt_layer(format, destination))
+        .with(create_fmt_layer(&level, format, destination))
         .with(filter);
 
     let _ = tracing::subscriber::set_global_default(subscriber);

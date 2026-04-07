@@ -157,6 +157,7 @@ pub async fn run_app(
             parameters: params,
             parent_run_id: None,
             initiator: None,
+            retry_policy: None,
         },
     };
 
@@ -214,6 +215,50 @@ pub async fn export_catalogs(
     };
 
     unwrap_api_response(tower_api::apis::default_api::export_catalogs(
+        api_config, params,
+    ))
+    .await
+}
+
+pub async fn list_catalogs(
+    config: &Config,
+    env: &str,
+    all: bool,
+) -> Result<
+    tower_api::models::ListCatalogsResponse,
+    Error<tower_api::apis::default_api::ListCatalogsError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListCatalogsParams {
+        environment: Some(env.to_string()),
+        all: Some(all),
+        page: None,
+        page_size: None,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_catalogs(
+        api_config, params,
+    ))
+    .await
+}
+
+pub async fn describe_catalog(
+    config: &Config,
+    name: &str,
+    env: &str,
+) -> Result<
+    tower_api::models::DescribeCatalogResponse,
+    Error<tower_api::apis::default_api::DescribeCatalogError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeCatalogParams {
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::describe_catalog(
         api_config, params,
     ))
     .await
@@ -355,6 +400,22 @@ pub async fn refresh_session(
         api_config, params,
     ))
     .await
+}
+
+pub async fn list_teams(
+    config: &Config,
+) -> Result<
+    tower_api::models::ListTeamsResponse,
+    Error<tower_api::apis::default_api::ListTeamsError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListTeamsParams {
+        page: None,
+        page_size: None,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_teams(api_config, params)).await
 }
 
 pub enum LogStreamEvent {
@@ -592,6 +653,28 @@ impl ResponseEntity for tower_api::apis::default_api::ExportCatalogsSuccess {
     }
 }
 
+impl ResponseEntity for tower_api::apis::default_api::ListCatalogsSuccess {
+    type Data = tower_api::models::ListCatalogsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeCatalogSuccess {
+    type Data = tower_api::models::DescribeCatalogResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
 impl ResponseEntity for tower_api::apis::default_api::CreateSecretSuccess {
     type Data = tower_api::models::CreateSecretResponse;
 
@@ -605,6 +688,17 @@ impl ResponseEntity for tower_api::apis::default_api::CreateSecretSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::DescribeSecretsKeySuccess {
     type Data = tower_api::models::DescribeSecretsKeyResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::ListTeamsSuccess {
+    type Data = tower_api::models::ListTeamsResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
@@ -843,7 +937,7 @@ pub async fn create_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                hidden: false,
+                hidden: None,
             })
             .collect()
     });
@@ -881,7 +975,7 @@ pub async fn update_schedule(
             .map(|(key, value)| RunParameter {
                 name: key,
                 value,
-                hidden: false,
+                hidden: None,
             })
             .collect()
     });

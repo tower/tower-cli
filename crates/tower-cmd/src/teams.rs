@@ -48,18 +48,39 @@ async fn refresh_session(config: &Config) -> config::Session {
 }
 
 pub async fn do_list(config: Config) {
+    if config.api_key.is_some() {
+        do_list_via_api(&config).await;
+    } else {
+        do_list_via_session(&config).await;
+    }
+}
+
+async fn do_list_via_api(config: &Config) {
+    let resp = output::with_spinner("Fetching teams", api::list_teams(config)).await;
+
+    let headers = vec!["Name".to_string()];
+
+    let teams_data: Vec<Vec<String>> = resp
+        .teams
+        .iter()
+        .map(|team| vec![team.name.clone()])
+        .collect();
+
+    output::newline();
+    output::table(headers, teams_data, None::<&Vec<config::Team>>);
+    output::newline();
+}
+
+async fn do_list_via_session(config: &Config) {
     // Refresh the session and get the updated data
-    let session = refresh_session(&config).await;
+    let session = refresh_session(config).await;
 
     // Get the current active team from the session
     let active_team = session.active_team.clone();
     let active_team_name = active_team.map(|team| team.name.clone());
 
     // Create headers for the table
-    let headers = vec!["", "Name"]
-        .into_iter()
-        .map(|h| h.yellow().to_string())
-        .collect();
+    let headers = vec!["".to_string(), "Name".to_string()];
 
     // Format the teams data for the table
     let teams = session.teams.clone();

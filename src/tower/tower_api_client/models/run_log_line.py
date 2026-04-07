@@ -17,6 +17,8 @@ T = TypeVar("T", bound="RunLogLine")
 class RunLogLine:
     """
     Attributes:
+        attempt_seq (int): The attempt number this log line belongs to (1-based). Attempt 1 is the original execution;
+            2+ are retries.
         channel (RunLogLineChannel): The channel this log line belongs to.
         content (str): Contents of the log message.
         line_num (int): Line number.
@@ -26,6 +28,7 @@ class RunLogLine:
         timestamp (datetime.datetime | Unset): This property is deprecated. Use reported_at instead.
     """
 
+    attempt_seq: int
     channel: RunLogLineChannel
     content: str
     line_num: int
@@ -35,6 +38,8 @@ class RunLogLine:
     timestamp: datetime.datetime | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        attempt_seq = self.attempt_seq
+
         channel = self.channel.value
 
         content = self.content
@@ -55,6 +60,7 @@ class RunLogLine:
 
         field_dict.update(
             {
+                "attempt_seq": attempt_seq,
                 "channel": channel,
                 "content": content,
                 "line_num": line_num,
@@ -72,6 +78,8 @@ class RunLogLine:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
+        attempt_seq = d.pop("attempt_seq")
+
         channel = RunLogLineChannel(d.pop("channel"))
 
         content = d.pop("content")
@@ -92,6 +100,7 @@ class RunLogLine:
             timestamp = isoparse(_timestamp)
 
         run_log_line = cls(
+            attempt_seq=attempt_seq,
             channel=channel,
             content=content,
             line_num=line_num,

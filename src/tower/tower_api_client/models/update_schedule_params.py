@@ -22,31 +22,31 @@ T = TypeVar("T", bound="UpdateScheduleParams")
 class UpdateScheduleParams:
     """
     Attributes:
-        name (None | str): The name for this schedule. Must be unique per team.
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateScheduleParams.json.
         app_version (None | str | Unset): The specific app version to run (if omitted, will use the app's default
             version)
         cron (str | Unset): The cron expression defining when the app should run
         environment (str | Unset): The environment to run the app in Default: 'default'.
+        name (None | str | Unset): The name for this schedule. Must be unique per team.
         overlap_policy (UpdateScheduleParamsOverlapPolicy | Unset): The overlap policy for the schedule
         parameters (list[RunParameter] | Unset): Parameters to pass when running the app
         status (UpdateScheduleParamsStatus | Unset): The status of the schedule
+        timezone (None | str | Unset): The IANA timezone identifier that the cron expression should be evaluated in
+            (e.g., 'America/New_York', 'Europe/London').
     """
 
-    name: None | str
     schema: str | Unset = UNSET
     app_version: None | str | Unset = UNSET
     cron: str | Unset = UNSET
     environment: str | Unset = "default"
+    name: None | str | Unset = UNSET
     overlap_policy: UpdateScheduleParamsOverlapPolicy | Unset = UNSET
     parameters: list[RunParameter] | Unset = UNSET
     status: UpdateScheduleParamsStatus | Unset = UNSET
+    timezone: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        name: None | str
-        name = self.name
-
         schema = self.schema
 
         app_version: None | str | Unset
@@ -58,6 +58,12 @@ class UpdateScheduleParams:
         cron = self.cron
 
         environment = self.environment
+
+        name: None | str | Unset
+        if isinstance(self.name, Unset):
+            name = UNSET
+        else:
+            name = self.name
 
         overlap_policy: str | Unset = UNSET
         if not isinstance(self.overlap_policy, Unset):
@@ -74,13 +80,15 @@ class UpdateScheduleParams:
         if not isinstance(self.status, Unset):
             status = self.status.value
 
+        timezone: None | str | Unset
+        if isinstance(self.timezone, Unset):
+            timezone = UNSET
+        else:
+            timezone = self.timezone
+
         field_dict: dict[str, Any] = {}
 
-        field_dict.update(
-            {
-                "name": name,
-            }
-        )
+        field_dict.update({})
         if schema is not UNSET:
             field_dict["$schema"] = schema
         if app_version is not UNSET:
@@ -89,12 +97,16 @@ class UpdateScheduleParams:
             field_dict["cron"] = cron
         if environment is not UNSET:
             field_dict["environment"] = environment
+        if name is not UNSET:
+            field_dict["name"] = name
         if overlap_policy is not UNSET:
             field_dict["overlap_policy"] = overlap_policy
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
         if status is not UNSET:
             field_dict["status"] = status
+        if timezone is not UNSET:
+            field_dict["timezone"] = timezone
 
         return field_dict
 
@@ -103,14 +115,6 @@ class UpdateScheduleParams:
         from ..models.run_parameter import RunParameter
 
         d = dict(src_dict)
-
-        def _parse_name(data: object) -> None | str:
-            if data is None:
-                return data
-            return cast(None | str, data)
-
-        name = _parse_name(d.pop("name"))
-
         schema = d.pop("$schema", UNSET)
 
         def _parse_app_version(data: object) -> None | str | Unset:
@@ -125,6 +129,15 @@ class UpdateScheduleParams:
         cron = d.pop("cron", UNSET)
 
         environment = d.pop("environment", UNSET)
+
+        def _parse_name(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        name = _parse_name(d.pop("name", UNSET))
 
         _overlap_policy = d.pop("overlap_policy", UNSET)
         overlap_policy: UpdateScheduleParamsOverlapPolicy | Unset
@@ -149,15 +162,25 @@ class UpdateScheduleParams:
         else:
             status = UpdateScheduleParamsStatus(_status)
 
+        def _parse_timezone(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        timezone = _parse_timezone(d.pop("timezone", UNSET))
+
         update_schedule_params = cls(
-            name=name,
             schema=schema,
             app_version=app_version,
             cron=cron,
             environment=environment,
+            name=name,
             overlap_policy=overlap_policy,
             parameters=parameters,
             status=status,
+            timezone=timezone,
         )
 
         return update_schedule_params

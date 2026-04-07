@@ -14,16 +14,20 @@ T = TypeVar("T", bound="Account")
 class Account:
     """
     Attributes:
+        execution_region (str):
         is_self_hosted_only (bool):
         name (str):
         slug (str | Unset): This property is deprecated. Use name instead.
     """
 
+    execution_region: str
     is_self_hosted_only: bool
     name: str
     slug: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        execution_region = self.execution_region
+
         is_self_hosted_only = self.is_self_hosted_only
 
         name = self.name
@@ -34,6 +38,7 @@ class Account:
 
         field_dict.update(
             {
+                "execution_region": execution_region,
                 "is_self_hosted_only": is_self_hosted_only,
                 "name": name,
             }
@@ -46,6 +51,8 @@ class Account:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
+        execution_region = d.pop("execution_region")
+
         is_self_hosted_only = d.pop("is_self_hosted_only")
 
         name = d.pop("name")
@@ -53,6 +60,7 @@ class Account:
         slug = d.pop("slug", UNSET)
 
         account = cls(
+            execution_region=execution_region,
             is_self_hosted_only=is_self_hosted_only,
             name=name,
             slug=slug,

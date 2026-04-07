@@ -7,6 +7,7 @@ class RunStatus(str, Enum):
     ERRORED = "errored"
     EXITED = "exited"
     PENDING = "pending"
+    RETRYING = "retrying"
     RUNNING = "running"
     SCHEDULED = "scheduled"
 

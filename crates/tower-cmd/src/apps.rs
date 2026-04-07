@@ -145,7 +145,7 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 
             let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
                 .into_iter()
-                .map(|h| h.to_string())
+                .map(str::to_string)
                 .collect();
 
             let rows = runs
@@ -607,7 +607,7 @@ mod tests {
 
     #[test]
     fn test_terminal_statuses_explicit() {
-        let non_terminal = [Status::Scheduled, Status::Pending, Status::Running];
+        let non_terminal = [Status::Scheduled, Status::Pending, Status::Running, Status::Retrying];
         for status in non_terminal {
             let run = Run {
                 status,
@@ -638,6 +638,7 @@ mod tests {
             Status::Scheduled => {}
             Status::Pending => {}
             Status::Running => {}
+            Status::Retrying => {}
             Status::Crashed => {}
             Status::Errored => {}
             Status::Exited => {}
@@ -658,6 +659,7 @@ mod tests {
 
         let started = [
             Status::Running,
+            Status::Retrying,
             Status::Crashed,
             Status::Errored,
             Status::Exited,

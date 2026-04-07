@@ -1,5 +1,4 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
-use colored::Colorize;
 use config::Config;
 
 use crate::{api, output};
@@ -26,10 +25,7 @@ pub fn environments_cmd() -> Command {
 pub async fn do_list(config: Config) {
     let resp = output::with_spinner("Listing environments", api::list_environments(&config)).await;
 
-    let headers = vec!["Name"]
-        .into_iter()
-        .map(|h| h.yellow().to_string())
-        .collect();
+    let headers = vec!["Name".to_string()];
 
     let envs_data: Vec<Vec<String>> = resp
         .environments

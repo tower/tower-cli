@@ -54,8 +54,8 @@ def sync_detailed(
 ) -> Response[ErrorModel | LeaveTeamResponse]:
     """Leave team
 
-     Remove yourself from a team, if that's something you'd like to do for whatever reason. If you're the
-    last member of a team, you cannot remove yourself. You should delete the team instead.
+     Remove yourself from a team. If you're the last member of a team, you cannot remove yourself. You
+    should delete the team instead.
 
     Args:
         name (str): The name of the team to leave
@@ -86,8 +86,8 @@ def sync(
 ) -> ErrorModel | LeaveTeamResponse | None:
     """Leave team
 
-     Remove yourself from a team, if that's something you'd like to do for whatever reason. If you're the
-    last member of a team, you cannot remove yourself. You should delete the team instead.
+     Remove yourself from a team. If you're the last member of a team, you cannot remove yourself. You
+    should delete the team instead.
 
     Args:
         name (str): The name of the team to leave
@@ -113,8 +113,8 @@ async def asyncio_detailed(
 ) -> Response[ErrorModel | LeaveTeamResponse]:
     """Leave team
 
-     Remove yourself from a team, if that's something you'd like to do for whatever reason. If you're the
-    last member of a team, you cannot remove yourself. You should delete the team instead.
+     Remove yourself from a team. If you're the last member of a team, you cannot remove yourself. You
+    should delete the team instead.
 
     Args:
         name (str): The name of the team to leave
@@ -143,8 +143,8 @@ async def asyncio(
 ) -> ErrorModel | LeaveTeamResponse | None:
     """Leave team
 
-     Remove yourself from a team, if that's something you'd like to do for whatever reason. If you're the
-    last member of a team, you cannot remove yourself. You should delete the team instead.
+     Remove yourself from a team. If you're the last member of a team, you cannot remove yourself. You
+    should delete the team instead.
 
     Args:
         name (str): The name of the team to leave
