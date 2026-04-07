@@ -70,7 +70,7 @@ def step_run_cli_command_with_api_key(context, command):
         test_env["FORCE_COLOR"] = "1"
         test_env["CLICOLOR_FORCE"] = "1"
         test_env["TOWER_URL"] = context.tower_url
-        test_env["TOWER_API_KEY"] = "sk-test-api-key"
+        test_env["TOWER_API_KEY"] = context.api_key
 
         # Use a temp HOME with no session.json to prove API key auth works standalone
         test_env["HOME"] = context.temp_dir
