@@ -5,6 +5,8 @@ from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="ExportedCatalogProperty")
 
 
@@ -15,11 +17,13 @@ class ExportedCatalogProperty:
         encrypted_value (str):
         name (str):
         preview (str):
+        environment_variable (str | Unset): The environment variable name this property is injected as at runtime.
     """
 
     encrypted_value: str
     name: str
     preview: str
+    environment_variable: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         encrypted_value = self.encrypted_value
@@ -27,6 +31,8 @@ class ExportedCatalogProperty:
         name = self.name
 
         preview = self.preview
+
+        environment_variable = self.environment_variable
 
         field_dict: dict[str, Any] = {}
 
@@ -37,6 +43,8 @@ class ExportedCatalogProperty:
                 "preview": preview,
             }
         )
+        if environment_variable is not UNSET:
+            field_dict["environment_variable"] = environment_variable
 
         return field_dict
 
@@ -49,10 +57,13 @@ class ExportedCatalogProperty:
 
         preview = d.pop("preview")
 
+        environment_variable = d.pop("environment_variable", UNSET)
+
         exported_catalog_property = cls(
             encrypted_value=encrypted_value,
             name=name,
             preview=preview,
+            environment_variable=environment_variable,
         )
 
         return exported_catalog_property
