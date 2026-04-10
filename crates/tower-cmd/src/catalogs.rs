@@ -98,7 +98,7 @@ pub async fn do_show(config: Config, args: &ArgMatches) {
                 output::newline();
                 output::header("Properties");
 
-                let headers = vec!["Name", "Preview"]
+                let headers = vec!["Name", "Runtime Var", "Preview"]
                     .into_iter()
                     .map(str::to_string)
                     .collect();
@@ -108,6 +108,7 @@ pub async fn do_show(config: Config, args: &ArgMatches) {
                     .map(|prop| {
                         vec![
                             prop.name.clone(),
+                            prop.environment_variable.clone().unwrap_or_default(),
                             prop.preview.dimmed().to_string(),
                         ]
                     })
@@ -131,7 +132,10 @@ mod tests {
 
         let (_, list_args) = matches.subcommand().expect("expected list subcommand");
 
-        assert_eq!(list_args.get_one::<String>("environment").unwrap(), "default");
+        assert_eq!(
+            list_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
         assert_eq!(list_args.get_one::<bool>("all").copied(), Some(false));
     }
 
@@ -143,7 +147,10 @@ mod tests {
 
         let (_, list_args) = matches.subcommand().expect("expected list subcommand");
 
-        assert_eq!(list_args.get_one::<String>("environment").unwrap(), "production");
+        assert_eq!(
+            list_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
     }
 
     #[test]
@@ -171,8 +178,14 @@ mod tests {
 
         let (_, show_args) = matches.subcommand().expect("expected show subcommand");
 
-        assert_eq!(show_args.get_one::<String>("catalog_name").unwrap(), "my-catalog");
-        assert_eq!(show_args.get_one::<String>("environment").unwrap(), "default");
+        assert_eq!(
+            show_args.get_one::<String>("catalog_name").unwrap(),
+            "my-catalog"
+        );
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
     }
 
     #[test]
@@ -183,7 +196,13 @@ mod tests {
 
         let (_, show_args) = matches.subcommand().expect("expected show subcommand");
 
-        assert_eq!(show_args.get_one::<String>("catalog_name").unwrap(), "my-catalog");
-        assert_eq!(show_args.get_one::<String>("environment").unwrap(), "production");
+        assert_eq!(
+            show_args.get_one::<String>("catalog_name").unwrap(),
+            "my-catalog"
+        );
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
     }
 }

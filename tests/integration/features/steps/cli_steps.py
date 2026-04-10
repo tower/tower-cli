@@ -13,9 +13,7 @@ from behave import given, when, then
 from dirty_equals import IsStr, IsPartialDict
 
 
-@step('I run "{command}" via CLI')
-def step_run_cli_command(context, command):
-    """Run a Tower CLI command and capture output"""
+def run_command_with_env(context, command, env, input=None):
     cli_path = context.tower_binary
 
     # Run the CLI command in the current directory (where environment.py set up the temp dir)
@@ -26,22 +24,13 @@ def step_run_cli_command(context, command):
     full_command = [cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
 
     try:
-        # Force colored output by setting environment variables
-        test_env = os.environ.copy()
-        test_env["FORCE_COLOR"] = "1"  # Force colored output
-        test_env["CLICOLOR_FORCE"] = "1"  # Force colored output
-        test_env["TOWER_URL"] = context.tower_url  # Use configured API URL
-
-        # Override HOME to use test session (which contains auth credentials)
-        test_home = Path(__file__).parent.parent.parent / "test-home"
-        test_env["HOME"] = str(test_home.absolute())
-
         result = subprocess.run(
             full_command,
             capture_output=True,
             text=True,
             timeout=60,  # 1 minute timeout
-            env=test_env,
+            env=env,
+            input=input,
         )
         context.cli_output = result.stdout + result.stderr
         context.cli_stdout = result.stdout
@@ -55,45 +44,53 @@ def step_run_cli_command(context, command):
         print(f"DEBUG: Command was: {full_command}")
         print(f"DEBUG: Working directory: {os.getcwd()}")
         raise
+
+
+@step('I run "{command}" via CLI')
+def step_run_cli_command(context, command):
+    """Run a Tower CLI command and capture output"""
+
+    # Force colored output by setting environment variables
+    test_env = os.environ.copy()
+    test_env["FORCE_COLOR"] = "1"  # Force colored output
+    test_env["CLICOLOR_FORCE"] = "1"  # Force colored output
+    test_env["TOWER_URL"] = context.tower_url  # Use configured API URL
+
+    # Override HOME to use test session (which contains auth credentials)
+    test_home = Path(__file__).parent.parent.parent / "test-home"
+    test_env["HOME"] = str(test_home.absolute())
+
+    return run_command_with_env(context, command, test_env)
 
 
 @step('I run "{command}" via CLI with API key')
 def step_run_cli_command_with_api_key(context, command):
     """Run a Tower CLI command authenticating via TOWER_API_KEY instead of session.json"""
-    cli_path = context.tower_binary
+    test_env = os.environ.copy()
+    test_env["FORCE_COLOR"] = "1"
+    test_env["CLICOLOR_FORCE"] = "1"
+    test_env["TOWER_URL"] = context.tower_url
+    test_env["TOWER_API_KEY"] = context.api_key
 
-    cmd_parts = shlex.split(command)
-    full_command = [cli_path] + cmd_parts[1:]  # Skip 'tower' prefix
+    # Use a temp HOME with no session.json to prove API key auth works standalone
+    test_env["HOME"] = context.temp_dir
 
-    try:
-        test_env = os.environ.copy()
-        test_env["FORCE_COLOR"] = "1"
-        test_env["CLICOLOR_FORCE"] = "1"
-        test_env["TOWER_URL"] = context.tower_url
-        test_env["TOWER_API_KEY"] = "sk-test-api-key"
+    return run_command_with_env(context, command, test_env)
 
-        # Use a temp HOME with no session.json to prove API key auth works standalone
-        test_env["HOME"] = context.temp_dir
 
-        result = subprocess.run(
-            full_command,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            env=test_env,
-        )
-        context.cli_output = result.stdout + result.stderr
-        context.cli_stdout = result.stdout
-        context.cli_return_code = result.returncode
-    except subprocess.TimeoutExpired:
-        context.cli_output = "Command timed out"
-        context.cli_stdout = ""
-        context.cli_return_code = 124
-    except Exception as e:
-        print(f"DEBUG: Exception in CLI command: {type(e).__name__}: {e}")
-        print(f"DEBUG: Command was: {full_command}")
-        print(f"DEBUG: Working directory: {os.getcwd()}")
-        raise
+@step('I run "{command}" via CLI with API key and input "{input}"')
+def step_run_cli_command_with_api_key_and_input(context, command, input):
+    """Run a Tower CLI command authenticating via TOWER_API_KEY instead of session.json"""
+    test_env = os.environ.copy()
+    test_env["FORCE_COLOR"] = "1"
+    test_env["CLICOLOR_FORCE"] = "1"
+    test_env["TOWER_URL"] = context.tower_url
+    test_env["TOWER_API_KEY"] = context.api_key
+
+    # Use a temp HOME with no session.json to prove API key auth works standalone
+    test_env["HOME"] = context.temp_dir
+
+    return run_command_with_env(context, command, test_env, input=input)
 
 
 @step("no session.json should exist in the temp home")
