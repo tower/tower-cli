@@ -38,7 +38,7 @@ pub fn secrets_cmd() -> Command {
                         .help("List secrets across all environments")
                         .action(clap::ArgAction::SetTrue),
                 )
-                .about("List all of your secrets"),
+                .about("List secrets in your Tower account"),
         )
         .subcommand(
             Command::new("create")
