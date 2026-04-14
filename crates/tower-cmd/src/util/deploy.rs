@@ -97,6 +97,7 @@ pub async fn deploy_app_package(
     app_name: &str,
     package: Package,
     environment: Option<&str>,
+    all_environments: bool,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
@@ -117,12 +118,12 @@ pub async fn deploy_app_package(
 
     // Create the URL for the API endpoint
     let base_url = &api_config.base_path;
-    let url = match environment {
-        Some(env) => format!(
-            "{}/apps/{}/deploy?environment={}",
-            base_url, app_name, env
-        ),
-        None => format!("{}/apps/{}/deploy", base_url, app_name),
+    let url = if all_environments {
+        format!("{}/apps/{}/deploy?all_environments=true", base_url, app_name)
+    } else if let Some(env) = environment {
+        format!("{}/apps/{}/deploy?environment={}", base_url, app_name, env)
+    } else {
+        format!("{}/apps/{}/deploy", base_url, app_name)
     };
 
     // Upload the package

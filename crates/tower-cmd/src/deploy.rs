@@ -141,17 +141,18 @@ async fn do_deploy_package(
     towerfile: &Towerfile,
     target: DeployTarget,
 ) -> Result<(), crate::Error> {
-    let environment = match &target {
-        DeployTarget::All => Some("all".to_string()),
-        DeployTarget::Environment(env) => Some(env.clone()),
-        DeployTarget::Default => None,
+    let (environment, all_environments) = match &target {
+        DeployTarget::All => (None, true),
+        DeployTarget::Environment(env) => (Some(env.as_str()), false),
+        DeployTarget::Default => (None, false),
     };
 
     let res = util::deploy::deploy_app_package(
         &api_config,
         &towerfile.app.name,
         package,
-        environment.as_deref(),
+        environment,
+        all_environments,
     )
     .await;
 
