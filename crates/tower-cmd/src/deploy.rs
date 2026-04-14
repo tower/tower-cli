@@ -24,6 +24,20 @@ pub fn deploy_cmd() -> Command {
                 .help("Automatically force creation of the app if it doesn't already exist")
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("environment")
+                .long("environment")
+                .short('e')
+                .help("The environment to deploy to")
+                .conflicts_with("all"),
+        )
+        .arg(
+            Arg::new("all")
+                .long("all")
+                .help("Deploy to all environments")
+                .action(clap::ArgAction::SetTrue)
+                .conflicts_with("environment"),
+        )
         .about("Deploy your latest code to Tower")
 }
 
@@ -35,10 +49,31 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
     }
 }
 
+/// Resolves the target environment from CLI args.
+///
+/// - `--all` → `DeployTarget::All`
+/// - `--environment <name>` → `DeployTarget::Environment(name)`
+/// - neither → `DeployTarget::Default`
+#[derive(Debug, Clone)]
+pub enum DeployTarget {
+    Default,
+    Environment(String),
+    All,
+}
+
 pub async fn do_deploy(config: Config, args: &ArgMatches) {
     let dir = resolve_path(args);
     let create_app = args.get_flag("create");
-    if let Err(err) = deploy_from_dir(config, dir, create_app).await {
+
+    let target = if args.get_flag("all") {
+        DeployTarget::All
+    } else if let Some(env) = args.get_one::<String>("environment") {
+        DeployTarget::Environment(env.clone())
+    } else {
+        DeployTarget::Default
+    };
+
+    if let Err(err) = deploy_from_dir(config, dir, create_app, target).await {
         match err {
             crate::Error::ApiDeployError { source } => {
                 output::tower_error_and_die(source, "Deploying app failed")
@@ -66,6 +101,7 @@ pub async fn deploy_from_dir(
     config: Config,
     dir: PathBuf,
     create_app: bool,
+    target: DeployTarget,
 ) -> Result<(), crate::Error> {
     debug!("Building package from directory: {:?}", dir);
 
@@ -96,23 +132,149 @@ pub async fn deploy_from_dir(
     };
 
     spinner.success();
-    do_deploy_package(api_config, package, &towerfile).await
+    do_deploy_package(api_config, package, &towerfile, target).await
 }
 
 async fn do_deploy_package(
     api_config: Configuration,
     package: Package,
     towerfile: &Towerfile,
+    target: DeployTarget,
 ) -> Result<(), crate::Error> {
-    let res = util::deploy::deploy_app_package(&api_config, &towerfile.app.name, package).await;
+    let environment = match &target {
+        DeployTarget::All => Some("all".to_string()),
+        DeployTarget::Environment(env) => Some(env.clone()),
+        DeployTarget::Default => None,
+    };
+
+    let res = util::deploy::deploy_app_package(
+        &api_config,
+        &towerfile.app.name,
+        package,
+        environment.as_deref(),
+    )
+    .await;
 
     match res {
         Ok(resp) => {
             let version = resp.version;
-            let line = format!("Version `{}` has been deployed to Tower!", version.version);
+            let line = match &target {
+                DeployTarget::All => format!(
+                    "Version `{}` has been deployed to all environments!",
+                    version.version
+                ),
+                DeployTarget::Environment(env) => format!(
+                    "Version `{}` has been deployed to environment '{}'!",
+                    version.version, env
+                ),
+                DeployTarget::Default => format!(
+                    "Version `{}` has been deployed to Tower!",
+                    version.version
+                ),
+            };
             output::success(&line);
             Ok(())
         }
         Err(err) => Err(crate::Error::ApiDeployError { source: err }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::deploy_cmd;
+
+    fn parse(args: &[&str]) -> Result<clap::ArgMatches, clap::Error> {
+        let mut full = vec!["deploy"];
+        full.extend_from_slice(args);
+        deploy_cmd().try_get_matches_from(full)
+    }
+
+    #[test]
+    fn no_args_uses_defaults() {
+        let m = parse(&[]).unwrap();
+        assert_eq!(m.get_one::<String>("environment"), None);
+        assert!(!m.get_flag("all"));
+    }
+
+    #[test]
+    fn environment_flag_long() {
+        let m = parse(&["--environment", "production"]).unwrap();
+        assert_eq!(
+            m.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("production")
+        );
+    }
+
+    #[test]
+    fn environment_flag_short() {
+        let m = parse(&["-e", "staging"]).unwrap();
+        assert_eq!(
+            m.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("staging")
+        );
+    }
+
+    #[test]
+    fn environment_flag_equals_syntax() {
+        let m = parse(&["--environment=production"]).unwrap();
+        assert_eq!(
+            m.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("production")
+        );
+    }
+
+    #[test]
+    fn all_flag() {
+        let m = parse(&["--all"]).unwrap();
+        assert!(m.get_flag("all"));
+        assert_eq!(m.get_one::<String>("environment"), None);
+    }
+
+    #[test]
+    fn environment_and_all_conflict() {
+        let err = parse(&["--environment", "production", "--all"]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn all_and_environment_conflict() {
+        let err = parse(&["--all", "--environment", "staging"]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn create_flag_with_environment() {
+        let m = parse(&["--create", "--environment", "production"]).unwrap();
+        assert!(m.get_flag("create"));
+        assert_eq!(
+            m.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("production")
+        );
+    }
+
+    #[test]
+    fn create_flag_with_all() {
+        let m = parse(&["--create", "--all"]).unwrap();
+        assert!(m.get_flag("create"));
+        assert!(m.get_flag("all"));
+    }
+
+    #[test]
+    fn dir_with_environment() {
+        let m = parse(&["-d", "/tmp/myapp", "-e", "production"]).unwrap();
+        assert_eq!(
+            m.get_one::<String>("dir").map(|s| s.as_str()),
+            Some("/tmp/myapp")
+        );
+        assert_eq!(
+            m.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("production")
+        );
+    }
+
+    #[test]
+    fn help_flag_shows_help() {
+        let err = parse(&["--help"]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::DisplayHelp);
     }
 }

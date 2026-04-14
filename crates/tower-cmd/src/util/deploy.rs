@@ -96,6 +96,7 @@ pub async fn deploy_app_package(
     api_config: &tower_api::apis::configuration::Configuration,
     app_name: &str,
     package: Package,
+    environment: Option<&str>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
@@ -116,7 +117,13 @@ pub async fn deploy_app_package(
 
     // Create the URL for the API endpoint
     let base_url = &api_config.base_path;
-    let url = format!("{}/apps/{}/deploy", base_url, app_name);
+    let url = match environment {
+        Some(env) => format!(
+            "{}/apps/{}/deploy?environment={}",
+            base_url, app_name, env
+        ),
+        None => format!("{}/apps/{}/deploy", base_url, app_name),
+    };
 
     // Upload the package
     let response = upload_file_with_progress(
