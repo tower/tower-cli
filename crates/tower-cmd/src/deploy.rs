@@ -56,7 +56,6 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 /// - neither → `DeployTarget::Default`
 #[derive(Debug, Clone)]
 pub enum DeployTarget {
-    Default,
     Environment(String),
     All,
 }
@@ -70,7 +69,7 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
     } else if let Some(env) = args.get_one::<String>("environment") {
         DeployTarget::Environment(env.clone())
     } else {
-        DeployTarget::Default
+        DeployTarget::Environment("default".to_string())
     };
 
     if let Err(err) = deploy_from_dir(config, dir, create_app, target).await {
@@ -144,7 +143,6 @@ async fn do_deploy_package(
     let (environment, all_environments) = match &target {
         DeployTarget::All => (None, true),
         DeployTarget::Environment(env) => (Some(env.as_str()), false),
-        DeployTarget::Default => (None, false),
     };
 
     let res = util::deploy::deploy_app_package(
@@ -167,10 +165,6 @@ async fn do_deploy_package(
                 DeployTarget::Environment(env) => format!(
                     "Version `{}` has been deployed to environment '{}'!",
                     version.version, env
-                ),
-                DeployTarget::Default => format!(
-                    "Version `{}` has been deployed to Tower!",
-                    version.version
                 ),
             };
             output::success(&line);
