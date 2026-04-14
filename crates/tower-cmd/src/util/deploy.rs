@@ -8,6 +8,7 @@ use tower_package::{compute_sha256_file, Package};
 use tower_telemetry::debug;
 
 use tower_api::apis::configuration::Configuration;
+use tower_api::apis::urlencode;
 use tower_api::apis::default_api::DeployAppError;
 use tower_api::apis::Error;
 use tower_api::apis::ResponseContent;
@@ -121,7 +122,8 @@ pub async fn deploy_app_package(
     let url = if all_environments {
         format!("{}/apps/{}/deploy?all_environments=true", base_url, app_name)
     } else if let Some(env) = environment {
-        format!("{}/apps/{}/deploy?environment={}", base_url, app_name, env)
+        let encoded_environment = urlencode(env);
+        format!("{}/apps/{}/deploy?environment={}", base_url, app_name, encoded_environment)
     } else {
         format!("{}/apps/{}/deploy", base_url, app_name)
     };
