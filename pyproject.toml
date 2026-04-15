@@ -48,7 +48,7 @@ tower = "tower.cli:main"
 
 [project.optional-dependencies]
 ai = ["huggingface-hub>=0.34.3", "ollama>=0.5.3"]
-iceberg = ["polars==1.39.3", "pyarrow==23.0.1", "pyiceberg==0.11.1"]
+iceberg = ["polars>=1.39.3", "pyarrow>=23.0.1", "pyiceberg>=0.11.1"]
 dbt = ["dbt-core>=1.9,<1.10"] # Can not use dbt 1.10+ due to dependency conflicts
 all = ["tower[ai,iceberg,dbt]"]
 
@@ -102,5 +102,5 @@ dev = [
   "mypy==1.13.0",
   "openapi-python-client==0.28.1",
   "pre-commit==4.0.1",
-  "pyiceberg[sql-sqlite]==0.11.1",
+  "pyiceberg[sql-sqlite]>=0.11.1",
 ]
