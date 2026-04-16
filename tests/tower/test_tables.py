@@ -321,6 +321,126 @@ def test_upsert_concurrent_writes_same_row(sql_catalog):
     assert final_counter in [1, 2, 3, 4, 5]
 
 
+def test_insert_concurrent_writes_with_retry(sql_catalog):
+    """Test that concurrent inserts succeed with retry logic handling conflicts."""
+    schema = pa.schema(
+        [
+            pa.field("ticker", pa.string()),
+            pa.field("date", pa.string()),
+            pa.field("price", pa.float64()),
+        ]
+    )
+
+    ref = tower.tables("concurrent_insert_test", catalog=sql_catalog)
+    table = ref.create_if_not_exists(schema)
+
+    retry_count = {"value": 0}
+    retry_lock = threading.Lock()
+
+    def insert_ticker(ticker: str, price: float):
+        t = tower.tables("concurrent_insert_test", catalog=sql_catalog).load()
+
+        original_refresh = t._table.refresh
+
+        def tracked_refresh():
+            with retry_lock:
+                retry_count["value"] += 1
+            return original_refresh()
+
+        t._table.refresh = tracked_refresh
+
+        data = pa.Table.from_pylist(
+            [{"ticker": ticker, "date": "2024-01-01", "price": price}],
+            schema=schema,
+        )
+        t.insert(data)
+        return ticker
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(insert_ticker, "AAPL", 150.0),
+            executor.submit(insert_ticker, "GOOGL", 250.0),
+            executor.submit(insert_ticker, "MSFT", 350.0),
+        ]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    assert len(results) == 3
+    assert (
+        retry_count["value"] > 0
+    ), "Expected at least one retry due to concurrent conflicts"
+
+    final_table = tower.tables("concurrent_insert_test", catalog=sql_catalog).load()
+    df = final_table.read()
+
+    assert len(df) == 3
+
+    ticker_prices = {row["ticker"]: row["price"] for row in df.iter_rows(named=True)}
+
+    assert ticker_prices["AAPL"] == 150.0
+    assert ticker_prices["GOOGL"] == 250.0
+    assert ticker_prices["MSFT"] == 350.0
+
+
+def test_delete_concurrent_writes_with_retry(sql_catalog):
+    """Test that concurrent deletes succeed with retry logic handling conflicts."""
+    schema = pa.schema(
+        [
+            pa.field("ticker", pa.string()),
+            pa.field("date", pa.string()),
+            pa.field("price", pa.float64()),
+        ]
+    )
+
+    ref = tower.tables("concurrent_delete_test", catalog=sql_catalog)
+    table = ref.create_if_not_exists(schema)
+
+    initial_data = pa.Table.from_pylist(
+        [
+            {"ticker": "AAPL", "date": "2024-01-01", "price": 100.0},
+            {"ticker": "GOOGL", "date": "2024-01-01", "price": 200.0},
+            {"ticker": "MSFT", "date": "2024-01-01", "price": 300.0},
+        ],
+        schema=schema,
+    )
+    table.insert(initial_data)
+
+    retry_count = {"value": 0}
+    retry_lock = threading.Lock()
+
+    def delete_ticker(ticker: str):
+        t = tower.tables("concurrent_delete_test", catalog=sql_catalog).load()
+
+        original_refresh = t._table.refresh
+
+        def tracked_refresh():
+            with retry_lock:
+                retry_count["value"] += 1
+            return original_refresh()
+
+        t._table.refresh = tracked_refresh
+
+        t.delete(filters=f"ticker = '{ticker}'")
+        return ticker
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(delete_ticker, "AAPL"),
+            executor.submit(delete_ticker, "GOOGL"),
+            executor.submit(delete_ticker, "MSFT"),
+        ]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    assert len(results) == 3
+    assert (
+        retry_count["value"] > 0
+    ), "Expected at least one retry due to concurrent conflicts"
+
+    final_table = tower.tables("concurrent_delete_test", catalog=sql_catalog).load()
+    df = final_table.read()
+
+    assert len(df) == 0
+
+
 def test_delete_from_tables(in_memory_catalog):
     schema = pa.schema(
         [
