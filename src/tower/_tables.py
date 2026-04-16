@@ -153,6 +153,13 @@ class Table:
         """
         return self._stats
 
+    @staticmethod
+    def _validate_retry_args(max_retries: int, retry_delay_seconds: float) -> None:
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
+        if retry_delay_seconds < 0:
+            raise ValueError("retry_delay_seconds must be >= 0")
+
     def insert(
         self,
         data: pa.Table,
@@ -194,6 +201,8 @@ class Table:
             >>> stats = table.rows_affected()
             >>> print(f"Inserted {stats.inserts} rows")
         """
+        self._validate_retry_args(max_retries, retry_delay_seconds)
+
         last_exception = None
 
         for attempt in range(max_retries + 1):
@@ -265,6 +274,8 @@ class Table:
             >>> print(f"Updated {stats.updates} rows")
             >>> print(f"Inserted {stats.inserts} rows")
         """
+        self._validate_retry_args(max_retries, retry_delay_seconds)
+
         last_exception = None
 
         for attempt in range(max_retries + 1):
@@ -342,6 +353,7 @@ class Table:
             >>> # Delete rows using a string expression
             >>> table.delete("age > 30 AND department = 'IT'")
         """
+        self._validate_retry_args(max_retries, retry_delay_seconds)
 
         if isinstance(filters, list):
             # We need to convert the pc.Expression into PyIceberg

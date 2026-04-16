@@ -12,6 +12,7 @@ import tower.polars as pl
 import pyarrow as pa
 from pyiceberg.catalog.memory import InMemoryCatalog
 from pyiceberg.catalog.sql import SqlCatalog
+from pyiceberg.exceptions import CommitFailedException
 
 import concurrent.futures
 
@@ -340,13 +341,24 @@ def test_insert_concurrent_writes_with_retry(sql_catalog):
     def insert_ticker(ticker: str, price: float):
         t = tower.tables("concurrent_insert_test", catalog=sql_catalog).load()
 
+        original_append = t._table.append
         original_refresh = t._table.refresh
+        first_attempt = {"done": False}
+        refresh_called = {"value": False}
+
+        def failing_then_succeeding_append(data):
+            if not first_attempt["done"]:
+                first_attempt["done"] = True
+                raise CommitFailedException("Simulated concurrent write conflict")
+            return original_append(data)
 
         def tracked_refresh():
+            refresh_called["value"] = True
             with retry_lock:
                 retry_count["value"] += 1
             return original_refresh()
 
+        t._table.append = failing_then_succeeding_append
         t._table.refresh = tracked_refresh
 
         data = pa.Table.from_pylist(
@@ -354,6 +366,7 @@ def test_insert_concurrent_writes_with_retry(sql_catalog):
             schema=schema,
         )
         t.insert(data)
+        assert refresh_called["value"], "Expected refresh() to be called before retry"
         return ticker
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -366,8 +379,8 @@ def test_insert_concurrent_writes_with_retry(sql_catalog):
 
     assert len(results) == 3
     assert (
-        retry_count["value"] > 0
-    ), "Expected at least one retry due to concurrent conflicts"
+        retry_count["value"] >= 3
+    ), "Expected at least one refresh per thread (one simulated failure each)"
 
     final_table = tower.tables("concurrent_insert_test", catalog=sql_catalog).load()
     df = final_table.read()
@@ -410,16 +423,28 @@ def test_delete_concurrent_writes_with_retry(sql_catalog):
     def delete_ticker(ticker: str):
         t = tower.tables("concurrent_delete_test", catalog=sql_catalog).load()
 
+        original_delete = t._table.delete
         original_refresh = t._table.refresh
+        first_attempt = {"done": False}
+        refresh_called = {"value": False}
+
+        def failing_then_succeeding_delete(**kwargs):
+            if not first_attempt["done"]:
+                first_attempt["done"] = True
+                raise CommitFailedException("Simulated concurrent write conflict")
+            return original_delete(**kwargs)
 
         def tracked_refresh():
+            refresh_called["value"] = True
             with retry_lock:
                 retry_count["value"] += 1
             return original_refresh()
 
+        t._table.delete = failing_then_succeeding_delete
         t._table.refresh = tracked_refresh
 
         t.delete(filters=f"ticker = '{ticker}'")
+        assert refresh_called["value"], "Expected refresh() to be called before retry"
         return ticker
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -432,8 +457,8 @@ def test_delete_concurrent_writes_with_retry(sql_catalog):
 
     assert len(results) == 3
     assert (
-        retry_count["value"] > 0
-    ), "Expected at least one retry due to concurrent conflicts"
+        retry_count["value"] >= 3
+    ), "Expected at least one refresh per thread (one simulated failure each)"
 
     final_table = tower.tables("concurrent_delete_test", catalog=sql_catalog).load()
     df = final_table.read()
