@@ -93,7 +93,9 @@ class Table:
         """
         # We call `collect` here to force the execution of the query and get
         # the result as a DataFrame.
-        return pl.scan_iceberg(self._table).collect()
+        # Note: reader_override="pyiceberg" ensures AWS S3 vended credentials are passed through
+        # properly. The native rust reader is faster but doesn't pass credentials from pyiceberg.
+        return pl.scan_iceberg(self._table, reader_override="pyiceberg").collect()
 
     def to_polars(self) -> pl.LazyFrame:
         """
@@ -121,7 +123,9 @@ class Table:
             >>> # Execute the plan
             >>> final_df = result.collect()
         """
-        return pl.scan_iceberg(self._table)
+        # Note: reader_override="pyiceberg" ensures AWS S3 vended credentials are passed through
+        # properly. The native rust reader is faster but doesn't pass credentials from pyiceberg.
+        return pl.scan_iceberg(self._table, reader_override="pyiceberg")
 
     def rows_affected(self) -> RowsAffectedInformation:
         """
