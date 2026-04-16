@@ -153,9 +153,21 @@ class Table:
         """
         return self._stats
 
-    def insert(self, data: pa.Table) -> TTable:
+    @staticmethod
+    def _validate_retry_args(max_retries: int, retry_delay_seconds: float) -> None:
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
+        if retry_delay_seconds < 0:
+            raise ValueError("retry_delay_seconds must be >= 0")
+
+    def insert(
+        self,
+        data: pa.Table,
+        max_retries: int = 5,
+        retry_delay_seconds: float = 0.5,
+    ) -> TTable:
         """
-        Inserts new rows into the Iceberg table.
+        Inserts new rows into the Iceberg table. In case of commit conflicts, reloads the metadata and retries.
 
         This method appends the provided data to the table. The data must be provided as a
         PyArrow table with a schema that matches the table's schema. The operation is
@@ -164,9 +176,16 @@ class Table:
         Args:
             data (pa.Table): The data to insert into the table. The schema of this table
                 must match the schema of the target table.
+            max_retries (int): Maximum number of retry attempts on commit conflicts.
+                Defaults to 5.
+            retry_delay_seconds (float): Wait time in seconds between retries.
+                Defaults to 0.5 seconds.
 
         Returns:
             TTable: The table instance with the newly inserted rows, allowing for method chaining.
+
+        Raises:
+            CommitFailedException: If all retry attempts are exhausted.
 
         Example:
             >>> table = tables("my_table").load()
@@ -182,9 +201,25 @@ class Table:
             >>> stats = table.rows_affected()
             >>> print(f"Inserted {stats.inserts} rows")
         """
-        self._table.append(data)
-        self._stats.inserts += data.num_rows
-        return self
+        self._validate_retry_args(max_retries, retry_delay_seconds)
+
+        last_exception = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    self._table.refresh()
+
+                self._table.append(data)
+                self._stats.inserts += data.num_rows
+                return self
+
+            except CommitFailedException as e:
+                last_exception = e
+                if attempt < max_retries:
+                    time.sleep(retry_delay_seconds)
+
+        raise last_exception
 
     def upsert(
         self,
@@ -239,6 +274,8 @@ class Table:
             >>> print(f"Updated {stats.updates} rows")
             >>> print(f"Inserted {stats.inserts} rows")
         """
+        self._validate_retry_args(max_retries, retry_delay_seconds)
+
         last_exception = None
 
         for attempt in range(max_retries + 1):
@@ -268,9 +305,15 @@ class Table:
 
         raise last_exception
 
-    def delete(self, filters: Union[str, List[pc.Expression]]) -> TTable:
+    def delete(
+        self,
+        filters: Union[str, List[pc.Expression]],
+        max_retries: int = 5,
+        retry_delay_seconds: float = 0.5,
+    ) -> TTable:
         """
         Deletes rows from the Iceberg table that match the specified filter conditions.
+        In case of commit conflicts, reloads the metadata and retries.
 
         This method removes rows from the table based on the provided filter expressions.
         The operation is always case-sensitive. Note that the number of deleted rows
@@ -282,9 +325,16 @@ class Table:
                 - A single PyArrow compute expression
                 - A list of PyArrow compute expressions (combined with AND)
                 - A string expression
+            max_retries (int): Maximum number of retry attempts on commit conflicts.
+                Defaults to 5.
+            retry_delay_seconds (float): Wait time in seconds between retries.
+                Defaults to 0.5 seconds.
 
         Returns:
             TTable: The table instance with the deleted rows, allowing for method chaining.
+
+        Raises:
+            CommitFailedException: If all retry attempts are exhausted.
 
         Note:
             - The operation is always case-sensitive
@@ -303,22 +353,37 @@ class Table:
             >>> # Delete rows using a string expression
             >>> table.delete("age > 30 AND department = 'IT'")
         """
+        self._validate_retry_args(max_retries, retry_delay_seconds)
 
         if isinstance(filters, list):
             # We need to convert the pc.Expression into PyIceberg
             next_filters = convert_pyarrow_expressions(filters)
             filters = next_filters
 
-        self._table.delete(
-            delete_filter=filters,
-            # We want this to always be the case. Not sure why you wouldn't?
-            case_sensitive=True,
-        )
+        last_exception = None
 
-        # NOTE: There is, unfortunately, no way to get the number of rows
-        # deleted besides comparing the two snapshots that were created.
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    self._table.refresh()
 
-        return self
+                self._table.delete(
+                    delete_filter=filters,
+                    # We want this to always be the case. Not sure why you wouldn't?
+                    case_sensitive=True,
+                )
+
+                # NOTE: There is, unfortunately, no way to get the number of rows
+                # deleted besides comparing the two snapshots that were created.
+
+                return self
+
+            except CommitFailedException as e:
+                last_exception = e
+                if attempt < max_retries:
+                    time.sleep(retry_delay_seconds)
+
+        raise last_exception
 
     def schema(self) -> pa.Schema:
         """
