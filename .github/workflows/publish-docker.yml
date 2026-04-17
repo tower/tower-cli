@@ -1,0 +1,44 @@
+# Publish a release Docker image to GHCR.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a publish job
+# within `cargo-dist`. Runs after `host`, so the GitHub Release and its binary artifacts exist;
+# the Dockerfile fetches the prebuilt musl binary from the release at image-build time.
+
+name: "[tower] Publish Docker image"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  docker-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        env:
+          TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+          PRERELEASE: ${{ fromJson(inputs.plan).announcement_is_prerelease }}
+        run: |
+          VERSION="${TAG#v}"
+          TAGS=(--tag "ghcr.io/tower/tower-cli:$VERSION")
+          if [ "$PRERELEASE" != "true" ]; then
+            TAGS+=(--tag "ghcr.io/tower/tower-cli:latest")
+          fi
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION="$VERSION" \
+            "${TAGS[@]}" \
+            --push .
