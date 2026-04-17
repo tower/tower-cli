@@ -109,7 +109,11 @@ fn append_command(out: &mut String, cmd: &Command, path: &[&str], depth: usize) 
     }
 }
 
-const WORKFLOW_HEADER: &str = r#"# Tower Skill
+const WORKFLOW_HEADER: &str = r#"---
+description: Use Tower to build, run, and deploy Python data apps, pipelines, and AI agents. Covers MCP tools, Towerfile setup, local development, cloud deployment, scheduling, and secrets management.
+---
+
+# Tower Skill
 
 Tower is a compute platform for Python data apps, pipelines, and AI agents.
 
@@ -117,25 +121,47 @@ Tower is a compute platform for Python data apps, pipelines, and AI agents.
 
 ## Setup
 
-Check whether Tower is configured:
+First, check if Tower is already installed and authenticated:
 
 ```bash
 tower teams list
 ```
 
-If that works, you're authenticated. If not, run:
+If that works, skip to the workflow. Otherwise, install and log in.
+
+### Install
+
+Preferred — `uvx` runs Tower with no global install (requires `uv`):
 
 ```bash
 uvx tower login
 ```
 
-`uvx` runs Tower with no global install. To start the MCP server so Claude Code can use it:
+If you don't have `uvx`, install with pip (Python ≥ 3.9):
 
 ```bash
-uvx tower mcp-server
+pip install tower
+tower login
 ```
 
-Add that to your Claude Code MCP config so it starts automatically.
+Or with nix:
+
+```bash
+nix run nixpkgs#tower -- login
+```
+
+### MCP server
+
+The MCP server gives Claude structured access to Tower tools. If it's not already running (you'll see `tower_*` tools available), start it:
+
+```bash
+uvx tower mcp-server          # if using uvx
+tower mcp-server              # if installed via pip/nix
+```
+
+If you installed Tower via the Claude Code plugin, this is already configured. Otherwise, copy the `.mcp.json` from the [tower-cli repo](https://github.com/tower/tower-cli) into your project root.
+
+**If MCP tools are unavailable**, fall back to the CLI equivalents — every MCP tool has a direct CLI counterpart (e.g. `tower apps list`, `tower deploy`).
 
 ## MCP-First, CLI as Fallback
 

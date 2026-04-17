@@ -149,11 +149,11 @@ Manage the apps in your current Tower account
 
 #### `tower apps list`
 
-List all of your apps
+List all apps in your Tower account
 
 #### `tower apps show`
 
-Show the details about an app in Tower
+Show details for a Tower app and its recent runs
 
 **Arguments:**
 
@@ -194,6 +194,28 @@ Cancel a running app run
 
 - `<app_name>`  *(required)* — Name of the app
 - `<run_number>`  *(required)* — Run number to cancel
+
+### `tower catalogs`
+
+Interact with the catalogs in your Tower account
+
+#### `tower catalogs list`
+
+List all of your catalogs
+
+**Arguments:**
+
+- `-e`, `--environment` — List catalogs in this environment
+- `-a`, `--all` — List catalogs across all environments
+
+#### `tower catalogs show`
+
+Show the details of a catalog, including its property names
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `-e`, `--environment` — Environment the catalog belongs to
 
 ### `tower schedules`
 
@@ -243,7 +265,7 @@ Interact with the secrets in your Tower account
 
 #### `tower secrets list`
 
-List all of your secrets
+List secrets in your Tower account
 
 **Arguments:**
 
@@ -344,3 +366,4 @@ Generate Claude Code skill files for AI agent integration
 #### `tower skill generate`
 
 Generate a SKILL.md describing how to use Tower with AI agents
+
