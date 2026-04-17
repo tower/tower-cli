@@ -1,0 +1,12 @@
+{
+  "name": "tower",
+  "description": "Tower compute platform — run and deploy Python apps, pipelines, and AI agents",
+  "version": "1.0.0",
+  "author": {
+    "name": "Tower",
+    "url": "https://tower.dev"
+  },
+  "homepage": "https://tower.dev/docs",
+  "repository": "https://github.com/tower/tower-cli",
+  "license": "MIT"
+}

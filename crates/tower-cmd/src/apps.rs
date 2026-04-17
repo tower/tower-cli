@@ -11,7 +11,7 @@ pub fn apps_cmd() -> Command {
     Command::new("apps")
         .about("Manage the apps in your current Tower account")
         .arg_required_else_help(true)
-        .subcommand(Command::new("list").about("List all of your apps"))
+        .subcommand(Command::new("list").about("List all apps in your Tower account"))
         .subcommand(
             Command::new("show")
                 .arg(
@@ -21,7 +21,7 @@ pub fn apps_cmd() -> Command {
                         .required(true)
                         .help("Name of the app"),
                 )
-                .about("Show the details about an app in Tower"),
+                .about("Show details for a Tower app and its recent runs"),
         )
         .subcommand(
             Command::new("logs")
