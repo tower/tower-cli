@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use tower_runtime::{local::LocalApp, App, StartOptions, Status};
 
 use config::Towerfile;
-use tower_package::{Package, PackageSpec};
+use tmpdir::TmpDir;
+use tower_package::{Manifest, Package, PackageSpec};
 use tower_telemetry::{self, debug};
 
 use tokio::sync::mpsc::unbounded_channel;
@@ -327,6 +328,69 @@ async fn test_running_app_with_secret() {
     // check the status once more, should be done.
     let status = app.status().await.expect("Failed to get app status");
     assert!(status == Status::Exited, "App should be running");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn test_setup_failure_reports_status_instead_of_waiter_closed() {
+    // Regression: execute_local_app used to bubble up `?` errors (e.g. a failing
+    // std::env::join_paths) without ever signalling the oneshot waiter, so
+    // LocalApp::status() returned Err(WaiterClosed) and callers exited 1
+    // silently. A setup failure must now surface as a terminal Status.
+    let tmp = TmpDir::new("test-silent-setup")
+        .await
+        .expect("Failed to create tmp dir");
+    let unpacked_path: PathBuf = tmp.as_ref().to_path_buf();
+
+    // On Unix, std::env::join_paths rejects paths containing ':'. Feeding one
+    // into manifest.import_paths causes the PYTHONPATH construction inside
+    // execute_local_app to fail via `?` before any subprocess is spawned.
+    let package = Package {
+        tmp_dir: None,
+        package_file_path: None,
+        unpacked_path: Some(unpacked_path),
+        manifest: Manifest {
+            version: Some(1),
+            invoke: "main.py".to_string(),
+            parameters: vec![],
+            schedule: None,
+            import_paths: vec!["bad:path".to_string()],
+            app_dir_name: "app".to_string(),
+            modules_dir_name: "modules".to_string(),
+            checksum: "".to_string(),
+        },
+    };
+
+    let (sender, _receiver) = unbounded_channel();
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir()),
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    for _ in 0..20 {
+        let status = app.status().await.expect("status should not be WaiterClosed");
+        if status.is_terminal() {
+            match status {
+                Status::Crashed { code } => {
+                    assert!(code < 0, "expected negative sentinel, got {}", code);
+                    return;
+                }
+                other => panic!("expected Crashed, got {:?}", other),
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+
+    panic!("status never reached a terminal state");
 }
 
 #[tokio::test]
