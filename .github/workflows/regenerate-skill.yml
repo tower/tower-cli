@@ -1,0 +1,47 @@
+name: Regenerate SKILL.md
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'crates/tower-cmd/**'
+      - 'crates/tower/**'
+      - 'skills/tower/SKILL.md'
+      - '.github/workflows/regenerate-skill.yml'
+
+concurrency:
+  group: regenerate-skill
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust
+        run: rustup show
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Regenerate SKILL.md
+        run: cargo run --quiet --bin tower -- skill generate > skills/tower/SKILL.md
+
+      - name: Open PR if SKILL.md changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: regenerate SKILL.md"
+          title: "chore: regenerate SKILL.md"
+          body: |
+            `tower skill generate` output has drifted from the checked-in `skills/tower/SKILL.md`.
+
+            This PR was opened automatically by the `Regenerate SKILL.md` workflow after a merge to `develop`.
+          branch: chore/regenerate-skill
+          base: develop
+          delete-branch: true
+          add-paths: skills/tower/SKILL.md
