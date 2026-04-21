@@ -56,6 +56,14 @@ function minimalInputs(): BundleInputs {
   };
 }
 
+function buildEntries(inputs: BundleInputs): TarEntry[] {
+  return parseTarEntries(gunzipSync(buildBundle(inputs)));
+}
+
+function getManifest(entries: TarEntry[]): Record<string, unknown> {
+  return JSON.parse(dec.decode(entries.find((e) => e.name === "MANIFEST")!.data));
+}
+
 test("returns a gzipped archive", () => {
   const out = buildBundle(minimalInputs());
   assert.ok(out instanceof Uint8Array);
@@ -70,7 +78,7 @@ test("output is byte-deterministic across calls", () => {
 });
 
 test("entries are sorted by archive name with MANIFEST and Towerfile last", () => {
-  const entries = parseTarEntries(gunzipSync(buildBundle(minimalInputs())));
+  const entries = buildEntries(minimalInputs());
   assert.deepEqual(
     entries.map((e) => e.name),
     ["app/helper.py", "app/main.py", "MANIFEST", "Towerfile"],
@@ -78,22 +86,19 @@ test("entries are sorted by archive name with MANIFEST and Towerfile last", () =
 });
 
 test("file contents round-trip through the archive", () => {
-  const entries = parseTarEntries(gunzipSync(buildBundle(minimalInputs())));
+  const entries = buildEntries(minimalInputs());
   const main = entries.find((e) => e.name === "app/main.py")!;
   assert.equal(dec.decode(main.data), 'print("hi")\n');
 });
 
 test("manifest matches the inputs", () => {
-  const entries = parseTarEntries(gunzipSync(buildBundle(minimalInputs())));
-  const manifest = JSON.parse(
-    dec.decode(entries.find((e) => e.name === "MANIFEST")!.data),
-  );
+  const manifest = getManifest(buildEntries(minimalInputs()));
   assert.equal(manifest.version, 3);
   assert.equal(manifest.invoke, "main.py");
   assert.equal(manifest.app_dir_name, "app");
   assert.equal(manifest.modules_dir_name, "modules");
   assert.equal(typeof manifest.checksum, "string");
-  assert.equal(manifest.checksum.length, 64);
+  assert.equal((manifest.checksum as string).length, 64);
 });
 
 test("module files and import paths flow through", () => {
@@ -110,33 +115,23 @@ test("module files and import paths flow through", () => {
   ];
   inputs.importPaths = ["modules/shared"];
 
-  const entries = parseTarEntries(gunzipSync(buildBundle(inputs)));
+  const entries = buildEntries(inputs);
   const names = entries.map((e) => e.name);
   assert.ok(names.includes("modules/shared/__init__.py"));
   assert.ok(names.includes("modules/shared/util.py"));
 
-  const manifest = JSON.parse(
-    dec.decode(entries.find((e) => e.name === "MANIFEST")!.data),
-  );
-  assert.deepEqual(manifest.import_paths, ["modules/shared"]);
+  assert.deepEqual(getManifest(entries).import_paths, ["modules/shared"]);
 });
 
 test("different inputs produce different checksums", () => {
-  const a = parseTarEntries(gunzipSync(buildBundle(minimalInputs())));
-
   const other = minimalInputs();
   other.appFiles[0] = {
     archiveName: "app/main.py",
     bytes: enc.encode('print("bye")\n'),
   };
-  const b = parseTarEntries(gunzipSync(buildBundle(other)));
 
-  const checksumA = JSON.parse(
-    dec.decode(a.find((e) => e.name === "MANIFEST")!.data),
-  ).checksum;
-  const checksumB = JSON.parse(
-    dec.decode(b.find((e) => e.name === "MANIFEST")!.data),
-  ).checksum;
+  const checksumA = getManifest(buildEntries(minimalInputs())).checksum;
+  const checksumB = getManifest(buildEntries(other)).checksum;
   assert.notEqual(checksumA, checksumB);
 });
 

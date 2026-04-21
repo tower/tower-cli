@@ -44,19 +44,6 @@ pub struct PackageSpec {
     pub import_paths: Vec<String>,
 }
 
-fn get_parameters(towerfile: &Towerfile) -> Vec<Parameter> {
-    let mut parameters = Vec::new();
-    for p in &towerfile.parameters {
-        parameters.push(Parameter {
-            name: p.name.clone(),
-            description: Some(p.description.clone()),
-            default: p.default.clone(),
-            hidden: p.hidden,
-        });
-    }
-    parameters
-}
-
 impl PackageSpec {
     pub fn from_towerfile(towerfile: &Towerfile) -> Self {
         debug!("creating package spec from towerfile: {:?}", towerfile);
@@ -80,6 +67,17 @@ impl PackageSpec {
             .map(|p| p.to_string_lossy().to_string())
             .collect();
 
+        let parameters = towerfile
+            .parameters
+            .iter()
+            .map(|p| Parameter {
+                name: p.name.clone(),
+                description: Some(p.description.clone()),
+                default: p.default.clone(),
+                hidden: p.hidden,
+            })
+            .collect();
+
         Self {
             schedule,
             towerfile_path,
@@ -87,7 +85,7 @@ impl PackageSpec {
             import_paths,
             invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
-            parameters: get_parameters(towerfile),
+            parameters,
         }
     }
 }
@@ -293,13 +291,8 @@ async fn is_valid_gzip<P: AsRef<Path>>(path: P) -> bool {
     let reader = BufReader::new(file);
     let mut decoder = GzipDecoder::new(reader);
 
-    // Try to read a small amount of data. If we can, then we assume that it's a valid gzip file.
-    // Othwewise, it's not gzipped I suppose?
     let mut buffer = [0u8; 1024];
-    match decoder.read(&mut buffer).await {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    decoder.read(&mut buffer).await.is_ok()
 }
 
 async fn unpack_archive<P: AsRef<Path>>(
@@ -445,20 +438,13 @@ impl FileResolver {
         queue.push_back(path.to_path_buf());
 
         while let Some(current_path) = queue.pop_front() {
-            let canonical_path = current_path.canonicalize();
-
-            if canonical_path.is_err() {
-                debug!(
-                    " - skipping path {}: {}",
-                    current_path.display(),
-                    canonical_path.unwrap_err()
-                );
-                continue;
-            }
-
-            // We can safely unwrap this because we understand that it's not going to fail at this
-            // point.
-            let physical_path = canonical_path.unwrap();
+            let physical_path = match current_path.canonicalize() {
+                Ok(p) => p,
+                Err(e) => {
+                    debug!(" - skipping path {}: {}", current_path.display(), e);
+                    continue;
+                }
+            };
 
             if physical_path.is_dir() {
                 let mut entries = tokio::fs::read_dir(&physical_path).await.unwrap();
@@ -469,7 +455,6 @@ impl FileResolver {
             } else {
                 if !self.should_ignore(&physical_path) {
                     let cp = physical_path.clone();
-
                     match self.logical_path(&cp) {
                         None => {
                             debug!(

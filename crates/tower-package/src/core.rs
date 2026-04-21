@@ -79,8 +79,7 @@ pub struct Manifest {
 
 impl Manifest {
     pub fn from_json(data: &str) -> Result<Self, Error> {
-        let manifest: Self = serde_json::from_str(data)?;
-        Ok(manifest)
+        Ok(serde_json::from_str(data)?)
     }
 }
 
@@ -211,9 +210,7 @@ pub fn compute_sha256_package(path_hashes: &HashMap<String, String>) -> String {
 
     let mut hasher = Sha256::new();
     for key in keys {
-        let value = path_hashes.get(key).unwrap();
-        let combined = format!("{}:{}", key, value);
-        hasher.update(combined.as_bytes());
+        hasher.update(format!("{}:{}", key, &path_hashes[key]).as_bytes());
     }
     format!("{:x}", hasher.finalize())
 }
