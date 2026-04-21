@@ -119,13 +119,15 @@ pub async fn deploy_app_package(
 
     // Create the URL for the API endpoint
     let base_url = &api_config.base_path;
+    let encoded_app_name = urlencode(app_name);
+
     let url = if all_environments {
-        format!("{}/apps/{}/deploy?all_environments=true", base_url, app_name)
+        format!("{}/apps/{}/deploy?all_environments=true", base_url, encoded_app_name)
     } else if let Some(env) = environment {
         let encoded_environment = urlencode(env);
-        format!("{}/apps/{}/deploy?environment={}", base_url, app_name, encoded_environment)
+        format!("{}/apps/{}/deploy?environment={}", base_url, encoded_app_name, encoded_environment)
     } else {
-        format!("{}/apps/{}/deploy", base_url, app_name)
+        format!("{}/apps/{}/deploy", base_url, encoded_app_name)
     };
 
     // Upload the package

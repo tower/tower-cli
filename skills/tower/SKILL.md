@@ -315,6 +315,8 @@ Deploy your latest code to Tower
 **Arguments:**
 
 - `-d`, `--dir` — The directory containing the app to deploy
+- `-a`, `--all` - Deploy this app to all environments. You can only specify `-a` or `-e`, not both.
+- `-e`, `--environment` — The environment to deploy this app to. You can only specifiy `-a` or `-e`, not both.
 - `-f`, `--create` — Automatically force creation of the app if it doesn't already exist
 
 ### `tower run`

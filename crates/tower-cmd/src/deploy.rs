@@ -53,7 +53,6 @@ fn resolve_path(args: &ArgMatches) -> PathBuf {
 ///
 /// - `--all` → `DeployTarget::All`
 /// - `--environment <name>` → `DeployTarget::Environment(name)`
-/// - neither → `DeployTarget::Default`
 #[derive(Debug, Clone)]
 pub enum DeployTarget {
     Environment(String),
