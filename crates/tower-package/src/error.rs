@@ -29,3 +29,19 @@ impl From<serde_json::Error> for Error {
         Error::InvalidManifest
     }
 }
+
+impl From<tower_package_core::Error> for Error {
+    fn from(err: tower_package_core::Error) -> Self {
+        match err {
+            tower_package_core::Error::InvalidPath => Error::InvalidPath,
+            tower_package_core::Error::Serialization { source } => {
+                debug!("core serialization error: {}", source);
+                Error::InvalidManifest
+            }
+            tower_package_core::Error::Io { source } => {
+                debug!("core IO error: {}", source);
+                Error::NoManifest
+            }
+        }
+    }
+}

@@ -1,98 +1,26 @@
 use config::Towerfile;
 use glob::glob;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use tmpdir::TmpDir;
 use tokio::{
     fs::File,
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader},
 };
-use tokio_tar::{Archive, Builder};
+use tokio_tar::Archive;
 
 use async_compression::tokio::bufread::GzipDecoder;
-use async_compression::tokio::write::GzipEncoder;
 
+use tower_package_core::{build_package, normalize_path, Entry, PackageInputs};
 use tower_telemetry::debug;
 
 mod error;
 pub use error::Error;
 
-// current version of the package format. we keep a version history here just in case anyone has
-// questions. will probably promote this to proper docs at some point.
-//
-// Version History:
-// 1 - Initial version
-// 2 - Add app_dir, modules_dir, and checksum
-// 3 - Change checksum algorithm to be cross-platform
-const CURRENT_PACKAGE_VERSION: i32 = 3;
-
-// Maximum allowed size for a bundle package in bytes (50MB)
-// This limit ensures bundles remain manageable for deployment and storage.
-pub const MAX_BUNDLE_SIZE: u64 = 50 * 1024 * 1024;
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Parameter {
-    #[serde(default)]
-    pub name: String,
-
-    #[serde(default)]
-    pub description: Option<String>,
-
-    #[serde(default)]
-    pub default: String,
-    
-    #[serde(default)]
-    pub hidden: bool,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Manifest {
-    // version is the version of the packaging format that was used.
-    pub version: Option<i32>,
-
-    // invoke is the target in this package to invoke.
-    pub invoke: String,
-
-    #[serde(default)]
-    pub parameters: Vec<Parameter>,
-
-    // schedule is the schedule that we want to execute this app on. this is, just temporarily,
-    // where it will live.
-    pub schedule: Option<String>,
-
-    // import_paths are the rewritten collection of modules that this app's code goes into.
-    #[serde(default)]
-    pub import_paths: Vec<String>,
-
-    // app_dir_name is the name of the application directory within the package.
-    #[serde(default)]
-    pub app_dir_name: String,
-
-    // modules_dir_name is the name of the modules directory within the package.
-    #[serde(default)]
-    pub modules_dir_name: String,
-
-    // checksum contains a hash of all the content in the package.
-    #[serde(default)]
-    pub checksum: String,
-}
-
-impl Manifest {
-    pub async fn from_path(path: &Path) -> Result<Self, Error> {
-        let mut file = File::open(path).await?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).await?;
-        Self::from_json(&contents).await
-    }
-
-    pub async fn from_json(data: &str) -> Result<Self, Error> {
-        let manifest: Self = serde_json::from_str(data)?;
-        Ok(manifest)
-    }
-}
+pub use tower_package_core::{
+    compute_sha256_bytes, Manifest, Parameter, CURRENT_PACKAGE_VERSION, MAX_BUNDLE_SIZE,
+};
 
 // PackageSpec describes how to build a package.
 #[derive(Debug)]
@@ -201,7 +129,10 @@ impl Package {
 
     pub async fn from_unpacked_path(path: PathBuf) -> Result<Self, Error> {
         let manifest_path = path.join("MANIFEST");
-        let manifest = Manifest::from_path(&manifest_path).await?;
+        let mut file = File::open(&manifest_path).await?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).await?;
+        let manifest = Manifest::from_json(&contents)?;
 
         Ok(Self {
             tmp_dir: None,
@@ -233,136 +164,81 @@ impl Package {
 
         let resolver = FileResolver::new(base_dir.clone(), canonical_import_paths.clone());
 
-        let tmp_dir = TmpDir::new("tower-package").await?;
-        let package_path = tmp_dir.to_path_buf().join("package.tar");
-        debug!("building package at: {:?}", package_path);
-
-        let file = File::create(package_path.clone()).await?;
-        let gzip = GzipEncoder::new(file);
-        let mut builder = Builder::new(gzip);
-
-        // These help us compute the integrity of the package contents overall. For each path, we'll
-        // store a hash of the contents written to the file. Then we'll hash the final content to
-        // create a fingerprint of the data.
-        let mut path_hashes = HashMap::new();
-
-        // If the user didn't specify anything here we'll package everything under this directory
-        // and ship it to Tower.
+        // If the user didn't specify anything here we'll package everything under this directory.
         let mut file_globs = spec.file_globs.clone();
-
-        // If there was no source specified, we'll pull in all the source code in the current
-        // directory.
         if file_globs.is_empty() {
             debug!("no source files specified. using default paths.");
             file_globs.push("./**/*".to_string());
         }
 
-        // We'll collect all the file paths in a collection here.
-        let mut file_paths = HashMap::new();
-
+        // Resolve app file paths: physical -> logical (relative to base_dir or import parent).
+        let mut app_file_paths: HashMap<PathBuf, PathBuf> = HashMap::new();
         for file_glob in file_globs {
             let path = base_dir.join(file_glob);
-            resolver.resolve_glob(path, &mut file_paths).await?;
+            resolver.resolve_glob(path, &mut app_file_paths).await?;
         }
 
-        // App code lives in the app dir
         let app_dir = PathBuf::from("app");
-
-        // Now that we have all the paths, we'll append them to the builder.
-        for (physical_path, logical_path) in file_paths {
-            // All of the app code goes into the "app" directory.
-            let logical_path = app_dir.join(logical_path);
-            // Normalize to forward slashes so archive entry names are POSIX-compatible
-            // on all platforms (Windows PathBuf uses backslashes).
-            let archive_name = normalize_path(&logical_path)?;
-
-            let hash = compute_sha256_file(&physical_path).await?;
-            path_hashes.insert(PathBuf::from(&archive_name), hash);
-
-            builder
-                .append_path_with_name(physical_path, &archive_name)
-                .await?;
+        let mut app_files: Vec<Entry> = Vec::with_capacity(app_file_paths.len());
+        for (physical_path, logical_path) in app_file_paths {
+            let archive_path = app_dir.join(logical_path);
+            let archive_name = normalize_path(&archive_path)?;
+            let bytes = tokio::fs::read(&physical_path).await?;
+            app_files.push(Entry { archive_name, bytes });
         }
 
-        // Module code lives in the modules dir.
+        // Resolve modules and compute their manifest import_paths entries.
         let module_dir = PathBuf::from("modules");
-        let mut import_paths = vec![];
+        let mut module_files: Vec<Entry> = Vec::new();
+        let mut import_paths: Vec<String> = Vec::new();
 
-        // Now we need to package up all the modules to include in the code base too.
         for import_path in &canonical_import_paths {
+            let mut module_file_paths: HashMap<PathBuf, PathBuf> = HashMap::new();
+            resolver.resolve_path(import_path, &mut module_file_paths).await;
 
-            let mut file_paths = HashMap::new();
-            resolver.resolve_path(&import_path, &mut file_paths).await;
-
-            // Resolve module files relative to the import path's parent so that the
-            // directory structure inside the package matches the manifest entry. Without
-            // this, an import path that lives inside base_dir (e.g. libs/shared) would be
-            // resolved relative to base_dir by logical_path(), producing
-            // modules/libs/shared/... while the manifest entry is modules/shared.
+            // Logical paths are relative to the import path's parent so the archive layout
+            // matches the manifest entry (modules/<dir>/... not modules/<parent>/<dir>/...).
             let import_parent = import_path.parent().unwrap_or(import_path.as_path());
 
-            // The file_name should constitute the logical path
-            let import_path = import_path.file_name().unwrap();
-            let import_path = module_dir.join(import_path);
-            // Normalize to forward slashes for the manifest (POSIX, cross-platform).
-            let import_path_str = normalize_path(&import_path)?;
-            import_paths.push(import_path_str);
+            let import_name = import_path.file_name().unwrap();
+            let manifest_import = module_dir.join(import_name);
+            import_paths.push(normalize_path(&manifest_import)?);
 
-            // Now we write all of these paths to the modules directory.
-            for (physical_path, _) in file_paths {
+            for (physical_path, _) in module_file_paths {
                 let logical_path = match physical_path.strip_prefix(import_parent) {
                     Ok(p) => module_dir.join(p),
                     Err(_) => continue,
                 };
-                // Normalize to forward slashes so archive entry names are POSIX-compatible
-                // on all platforms (Windows PathBuf uses backslashes).
                 let archive_name = normalize_path(&logical_path)?;
-
-                let hash = compute_sha256_file(&physical_path).await?;
-                path_hashes.insert(PathBuf::from(&archive_name), hash);
-
-                debug!("adding file {}", logical_path.display());
-                builder
-                    .append_path_with_name(physical_path, &archive_name)
-                    .await?;
+                let bytes = tokio::fs::read(&physical_path).await?;
+                module_files.push(Entry { archive_name, bytes });
             }
         }
 
-        let manifest = Manifest {
-            import_paths,
-            version: Some(CURRENT_PACKAGE_VERSION),
-            invoke: String::from(spec.invoke),
+        let towerfile_bytes = tokio::fs::read(&spec.towerfile_path).await?;
+
+        let inputs = PackageInputs {
+            app_files,
+            module_files,
+            towerfile_bytes,
+            invoke: spec.invoke,
             parameters: spec.parameters,
             schedule: spec.schedule,
-            app_dir_name: app_dir.to_string_lossy().to_string(),
-            modules_dir_name: module_dir.to_string_lossy().to_string(),
-            checksum: compute_sha256_package(&path_hashes)?,
+            import_paths,
         };
 
-        // the whole manifest needs to be written to a file as a convenient way to avoid having to
-        // manually populate the TAR file headers for this data. maybe in the future, someone will
-        // have the humption to do so here, thus avoiding an unnecessary file write (and the
-        // associated failure modes).
-        let manifest_path = tmp_dir.to_path_buf().join("MANIFEST");
-        write_manifest_to_file(&manifest_path, &manifest).await?;
-        builder
-            .append_path_with_name(manifest_path, "MANIFEST")
-            .await?;
+        let built = build_package(inputs)?;
 
-        // Let's also package the Towerfile along with it.
-        builder
-            .append_path_with_name(spec.towerfile_path, "Towerfile")
-            .await?;
+        let tmp_dir = TmpDir::new("tower-package").await?;
+        let package_path = tmp_dir.to_path_buf().join("package.tar");
+        debug!("writing package to: {:?}", package_path);
 
-        let mut gzip = builder.into_inner().await?;
-        gzip.shutdown().await?;
-
-        // probably not explicitly required; however, makes the test suite pass so...
-        let mut file = gzip.into_inner();
+        let mut file = File::create(&package_path).await?;
+        file.write_all(&built.bytes).await?;
         file.shutdown().await?;
 
         Ok(Self {
-            manifest,
+            manifest: built.manifest,
             unpacked_path: None,
             tmp_dir: Some(tmp_dir),
             package_file_path: Some(package_path),
@@ -389,18 +265,6 @@ impl Package {
         self.unpacked_path = Some(path);
         Ok(())
     }
-}
-
-async fn write_manifest_to_file(path: &PathBuf, manifest: &Manifest) -> Result<(), Error> {
-    let mut file = File::create(path).await?;
-    let data = serde_json::to_string(&manifest)?;
-    file.write_all(data.as_bytes()).await?;
-
-    // this is required to ensure that everything gets flushed to disk. it's not enough to just let
-    // the file reference get dropped.
-    file.shutdown().await?;
-
-    Ok(())
 }
 
 fn extract_glob_path(path: PathBuf) -> String {
@@ -632,92 +496,9 @@ impl FileResolver {
     }
 }
 
-// normalize_path converts a Path to a normalized string with forward slashes as separators.
-fn normalize_path(path: &Path) -> Result<String, Error> {
-    let mut next = Vec::new();
-
-    for component in path.components() {
-        match component {
-            Component::Prefix(_) | Component::RootDir => {
-                // Skip Windows prefixes (C:) and root markers
-                // You might want to keep root as "/" depending on needs
-            }
-            Component::CurDir => {
-                // Skip "." components
-            }
-            Component::ParentDir => {
-                // If the user is trying to navigate up but that's not possible, we'll just return
-                // an error here.
-                if !next.is_empty() {
-                    return Err(Error::InvalidPath);
-                }
-            }
-            Component::Normal(os_str) => {
-                if let Some(s) = os_str.to_str() {
-                    next.push(s.to_string());
-                }
-            }
-        }
-    }
-
-    Ok(next.join("/"))
-}
-
-fn compute_sha256_package(path_hashes: &HashMap<PathBuf, String>) -> Result<String, Error> {
-    // We'll standardize all the paths into a set of strings with normalized path separators. This
-    // is in particular important on Windows.
-    let mut key_cache = HashMap::new();
-
-    for key in path_hashes.keys() {
-        let normalized = normalize_path(&key)?;
-        key_cache.insert(normalized, key.clone());
-    }
-
-    let mut sorted_keys: Vec<_> = key_cache.keys().collect();
-    sorted_keys.sort();
-
-    // hasher that we'll use for computing the overall SHA256 hash.
-    let mut hasher = Sha256::new();
-
-    for key in sorted_keys {
-        // We need to sort the keys so that we can compute a consistent hash.
-        let path = key_cache.get(key).unwrap();
-        let value = path_hashes.get(path).unwrap();
-
-        let combined = format!("{}:{}", key, value);
-        hasher.update(combined.as_bytes());
-    }
-
-    // Finalize and get the hash result
-    let result = hasher.finalize();
-
-    // Convert to hex string
-    Ok(format!("{:x}", result))
-}
-
 pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
-    // Open the file
-    let file = File::open(file_path).await?;
-    let mut reader = BufReader::new(file);
-
-    // Create a SHA256 hasher
-    let mut hasher = Sha256::new();
-
-    // Read file in chunks to handle large files efficiently
-    let mut buffer = [0; 8192]; // 8KB buffer
-    loop {
-        let bytes_read = reader.read(&mut buffer).await?;
-        if bytes_read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..bytes_read]);
-    }
-
-    // Finalize and get the hash result
-    let result = hasher.finalize();
-
-    // Convert to hex string
-    Ok(format!("{:x}", result))
+    let bytes = tokio::fs::read(file_path).await?;
+    Ok(compute_sha256_bytes(&bytes))
 }
 
 #[cfg(test)]
@@ -737,17 +518,5 @@ mod test {
 
         // A .py file should not be ignored
         assert!(!resolver.should_ignore(&PathBuf::from("/project/module.py")));
-    }
-
-    #[tokio::test]
-    async fn test_normalize_path() {
-        let path = PathBuf::from(".")
-            .join("some")
-            .join("nested")
-            .join("path")
-            .join("to")
-            .join("file.txt");
-        let normalized = normalize_path(&path).unwrap();
-        assert_eq!(normalized, "some/nested/path/to/file.txt");
     }
 }

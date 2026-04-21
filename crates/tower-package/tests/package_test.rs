@@ -276,7 +276,6 @@ async fn it_packages_import_paths() {
 
     // Let's decode the manifest and make sure import paths are set correctly.
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .await
         .expect("Manifest was not valid JSON");
 
     // Archive paths are always normalized to forward slashes regardless of OS.
@@ -339,7 +338,6 @@ async fn it_packages_import_paths_nested_within_base_dir() {
 
     // Verify the manifest import_paths entry matches the actual package structure.
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .await
         .expect("Manifest was not valid JSON");
 
     assert!(
@@ -527,7 +525,6 @@ async fn it_includes_hidden_parameters_in_manifest() {
     let files = read_package_files(package).await;
 
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .await
         .expect("Manifest was not valid JSON");
 
     assert_eq!(manifest.parameters.len(), 2);

@@ -18,4 +18,5 @@ tmpdir = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-tar = { workspace = true }
+tower-package-core = { workspace = true }
 tower-telemetry = { workspace = true }

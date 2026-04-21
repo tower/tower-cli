@@ -3277,6 +3277,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tar"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "target-lexicon"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3709,7 +3720,20 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tar",
+ "tower-package-core",
  "tower-telemetry",
+]
+
+[[package]]
+name = "tower-package-core"
+version = "0.3.58"
+dependencies = [
+ "flate2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "snafu",
+ "tar",
 ]
 
 [[package]]
