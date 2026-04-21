@@ -1,12 +1,6 @@
 # Publish tower-package-wasm to npm.
-#
-# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a publish job
-# within `cargo-dist`, in parallel with publish-pypi.yml.
-#
-# Authentication uses npm's OIDC Trusted Publishing — no NPM_TOKEN
-# secret. The `tower-package-wasm` package must have a trusted publisher
-# configured on npmjs.com that matches this repo, this workflow file,
-# and the `release` environment below.
+# Uses OIDC Trusted Publishing — no NPM_TOKEN needed, but the package must have a trusted publisher
+# configured on npmjs.com matching this repo, this workflow file, and the `release` environment.
 name: "[tower] Publish to npm"
 
 on:

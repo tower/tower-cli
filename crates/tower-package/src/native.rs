@@ -291,6 +291,8 @@ async fn is_valid_gzip<P: AsRef<Path>>(path: P) -> bool {
     let reader = BufReader::new(file);
     let mut decoder = GzipDecoder::new(reader);
 
+    // Try to read a small amount of data. If we can, then we assume that it's a valid gzip file.
+    // Othwewise, it's not gzipped I suppose?
     let mut buffer = [0u8; 1024];
     decoder.read(&mut buffer).await.is_ok()
 }
