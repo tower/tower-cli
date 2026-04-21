@@ -16,27 +16,21 @@ use tower_telemetry::debug;
 
 use crate::core::{
     build_package, compute_sha256_bytes, normalize_path, Entry, Manifest, PackageInputs,
-    Parameter, CURRENT_PACKAGE_VERSION,
+    CURRENT_PACKAGE_VERSION,
 };
 use crate::error::Error;
 
-// PackageSpec describes how to build a package.
+// PackageSpec describes how to build a package. Everything core needs (invoke, parameters,
+// import_paths as manifest entries) is derived from the Towerfile on disk, so this struct only
+// carries what the file resolver needs: where the Towerfile lives, what's considered the project
+// root, which globs match app files, and which import paths to walk.
 #[derive(Debug)]
 pub struct PackageSpec {
-    // towerfile_path is the path to the Towerfile that was used to build this package.
     pub towerfile_path: PathBuf,
 
-    // invoke is the file to invoke when the package is run.
-    pub invoke: String,
-
-    // base_dir is the directory where the package is located.
     pub base_dir: PathBuf,
 
-    // file_globs is a list of globs that match the files in the package.
     pub file_globs: Vec<String>,
-
-    // parameters are the parameters to use for this app.
-    pub parameters: Vec<Parameter>,
 
     pub import_paths: Vec<String>,
 }
@@ -50,7 +44,6 @@ impl PackageSpec {
             .unwrap_or_else(|| Path::new("."))
             .to_path_buf();
 
-        // We need to turn these (validated) paths into something taht we can use at runtime.
         let import_paths = towerfile
             .app
             .import_paths
@@ -58,24 +51,11 @@ impl PackageSpec {
             .map(|p| p.to_string_lossy().to_string())
             .collect();
 
-        let parameters = towerfile
-            .parameters
-            .iter()
-            .map(|p| Parameter {
-                name: p.name.clone(),
-                description: Some(p.description.clone()),
-                default: p.default.clone(),
-                hidden: p.hidden,
-            })
-            .collect();
-
         Self {
             towerfile_path,
             base_dir,
             import_paths,
-            invoke: towerfile.app.script.clone(),
             file_globs: towerfile.app.source.clone(),
-            parameters,
         }
     }
 }
@@ -173,29 +153,27 @@ impl Package {
             app_files.push(Entry { archive_name, bytes });
         }
 
-        // Resolve modules and compute their manifest import_paths entries.
+        // Resolve modules. Archive names use the raw import_path basename so they stay in sync
+        // with the manifest entries core derives from the same Towerfile string.
         let module_dir = PathBuf::from("modules");
         let mut module_files: Vec<Entry> = Vec::new();
-        let mut import_paths: Vec<String> = Vec::new();
 
-        for import_path in &canonical_import_paths {
+        for (raw_import, canonical_import) in spec.import_paths.iter().zip(canonical_import_paths.iter()) {
             let mut module_file_paths: HashMap<PathBuf, PathBuf> = HashMap::new();
-            resolver.resolve_path(import_path, &mut module_file_paths).await;
+            resolver.resolve_path(canonical_import, &mut module_file_paths).await;
 
-            // Logical paths are relative to the import path's parent so the archive layout
-            // matches the manifest entry (modules/<dir>/... not modules/<parent>/<dir>/...).
-            let import_parent = import_path.parent().unwrap_or(import_path.as_path());
-
-            let import_name = import_path.file_name().unwrap();
-            let manifest_import = module_dir.join(import_name);
-            import_paths.push(normalize_path(&manifest_import)?);
+            let raw_basename = Path::new(raw_import)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
+            let archive_prefix = module_dir.join(raw_basename);
 
             for (physical_path, _) in module_file_paths {
-                let logical_path = match physical_path.strip_prefix(import_parent) {
-                    Ok(p) => module_dir.join(p),
+                let rel = match physical_path.strip_prefix(canonical_import) {
+                    Ok(p) => p,
                     Err(_) => continue,
                 };
-                let archive_name = normalize_path(&logical_path)?;
+                let archive_name = normalize_path(&archive_prefix.join(rel))?;
                 let bytes = tokio::fs::read(&physical_path).await?;
                 module_files.push(Entry { archive_name, bytes });
             }
@@ -207,9 +185,6 @@ impl Package {
             app_files,
             module_files,
             towerfile_bytes,
-            invoke: spec.invoke,
-            parameters: spec.parameters,
-            import_paths,
         };
 
         let built = build_package(inputs)?;

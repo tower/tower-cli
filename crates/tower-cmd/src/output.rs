@@ -167,6 +167,9 @@ pub fn package_error(err: tower_package::Error) {
         tower_package::Error::InvalidGlob { message } => {
             format!("Invalid file glob pattern: {}", message)
         }
+        tower_package::Error::InvalidTowerfile { message } => {
+            format!("Invalid Towerfile: {}", message)
+        }
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);

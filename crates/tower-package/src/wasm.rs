@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use crate::core::{build_package, Entry, PackageInputs, Parameter};
+use crate::core::{build_package, Entry, PackageInputs};
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize)]
@@ -24,9 +24,6 @@ struct JsInputs {
     app_files: Vec<JsEntry>,
     module_files: Vec<JsEntry>,
     towerfile_bytes: serde_bytes::ByteBuf,
-    invoke: String,
-    parameters: Vec<Parameter>,
-    import_paths: Vec<String>,
 }
 
 /// Build a Tower app package (gzipped tar) from in-memory file contents.
@@ -35,11 +32,12 @@ struct JsInputs {
 ///   {
 ///     appFiles: [{ archiveName: string, bytes: Uint8Array }, ...],
 ///     moduleFiles: [{ archiveName: string, bytes: Uint8Array }, ...],
-///     towerfileBytes: Uint8Array,
-///     invoke: string,
-///     parameters: [{ name, description?, default, hidden }, ...],
-///     importPaths: string[]
+///     towerfileBytes: Uint8Array
 ///   }
+///
+/// invoke, parameters, and import_paths in the manifest are derived from
+/// towerfileBytes (parsed as TOML), so the caller cannot produce a package
+/// whose manifest disagrees with the embedded Towerfile.
 ///
 /// Returns the gzipped tar archive as a Uint8Array, byte-identical across
 /// runs for the same inputs.
@@ -52,9 +50,6 @@ pub fn build_package_wasm(inputs: JsValue) -> Result<Vec<u8>, JsError> {
         app_files: js.app_files.into_iter().map(Entry::from).collect(),
         module_files: js.module_files.into_iter().map(Entry::from).collect(),
         towerfile_bytes: js.towerfile_bytes.into_vec(),
-        invoke: js.invoke,
-        parameters: js.parameters,
-        import_paths: js.import_paths,
     };
 
     let built = build_package(core_inputs)

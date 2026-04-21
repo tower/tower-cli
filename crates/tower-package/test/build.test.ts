@@ -49,10 +49,7 @@ function minimalInputs(): PackageInputs {
       { archiveName: "app/helper.py", bytes: enc.encode("# helper\n") },
     ],
     moduleFiles: [],
-    towerfileBytes: enc.encode('[app]\nname = "test"\n'),
-    invoke: "main.py",
-    parameters: [],
-    importPaths: [],
+    towerfileBytes: enc.encode('[app]\nname = "test"\nscript = "main.py"\n'),
   };
 }
 
@@ -113,7 +110,9 @@ test("module files and import paths flow through", () => {
       bytes: enc.encode("# util\n"),
     },
   ];
-  inputs.importPaths = ["modules/shared"];
+  inputs.towerfileBytes = enc.encode(
+    '[app]\nname = "test"\nscript = "main.py"\nimport_paths = ["shared"]\n',
+  );
 
   const entries = buildEntries(inputs);
   const names = entries.map((e) => e.name);

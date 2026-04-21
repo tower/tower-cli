@@ -20,6 +20,9 @@ pub enum Error {
     #[snafu(display("Invalid path"))]
     InvalidPath,
 
+    #[snafu(display("Invalid Towerfile: {message}"))]
+    InvalidTowerfile { message: String },
+
     #[snafu(display("Serialization error: {source}"))]
     Serialization { source: serde_json::Error },
 
@@ -98,12 +101,26 @@ pub struct PackageInputs {
     // module_files have archive_name already rooted under "modules/".
     pub module_files: Vec<Entry>,
 
+    // towerfile_bytes is the sole source of invoke, parameters, and import_paths.
     pub towerfile_bytes: Vec<u8>,
+}
 
-    pub invoke: String,
-    pub parameters: Vec<Parameter>,
-    // import_paths are the manifest entries (e.g. "modules/shared"), precomputed by the caller.
-    pub import_paths: Vec<String>,
+#[derive(Default, Deserialize)]
+struct TowerfileApp {
+    #[serde(default)]
+    script: String,
+
+    #[serde(default)]
+    import_paths: Vec<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct TowerfileSpec {
+    #[serde(default)]
+    app: TowerfileApp,
+
+    #[serde(default)]
+    parameters: Vec<Parameter>,
 }
 
 pub struct BuiltPackage {
@@ -116,6 +133,19 @@ pub struct BuiltPackage {
 // normalized (mtime/uid/gid zero, mode 0644) so the output is byte-deterministic for a given
 // input.
 pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
+    let towerfile_str = std::str::from_utf8(&inputs.towerfile_bytes).map_err(|e| {
+        Error::InvalidTowerfile { message: format!("Towerfile is not valid UTF-8: {}", e) }
+    })?;
+    let spec: TowerfileSpec = toml::from_str(towerfile_str)
+        .map_err(|e| Error::InvalidTowerfile { message: e.to_string() })?;
+
+    let import_paths: Vec<String> = spec
+        .app
+        .import_paths
+        .iter()
+        .map(|p| format!("modules/{}", import_path_basename(p)))
+        .collect();
+
     let mut entries: Vec<Entry> = Vec::with_capacity(inputs.app_files.len() + inputs.module_files.len());
     entries.extend(inputs.app_files);
     entries.extend(inputs.module_files);
@@ -128,10 +158,10 @@ pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
 
     let manifest = Manifest {
         version: Some(CURRENT_PACKAGE_VERSION),
-        invoke: inputs.invoke,
-        parameters: inputs.parameters,
+        invoke: spec.app.script,
+        parameters: spec.parameters,
         schedule: None,
-        import_paths: inputs.import_paths,
+        import_paths,
         app_dir_name: "app".to_string(),
         modules_dir_name: "modules".to_string(),
         checksum: compute_sha256_package(&path_hashes),
@@ -167,6 +197,14 @@ fn append_entry<W: Write>(builder: &mut Builder<W>, name: &str, bytes: &[u8]) ->
     header.set_cksum();
     builder.append_data(&mut header, name, bytes)?;
     Ok(())
+}
+
+// import_path_basename returns the final non-empty path component of an import path string.
+// Accepts both forward- and back-slashes so Towerfiles authored on either OS parse the same.
+fn import_path_basename(path: &str) -> &str {
+    path.rsplit(|c| c == '/' || c == '\\')
+        .find(|s| !s.is_empty() && *s != "." && *s != "..")
+        .unwrap_or("")
 }
 
 // normalize_path converts a Path to a POSIX-style string with forward slashes, dropping root and
@@ -237,15 +275,43 @@ mod test {
                 Entry { archive_name: "app/a.py".into(), bytes: b"a".to_vec() },
             ],
             module_files: vec![],
-            towerfile_bytes: b"[app]\nname = \"x\"\n".to_vec(),
-            invoke: "app/a.py".into(),
-            parameters: vec![],
-            import_paths: vec![],
+            towerfile_bytes: b"[app]\nname = \"x\"\nscript = \"app/a.py\"\n".to_vec(),
         };
 
         let p1 = build_package(inputs()).unwrap();
         let p2 = build_package(inputs()).unwrap();
         assert_eq!(p1.bytes, p2.bytes);
         assert!(!p1.manifest.checksum.is_empty());
+        assert_eq!(p1.manifest.invoke, "app/a.py");
+    }
+
+    #[test]
+    fn test_derives_import_paths_from_towerfile() {
+        let towerfile = br#"
+[app]
+name = "x"
+script = "main.py"
+import_paths = ["../shared", "libs/inner", "./weird/"]
+"#;
+        let out = build_package(PackageInputs {
+            app_files: vec![],
+            module_files: vec![],
+            towerfile_bytes: towerfile.to_vec(),
+        })
+        .unwrap();
+        assert_eq!(
+            out.manifest.import_paths,
+            vec!["modules/shared", "modules/inner", "modules/weird"]
+        );
+    }
+
+    #[test]
+    fn test_invalid_towerfile_is_rejected() {
+        let result = build_package(PackageInputs {
+            app_files: vec![],
+            module_files: vec![],
+            towerfile_bytes: b"not = = toml".to_vec(),
+        });
+        assert!(matches!(result, Err(Error::InvalidTowerfile { .. })));
     }
 }

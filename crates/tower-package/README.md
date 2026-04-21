@@ -38,28 +38,28 @@ Output lands in `pkg/` and is publishable to npm as `tower-package-wasm`.
 ### Usage
 
 ```ts
-import { buildBundle, BundleInputs } from 'tower-package-wasm';
+import { buildPackage, PackageInputs } from 'tower-package-wasm';
 
-const inputs: BundleInputs = {
+const inputs: PackageInputs = {
   appFiles: [
     { archiveName: 'app/main.py', bytes: new TextEncoder().encode('print("hi")') },
   ],
   moduleFiles: [],
-  towerfileBytes: new TextEncoder().encode('[app]\nname = "my-app"\n'),
-  invoke: 'main.py',
-  parameters: [],
-  importPaths: [],
+  towerfileBytes: new TextEncoder().encode(
+    '[app]\nname = "my-app"\nscript = "main.py"\n',
+  ),
 };
 
-const tarGz: Uint8Array = buildBundle(inputs);
+const tarGz: Uint8Array = buildPackage(inputs);
 ```
 
 Archive names must already be rooted under `app/` or `modules/<name>/`;
-the core does no path rewriting.
+the core does no path rewriting. `invoke`, `parameters`, and import
+paths in the manifest are derived from `towerfileBytes`.
 
 Output is byte-deterministic for a given input: entries are sorted by
 `archiveName`, tar headers are normalized (zero mtime/uid/gid, mode
-`0644`), and the gzip header embeds no mtime. The bundle format
+`0644`), and the gzip header embeds no mtime. The package format
 (`ustar` + gzip, `MANIFEST` + `Towerfile` at the top level) matches
 what the Tower CLI produces natively.
 

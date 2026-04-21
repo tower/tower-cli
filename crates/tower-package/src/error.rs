@@ -14,6 +14,9 @@ pub enum Error {
 
     #[snafu(display("Invalid glob pattern: {message}"))]
     InvalidGlob { message: String },
+
+    #[snafu(display("Invalid Towerfile: {message}"))]
+    InvalidTowerfile { message: String },
 }
 
 impl From<std::io::Error> for Error {
@@ -43,6 +46,7 @@ impl From<crate::core::Error> for Error {
                 debug!("core IO error: {}", source);
                 Error::NoManifest
             }
+            Core::InvalidTowerfile { message } => Error::InvalidTowerfile { message },
         }
     }
 }

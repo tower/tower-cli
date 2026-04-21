@@ -3,24 +3,18 @@ export interface PackageEntry {
   bytes: Uint8Array;
 }
 
-export interface PackageParameter {
-  name: string;
-  description?: string;
-  default: string;
-  hidden: boolean;
-}
-
 export interface PackageInputs {
   appFiles: PackageEntry[];
   moduleFiles: PackageEntry[];
   towerfileBytes: Uint8Array;
-  invoke: string;
-  parameters: PackageParameter[];
-  importPaths: string[];
 }
 
 /**
  * Build a Tower app package (gzipped tar) from in-memory file contents.
+ *
+ * invoke, parameters, and import paths in the manifest are derived from
+ * towerfileBytes, so the caller cannot produce a package whose manifest
+ * disagrees with the embedded Towerfile.
  *
  * Output is byte-identical across runs for the same inputs: entries are
  * sorted by archiveName, tar headers are normalized (zero mtime/uid/gid,

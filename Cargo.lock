@@ -3745,6 +3745,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tar",
+ "toml",
  "tower-telemetry",
  "wasm-bindgen",
 ]
