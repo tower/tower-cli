@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use tower_package_core::{build_package, Entry, PackageInputs, Parameter};
+use crate::core::{build_package, Entry, PackageInputs, Parameter};
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize)]

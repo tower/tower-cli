@@ -3732,39 +3732,20 @@ version = "0.3.58"
 dependencies = [
  "async-compression",
  "config",
+ "flate2",
  "glob",
  "serde",
- "serde_json",
- "sha2",
- "snafu",
- "tmpdir",
- "tokio",
- "tokio-stream",
- "tokio-tar",
- "tower-package-core",
- "tower-telemetry",
-]
-
-[[package]]
-name = "tower-package-core"
-version = "0.3.58"
-dependencies = [
- "flate2",
- "serde",
+ "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
  "sha2",
  "snafu",
  "tar",
-]
-
-[[package]]
-name = "tower-package-wasm"
-version = "0.3.58"
-dependencies = [
- "serde",
- "serde-wasm-bindgen",
- "serde_bytes",
- "tower-package-core",
+ "tmpdir",
+ "tokio",
+ "tokio-stream",
+ "tokio-tar",
+ "tower-telemetry",
  "wasm-bindgen",
 ]
 

@@ -6,17 +6,43 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["native"]
+native = [
+    "dep:async-compression",
+    "dep:config",
+    "dep:glob",
+    "dep:tmpdir",
+    "dep:tokio",
+    "dep:tokio-stream",
+    "dep:tokio-tar",
+    "dep:tower-telemetry",
+]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:serde_bytes"]
+
 [dependencies]
-async-compression = { workspace = true }
-config = { workspace = true }
-glob = { workspace = true }
-serde = { workspace = true }
+# Pure core — always compiled.
+flate2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 snafu = { workspace = true }
-tmpdir = { workspace = true }
-tokio = { workspace = true }
-tokio-stream = { workspace = true }
-tokio-tar = { workspace = true }
-tower-package-core = { workspace = true }
-tower-telemetry = { workspace = true }
+tar = { workspace = true }
+
+# Native shell — gated behind the `native` feature.
+async-compression = { workspace = true, optional = true }
+config = { workspace = true, optional = true }
+glob = { workspace = true, optional = true }
+tmpdir = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+tokio-tar = { workspace = true, optional = true }
+tower-telemetry = { workspace = true, optional = true }
+
+# WASM bindings — gated behind the `wasm` feature.
+serde_bytes = { version = "0.11", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }

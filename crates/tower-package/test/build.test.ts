@@ -5,7 +5,7 @@ import { gunzipSync } from "node:zlib";
 import {
   buildBundle,
   type BundleInputs,
-} from "../pkg/tower_package_wasm.js";
+} from "../pkg/tower_package.js";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
