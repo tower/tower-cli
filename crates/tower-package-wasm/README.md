@@ -44,3 +44,10 @@ Output is byte-deterministic for a given input: entries are sorted by
 `0644`), and the gzip header embeds no mtime. The bundle format
 (`ustar` + gzip, `MANIFEST` + `Towerfile` at the top level) matches
 what the Tower CLI produces.
+
+## Tests
+
+```sh
+./scripts/build.sh nodejs
+cd test && npm install && npm test
+```
