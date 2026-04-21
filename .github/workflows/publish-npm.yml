@@ -1,0 +1,45 @@
+# Publish tower-package-wasm to npm.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a publish job
+# within `cargo-dist`, in parallel with publish-pypi.yml.
+name: "[tower] Publish to npm"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  npm-publish:
+    name: Upload to npm
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+        with:
+          target: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Build wasm package
+        working-directory: crates/tower-package
+        run: ./scripts/build.sh bundler
+
+      - name: Publish to npm
+        working-directory: crates/tower-package/pkg
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
