@@ -37,7 +37,6 @@ async fn it_creates_package() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["*.py".to_string()],
         parameters: vec![],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -79,7 +78,6 @@ async fn it_respects_complex_file_globs() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["*.py".to_string(), "**/*.py".to_string()],
         parameters: vec![],
-        schedule: Some("every 1 minute".to_string()),
         import_paths: vec![],
     };
 
@@ -87,10 +85,6 @@ async fn it_respects_complex_file_globs() {
 
     assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
-    assert_eq!(
-        package.manifest.schedule,
-        Some("every 1 minute".to_string())
-    );
 
     let package_file_path = package.package_file_path.clone().unwrap();
     assert!(!package_file_path.as_os_str().is_empty());
@@ -130,7 +124,6 @@ async fn it_packages_all_files_by_default() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec![],
         parameters: vec![],
-        schedule: Some("every 1 minute".to_string()),
         import_paths: vec![],
     };
 
@@ -179,7 +172,6 @@ async fn it_packages_directory_contents() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["main.py".to_string(), "pack".to_string()],
         parameters: vec![],
-        schedule: Some("every 1 minute".to_string()),
         import_paths: vec![],
     };
 
@@ -241,7 +233,6 @@ async fn it_packages_import_paths() {
             .to_path_buf(),
         file_globs: vec!["**/*.py".to_string()],
         parameters: vec![],
-        schedule: None,
         import_paths: vec!["../shared".to_string()],
     };
 
@@ -249,7 +240,6 @@ async fn it_packages_import_paths() {
 
     assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
-    assert_eq!(package.manifest.schedule, None);
 
     let files = read_package_files(package).await;
 
@@ -311,7 +301,6 @@ async fn it_packages_import_paths_nested_within_base_dir() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
         file_globs: vec!["main.py".to_string()],
         parameters: vec![],
-        schedule: None,
         import_paths: vec!["libs/shared".to_string()],
     };
 
@@ -380,7 +369,6 @@ async fn it_excludes_various_content_that_should_not_be_there() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec![],
         parameters: vec![],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -423,7 +411,6 @@ async fn building_package_spec_from_towerfile() {
     let spec = PackageSpec::from_towerfile(&towerfile);
 
     assert_eq!(spec.invoke, "./script.py");
-    assert_eq!(spec.schedule, Some("0 0 * * *".to_string()));
 }
 
 #[tokio::test]
@@ -449,7 +436,6 @@ async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
         file_globs: vec![],
         parameters: vec![],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -517,7 +503,6 @@ async fn it_includes_hidden_parameters_in_manifest() {
                 hidden: true,
             },
         ],
-        schedule: None,
         import_paths: vec![],
     };
 

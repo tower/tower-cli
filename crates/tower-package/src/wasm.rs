@@ -26,11 +26,10 @@ struct JsInputs {
     towerfile_bytes: serde_bytes::ByteBuf,
     invoke: String,
     parameters: Vec<Parameter>,
-    schedule: Option<String>,
     import_paths: Vec<String>,
 }
 
-/// Build a Tower app bundle from in-memory file contents.
+/// Build a Tower app package (gzipped tar) from in-memory file contents.
 ///
 /// Input shape (camelCase):
 ///   {
@@ -39,14 +38,13 @@ struct JsInputs {
 ///     towerfileBytes: Uint8Array,
 ///     invoke: string,
 ///     parameters: [{ name, description?, default, hidden }, ...],
-///     schedule?: string,
 ///     importPaths: string[]
 ///   }
 ///
 /// Returns the gzipped tar archive as a Uint8Array, byte-identical across
 /// runs for the same inputs.
-#[wasm_bindgen(js_name = buildBundle)]
-pub fn build_bundle(inputs: JsValue) -> Result<Vec<u8>, JsError> {
+#[wasm_bindgen(js_name = buildPackage)]
+pub fn build_package_wasm(inputs: JsValue) -> Result<Vec<u8>, JsError> {
     let js: JsInputs = serde_wasm_bindgen::from_value(inputs)
         .map_err(|e| JsError::new(&format!("invalid inputs: {}", e)))?;
 
@@ -56,7 +54,6 @@ pub fn build_bundle(inputs: JsValue) -> Result<Vec<u8>, JsError> {
         towerfile_bytes: js.towerfile_bytes.into_vec(),
         invoke: js.invoke,
         parameters: js.parameters,
-        schedule: js.schedule,
         import_paths: js.import_paths,
     };
 

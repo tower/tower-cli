@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { gunzipSync } from "node:zlib";
 
 import {
-  buildBundle,
-  type BundleInputs,
+  buildPackage,
+  type PackageInputs,
 } from "../pkg/tower_package.js";
 
 const enc = new TextEncoder();
@@ -42,7 +42,7 @@ function parseTarEntries(data: Uint8Array): TarEntry[] {
   return entries;
 }
 
-function minimalInputs(): BundleInputs {
+function minimalInputs(): PackageInputs {
   return {
     appFiles: [
       { archiveName: "app/main.py", bytes: enc.encode('print("hi")\n') },
@@ -56,8 +56,8 @@ function minimalInputs(): BundleInputs {
   };
 }
 
-function buildEntries(inputs: BundleInputs): TarEntry[] {
-  return parseTarEntries(gunzipSync(buildBundle(inputs)));
+function buildEntries(inputs: PackageInputs): TarEntry[] {
+  return parseTarEntries(gunzipSync(buildPackage(inputs)));
 }
 
 function getManifest(entries: TarEntry[]): Record<string, unknown> {
@@ -65,15 +65,15 @@ function getManifest(entries: TarEntry[]): Record<string, unknown> {
 }
 
 test("returns a gzipped archive", () => {
-  const out = buildBundle(minimalInputs());
+  const out = buildPackage(minimalInputs());
   assert.ok(out instanceof Uint8Array);
   assert.equal(out[0], 0x1f);
   assert.equal(out[1], 0x8b);
 });
 
 test("output is byte-deterministic across calls", () => {
-  const a = buildBundle(minimalInputs());
-  const b = buildBundle(minimalInputs());
+  const a = buildPackage(minimalInputs());
+  const b = buildPackage(minimalInputs());
   assert.deepEqual(a, b);
 });
 
@@ -136,5 +136,5 @@ test("different inputs produce different checksums", () => {
 });
 
 test("invalid input shape throws", () => {
-  assert.throws(() => buildBundle({} as unknown as BundleInputs));
+  assert.throws(() => buildPackage({} as unknown as PackageInputs));
 });

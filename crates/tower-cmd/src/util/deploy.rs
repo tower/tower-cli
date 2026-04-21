@@ -34,9 +34,9 @@ pub async fn upload_file_with_progress(
     let file_size = metadata.len();
 
     // Check if bundle size exceeds the maximum allowed size
-    if file_size > tower_package::MAX_BUNDLE_SIZE {
+    if file_size > tower_package::MAX_PACKAGE_SIZE {
         let size_mb = file_size as f64 / (1024.0 * 1024.0);
-        let max_mb = tower_package::MAX_BUNDLE_SIZE as f64 / (1024.0 * 1024.0);
+        let max_mb = tower_package::MAX_PACKAGE_SIZE as f64 / (1024.0 * 1024.0);
         output::die(&format!(
             "Your App is too big! ({:.2} MB) exceeds maximum allowed size ({:.0} MB). Please consider reducing app size by removing unnecessary files or import_paths in the Towerfile.",
             size_mb, max_mb

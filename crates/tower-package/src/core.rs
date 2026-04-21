@@ -13,7 +13,7 @@ use tar::{Builder, Header};
 // 3 - Change checksum algorithm to be cross-platform
 pub const CURRENT_PACKAGE_VERSION: i32 = 3;
 
-pub const MAX_BUNDLE_SIZE: u64 = 50 * 1024 * 1024;
+pub const MAX_PACKAGE_SIZE: u64 = 50 * 1024 * 1024;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -102,8 +102,6 @@ pub struct PackageInputs {
 
     pub invoke: String,
     pub parameters: Vec<Parameter>,
-    pub schedule: Option<String>,
-
     // import_paths are the manifest entries (e.g. "modules/shared"), precomputed by the caller.
     pub import_paths: Vec<String>,
 }
@@ -132,7 +130,7 @@ pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
         version: Some(CURRENT_PACKAGE_VERSION),
         invoke: inputs.invoke,
         parameters: inputs.parameters,
-        schedule: inputs.schedule,
+        schedule: None,
         import_paths: inputs.import_paths,
         app_dir_name: "app".to_string(),
         modules_dir_name: "modules".to_string(),
@@ -242,7 +240,6 @@ mod test {
             towerfile_bytes: b"[app]\nname = \"x\"\n".to_vec(),
             invoke: "app/a.py".into(),
             parameters: vec![],
-            schedule: None,
             import_paths: vec![],
         };
 

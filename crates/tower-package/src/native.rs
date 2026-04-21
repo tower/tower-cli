@@ -15,8 +15,8 @@ use async_compression::tokio::bufread::GzipDecoder;
 use tower_telemetry::debug;
 
 use crate::core::{
-    build_package, compute_sha256_bytes, normalize_path, Entry, Manifest, PackageInputs, Parameter,
-    CURRENT_PACKAGE_VERSION,
+    build_package, compute_sha256_bytes, normalize_path, Entry, Manifest, PackageInputs,
+    Parameter, CURRENT_PACKAGE_VERSION,
 };
 use crate::error::Error;
 
@@ -38,9 +38,6 @@ pub struct PackageSpec {
     // parameters are the parameters to use for this app.
     pub parameters: Vec<Parameter>,
 
-    // schedule defines the frequency that this app should be run on.
-    pub schedule: Option<String>,
-
     pub import_paths: Vec<String>,
 }
 
@@ -52,12 +49,6 @@ impl PackageSpec {
             .parent()
             .unwrap_or_else(|| Path::new("."))
             .to_path_buf();
-
-        let schedule = if towerfile.app.schedule.is_empty() {
-            None
-        } else {
-            Some(towerfile.app.schedule.to_string())
-        };
 
         // We need to turn these (validated) paths into something taht we can use at runtime.
         let import_paths = towerfile
@@ -79,7 +70,6 @@ impl PackageSpec {
             .collect();
 
         Self {
-            schedule,
             towerfile_path,
             base_dir,
             import_paths,
@@ -219,7 +209,6 @@ impl Package {
             towerfile_bytes,
             invoke: spec.invoke,
             parameters: spec.parameters,
-            schedule: spec.schedule,
             import_paths,
         };
 
