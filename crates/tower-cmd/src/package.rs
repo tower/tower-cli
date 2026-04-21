@@ -72,7 +72,7 @@ pub async fn do_package(_config: Config, args: &ArgMatches) {
             }
         }
         Err(err) => {
-            output::config_error(err);
+            output::package_error(err);
         }
     }
 }

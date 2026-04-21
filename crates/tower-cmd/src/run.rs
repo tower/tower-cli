@@ -508,7 +508,7 @@ fn handle_run_completion(res: Result<Run, oneshot::error::RecvError>) -> Result<
 /// from the parsed CLI args.
 fn get_run_parameters(
     args: &ArgMatches,
-) -> Result<(bool, PathBuf, HashMap<String, String>, Option<String>), config::Error> {
+) -> Result<(bool, PathBuf, HashMap<String, String>, Option<String>), crate::Error> {
     let local = *args.get_one::<bool>("local").unwrap();
     let path = resolve_path(args);
     let params = parse_parameters(args);

@@ -17,6 +17,15 @@ pub enum Error {
 
     #[snafu(display("Invalid Towerfile: {message}"))]
     InvalidTowerfile { message: String },
+
+    #[snafu(display("No Towerfile was found in this directory"))]
+    MissingTowerfile,
+
+    #[snafu(display("Missing required app field `{field}` in Towerfile"))]
+    MissingRequiredAppField { field: String },
+
+    #[snafu(display("IO error: {source}"))]
+    Io { source: std::io::Error },
 }
 
 impl From<std::io::Error> for Error {
@@ -47,6 +56,8 @@ impl From<crate::core::Error> for Error {
                 Error::NoManifest
             }
             Core::InvalidTowerfile { message } => Error::InvalidTowerfile { message },
+            Core::MissingTowerfile => Error::MissingTowerfile,
+            Core::MissingRequiredAppField { field } => Error::MissingRequiredAppField { field },
         }
     }
 }

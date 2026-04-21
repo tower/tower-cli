@@ -54,7 +54,7 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
                 std::process::exit(1);
             }
             crate::Error::TowerfileLoadFailed { source, .. } => {
-                output::config_error(source);
+                output::package_error(source);
                 std::process::exit(1);
             }
             _ => output::die(&err.to_string()),
@@ -71,7 +71,13 @@ pub async fn deploy_from_dir(
 
     let path = dir.join("Towerfile");
 
-    let towerfile = Towerfile::from_path(path)?;
+    let path_display = path.display().to_string();
+    let towerfile = Towerfile::from_path(path).map_err(|source| {
+        crate::Error::TowerfileLoadFailed {
+            path: path_display,
+            source,
+        }
+    })?;
     let api_config = config.into();
 
     // Add app existence check before proceeding

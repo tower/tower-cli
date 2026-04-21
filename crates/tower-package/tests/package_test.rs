@@ -10,9 +10,8 @@ use tokio::{
 };
 use tokio_stream::*;
 
-use config::Towerfile;
 use tokio_tar::Archive;
-use tower_package::{Manifest, Package, PackageSpec};
+use tower_package::{Manifest, Package, PackageSpec, Towerfile};
 use tower_telemetry::debug;
 
 const TRIVIAL_TOWERFILE: &str = "[app]\nname = \"test\"\nscript = \"main.py\"\n";

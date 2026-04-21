@@ -13,7 +13,6 @@ crate-type = ["cdylib", "rlib"]
 default = ["native"]
 native = [
     "dep:async-compression",
-    "dep:config",
     "dep:glob",
     "dep:tmpdir",
     "dep:tokio",
@@ -35,7 +34,6 @@ toml = { workspace = true }
 
 # Native shell — gated behind the `native` feature.
 async-compression = { workspace = true, optional = true }
-config = { workspace = true, optional = true }
 glob = { workspace = true, optional = true }
 tmpdir = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
@@ -47,3 +45,6 @@ tower-telemetry = { workspace = true, optional = true }
 serde_bytes = { version = "0.11", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
+
+[dev-dependencies]
+testutils = { workspace = true }

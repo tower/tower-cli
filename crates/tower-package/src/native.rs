@@ -1,4 +1,3 @@
-use config::Towerfile;
 use glob::glob;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -19,6 +18,7 @@ use crate::core::{
     CURRENT_PACKAGE_VERSION,
 };
 use crate::error::Error;
+use crate::towerfile::Towerfile;
 
 // PackageSpec describes how to build a package. Everything core needs (invoke, parameters,
 // import_paths as manifest entries) is derived from the Towerfile on disk, so this struct only

@@ -7,6 +7,8 @@ use std::io::Write;
 use std::path::{Component, Path};
 use tar::{Builder, Header};
 
+use crate::towerfile::{Parameter, Towerfile};
+
 // Version History:
 // 1 - Initial version
 // 2 - Add app_dir, modules_dir, and checksum
@@ -22,6 +24,12 @@ pub enum Error {
 
     #[snafu(display("Invalid Towerfile: {message}"))]
     InvalidTowerfile { message: String },
+
+    #[snafu(display("No Towerfile was found in this directory"))]
+    MissingTowerfile,
+
+    #[snafu(display("Missing required app field `{field}` in Towerfile"))]
+    MissingRequiredAppField { field: String },
 
     #[snafu(display("Serialization error: {source}"))]
     Serialization { source: serde_json::Error },
@@ -42,19 +50,20 @@ impl From<std::io::Error> for Error {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Parameter {
-    #[serde(default)]
-    pub name: String,
+impl From<toml::de::Error> for Error {
+    fn from(err: toml::de::Error) -> Self {
+        Error::InvalidTowerfile {
+            message: err.to_string(),
+        }
+    }
+}
 
-    #[serde(default)]
-    pub description: Option<String>,
-
-    #[serde(default)]
-    pub default: String,
-
-    #[serde(default)]
-    pub hidden: bool,
+impl From<toml::ser::Error> for Error {
+    fn from(err: toml::ser::Error) -> Self {
+        Error::InvalidTowerfile {
+            message: err.to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -105,24 +114,6 @@ pub struct PackageInputs {
     pub towerfile_bytes: Vec<u8>,
 }
 
-#[derive(Default, Deserialize)]
-struct TowerfileApp {
-    #[serde(default)]
-    script: String,
-
-    #[serde(default)]
-    import_paths: Vec<String>,
-}
-
-#[derive(Default, Deserialize)]
-struct TowerfileSpec {
-    #[serde(default)]
-    app: TowerfileApp,
-
-    #[serde(default)]
-    parameters: Vec<Parameter>,
-}
-
 pub struct BuiltPackage {
     pub bytes: Vec<u8>,
     pub manifest: Manifest,
@@ -134,16 +125,17 @@ pub struct BuiltPackage {
 // input.
 pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
     let towerfile_str = std::str::from_utf8(&inputs.towerfile_bytes).map_err(|e| {
-        Error::InvalidTowerfile { message: format!("Towerfile is not valid UTF-8: {}", e) }
+        Error::InvalidTowerfile {
+            message: format!("Towerfile is not valid UTF-8: {}", e),
+        }
     })?;
-    let spec: TowerfileSpec = toml::from_str(towerfile_str)
-        .map_err(|e| Error::InvalidTowerfile { message: e.to_string() })?;
+    let towerfile = Towerfile::from_toml(towerfile_str)?;
 
-    let import_paths: Vec<String> = spec
+    let import_paths: Vec<String> = towerfile
         .app
         .import_paths
         .iter()
-        .map(|p| format!("modules/{}", import_path_basename(p)))
+        .map(|p| format!("modules/{}", import_path_basename(&p.to_string_lossy())))
         .collect();
 
     let mut entries: Vec<Entry> = Vec::with_capacity(inputs.app_files.len() + inputs.module_files.len());
@@ -158,8 +150,8 @@ pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
 
     let manifest = Manifest {
         version: Some(CURRENT_PACKAGE_VERSION),
-        invoke: spec.app.script,
-        parameters: spec.parameters,
+        invoke: towerfile.app.script,
+        parameters: towerfile.parameters,
         schedule: None,
         import_paths,
         app_dir_name: "app".to_string(),
