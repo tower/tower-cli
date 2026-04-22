@@ -1,0 +1,52 @@
+name: "[tower] Test wasm"
+
+on:
+  pull_request:
+    paths:
+      - 'crates/tower-package/**'
+      - '.github/workflows/test-wasm.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+        with:
+          target: wasm32-unknown-unknown
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref_name == 'main' }}
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Build wasm package
+        working-directory: crates/tower-package
+        run: ./scripts/build.sh nodejs
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install test deps
+        working-directory: crates/tower-package/test
+        run: npm install
+
+      - name: Run tests
+        working-directory: crates/tower-package/test
+        run: npm test

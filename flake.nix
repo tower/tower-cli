@@ -63,7 +63,9 @@
 
         isMuslTarget = target: target == "x86_64-unknown-linux-musl" || target == "aarch64-unknown-linux-musl";
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default;
+        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+          targets = [ "wasm32-unknown-unknown" ];
+        };
 
         python = pkgs.python312;
         naersk-native = naersk.lib.${system}.override {
@@ -261,6 +263,9 @@
             behave
             pkg-config
             openssl
+            wasm-pack
+            wasm-bindgen-cli
+            binaryen
           ];
           
           buildInputs = commonBuildInputs;

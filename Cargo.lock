@@ -503,8 +503,8 @@ dependencies = [
  "snafu",
  "testutils",
  "tokio",
- "toml",
  "tower-api",
+ "tower-package",
  "tower-telemetry",
  "url",
 ]
@@ -2883,6 +2883,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3274,6 +3295,17 @@ dependencies = [
  "quote",
  "sealed",
  "syn 2.0.104",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
 ]
 
 [[package]]
@@ -3699,17 +3731,23 @@ name = "tower-package"
 version = "0.3.59"
 dependencies = [
  "async-compression",
- "config",
+ "flate2",
  "glob",
  "serde",
+ "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
  "sha2",
  "snafu",
+ "tar",
+ "testutils",
  "tmpdir",
  "tokio",
  "tokio-stream",
  "tokio-tar",
+ "toml",
  "tower-telemetry",
+ "wasm-bindgen",
 ]
 
 [[package]]

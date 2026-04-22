@@ -167,6 +167,16 @@ pub fn package_error(err: tower_package::Error) {
         tower_package::Error::InvalidGlob { message } => {
             format!("Invalid file glob pattern: {}", message)
         }
+        tower_package::Error::InvalidTowerfile { message } => {
+            format!("Invalid Towerfile: {}", message)
+        }
+        tower_package::Error::MissingTowerfile => {
+            "No Towerfile was found in the target directory".to_string()
+        }
+        tower_package::Error::MissingRequiredAppField { field } => {
+            format!("Missing required app field `{}` in Towerfile", field)
+        }
+        tower_package::Error::Io { source } => format!("IO error: {}", source),
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
@@ -207,15 +217,6 @@ pub fn config_error(err: config::Error) {
         config::Error::NoHomeDir => "No home directory found".to_string(),
         config::Error::Io { ref source } => format!("IO error: {}", source),
         config::Error::NoSession => "No session".to_string(),
-        config::Error::InvalidTowerfile => {
-            "Couldn't read the Towerfile in this directory".to_string()
-        }
-        config::Error::MissingTowerfile => {
-            "No Towerfile was found in the target directory".to_string()
-        }
-        config::Error::MissingRequiredAppField { ref field } => {
-            format!("Missing required app field `{}` in Towerfile", field)
-        }
         config::Error::TeamNotFound { ref team_name } => {
             format!("Team with name `{}` not found!", team_name)
         }

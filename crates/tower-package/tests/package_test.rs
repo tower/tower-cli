@@ -10,19 +10,18 @@ use tokio::{
 };
 use tokio_stream::*;
 
-use config::Towerfile;
 use tokio_tar::Archive;
-use tower_package::{Manifest, Package, PackageSpec, Parameter};
+use tower_package::{Manifest, Package, PackageSpec, Towerfile};
 use tower_telemetry::debug;
 
-
+const TRIVIAL_TOWERFILE: &str = "[app]\nname = \"test\"\nscript = \"main.py\"\n";
 
 #[tokio::test]
 async fn it_creates_package() {
     let tmp_dir = TmpDir::new("example")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", TRIVIAL_TOWERFILE).await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(
         tmp_dir.to_path_buf(),
@@ -32,12 +31,9 @@ async fn it_creates_package() {
     .await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["*.py".to_string()],
-        parameters: vec![],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -68,18 +64,15 @@ async fn it_respects_complex_file_globs() {
     let tmp_dir = TmpDir::new("example")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", TRIVIAL_TOWERFILE).await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["*.py".to_string(), "**/*.py".to_string()],
-        parameters: vec![],
-        schedule: Some("every 1 minute".to_string()),
         import_paths: vec![],
     };
 
@@ -87,10 +80,6 @@ async fn it_respects_complex_file_globs() {
 
     assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
-    assert_eq!(
-        package.manifest.schedule,
-        Some("every 1 minute".to_string())
-    );
 
     let package_file_path = package.package_file_path.clone().unwrap();
     assert!(!package_file_path.as_os_str().is_empty());
@@ -119,18 +108,15 @@ async fn it_packages_all_files_by_default() {
     let tmp_dir = TmpDir::new("all-files-by-default")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", TRIVIAL_TOWERFILE).await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec![],
-        parameters: vec![],
-        schedule: Some("every 1 minute".to_string()),
         import_paths: vec![],
     };
 
@@ -167,19 +153,16 @@ async fn it_packages_directory_contents() {
     let tmp_dir = TmpDir::new("directory-contents")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", TRIVIAL_TOWERFILE).await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/__init__.py", "").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/pack.py", "").await;
     create_test_file(tmp_dir.to_path_buf(), "pack/submodule/pack.py", "").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["main.py".to_string(), "pack".to_string()],
-        parameters: vec![],
-        schedule: Some("every 1 minute".to_string()),
         import_paths: vec![],
     };
 
@@ -221,7 +204,12 @@ async fn it_packages_import_paths() {
     let tmp_dir = TmpDir::new("example")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "app/Towerfile", "").await;
+    create_test_file(
+        tmp_dir.to_path_buf(),
+        "app/Towerfile",
+        "[app]\nname = \"test\"\nscript = \"main.py\"\nimport_paths = [\"../shared\"]\n",
+    )
+    .await;
     create_test_file(
         tmp_dir.to_path_buf(),
         "app/main.py",
@@ -232,7 +220,6 @@ async fn it_packages_import_paths() {
     create_test_file(tmp_dir.to_path_buf(), "shared/module/test.py", "").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf().join("app"),
         towerfile_path: tmp_dir
             .to_path_buf()
@@ -240,8 +227,6 @@ async fn it_packages_import_paths() {
             .join("Towerfile")
             .to_path_buf(),
         file_globs: vec!["**/*.py".to_string()],
-        parameters: vec![],
-        schedule: None,
         import_paths: vec!["../shared".to_string()],
     };
 
@@ -249,7 +234,6 @@ async fn it_packages_import_paths() {
 
     assert_eq!(package.manifest.version, Some(3));
     assert_eq!(package.manifest.invoke, "main.py");
-    assert_eq!(package.manifest.schedule, None);
 
     let files = read_package_files(package).await;
 
@@ -276,7 +260,6 @@ async fn it_packages_import_paths() {
 
     // Let's decode the manifest and make sure import paths are set correctly.
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .await
         .expect("Manifest was not valid JSON");
 
     // Archive paths are always normalized to forward slashes regardless of OS.
@@ -301,18 +284,20 @@ async fn it_packages_import_paths_nested_within_base_dir() {
     let tmp_dir = TmpDir::new("nested-import")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(
+        tmp_dir.to_path_buf(),
+        "Towerfile",
+        "[app]\nname = \"test\"\nscript = \"main.py\"\nimport_paths = [\"libs/shared\"]\n",
+    )
+    .await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello')").await;
     create_test_file(tmp_dir.to_path_buf(), "libs/shared/__init__.py", "").await;
     create_test_file(tmp_dir.to_path_buf(), "libs/shared/util.py", "# util").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
         file_globs: vec!["main.py".to_string()],
-        parameters: vec![],
-        schedule: None,
         import_paths: vec!["libs/shared".to_string()],
     };
 
@@ -339,7 +324,6 @@ async fn it_packages_import_paths_nested_within_base_dir() {
 
     // Verify the manifest import_paths entry matches the actual package structure.
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .await
         .expect("Manifest was not valid JSON");
 
     assert!(
@@ -354,7 +338,7 @@ async fn it_excludes_various_content_that_should_not_be_there() {
     let tmp_dir = TmpDir::new("example")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", TRIVIAL_TOWERFILE).await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
     create_test_file(
         tmp_dir.to_path_buf(),
@@ -377,12 +361,9 @@ async fn it_excludes_various_content_that_should_not_be_there() {
     create_test_file(tmp_dir.to_path_buf(), ".git/some-file", "").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec![],
-        parameters: vec![],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -417,15 +398,12 @@ async fn building_package_spec_from_towerfile() {
     "#;
 
     let mut towerfile = Towerfile::from_toml(toml).unwrap();
-
-    // we have to set the file_path on the Towerfile otherwise we can't build a package spec from
-    // it.
     towerfile.file_path = PathBuf::from("./Towerfile");
 
     let spec = PackageSpec::from_towerfile(&towerfile);
 
-    assert_eq!(spec.invoke, "./script.py");
-    assert_eq!(spec.schedule, Some("0 0 * * *".to_string()));
+    assert_eq!(spec.file_globs, vec!["*.py".to_string()]);
+    assert_eq!(spec.towerfile_path, PathBuf::from("./Towerfile"));
 }
 
 #[tokio::test]
@@ -438,7 +416,12 @@ async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
         .expect("Failed to create temp dir");
 
     // Root app files
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "[app]\nname = \"root\"").await;
+    create_test_file(
+        tmp_dir.to_path_buf(),
+        "Towerfile",
+        "[app]\nname = \"root\"\nscript = \"main.py\"\n",
+    )
+    .await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
 
     // Sub-app with its own Towerfile
@@ -446,12 +429,9 @@ async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
     create_test_file(tmp_dir.to_path_buf(), "subapp/main.py", "print('subapp')").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile"),
         file_globs: vec![],
-        parameters: vec![],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -497,29 +477,29 @@ async fn it_includes_hidden_parameters_in_manifest() {
     let tmp_dir = TmpDir::new("hidden-params")
         .await
         .expect("Failed to create temp dir");
-    create_test_file(tmp_dir.to_path_buf(), "Towerfile", "").await;
+    let towerfile = r#"[app]
+name = "test"
+script = "main.py"
+
+[[parameters]]
+name = "visible_param"
+description = "A visible parameter"
+default = ""
+hidden = false
+
+[[parameters]]
+name = "hidden_param"
+description = "A hidden parameter"
+default = "secret"
+hidden = true
+"#;
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", towerfile).await;
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
 
     let spec = PackageSpec {
-        invoke: "main.py".to_string(),
         base_dir: tmp_dir.to_path_buf(),
         towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
         file_globs: vec!["*.py".to_string()],
-        parameters: vec![
-            Parameter {
-                name: "visible_param".to_string(),
-                description: Some("A visible parameter".to_string()),
-                default: "".to_string(),
-                hidden: false,
-            },
-            Parameter {
-                name: "hidden_param".to_string(),
-                description: Some("A hidden parameter".to_string()),
-                default: "secret".to_string(),
-                hidden: true,
-            },
-        ],
-        schedule: None,
         import_paths: vec![],
     };
 
@@ -527,7 +507,6 @@ async fn it_includes_hidden_parameters_in_manifest() {
     let files = read_package_files(package).await;
 
     let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .await
         .expect("Manifest was not valid JSON");
 
     assert_eq!(manifest.parameters.len(), 2);

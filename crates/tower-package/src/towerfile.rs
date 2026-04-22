@@ -1,8 +1,8 @@
-use crate::Error;
+use crate::core::Error;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
     #[serde(default)]
     pub name: String,
@@ -81,44 +81,6 @@ impl Towerfile {
         }
     }
 
-    /// from_path reads a Towerfile from a path and parses it as TOML content.
-    pub fn from_path(path: PathBuf) -> Result<Self, Error> {
-        if !path.exists() {
-            return Err(Error::MissingTowerfile);
-        }
-
-        let mut towerfile = Self::from_toml(&std::fs::read_to_string(path.to_path_buf())?)?;
-        towerfile.file_path = path;
-
-        Ok(towerfile)
-    }
-
-    /// from_local_file looks for a new, local Towerfile in the current working directory.
-    pub fn from_local_file() -> Result<Self, Error> {
-        Self::from_dir_str(".")
-    }
-
-    /// from_dir_str reads a Towerfile from a directory represented by a string. This is useful in
-    /// the context of the `tower` CLI, where the user may specify a directory to read the
-    /// Towerfile on the command line as an argument or whatever.
-    pub fn from_dir_str(dir: &str) -> Result<Self, Error> {
-        let dir = PathBuf::from(dir);
-        let path = dir.join("Towerfile");
-
-        if !path.exists() {
-            Err(Error::MissingTowerfile)
-        } else {
-            Self::from_path(path)
-        }
-    }
-
-    /// save writes the Towerfile as TOML to the specified path, defaulting to current dir
-    pub fn save(&self, path: Option<&std::path::Path>) -> Result<(), Error> {
-        let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
-        std::fs::write(target_path, toml::to_string_pretty(self)?)?;
-        Ok(())
-    }
-
     /// set_parameter upserts a parameter by lookup name. If a parameter with the given name
     /// exists, it is replaced. Otherwise, the parameter is appended.
     pub fn set_parameter(&mut self, lookup_name: &str, param: Parameter) {
@@ -134,6 +96,49 @@ impl Towerfile {
         let len_before = self.parameters.len();
         self.parameters.retain(|p| p.name != name);
         self.parameters.len() < len_before
+    }
+}
+
+#[cfg(feature = "native")]
+impl Towerfile {
+    /// from_path reads a Towerfile from a path and parses it as TOML content.
+    pub fn from_path(path: PathBuf) -> Result<Self, crate::error::Error> {
+        use crate::error::Error as OuterError;
+
+        if !path.exists() {
+            return Err(OuterError::MissingTowerfile);
+        }
+
+        let contents =
+            std::fs::read_to_string(&path).map_err(|source| OuterError::Io { source })?;
+        let mut towerfile = Self::from_toml(&contents)?;
+        towerfile.file_path = path;
+
+        Ok(towerfile)
+    }
+
+    /// from_local_file looks for a new, local Towerfile in the current working directory.
+    pub fn from_local_file() -> Result<Self, crate::error::Error> {
+        Self::from_dir_str(".")
+    }
+
+    /// from_dir_str reads a Towerfile from a directory represented by a string. This is useful in
+    /// the context of the `tower` CLI, where the user may specify a directory to read the
+    /// Towerfile on the command line as an argument or whatever.
+    pub fn from_dir_str(dir: &str) -> Result<Self, crate::error::Error> {
+        Self::from_path(PathBuf::from(dir).join("Towerfile"))
+    }
+
+    /// save writes the Towerfile as TOML to the specified path, defaulting to current dir
+    pub fn save(&self, path: Option<&std::path::Path>) -> Result<(), crate::error::Error> {
+        use crate::error::Error as OuterError;
+
+        let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
+        let serialized = toml::to_string_pretty(self).map_err(|err| OuterError::InvalidTowerfile {
+            message: err.to_string(),
+        })?;
+        std::fs::write(target_path, serialized).map_err(|source| OuterError::Io { source })?;
+        Ok(())
     }
 }
 
@@ -209,7 +214,7 @@ mod test {
         assert!(opt.is_some());
 
         let err = opt.unwrap();
-        assert!(matches!(err, crate::Error::MissingTowerfile));
+        assert!(matches!(err, crate::error::Error::MissingTowerfile));
     }
 
     #[test]

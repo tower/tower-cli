@@ -48,7 +48,10 @@ pub enum Error {
     ApiError,
 
     #[snafu(display("Failed to load Towerfile from {}: {}", path, source))]
-    TowerfileLoadFailed { path: String, source: config::Error },
+    TowerfileLoadFailed {
+        path: String,
+        source: tower_package::Error,
+    },
 
     // Towerfile generation errors
     #[snafu(display("pyproject.toml not found at {}", path))]
@@ -140,15 +143,6 @@ impl From<toml::de::Error> for Error {
 impl From<toml::ser::Error> for Error {
     fn from(source: toml::ser::Error) -> Self {
         Self::SerializationError { source }
-    }
-}
-
-impl From<config::Error> for Error {
-    fn from(source: config::Error) -> Self {
-        Self::TowerfileLoadFailed {
-            path: "unknown".to_string(),
-            source,
-        }
     }
 }
 

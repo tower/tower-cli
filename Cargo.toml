@@ -7,7 +7,7 @@ edition = "2021"
 version = "0.3.59"
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.81"
-authors = ["Brad Heller <brad@tower.dev>"]
+authors = ["Brad Heller <brad@tower.dev>", "Ben Lovell <ben@tower.dev>"]
 license = "MIT"
 repository = "https://github.com/tower/tower-cli"
 
@@ -28,6 +28,7 @@ config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
 ctrlc = "3"
 dirs = "5"
+flate2 = "1"
 fs2 = "0.4"
 futures = "0.3"
 futures-util = "0.3"
@@ -51,6 +52,7 @@ serde = "1"
 serde_json = "1.0"
 sha2 = "0.10"
 snafu = "0.7"
+tar = "0.4"
 spinners = "4"
 testutils = { path = "crates/testutils" }
 tmpdir = "1.0"

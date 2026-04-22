@@ -1,0 +1,13 @@
+{
+  "name": "tower-package-wasm-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test build.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  }
+}
