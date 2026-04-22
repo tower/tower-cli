@@ -1,6 +1,6 @@
 use crate::core::Error;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
@@ -133,7 +133,7 @@ impl Towerfile {
     pub fn save(&self, path: Option<&std::path::Path>) -> Result<(), crate::error::Error> {
         use crate::error::Error as OuterError;
 
-        let target_path = path.unwrap_or_else(|| Path::new("Towerfile"));
+        let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
         let serialized = toml::to_string_pretty(self).map_err(|err| OuterError::InvalidTowerfile {
             message: err.to_string(),
         })?;

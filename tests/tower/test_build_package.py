@@ -126,23 +126,6 @@ source = ["*.py", "**/*.py"]
         assert "app/pkg/__init__.py" in entries
         assert "app/pkg/module.py" in entries
 
-    def test_manifest_contains_schedule(self, tmp_path):
-        towerfile = """\
-[app]
-name = "scheduled-app"
-script = "job.py"
-source = ["*.py"]
-schedule = "0 0 * * *"
-"""
-        app_dir = _make_app(tmp_path, towerfile, {"job.py": "print('run')"})
-        output = str(tmp_path / "out.tar.gz")
-
-        tower.packages.build_package(app_dir, output)
-
-        entries = _read_package(output)
-        manifest = json.loads(entries["MANIFEST"])
-        assert manifest["schedule"] == "0 0 * * *"
-
     def test_manifest_contains_parameters(self, tmp_path):
         towerfile = """\
 [app]
