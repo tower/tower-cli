@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "base64",
  "chrono",
@@ -503,8 +503,8 @@ dependencies = [
  "snafu",
  "testutils",
  "tokio",
- "toml",
  "tower-api",
+ "tower-package",
  "tower-telemetry",
  "url",
 ]
@@ -598,7 +598,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypto"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -2883,6 +2883,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3277,6 +3298,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tar"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "target-lexicon"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3316,7 +3348,7 @@ dependencies = [
 
 [[package]]
 name = "testutils"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "pem",
  "rsa",
@@ -3586,7 +3618,7 @@ checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "tower"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "config",
  "pyo3",
@@ -3614,7 +3646,7 @@ dependencies = [
 
 [[package]]
 name = "tower-api"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "reqwest",
  "serde",
@@ -3626,7 +3658,7 @@ dependencies = [
 
 [[package]]
 name = "tower-cmd"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "axum",
  "bytes",
@@ -3696,25 +3728,31 @@ checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
 
 [[package]]
 name = "tower-package"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "async-compression",
- "config",
+ "flate2",
  "glob",
  "serde",
+ "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
  "sha2",
  "snafu",
+ "tar",
+ "testutils",
  "tmpdir",
  "tokio",
  "tokio-stream",
  "tokio-tar",
+ "toml",
  "tower-telemetry",
+ "wasm-bindgen",
 ]
 
 [[package]]
 name = "tower-runtime"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3737,7 +3775,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tower-telemetry"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "tracing",
  "tracing-appender",
@@ -3746,7 +3784,7 @@ dependencies = [
 
 [[package]]
 name = "tower-uv"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "async-compression",
  "async_zip",
@@ -3764,7 +3802,7 @@ dependencies = [
 
 [[package]]
 name = "tower-version"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "anyhow",
  "chrono",

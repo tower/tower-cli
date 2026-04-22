@@ -8,6 +8,7 @@ use tower_package::{compute_sha256_file, Package};
 use tower_telemetry::debug;
 
 use tower_api::apis::configuration::Configuration;
+use tower_api::apis::urlencode;
 use tower_api::apis::default_api::DeployAppError;
 use tower_api::apis::Error;
 use tower_api::apis::ResponseContent;
@@ -34,9 +35,9 @@ pub async fn upload_file_with_progress(
     let file_size = metadata.len();
 
     // Check if bundle size exceeds the maximum allowed size
-    if file_size > tower_package::MAX_BUNDLE_SIZE {
+    if file_size > tower_package::MAX_PACKAGE_SIZE {
         let size_mb = file_size as f64 / (1024.0 * 1024.0);
-        let max_mb = tower_package::MAX_BUNDLE_SIZE as f64 / (1024.0 * 1024.0);
+        let max_mb = tower_package::MAX_PACKAGE_SIZE as f64 / (1024.0 * 1024.0);
         output::die(&format!(
             "Your App is too big! ({:.2} MB) exceeds maximum allowed size ({:.0} MB). Please consider reducing app size by removing unnecessary files or import_paths in the Towerfile.",
             size_mb, max_mb
@@ -96,6 +97,8 @@ pub async fn deploy_app_package(
     api_config: &tower_api::apis::configuration::Configuration,
     app_name: &str,
     package: Package,
+    environment: Option<&str>,
+    all_environments: bool,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
@@ -116,7 +119,16 @@ pub async fn deploy_app_package(
 
     // Create the URL for the API endpoint
     let base_url = &api_config.base_path;
-    let url = format!("{}/apps/{}/deploy", base_url, app_name);
+    let encoded_app_name = urlencode(app_name);
+
+    let url = if all_environments {
+        format!("{}/apps/{}/deploy?all_environments=true", base_url, encoded_app_name)
+    } else if let Some(env) = environment {
+        let encoded_environment = urlencode(env);
+        format!("{}/apps/{}/deploy?environment={}", base_url, encoded_app_name, encoded_environment)
+    } else {
+        format!("{}/apps/{}/deploy", base_url, encoded_app_name)
+    };
 
     // Upload the package
     let response = upload_file_with_progress(

@@ -1,0 +1,58 @@
+use serde::Deserialize;
+use crate::core::{build_package, Entry, PackageInputs};
+use wasm_bindgen::prelude::*;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JsEntry {
+    archive_name: String,
+    bytes: serde_bytes::ByteBuf,
+}
+
+impl From<JsEntry> for Entry {
+    fn from(e: JsEntry) -> Self {
+        Entry {
+            archive_name: e.archive_name,
+            bytes: e.bytes.into_vec(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JsInputs {
+    app_files: Vec<JsEntry>,
+    module_files: Vec<JsEntry>,
+    towerfile_bytes: serde_bytes::ByteBuf,
+}
+
+/// Build a Tower app package (gzipped tar) from in-memory file contents.
+///
+/// Input shape (camelCase):
+///   {
+///     appFiles: [{ archiveName: string, bytes: Uint8Array }, ...],
+///     moduleFiles: [{ archiveName: string, bytes: Uint8Array }, ...],
+///     towerfileBytes: Uint8Array
+///   }
+///
+/// invoke, parameters, and import_paths in the manifest are derived from
+/// towerfileBytes (parsed as TOML), so the caller cannot produce a package
+/// whose manifest disagrees with the embedded Towerfile.
+///
+/// Returns the gzipped tar archive as a Uint8Array, byte-identical across
+/// runs for the same inputs.
+#[wasm_bindgen(js_name = buildPackage)]
+pub fn build_package_wasm(inputs: JsValue) -> Result<Vec<u8>, JsError> {
+    let js: JsInputs = serde_wasm_bindgen::from_value(inputs)
+        .map_err(|e| JsError::new(&format!("invalid inputs: {}", e)))?;
+
+    let core_inputs = PackageInputs {
+        app_files: js.app_files.into_iter().map(Entry::from).collect(),
+        module_files: js.module_files.into_iter().map(Entry::from).collect(),
+        towerfile_bytes: js.towerfile_bytes.into_vec(),
+    };
+
+    let built = build_package(core_inputs)
+        .map_err(|e| JsError::new(&format!("build failed: {}", e)))?;
+    Ok(built.bytes)
+}

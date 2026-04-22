@@ -1,0 +1,4 @@
+language: en-US
+reviews:
+  base_branches:
+    - develop

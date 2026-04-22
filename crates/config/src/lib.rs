@@ -5,11 +5,10 @@ use url::Url;
 
 mod error;
 mod session;
-mod towerfile;
 
 pub use error::Error;
 pub use session::{default_tower_url, Session, Team, Token, User};
-pub use towerfile::{Parameter, Towerfile};
+pub use tower_package::{Parameter, Towerfile};
 
 pub use session::{get_last_version_check_timestamp, set_last_version_check_timestamp};
 

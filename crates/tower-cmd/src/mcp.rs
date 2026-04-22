@@ -460,7 +460,11 @@ impl TowerService {
         (result, output)
     }
 
-    #[tool(description = "List all Tower apps in your account")]
+    // Tool descriptions below should stay in sync with .about() in the corresponding command
+    // files (apps.rs, secrets.rs, etc.). Proc macros require string literals so they can't
+    // share constants directly. MCP-only descriptions (with Prerequisites/Optional) are
+    // intentionally more detailed and don't need a CLI counterpart.
+    #[tool(description = "List all apps in your Tower account")]
     async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_apps(&self.config).await {
             Ok(response) => {
@@ -708,8 +712,9 @@ impl TowerService {
         Parameters(request): Parameters<EmptyRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
+        let deploy_target = deploy::DeployTarget::Environment("default".to_string());
 
-        match deploy::deploy_from_dir(self.config.clone(), working_dir, true).await {
+        match deploy::deploy_from_dir(self.config.clone(), working_dir, true, deploy_target).await {
             Ok(_) => Self::text_success("Deploy completed successfully".to_string()),
             Err(e) => Self::error_result("Deploy failed", e),
         }
