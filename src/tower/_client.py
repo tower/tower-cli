@@ -47,7 +47,12 @@ DEFAULT_NUM_TIMEOUT_RETRIES = 5
 
 # TERMINAL_RUN_STATUSES are the run statuses that indicate that a run has finished,
 # regardless of whether it completed successfully or not.
-TERMINAL_RUN_STATUSES = [RunStatus.EXITED, RunStatus.CANCELLED, RunStatus.CRASHED, RunStatus.ERRORED]
+TERMINAL_RUN_STATUSES = [
+    RunStatus.EXITED,
+    RunStatus.CANCELLED,
+    RunStatus.CRASHED,
+    RunStatus.ERRORED,
+]
 
 # SUCCESSFUL_RUN_STATUSES are the run statuses that indicate that a run has finished and
 # completed successfully.
@@ -59,7 +64,13 @@ FAILED_RUN_STATUSES = [RunStatus.ERRORED, RunStatus.CANCELLED, RunStatus.CRASHED
 
 # AWAITING_RUN_STATUSES are the run statuses that indicate that a run is either currently
 # running or is expected to run in the near future.
-AWAITING_RUN_STATUSES = [RunStatus.PENDING, RunStatus.SCHEDULED, RunStatus.RUNNING, RunStatus.STARTING, RunStatus.RETRYING]
+AWAITING_RUN_STATUSES = [
+    RunStatus.PENDING,
+    RunStatus.SCHEDULED,
+    RunStatus.RUNNING,
+    RunStatus.STARTING,
+    RunStatus.RETRYING,
+]
 
 
 def run_app(
