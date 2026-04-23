@@ -1,6 +1,11 @@
 # Publish tower-package-wasm to npm.
 # Uses OIDC Trusted Publishing — no NPM_TOKEN needed, but the package must have a trusted publisher
 # configured on npmjs.com matching this repo, this workflow file, and the `release` environment.
+#
+# Consumes the `npm-package` artifact produced by build-wasm.yml. We do not check out
+# the repo here because the caller in release.yml grants only `id-token: write` and
+# `packages: write` to custom publish jobs — `contents: read` would exceed that and
+# fail workflow validation.
 name: "[tower] Publish to npm"
 
 on:
@@ -17,32 +22,18 @@ jobs:
     environment:
       name: release
     permissions:
-      contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+      - uses: actions/download-artifact@v7
         with:
-          target: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
+          name: npm-package
+          path: pkg
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
-
       - name: Upgrade npm for Trusted Publishing
         run: npm install -g npm@latest
-
-      - name: Build wasm package
-        working-directory: crates/tower-package
-        run: ./scripts/build.sh bundler
-
       - name: Publish to npm
-        working-directory: crates/tower-package/pkg
+        working-directory: pkg
         run: npm publish --access public --provenance

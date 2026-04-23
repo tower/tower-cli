@@ -1,0 +1,34 @@
+# Build the tower-package-wasm npm package and upload it as an artifact for
+# publish-npm.yml to consume. Exists as its own job because publish-npm.yml runs
+# with caller-granted permissions that do not include `contents: read`, so it
+# cannot check out the repo or build from source itself.
+
+name: "[tower] Build wasm npm package"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+        with:
+          target: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - name: Build wasm package
+        working-directory: crates/tower-package
+        run: ./scripts/build.sh bundler
+      - name: Upload npm package
+        uses: actions/upload-artifact@v6
+        with:
+          name: npm-package
+          path: crates/tower-package/pkg
