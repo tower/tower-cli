@@ -1,0 +1,25 @@
+# Bundle the Dockerfile as an artifact for publish-docker.yml to consume.
+# Exists as its own job because publish-docker.yml runs with caller-granted
+# permissions that do not include `contents: read`, so it cannot check out
+# the repo to read the Dockerfile itself.
+
+name: "[tower] Bundle Docker context"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Upload Docker context
+        uses: actions/upload-artifact@v6
+        with:
+          name: docker-context
+          path: Dockerfile
