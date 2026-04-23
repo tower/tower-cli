@@ -552,7 +552,7 @@ fn is_run_finished(run: &Run) -> bool {
 
 fn is_run_started(run: &Run) -> bool {
     match run.status {
-        tower_api::models::run::Status::Scheduled | tower_api::models::run::Status::Pending => {
+        tower_api::models::run::Status::Scheduled | tower_api::models::run::Status::Pending | tower_api::models::run::Status::Starting => {
             false
         }
         _ => true,
@@ -636,6 +636,7 @@ mod tests {
         let status = Status::Scheduled;
         match status {
             Status::Scheduled => {}
+            Status::Starting => {}
             Status::Pending => {}
             Status::Running => {}
             Status::Retrying => {}
@@ -648,7 +649,7 @@ mod tests {
 
     #[test]
     fn test_run_started_statuses() {
-        let not_started = [Status::Scheduled, Status::Pending];
+        let not_started = [Status::Scheduled, Status::Pending, Status::Starting];
         for status in not_started {
             let run = Run {
                 status,
