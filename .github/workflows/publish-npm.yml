@@ -32,8 +32,9 @@ jobs:
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
-      - name: Upgrade npm for Trusted Publishing
-        run: npm install -g npm@latest
       - name: Publish to npm
         working-directory: pkg
-        run: npm publish --access public --provenance
+        # Use `npx npm@latest` rather than upgrading the global npm in place:
+        # the npm bundled with Node 22.22.x self-destructs during
+        # `npm install -g npm@latest` (missing promise-retry, npm/cli#7657).
+        run: npx -y npm@latest publish --access public --provenance
