@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tower_api::apis::configuration;
 use tower_api::apis::Error;
 use tower_api::apis::ResponseContent;
-use tower_api::models::RunParameter;
+use tower_api::models::RunParameterInput;
 use tower_telemetry::debug;
 
 /// Helper trait to extract the successful response data from API responses
@@ -934,7 +934,7 @@ pub async fn create_schedule(
     let run_parameters = parameters.map(|params| {
         params
             .into_iter()
-            .map(|(key, value)| RunParameter {
+            .map(|(key, value)| RunParameterInput {
                 name: key,
                 value,
                 hidden: None,
@@ -972,7 +972,7 @@ pub async fn update_schedule(
     let run_parameters = parameters.map(|params| {
         params
             .into_iter()
-            .map(|(key, value)| RunParameter {
+            .map(|(key, value)| RunParameterInput {
                 name: key,
                 value,
                 hidden: None,
