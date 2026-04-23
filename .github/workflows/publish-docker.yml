@@ -3,6 +3,11 @@
 # Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a publish job
 # within `cargo-dist`. Runs after `host`, so the GitHub Release and its binary artifacts exist;
 # the Dockerfile fetches the prebuilt musl binary from the release at image-build time.
+#
+# Consumes the `docker-context` artifact produced by build-docker.yml. We do not check out
+# the repo here because the caller in release.yml grants only `id-token: write` and
+# `packages: write` to custom publish jobs — `contents: read` would exceed that and
+# fail workflow validation.
 
 name: "[tower] Publish Docker image"
 
@@ -17,10 +22,11 @@ jobs:
   docker-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: docker-context
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
