@@ -24,6 +24,7 @@ from .tower_api_client.models import (
     RunAppParams,
     RunAppParamsParameters,
     RunAppResponse,
+    RunStatus,
 )
 from .tower_api_client.models.error_model import ErrorModel
 from .tower_api_client.errors import UnexpectedStatus
@@ -43,6 +44,22 @@ DEFAULT_TOWER_ENVIRONMENT = "default"
 # DEFAULT_NUM_TIMEOUT_RETRIES is the number of times to retry querying the Tower
 # API before we just give up entirely.
 DEFAULT_NUM_TIMEOUT_RETRIES = 5
+
+# TERMINAL_RUN_STATUSES are the run statuses that indicate that a run has finished,
+# regardless of whether it completed successfully or not.
+TERMINAL_RUN_STATUSES = [RunStatus.EXITED, RunStatus.CANCELLED, RunStatus.CRASHED, RunStatus.ERRORED]
+
+# SUCCESSFUL_RUN_STATUSES are the run statuses that indicate that a run has finished and
+# completed successfully.
+SUCCESSFUL_RUN_STATUSES = [RunStatus.EXITED]
+
+# FAILED_RUN_STATUSES are the run statuses that indicate that a run has finished but
+# did not complete successfully.
+FAILED_RUN_STATUSES = [RunStatus.ERRORED, RunStatus.CANCELLED, RunStatus.CRASHED]
+
+# AWAITING_RUN_STATUSES are the run statuses that indicate that a run is either currently
+# running or is expected to run in the near future.
+AWAITING_RUN_STATUSES = [RunStatus.PENDING, RunStatus.SCHEDULED, RunStatus.RUNNING, RunStatus.STARTING, RunStatus.RETRYING]
 
 
 def run_app(
@@ -279,7 +296,7 @@ def _is_failed_run(run: Run) -> bool:
     Returns:
         bool: True if the run has failed, False otherwise.
     """
-    return run.status in ["crashed", "cancelled", "errored"]
+    return run.status in FAILED_RUN_STATUSES
 
 
 def _is_successful_run(run: Run) -> bool:
@@ -292,7 +309,7 @@ def _is_successful_run(run: Run) -> bool:
     Returns:
         bool: True if the run was successful, False otherwise.
     """
-    return run.status in ["exited"]
+    return run.status in SUCCESSFUL_RUN_STATUSES
 
 
 def _is_run_awaiting_completion(run: Run) -> bool:
@@ -305,7 +322,7 @@ def _is_run_awaiting_completion(run: Run) -> bool:
     Returns:
         bool: True if the run is awaiting run or currently running, False otherwise.
     """
-    return run.status in ["pending", "scheduled", "running"]
+    return run.status in AWAITING_RUN_STATUSES
 
 
 def _env_client(
