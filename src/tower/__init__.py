@@ -8,6 +8,7 @@ Optional features:
 - AI/LLM support: Install with `pip install "tower[ai]"`
 - Apache Iceberg support: Install with `pip install "tower[iceberg]"`
 - dbt Core support: Install with `pip install "tower[dbt]"`
+- Snowflake catalog sync: Install with `pip install "tower[snowflake]"`
 - All features: Install with `pip install "tower[all]"`
 """
 
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from ._tables import tables as tables
     from ._llms import llms as llms
     from ._dbt import dbt as dbt
+    from . import _snowflake as snowflake
 
 #
 # Sub-packages to expose

@@ -32,6 +32,7 @@ _feature_dependencies: Dict[str, List[str]] = {
     "ai": ["ollama", "huggingface_hub"],
     "iceberg": ["pyiceberg", "pyarrow", "polars"],
     "dbt": ["dbt"],
+    "snowflake": ["snowflake.connector", "cryptography", "pyiceberg"],
 }
 
 # Cache for imported modules
@@ -44,6 +45,7 @@ _feature_modules: Dict[str, tuple[str, List[str], str]] = {
     "ai": ("_llms", ["llms"], "function"),
     "iceberg": ("_tables", ["tables"], "function"),
     "dbt": ("_dbt", ["dbt"], "function"),
+    "snowflake": ("_snowflake", ["snowflake"], "module"),
 }
 
 
