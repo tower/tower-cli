@@ -365,11 +365,6 @@ impl Uv {
             // pin makes resolution fail for apps using newer deps that require
             // setuptools>=82.
             //
-            // Try resolution *without* the pin first (the common, fast path).
-            // Only if resolution fails do we retry with `setuptools<82` — this
-            // covers cases like `dlt[motherduck,hub]==1.26.0a1` where the
-            // unconstrained resolution can't find a working solution but a
-            // bounded setuptools constraint nudges uv to one.
             // https://github.com/pypa/setuptools/issues/5174
             let unpinned_resolves = {
                 let mut probe = Command::new(&self.uv_path);
