@@ -629,6 +629,7 @@ async fn get_catalogs(
                     })?;
             let name = property
                 .environment_variable
+                .filter(|s| !s.is_empty())
                 .unwrap_or_else(|| {
                     create_pyiceberg_catalog_property_name(&catalog.name, &property.name)
                 });
