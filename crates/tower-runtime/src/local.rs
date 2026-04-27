@@ -49,6 +49,31 @@ pub struct LocalApp {
     execute_handle: Option<JoinHandle<Result<(), Error>>>,
 }
 
+// Sent when execute_local_app returns Err before producing a real exit code
+// (uv not found, venv spawn failed, PYTHONPATH construction failed, etc).
+// Distinct from the cancellation sentinel -1.
+pub(crate) const SETUP_FAILURE_EXIT_CODE: i32 = -2;
+
+// Drop guard that ensures the oneshot waiter always receives a code, so `?`
+// paths in execute_local_app cannot leave status() stuck on WaiterClosed.
+struct StatusReporter {
+    tx: Option<oneshot::Sender<i32>>,
+}
+
+impl StatusReporter {
+    fn send(&mut self, code: i32) {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send(code);
+        }
+    }
+}
+
+impl Drop for StatusReporter {
+    fn drop(&mut self) {
+        self.send(SETUP_FAILURE_EXIT_CODE);
+    }
+}
+
 // Helper function to check if a file is executable
 async fn is_executable(path: &PathBuf) -> bool {
     let metadata = match fs::metadata(path).await {
@@ -104,6 +129,7 @@ async fn execute_local_app(
     sx: oneshot::Sender<i32>,
     cancel_token: CancellationToken,
 ) -> Result<(), Error> {
+    let mut reporter = StatusReporter { tx: Some(sx) };
     let ctx = opts.ctx.clone();
     let package = opts.package;
     let environment = opts.environment;
@@ -159,7 +185,7 @@ async fn execute_local_app(
     if cancel_token.is_cancelled() {
         // if there's a waiter, we want them to know that the process was cancelled so we have
         // to return something on the relevant channel.
-        let _ = sx.send(-1);
+        reporter.send(-1);
         return Err(Error::Cancelled);
     }
 
@@ -176,7 +202,7 @@ async fn execute_local_app(
         )
         .await?;
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        reporter.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     } else {
         // we put Uv in to protected mode when there's no caching configured/enabled.
         let protected_mode = opts.cache_dir.is_none();
@@ -198,7 +224,7 @@ async fn execute_local_app(
         // ensure everything is in place.
         if cancel_token.is_cancelled() {
             // again tell any waiters that we cancelled.
-            let _ = sx.send(-1);
+            reporter.send(-1);
             return Err(Error::Cancelled);
         }
 
@@ -226,7 +252,7 @@ async fn execute_local_app(
 
         if res != 0 {
             // If the venv process failed, we want to return an error.
-            let _ = sx.send(res);
+            reporter.send(res);
             return Err(Error::VirtualEnvCreationFailed);
         }
 
@@ -234,7 +260,7 @@ async fn execute_local_app(
         // once started, will take a while and we have logic for checking for cancellation.
         if cancel_token.is_cancelled() {
             // again tell any waiters that we cancelled.
-            let _ = sx.send(-1);
+            reporter.send(-1);
             return Err(Error::Cancelled);
         }
 
@@ -279,7 +305,7 @@ async fn execute_local_app(
 
                 if res != 0 {
                     // If the sync process failed, we want to return an error.
-                    let _ = sx.send(res);
+                    reporter.send(res);
                     return Err(Error::DependencyInstallationFailed);
                 }
             }
@@ -289,7 +315,7 @@ async fn execute_local_app(
         if cancel_token.is_cancelled() {
             // if there's a waiter, we want them to know that the process was cancelled so we have
             // to return something on the relevant channel.
-            let _ = sx.send(-1);
+            reporter.send(-1);
             return Err(Error::Cancelled);
         }
 
@@ -312,7 +338,7 @@ async fn execute_local_app(
             BufReader::new(stderr),
         ));
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        reporter.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
     }
 
     // Everything was properly executed I suppose.
