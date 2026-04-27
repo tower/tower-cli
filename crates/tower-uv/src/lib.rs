@@ -357,6 +357,50 @@ impl Uv {
                 &self.uv_path, cwd
             );
 
+            let req_path = cwd.join("requirements.txt");
+
+            // setuptools 82 removed pkg_resources, but many legacy packages still
+            // import it without declaring the dependency. Historically we always
+            // injected `setuptools<82` to keep pkg_resources available, but that
+            // pin makes resolution fail for apps using newer deps that require
+            // setuptools>=82.
+            //
+            // Try resolution *without* the pin first (the common, fast path).
+            // Only if resolution fails do we retry with `setuptools<82` — this
+            // covers cases like `dlt[motherduck,hub]==1.26.0a1` where the
+            // unconstrained resolution can't find a working solution but a
+            // bounded setuptools constraint nudges uv to one.
+            // https://github.com/pypa/setuptools/issues/5174
+            let unpinned_resolves = {
+                let mut probe = Command::new(&self.uv_path);
+                probe
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .current_dir(cwd)
+                    .arg("--color")
+                    .arg("never")
+                    .arg("pip")
+                    .arg("install")
+                    .arg("--dry-run")
+                    .arg("-r")
+                    .arg(&req_path)
+                    .envs(env_vars);
+
+                if let Some(dir) = &self.cache_dir {
+                    probe.arg("--cache-dir").arg(dir);
+                }
+
+                matches!(probe.status().await, Ok(s) if s.success())
+            };
+
+            if !unpinned_resolves {
+                debug!(
+                    "Falling back to setuptools<82 pin for {:?}: unpinned resolution failed",
+                    cwd
+                );
+            }
+
             // If there is a requirements.txt, then we can use that to sync.
             let mut cmd = Command::new(&self.uv_path);
             cmd.kill_on_drop(true)
@@ -369,15 +413,13 @@ impl Uv {
                 .arg("pip")
                 .arg("install")
                 .arg("-r")
-                .arg(cwd.join("requirements.txt"))
-                // setuptools 82 removed pkg_resources, but many legacy packages
-                // still import it without declaring the dependency. Let's always install
-                // a version that includes pkg_resources for requirements.txt, on the
-                // basis that requirements.txt projects are probably not using the latest
-                // and greatest deps (then they'd likely be using pyproject.toml anyway)
-                // https://github.com/pypa/setuptools/issues/5174
-                .arg("setuptools<82")
-                .envs(env_vars);
+                .arg(&req_path);
+
+            if !unpinned_resolves {
+                cmd.arg("setuptools<82");
+            }
+
+            cmd.envs(env_vars);
 
             #[cfg(unix)]
             {
