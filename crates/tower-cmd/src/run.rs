@@ -615,7 +615,9 @@ async fn get_catalogs(
     let mut vals = HashMap::new();
 
     for catalog in res.catalogs {
-        // we will decrypt each property and inject it into the vals map.
+        // Decrypt each property and inject it into the vals map. The API returns
+        // the correct environment_variable name for each property (including S3
+        // Tables remapping, static constants, and derived URI).
         for property in catalog.properties {
             let decrypted_value =
                 crypto::decrypt(private_key.clone(), property.encrypted_value.to_string())
@@ -625,7 +627,12 @@ async fn get_catalogs(
                             "Failed to decrypt catalog property",
                         ))
                     })?;
-            let name = create_pyiceberg_catalog_property_name(&catalog.name, &property.name);
+            let name = property
+                .environment_variable
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| {
+                    create_pyiceberg_catalog_property_name(&catalog.name, &property.name)
+                });
             vals.insert(name, decrypted_value);
         }
     }
@@ -743,10 +750,12 @@ async fn monitor_cli_status(
 
 fn create_pyiceberg_catalog_property_name(catalog_name: &str, property_name: &str) -> String {
     let catalog_name = catalog_name
+        .replace('-', "_")
         .replace('.', "_")
         .replace(':', "_")
         .to_uppercase();
     let property_name = property_name
+        .replace('-', "_")
         .replace('.', "_")
         .replace(':', "_")
         .to_uppercase();
