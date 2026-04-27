@@ -21,4 +21,4 @@ tokio-tar = { workspace = true }
 tower-telemetry = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.12"
+tempfile = { workspace = true }
