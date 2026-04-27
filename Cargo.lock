@@ -3795,6 +3795,7 @@ dependencies = [
  "regex",
  "reqwest",
  "seahash",
+ "tempfile",
  "tokio",
  "tokio-tar",
  "tower-telemetry",
