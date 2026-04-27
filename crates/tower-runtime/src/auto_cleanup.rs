@@ -12,7 +12,7 @@ use std::time::Duration;
 use tmpdir::TmpDir;
 use tokio::sync::Mutex;
 
-use crate::App;
+use crate::execution::App;
 
 /// How often to poll the app status to check if it has reached terminal state
 const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(5);
@@ -79,7 +79,9 @@ pub fn spawn_cleanup_monitor<T: App + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{errors::Error, StartOptions, Status};
+    use crate::execution::ServiceEndpoint;
+    use crate::{errors::Error, OutputReceiver, Status};
+    use async_trait::async_trait;
 
     /// Mock LocalApp for testing that allows controlled status transitions
     struct MockLocalApp {
@@ -103,17 +105,31 @@ mod tests {
         }
     }
 
-    impl crate::App for MockLocalApp {
-        async fn start(_opts: StartOptions) -> Result<Self, Error> {
-            unimplemented!("MockLocalApp doesn't support start")
+    #[async_trait]
+    impl App for MockLocalApp {
+        fn id(&self) -> &str {
+            "mock"
+        }
+
+        async fn status(&self) -> Result<Status, Error> {
+            Ok(self.status.lock().await.clone())
+        }
+
+        async fn logs(&self) -> Result<OutputReceiver, Error> {
+            let (_, rx) = tokio::sync::mpsc::unbounded_channel();
+            Ok(rx)
         }
 
         async fn terminate(&mut self) -> Result<(), Error> {
             Ok(())
         }
 
-        async fn status(&self) -> Result<Status, Error> {
+        async fn wait_for_completion(&self) -> Result<Status, Error> {
             Ok(self.status.lock().await.clone())
+        }
+
+        async fn service_endpoint(&self) -> Result<Option<ServiceEndpoint>, Error> {
+            Ok(None)
         }
     }
 

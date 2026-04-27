@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use tower_runtime::execution::{
-    CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    ResourceLimits, RuntimeConfig,
+    App as _, Backend, CacheBackend, CacheConfig, CacheIsolation, ExecutionSpec, ResourceLimits,
+    RuntimeConfig,
 };
 use tower_runtime::subprocess::SubprocessBackend;
 use tower_runtime::Status;
