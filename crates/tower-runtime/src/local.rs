@@ -275,7 +275,49 @@ async fn execute_local_app(
                 ));
 
                 // Let's wait for the setup to finish. We don't care about the results.
-                let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
+                let mut res = wait_for_process(ctx.clone(), &cancel_token, child).await;
+
+                // If the requirements.txt install failed, retry with the legacy
+                // setuptools<82 pin. Some apps (those whose transitive deps rely on
+                // pkg_resources) need that pin to install successfully; we don't
+                // apply it by default because it conflicts with apps whose deps
+                // require setuptools>=82.
+                if res != 0 && uv.should_use_legacy_setuptools_pin(&working_dir) {
+                    let _ = opts.output_sender.send(Output {
+                        channel: Channel::Setup,
+                        fd: FD::Stdout,
+                        line: "tower: dependency install failed; retrying with setuptools<82 pin for pkg_resources compatibility".to_string(),
+                        time: chrono::Utc::now(),
+                    });
+
+                    match uv
+                        .sync_with_legacy_setuptools_pin(&working_dir, &env_vars)
+                        .await
+                    {
+                        Err(e) => {
+                            return Err(e.into());
+                        }
+                        Ok(mut retry_child) => {
+                            let stdout = retry_child.stdout.take().expect("no stdout");
+                            tokio::spawn(drain_output(
+                                FD::Stdout,
+                                Channel::Setup,
+                                opts.output_sender.clone(),
+                                BufReader::new(stdout),
+                            ));
+
+                            let stderr = retry_child.stderr.take().expect("no stderr");
+                            tokio::spawn(drain_output(
+                                FD::Stderr,
+                                Channel::Setup,
+                                opts.output_sender.clone(),
+                                BufReader::new(stderr),
+                            ));
+
+                            res = wait_for_process(ctx.clone(), &cancel_token, retry_child).await;
+                        }
+                    }
+                }
 
                 if res != 0 {
                     // If the sync process failed, we want to return an error.
