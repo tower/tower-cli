@@ -30,9 +30,9 @@ jobs:
           path: pkg
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
-      - name: Upgrade npm for Trusted Publishing
+      - name: Upgrade npm to latest patch
         run: npm install -g npm@latest
       - name: Publish to npm
         working-directory: pkg
