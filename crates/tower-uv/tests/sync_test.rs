@@ -116,7 +116,7 @@ async fn sync_with_legacy_setuptools_pin_fails_when_user_requires_modern_setupto
 }
 
 #[tokio::test]
-async fn sync_with_legacy_setuptools_pin_errors_without_requirements_txt() {
+async fn sync_with_legacy_setuptools_pin_errors_without_project_files() {
     let tmp = TempDir::new().expect("tempdir");
     let cwd = tmp.path().to_path_buf();
 
@@ -125,6 +125,58 @@ async fn sync_with_legacy_setuptools_pin_errors_without_requirements_txt() {
     let result = uv.sync_with_legacy_setuptools_pin(&cwd, &env_vars).await;
     assert!(
         matches!(result, Err(tower_uv::Error::MissingPyprojectToml)),
-        "fallback should refuse to run without a requirements.txt"
+        "fallback should refuse to run without pyproject.toml or requirements.txt"
+    );
+}
+
+#[tokio::test]
+async fn sync_with_legacy_setuptools_pin_fails_for_pyproject_requiring_modern_setuptools() {
+    let tmp = TempDir::new().expect("tempdir");
+    let cwd = tmp.path().to_path_buf();
+
+    // Mirrors the requirements.txt counterpart: when the project pins
+    // setuptools>=82, the pin must conflict — proving it's actually applied.
+    tokio::fs::write(
+        cwd.join("pyproject.toml"),
+        "[project]\nname = \"test-app\"\nversion = \"0.0.1\"\nrequires-python = \">=3.10\"\ndependencies = [\"setuptools>=82\"]\n",
+    )
+    .await
+    .expect("write pyproject.toml");
+
+    let uv = make_uv_with_venv(&cwd).await;
+    let env_vars: HashMap<String, String> = HashMap::new();
+    let child = uv
+        .sync_with_legacy_setuptools_pin(&cwd, &env_vars)
+        .await
+        .expect("retry spawn failed");
+    let code = wait(child).await;
+    assert_ne!(
+        code, 0,
+        "sync_with_legacy_setuptools_pin should fail when the pyproject project requires setuptools>=82"
+    );
+}
+
+#[tokio::test]
+async fn sync_with_legacy_setuptools_pin_installs_for_pyproject() {
+    let tmp = TempDir::new().expect("tempdir");
+    let cwd = tmp.path().to_path_buf();
+
+    tokio::fs::write(
+        cwd.join("pyproject.toml"),
+        "[project]\nname = \"test-app\"\nversion = \"0.0.1\"\nrequires-python = \">=3.10\"\ndependencies = [\"six\"]\n",
+    )
+    .await
+    .expect("write pyproject.toml");
+
+    let uv = make_uv_with_venv(&cwd).await;
+    let env_vars: HashMap<String, String> = HashMap::new();
+    let child = uv
+        .sync_with_legacy_setuptools_pin(&cwd, &env_vars)
+        .await
+        .expect("retry spawn failed");
+    let code = wait(child).await;
+    assert_eq!(
+        code, 0,
+        "sync_with_legacy_setuptools_pin should succeed for a pyproject project"
     );
 }

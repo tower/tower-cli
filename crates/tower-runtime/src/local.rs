@@ -256,33 +256,15 @@ async fn execute_local_app(
                     }
                 }
             }
-            Ok(mut child) => {
-                // Drain the logs to the output channel.
-                let stdout = child.stdout.take().expect("no stdout");
-                tokio::spawn(drain_output(
-                    FD::Stdout,
-                    Channel::Setup,
-                    opts.output_sender.clone(),
-                    BufReader::new(stdout),
-                ));
+            Ok(child) => {
+                let mut res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, child).await;
 
-                let stderr = child.stderr.take().expect("no stderr");
-                tokio::spawn(drain_output(
-                    FD::Stderr,
-                    Channel::Setup,
-                    opts.output_sender.clone(),
-                    BufReader::new(stderr),
-                ));
-
-                // Let's wait for the setup to finish. We don't care about the results.
-                let mut res = wait_for_process(ctx.clone(), &cancel_token, child).await;
-
-                // If the requirements.txt install failed, retry with the legacy
-                // setuptools<82 pin. Some apps (those whose transitive deps rely on
+                // If the install failed, retry with the legacy setuptools<82
+                // pin. Some apps (those whose transitive deps rely on
                 // pkg_resources) need that pin to install successfully; we don't
                 // apply it by default because it conflicts with apps whose deps
                 // require setuptools>=82.
-                if res != 0 && uv.should_use_legacy_setuptools_pin(&working_dir) {
+                if res != 0 {
                     let _ = opts.output_sender.send(Output {
                         channel: Channel::Setup,
                         fd: FD::Stdout,
@@ -290,33 +272,10 @@ async fn execute_local_app(
                         time: chrono::Utc::now(),
                     });
 
-                    match uv
+                    let retry_child = uv
                         .sync_with_legacy_setuptools_pin(&working_dir, &env_vars)
-                        .await
-                    {
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                        Ok(mut retry_child) => {
-                            let stdout = retry_child.stdout.take().expect("no stdout");
-                            tokio::spawn(drain_output(
-                                FD::Stdout,
-                                Channel::Setup,
-                                opts.output_sender.clone(),
-                                BufReader::new(stdout),
-                            ));
-
-                            let stderr = retry_child.stderr.take().expect("no stderr");
-                            tokio::spawn(drain_output(
-                                FD::Stderr,
-                                Channel::Setup,
-                                opts.output_sender.clone(),
-                                BufReader::new(stderr),
-                            ));
-
-                            res = wait_for_process(ctx.clone(), &cancel_token, retry_child).await;
-                        }
-                    }
+                        .await?;
+                    res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, retry_child).await;
                 }
 
                 if res != 0 {
@@ -572,6 +531,31 @@ async fn kill_child_process(ctx: &tower_telemetry::Context, mut child: Child) {
         Ok(_) => debug!(ctx: &ctx, "child process killed successfully"),
         Err(e) => debug!(ctx: &ctx, "failed to kill child process: {}", e),
     };
+}
+
+async fn run_setup_child(
+    ctx: &tower_telemetry::Context,
+    cancel_token: &CancellationToken,
+    output_sender: &OutputSender,
+    mut child: Child,
+) -> i32 {
+    let stdout = child.stdout.take().expect("no stdout");
+    tokio::spawn(drain_output(
+        FD::Stdout,
+        Channel::Setup,
+        output_sender.clone(),
+        BufReader::new(stdout),
+    ));
+
+    let stderr = child.stderr.take().expect("no stderr");
+    tokio::spawn(drain_output(
+        FD::Stderr,
+        Channel::Setup,
+        output_sender.clone(),
+        BufReader::new(stderr),
+    ));
+
+    wait_for_process(ctx.clone(), cancel_token, child).await
 }
 
 async fn wait_for_process(
