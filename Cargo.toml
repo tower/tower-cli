@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.60"
+version = "0.3.61"
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.81"
 authors = ["Brad Heller <brad@tower.dev>", "Ben Lovell <ben@tower.dev>"]
@@ -54,6 +54,7 @@ sha2 = "0.10"
 snafu = "0.7"
 tar = "0.4"
 spinners = "4"
+tempfile = "3.12"
 testutils = { path = "crates/testutils" }
 tmpdir = "1.0"
 tokio = { version = "1", features = ["full"] }
