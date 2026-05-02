@@ -19,8 +19,8 @@ class ListMyTeamInvitationsResponse:
     """
     Attributes:
         team_invitations (list[TeamInvitation]): All of team invitations
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/ListMyTeamInvitationsResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/ListMyTeamInvitationsResponse.json.
     """
 
     team_invitations: list[TeamInvitation]

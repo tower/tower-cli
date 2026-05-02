@@ -16,8 +16,8 @@ class UpdateTeamMemberParams:
     """
     Attributes:
         email (str): The email address of the team member to update
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateTeamMemberParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateTeamMemberParams.json.
         role (UpdateTeamMemberParamsRole | Unset): The role to update the team member to
     """
 

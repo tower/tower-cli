@@ -15,8 +15,8 @@ class BatchScheduleParams:
     """
     Attributes:
         ids (list[str]): The IDs of the schedules to modify
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/BatchScheduleParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/BatchScheduleParams.json.
     """
 
     ids: list[str]

@@ -23,8 +23,8 @@ class CreateGuestResponse:
         guest (Guest):
         login_url (str): The URL to share with the guest for logging in.
         login_url_expires_at (datetime.datetime): When the login URL expires.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateGuestResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateGuestResponse.json.
     """
 
     guest: Guest

@@ -19,8 +19,8 @@ class BatchScheduleResponse:
     """
     Attributes:
         schedules (list[Schedule]):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/BatchScheduleResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/BatchScheduleResponse.json.
     """
 
     schedules: list[Schedule]

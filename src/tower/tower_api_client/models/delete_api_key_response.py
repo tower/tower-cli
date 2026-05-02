@@ -19,8 +19,8 @@ class DeleteAPIKeyResponse:
     """
     Attributes:
         api_key (APIKey):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/DeleteAPIKeyResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/DeleteAPIKeyResponse.json.
     """
 
     api_key: APIKey

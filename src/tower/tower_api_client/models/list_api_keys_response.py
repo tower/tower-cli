@@ -21,8 +21,8 @@ class ListAPIKeysResponse:
     Attributes:
         api_keys (list[APIKey]): List of API keys
         pages (Pagination):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/ListAPIKeysResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/ListAPIKeysResponse.json.
     """
 
     api_keys: list[APIKey]

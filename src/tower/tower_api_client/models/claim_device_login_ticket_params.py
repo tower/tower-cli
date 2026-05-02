@@ -16,8 +16,8 @@ class ClaimDeviceLoginTicketParams:
     Attributes:
         refresh_token (str): The refresh token for the session to delegate to the device.
         user_code (str): The user code to claim.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/ClaimDeviceLoginTicketParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/ClaimDeviceLoginTicketParams.json.
     """
 
     refresh_token: str

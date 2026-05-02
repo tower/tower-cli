@@ -20,8 +20,8 @@ class CreateWebhookResponse:
     Attributes:
         signing_key (str):
         webhook (Webhook):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateWebhookResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateWebhookResponse.json.
     """
 
     signing_key: str

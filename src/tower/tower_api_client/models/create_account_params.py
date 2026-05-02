@@ -16,8 +16,8 @@ class CreateAccountParams:
     Attributes:
         email (str):
         password (str):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateAccountParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateAccountParams.json.
     """
 
     email: str

@@ -15,8 +15,8 @@ class DescribeSecretsKeyResponse:
     """
     Attributes:
         public_key (str):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/DescribeSecretsKeyResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/DescribeSecretsKeyResponse.json.
     """
 
     public_key: str

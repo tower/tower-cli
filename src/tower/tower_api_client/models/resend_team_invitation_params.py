@@ -15,8 +15,8 @@ class ResendTeamInvitationParams:
     """
     Attributes:
         email (str): The email address of team invitation to resend
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/ResendTeamInvitationParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/ResendTeamInvitationParams.json.
         message (str | Unset): Optional message to include in the invite email
     """
 

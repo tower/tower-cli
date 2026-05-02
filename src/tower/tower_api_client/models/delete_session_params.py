@@ -14,8 +14,8 @@ T = TypeVar("T", bound="DeleteSessionParams")
 class DeleteSessionParams:
     """
     Attributes:
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/DeleteSessionParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/DeleteSessionParams.json.
         session_id (str | Unset): The ID of the session to delete. If not provided, the current session will be deleted.
     """
 

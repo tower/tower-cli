@@ -23,8 +23,8 @@ class CreateDeviceLoginTicketResponse:
         login_url (str): The URL where the user should go to enter the user code.
         user_code (str): The code that the user needs to enter to authenticate.
         verification_url (str): The URL that the device should poll to check authentication status.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateDeviceLoginTicketResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateDeviceLoginTicketResponse.json.
     """
 
     device_code: str

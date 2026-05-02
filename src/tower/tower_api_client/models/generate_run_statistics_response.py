@@ -23,8 +23,8 @@ class GenerateRunStatisticsResponse:
         series (list[RunTimeseriesPoint]):
         settings (StatisticsSettings):
         stats (RunStatistics):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/GenerateRunStatisticsResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/GenerateRunStatisticsResponse.json.
     """
 
     series: list[RunTimeseriesPoint]

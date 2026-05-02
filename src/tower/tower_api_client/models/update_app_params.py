@@ -18,8 +18,8 @@ T = TypeVar("T", bound="UpdateAppParams")
 class UpdateAppParams:
     """
     Attributes:
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateAppParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateAppParams.json.
         description (None | str | Unset): New description for the App
         is_externally_accessible (bool | None | Unset): Indicates that web traffic should be routed to this app and that
             its runs should get a hostname assigned to it.

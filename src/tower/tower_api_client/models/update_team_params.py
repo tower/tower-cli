@@ -17,8 +17,8 @@ class UpdateTeamParams:
     Attributes:
         name (None | str): The name of the team to update. This is optional, if you supply null it will not update the
             team name.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateTeamParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateTeamParams.json.
         execution_region (UpdateTeamParamsExecutionRegion | Unset): The execution region for runs (eu-central-1 or us-
             east-1)
     """

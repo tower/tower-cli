@@ -159,7 +159,6 @@ from .run_initiator import RunInitiator
 from .run_log_line import RunLogLine
 from .run_log_line_channel import RunLogLineChannel
 from .run_parameter import RunParameter
-from .run_parameter_input import RunParameterInput
 from .run_results import RunResults
 from .run_retry_policy import RunRetryPolicy
 from .run_run_initiator_details import RunRunInitiatorDetails
@@ -393,7 +392,6 @@ __all__ = (
     "Runner",
     "RunnerCredentials",
     "RunParameter",
-    "RunParameterInput",
     "RunResults",
     "RunRetryPolicy",
     "RunRunInitiatorDetails",

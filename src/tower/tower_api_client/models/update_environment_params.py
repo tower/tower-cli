@@ -15,8 +15,8 @@ class UpdateEnvironmentParams:
     """
     Attributes:
         new_name (str): The desired new name of the environment
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateEnvironmentParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateEnvironmentParams.json.
     """
 
     new_name: str

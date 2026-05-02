@@ -21,8 +21,8 @@ class ListAlertsResponse:
     Attributes:
         alerts (list[Alert]): List of alerts
         pages (Pagination):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/ListAlertsResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/ListAlertsResponse.json.
     """
 
     alerts: list[Alert]

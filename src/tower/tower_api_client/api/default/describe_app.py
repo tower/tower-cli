@@ -18,6 +18,7 @@ def _get_kwargs(
     start_at: datetime.datetime | Unset = UNSET,
     end_at: datetime.datetime | Unset = UNSET,
     timezone: str | Unset = "UTC",
+    environment: str | Unset = "default",
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -34,6 +35,8 @@ def _get_kwargs(
     params["end_at"] = json_end_at
 
     params["timezone"] = timezone
+
+    params["environment"] = environment
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -80,6 +83,7 @@ def sync_detailed(
     start_at: datetime.datetime | Unset = UNSET,
     end_at: datetime.datetime | Unset = UNSET,
     timezone: str | Unset = "UTC",
+    environment: str | Unset = "default",
 ) -> Response[DescribeAppResponse | ErrorModel]:
     """Describe app
 
@@ -94,6 +98,8 @@ def sync_detailed(
             (inclusive). Provide timestamps in ISO-8601 format.
         timezone (str | Unset): Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to
             UTC. Default: 'UTC'.
+        environment (str | Unset): The environment to resolve the app version against. Defaults to
+            'default'. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -109,6 +115,7 @@ def sync_detailed(
         start_at=start_at,
         end_at=end_at,
         timezone=timezone,
+        environment=environment,
     )
 
     response = client.get_httpx_client().request(
@@ -126,6 +133,7 @@ def sync(
     start_at: datetime.datetime | Unset = UNSET,
     end_at: datetime.datetime | Unset = UNSET,
     timezone: str | Unset = "UTC",
+    environment: str | Unset = "default",
 ) -> DescribeAppResponse | ErrorModel | None:
     """Describe app
 
@@ -140,6 +148,8 @@ def sync(
             (inclusive). Provide timestamps in ISO-8601 format.
         timezone (str | Unset): Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to
             UTC. Default: 'UTC'.
+        environment (str | Unset): The environment to resolve the app version against. Defaults to
+            'default'. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -156,6 +166,7 @@ def sync(
         start_at=start_at,
         end_at=end_at,
         timezone=timezone,
+        environment=environment,
     ).parsed
 
 
@@ -167,6 +178,7 @@ async def asyncio_detailed(
     start_at: datetime.datetime | Unset = UNSET,
     end_at: datetime.datetime | Unset = UNSET,
     timezone: str | Unset = "UTC",
+    environment: str | Unset = "default",
 ) -> Response[DescribeAppResponse | ErrorModel]:
     """Describe app
 
@@ -181,6 +193,8 @@ async def asyncio_detailed(
             (inclusive). Provide timestamps in ISO-8601 format.
         timezone (str | Unset): Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to
             UTC. Default: 'UTC'.
+        environment (str | Unset): The environment to resolve the app version against. Defaults to
+            'default'. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,6 +210,7 @@ async def asyncio_detailed(
         start_at=start_at,
         end_at=end_at,
         timezone=timezone,
+        environment=environment,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -211,6 +226,7 @@ async def asyncio(
     start_at: datetime.datetime | Unset = UNSET,
     end_at: datetime.datetime | Unset = UNSET,
     timezone: str | Unset = "UTC",
+    environment: str | Unset = "default",
 ) -> DescribeAppResponse | ErrorModel | None:
     """Describe app
 
@@ -225,6 +241,8 @@ async def asyncio(
             (inclusive). Provide timestamps in ISO-8601 format.
         timezone (str | Unset): Timezone for the statistics (e.g., 'Europe/Berlin'). Defaults to
             UTC. Default: 'UTC'.
+        environment (str | Unset): The environment to resolve the app version against. Defaults to
+            'default'. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -242,5 +260,6 @@ async def asyncio(
             start_at=start_at,
             end_at=end_at,
             timezone=timezone,
+            environment=environment,
         )
     ).parsed

@@ -21,8 +21,8 @@ class DescribeRunResponse:
     Attributes:
         links (DescribeRunLinks):
         run (Run):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/DescribeRunResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/DescribeRunResponse.json.
     """
 
     links: DescribeRunLinks

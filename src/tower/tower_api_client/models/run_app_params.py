@@ -22,8 +22,8 @@ class RunAppParams:
     Attributes:
         environment (str): The environment to run this app in.
         parameters (RunAppParamsParameters): The parameters to pass into this app.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/RunAppParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/RunAppParams.json.
         initiator (RunAppInitiatorData | Unset):
         parent_run_id (None | str | Unset): The ID of the run that invoked this run, if relevant. Should be null, if
             none.

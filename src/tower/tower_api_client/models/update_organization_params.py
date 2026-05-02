@@ -14,8 +14,8 @@ T = TypeVar("T", bound="UpdateOrganizationParams")
 class UpdateOrganizationParams:
     """
     Attributes:
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateOrganizationParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateOrganizationParams.json.
         name (str | Unset): The name of the organization to update. This is optional, if you supply null it will not
             update the organization name.
     """

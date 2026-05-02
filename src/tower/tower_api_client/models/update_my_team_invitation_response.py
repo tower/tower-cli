@@ -14,8 +14,8 @@ T = TypeVar("T", bound="UpdateMyTeamInvitationResponse")
 class UpdateMyTeamInvitationResponse:
     """
     Attributes:
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateMyTeamInvitationResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateMyTeamInvitationResponse.json.
     """
 
     schema: str | Unset = UNSET

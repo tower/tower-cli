@@ -23,8 +23,8 @@ class DescribeTeamResponse:
         invitations (list[TeamInvitation]): Pending team invitations
         members (list[User]): The members of the team
         team (Team):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/DescribeTeamResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/DescribeTeamResponse.json.
     """
 
     invitations: list[TeamInvitation]

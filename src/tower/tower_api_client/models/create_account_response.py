@@ -19,8 +19,8 @@ class CreateAccountResponse:
     """
     Attributes:
         session (Session):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateAccountResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateAccountResponse.json.
     """
 
     session: Session

@@ -19,8 +19,8 @@ class ListTeamMembersResponse:
     """
     Attributes:
         team_members (list[TeamMembership]): All of the members of a team
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/ListTeamMembersResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/ListTeamMembersResponse.json.
     """
 
     team_members: list[TeamMembership]

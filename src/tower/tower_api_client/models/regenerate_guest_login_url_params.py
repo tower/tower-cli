@@ -14,8 +14,8 @@ T = TypeVar("T", bound="RegenerateGuestLoginURLParams")
 class RegenerateGuestLoginURLParams:
     """
     Attributes:
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/RegenerateGuestLoginURLParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/RegenerateGuestLoginURLParams.json.
         expires_in (int | Unset): The number of seconds the guest session should last. Defaults to 72 hours. Default:
             259200.
         redirect_url (str | Unset): Where to redirect the guest after they log in.

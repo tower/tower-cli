@@ -15,8 +15,8 @@ class CreateEnvironmentParams:
     """
     Attributes:
         name (str): The name of the environment
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateEnvironmentParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateEnvironmentParams.json.
     """
 
     name: str

@@ -19,8 +19,8 @@ class InviteTeamMemberResponse:
     """
     Attributes:
         team_invitations (list[TeamInvitation]): The team invitation that you created
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/InviteTeamMemberResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/InviteTeamMemberResponse.json.
     """
 
     team_invitations: list[TeamInvitation]

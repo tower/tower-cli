@@ -21,8 +21,8 @@ class GetFeatureFlagResponseBody:
         key (str): The feature flag key
         value (Any): The flag value (type depends on value_type)
         value_type (GetFeatureFlagResponseBodyValueType): The type of the value
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/GetFeatureFlagResponseBody.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/GetFeatureFlagResponseBody.json.
     """
 
     enabled: bool

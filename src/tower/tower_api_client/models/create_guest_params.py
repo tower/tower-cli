@@ -15,8 +15,8 @@ class CreateGuestParams:
     """
     Attributes:
         app (str): The name of the externally accessible app this guest can access.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateGuestParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateGuestParams.json.
         expires_in (int | Unset): The number of seconds the guest session should last. Defaults to 72 hours. Default:
             259200.
         name (str | Unset): Optional display name for the guest.

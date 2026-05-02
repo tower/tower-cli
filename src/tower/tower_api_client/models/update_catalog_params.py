@@ -20,8 +20,8 @@ class UpdateCatalogParams:
     Attributes:
         environment (str): New environment for the catalog
         properties (list[EncryptedCatalogProperty]):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/UpdateCatalogParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/UpdateCatalogParams.json.
     """
 
     environment: str

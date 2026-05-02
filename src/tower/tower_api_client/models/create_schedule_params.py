@@ -12,7 +12,7 @@ from ..models.create_schedule_params_status import CreateScheduleParamsStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.run_parameter_input import RunParameterInput
+    from ..models.run_parameter import RunParameter
 
 
 T = TypeVar("T", bound="CreateScheduleParams")
@@ -24,8 +24,8 @@ class CreateScheduleParams:
     Attributes:
         app_name (str): The name of the app to create a schedule for
         cron (str): The cron expression defining when the app should run
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateScheduleParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateScheduleParams.json.
         app_version (None | str | Unset): This property is deprecated and ignored. Schedules inherit the version from
             their environment.
         environment (str | Unset): The environment to run the app in Default: 'default'.
@@ -33,7 +33,7 @@ class CreateScheduleParams:
             generated for you.
         overlap_policy (CreateScheduleParamsOverlapPolicy | Unset): The overlap policy for the schedule Default:
             CreateScheduleParamsOverlapPolicy.ALLOW.
-        parameters (list[RunParameterInput] | Unset): Parameters to pass when running the app
+        parameters (list[RunParameter] | Unset): Parameters to pass when running the app
         status (CreateScheduleParamsStatus | Unset): The status of the schedule (defaults to active)
         timezone (None | str | Unset): The IANA timezone identifier that the cron expression should be evaluated in
             (e.g., 'America/New_York', 'Europe/London'). Defaults to 'UTC'. Default: 'UTC'.
@@ -48,7 +48,7 @@ class CreateScheduleParams:
     overlap_policy: CreateScheduleParamsOverlapPolicy | Unset = (
         CreateScheduleParamsOverlapPolicy.ALLOW
     )
-    parameters: list[RunParameterInput] | Unset = UNSET
+    parameters: list[RunParameter] | Unset = UNSET
     status: CreateScheduleParamsStatus | Unset = UNSET
     timezone: None | str | Unset = "UTC"
 
@@ -123,7 +123,7 @@ class CreateScheduleParams:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.run_parameter_input import RunParameterInput
+        from ..models.run_parameter import RunParameter
 
         d = dict(src_dict)
         app_name = d.pop("app_name")
@@ -160,11 +160,11 @@ class CreateScheduleParams:
             overlap_policy = CreateScheduleParamsOverlapPolicy(_overlap_policy)
 
         _parameters = d.pop("parameters", UNSET)
-        parameters: list[RunParameterInput] | Unset = UNSET
+        parameters: list[RunParameter] | Unset = UNSET
         if _parameters is not UNSET:
             parameters = []
             for parameters_item_data in _parameters:
-                parameters_item = RunParameterInput.from_dict(parameters_item_data)
+                parameters_item = RunParameter.from_dict(parameters_item_data)
 
                 parameters.append(parameters_item)
 

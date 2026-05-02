@@ -18,8 +18,8 @@ class RegenerateGuestLoginURLResponse:
     Attributes:
         login_url (str): The new login URL to share with the guest.
         login_url_expires_at (datetime.datetime): When the login URL expires.
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/RegenerateGuestLoginURLResponse.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/RegenerateGuestLoginURLResponse.json.
     """
 
     login_url: str

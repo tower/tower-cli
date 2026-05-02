@@ -17,8 +17,8 @@ class CreateAPIKeyParams:
     """
     Attributes:
         name (str):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateAPIKeyParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateAPIKeyParams.json.
         expires_at (datetime.datetime | None | Unset): When this API key expires.
         scopes (None | str | Unset): Space separated scopes that this API key is valid for.
         team (None | str | Unset): The team this API key is associated with. This field is optional. You must be a

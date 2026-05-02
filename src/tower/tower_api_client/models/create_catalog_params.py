@@ -23,8 +23,8 @@ class CreateCatalogParams:
         name (str):
         properties (list[EncryptedCatalogProperty]):
         type_ (CreateCatalogParamsType):
-        schema (str | Unset): A URL to the JSON Schema for this object. Example: https://api.staging.tower-
-            dev.net/v1/schemas/CreateCatalogParams.json.
+        schema (str | Unset): A URL to the JSON Schema for this object. Example:
+            https://api.tower.dev/v1/schemas/CreateCatalogParams.json.
     """
 
     environment: str

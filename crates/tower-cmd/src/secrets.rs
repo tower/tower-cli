@@ -185,11 +185,15 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
-    let secret_name_arg = args.get_one::<String>("secret_name").expect("secret_name is required");
+    let secret_name_arg = args
+        .get_one::<String>("secret_name")
+        .expect("secret_name is required");
     let (environment, name) = if let Some((env, name)) = secret_name_arg.split_once('/') {
         (env.to_string(), name.to_string())
     } else {
-        let env = args.get_one::<String>("environment").expect("environment has default");
+        let env = args
+            .get_one::<String>("environment")
+            .expect("environment has default");
         (env.clone(), secret_name_arg.clone())
     };
     debug!("deleting secret, environment={} name={}", environment, name);
@@ -240,4 +244,3 @@ async fn encrypt_and_create_secret(
         .await
         .map_err(SecretCreationError::CreateFailed)
 }
-
