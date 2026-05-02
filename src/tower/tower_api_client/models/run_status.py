@@ -10,6 +10,7 @@ class RunStatus(str, Enum):
     RETRYING = "retrying"
     RUNNING = "running"
     SCHEDULED = "scheduled"
+    STARTING = "starting"
 
     def __str__(self) -> str:
         return str(self.value)

@@ -26,8 +26,8 @@ class CreateScheduleParams:
         cron (str): The cron expression defining when the app should run
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/CreateScheduleParams.json.
-        app_version (None | str | Unset): The specific app version to run (if omitted, will use the app's default
-            version)
+        app_version (None | str | Unset): This property is deprecated and ignored. Schedules inherit the version from
+            their environment.
         environment (str | Unset): The environment to run the app in Default: 'default'.
         name (None | str | Unset): The name for this schedule. Must be unique per environment. If not set, one will be
             generated for you.

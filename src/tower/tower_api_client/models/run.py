@@ -41,7 +41,8 @@ class Run:
         parameters (list[RunParameter]): Parameters used to invoke this run.
         run_id (str):
         scheduled_at (datetime.datetime):
-        started_at (datetime.datetime | None):
+        started_at (datetime.datetime | None): When the run started executing your code.
+        starting_at (datetime.datetime | None): When the runner environment started to get setup.
         status (RunStatus):
         status_group (RunStatusGroup):
         app_slug (str | Unset): This property is deprecated. Use app_name instead.
@@ -68,6 +69,7 @@ class Run:
     run_id: str
     scheduled_at: datetime.datetime
     started_at: datetime.datetime | None
+    starting_at: datetime.datetime | None
     status: RunStatus
     status_group: RunStatusGroup
     app_slug: str | Unset = UNSET
@@ -125,6 +127,12 @@ class Run:
         else:
             started_at = self.started_at
 
+        starting_at: None | str
+        if isinstance(self.starting_at, datetime.datetime):
+            starting_at = self.starting_at.isoformat()
+        else:
+            starting_at = self.starting_at
+
         status = self.status.value
 
         status_group = self.status_group.value
@@ -170,6 +178,7 @@ class Run:
                 "run_id": run_id,
                 "scheduled_at": scheduled_at,
                 "started_at": started_at,
+                "starting_at": starting_at,
                 "status": status,
                 "status_group": status_group,
             }
@@ -276,6 +285,21 @@ class Run:
 
         started_at = _parse_started_at(d.pop("started_at"))
 
+        def _parse_starting_at(data: object) -> datetime.datetime | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                starting_at_type_0 = isoparse(data)
+
+                return starting_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
+
+        starting_at = _parse_starting_at(d.pop("starting_at"))
+
         status = RunStatus(d.pop("status"))
 
         status_group = RunStatusGroup(d.pop("status_group"))
@@ -326,6 +350,7 @@ class Run:
             run_id=run_id,
             scheduled_at=scheduled_at,
             started_at=started_at,
+            starting_at=starting_at,
             status=status,
             status_group=status_group,
             app_slug=app_slug,

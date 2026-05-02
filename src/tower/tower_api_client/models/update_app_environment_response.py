@@ -7,23 +7,27 @@ from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="VerifyEmailParams")
+T = TypeVar("T", bound="UpdateAppEnvironmentResponse")
 
 
 @_attrs_define
-class VerifyEmailParams:
+class UpdateAppEnvironmentResponse:
     """
     Attributes:
-        code (str):
+        environment (str):
+        version (str):
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/VerifyEmailParams.json.
+            https://api.tower.dev/v1/schemas/UpdateAppEnvironmentResponse.json.
     """
 
-    code: str
+    environment: str
+    version: str
     schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        code = self.code
+        environment = self.environment
+
+        version = self.version
 
         schema = self.schema
 
@@ -31,7 +35,8 @@ class VerifyEmailParams:
 
         field_dict.update(
             {
-                "code": code,
+                "environment": environment,
+                "version": version,
             }
         )
         if schema is not UNSET:
@@ -42,13 +47,16 @@ class VerifyEmailParams:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        code = d.pop("code")
+        environment = d.pop("environment")
+
+        version = d.pop("version")
 
         schema = d.pop("$schema", UNSET)
 
-        verify_email_params = cls(
-            code=code,
+        update_app_environment_response = cls(
+            environment=environment,
+            version=version,
             schema=schema,
         )
 
-        return verify_email_params
+        return update_app_environment_response

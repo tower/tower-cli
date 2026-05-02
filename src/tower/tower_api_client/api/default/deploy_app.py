@@ -16,6 +16,8 @@ def _get_kwargs(
     name: str,
     *,
     body: DeployAppJsonBody | File | Unset = UNSET,
+    environment: str | Unset = UNSET,
+    all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> dict[str, Any]:
@@ -26,11 +28,20 @@ def _get_kwargs(
     if not isinstance(content_length, Unset):
         headers["Content-Length"] = str(content_length)
 
+    params: dict[str, Any] = {}
+
+    params["environment"] = environment
+
+    params["all_environments"] = all_environments
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/apps/{name}/deploy".format(
             name=quote(str(name), safe=""),
         ),
+        "params": params,
     }
 
     if isinstance(body, DeployAppJsonBody):
@@ -91,6 +102,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: DeployAppJsonBody | File | Unset = UNSET,
+    environment: str | Unset = UNSET,
+    all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> Response[DeployAppResponse | ErrorModel]:
@@ -101,6 +114,9 @@ def sync_detailed(
 
     Args:
         name (str): The name of the app to deploy.
+        environment (str | Unset): The environment to deploy to.
+        all_environments (bool | Unset): Whether to deploy to all environments for this app. If
+            true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
@@ -120,6 +136,8 @@ def sync_detailed(
     kwargs = _get_kwargs(
         name=name,
         body=body,
+        environment=environment,
+        all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
         content_length=content_length,
     )
@@ -136,6 +154,8 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: DeployAppJsonBody | File | Unset = UNSET,
+    environment: str | Unset = UNSET,
+    all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> DeployAppResponse | ErrorModel | None:
@@ -146,6 +166,9 @@ def sync(
 
     Args:
         name (str): The name of the app to deploy.
+        environment (str | Unset): The environment to deploy to.
+        all_environments (bool | Unset): Whether to deploy to all environments for this app. If
+            true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
@@ -166,6 +189,8 @@ def sync(
         name=name,
         client=client,
         body=body,
+        environment=environment,
+        all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
         content_length=content_length,
     ).parsed
@@ -176,6 +201,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: DeployAppJsonBody | File | Unset = UNSET,
+    environment: str | Unset = UNSET,
+    all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> Response[DeployAppResponse | ErrorModel]:
@@ -186,6 +213,9 @@ async def asyncio_detailed(
 
     Args:
         name (str): The name of the app to deploy.
+        environment (str | Unset): The environment to deploy to.
+        all_environments (bool | Unset): Whether to deploy to all environments for this app. If
+            true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
@@ -205,6 +235,8 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         name=name,
         body=body,
+        environment=environment,
+        all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
         content_length=content_length,
     )
@@ -219,6 +251,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: DeployAppJsonBody | File | Unset = UNSET,
+    environment: str | Unset = UNSET,
+    all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> DeployAppResponse | ErrorModel | None:
@@ -229,6 +263,9 @@ async def asyncio(
 
     Args:
         name (str): The name of the app to deploy.
+        environment (str | Unset): The environment to deploy to.
+        all_environments (bool | Unset): Whether to deploy to all environments for this app. If
+            true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
@@ -250,6 +287,8 @@ async def asyncio(
             name=name,
             client=client,
             body=body,
+            environment=environment,
+            all_environments=all_environments,
             x_tower_checksum_sha256=x_tower_checksum_sha256,
             content_length=content_length,
         )

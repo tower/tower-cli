@@ -35,7 +35,8 @@ class Schedule:
         timezone (str): The IANA timezone identifier that the cron expression is evaluated in (e.g., 'America/New_York',
             'Europe/London'). Defaults to 'UTC'.
         updated_at (datetime.datetime): The timestamp when the schedule was last updated
-        app_version (str | Unset): The specific app version to run, or null for the default version
+        app_version (str | Unset): This property is deprecated. Schedules inherit the version from their environment.
+            This field returns the environment's current version.
         parameters (list[RunParameter] | Unset): The parameters to pass when running the app
     """
 

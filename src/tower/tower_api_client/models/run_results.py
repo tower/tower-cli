@@ -19,6 +19,7 @@ class RunResults:
         pending (int):
         retrying (int):
         running (int):
+        starting (int):
     """
 
     cancelled: int
@@ -28,6 +29,7 @@ class RunResults:
     pending: int
     retrying: int
     running: int
+    starting: int
 
     def to_dict(self) -> dict[str, Any]:
         cancelled = self.cancelled
@@ -44,6 +46,8 @@ class RunResults:
 
         running = self.running
 
+        starting = self.starting
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -55,6 +59,7 @@ class RunResults:
                 "pending": pending,
                 "retrying": retrying,
                 "running": running,
+                "starting": starting,
             }
         )
 
@@ -77,6 +82,8 @@ class RunResults:
 
         running = d.pop("running")
 
+        starting = d.pop("starting")
+
         run_results = cls(
             cancelled=cancelled,
             crashed=crashed,
@@ -85,6 +92,7 @@ class RunResults:
             pending=pending,
             retrying=retrying,
             running=running,
+            starting=starting,
         )
 
         return run_results
