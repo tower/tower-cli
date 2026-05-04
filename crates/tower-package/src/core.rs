@@ -124,11 +124,10 @@ pub struct BuiltPackage {
 // normalized (mtime/uid/gid zero, mode 0644) so the output is byte-deterministic for a given
 // input.
 pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
-    let towerfile_str = std::str::from_utf8(&inputs.towerfile_bytes).map_err(|e| {
-        Error::InvalidTowerfile {
+    let towerfile_str =
+        std::str::from_utf8(&inputs.towerfile_bytes).map_err(|e| Error::InvalidTowerfile {
             message: format!("Towerfile is not valid UTF-8: {}", e),
-        }
-    })?;
+        })?;
     let towerfile = Towerfile::from_toml(towerfile_str)?;
 
     let import_paths: Vec<String> = towerfile
@@ -138,14 +137,18 @@ pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
         .map(|p| format!("modules/{}", import_path_basename(&p.to_string_lossy())))
         .collect();
 
-    let mut entries: Vec<Entry> = Vec::with_capacity(inputs.app_files.len() + inputs.module_files.len());
+    let mut entries: Vec<Entry> =
+        Vec::with_capacity(inputs.app_files.len() + inputs.module_files.len());
     entries.extend(inputs.app_files);
     entries.extend(inputs.module_files);
     entries.sort_by(|a, b| a.archive_name.cmp(&b.archive_name));
 
     let mut path_hashes: HashMap<String, String> = HashMap::with_capacity(entries.len());
     for entry in &entries {
-        path_hashes.insert(entry.archive_name.clone(), compute_sha256_bytes(&entry.bytes));
+        path_hashes.insert(
+            entry.archive_name.clone(),
+            compute_sha256_bytes(&entry.bytes),
+        );
     }
 
     let manifest = Manifest {
@@ -256,15 +259,24 @@ mod test {
             .join("path")
             .join("to")
             .join("file.txt");
-        assert_eq!(normalize_path(&path).unwrap(), "some/nested/path/to/file.txt");
+        assert_eq!(
+            normalize_path(&path).unwrap(),
+            "some/nested/path/to/file.txt"
+        );
     }
 
     #[test]
     fn test_build_package_is_deterministic() {
         let inputs = || PackageInputs {
             app_files: vec![
-                Entry { archive_name: "app/b.py".into(), bytes: b"b".to_vec() },
-                Entry { archive_name: "app/a.py".into(), bytes: b"a".to_vec() },
+                Entry {
+                    archive_name: "app/b.py".into(),
+                    bytes: b"b".to_vec(),
+                },
+                Entry {
+                    archive_name: "app/a.py".into(),
+                    bytes: b"a".to_vec(),
+                },
             ],
             module_files: vec![],
             towerfile_bytes: b"[app]\nname = \"x\"\nscript = \"app/a.py\"\n".to_vec(),

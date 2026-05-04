@@ -259,12 +259,14 @@ async fn it_packages_import_paths() {
     );
 
     // Let's decode the manifest and make sure import paths are set correctly.
-    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .expect("Manifest was not valid JSON");
+    let manifest =
+        Manifest::from_json(files.get("MANIFEST").unwrap()).expect("Manifest was not valid JSON");
 
     // Archive paths are always normalized to forward slashes regardless of OS.
     assert!(
-        manifest.import_paths.contains(&"modules/shared".to_string()),
+        manifest
+            .import_paths
+            .contains(&"modules/shared".to_string()),
         "Import paths {:?} did not contain expected path",
         manifest.import_paths
     );
@@ -323,11 +325,13 @@ async fn it_packages_import_paths_nested_within_base_dir() {
     );
 
     // Verify the manifest import_paths entry matches the actual package structure.
-    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .expect("Manifest was not valid JSON");
+    let manifest =
+        Manifest::from_json(files.get("MANIFEST").unwrap()).expect("Manifest was not valid JSON");
 
     assert!(
-        manifest.import_paths.contains(&"modules/shared".to_string()),
+        manifest
+            .import_paths
+            .contains(&"modules/shared".to_string()),
         "Import paths {:?} did not contain expected path modules/shared",
         manifest.import_paths
     );
@@ -425,7 +429,12 @@ async fn it_includes_subapp_towerfiles_but_excludes_root_towerfile() {
     create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
 
     // Sub-app with its own Towerfile
-    create_test_file(tmp_dir.to_path_buf(), "subapp/Towerfile", "[app]\nname = \"subapp\"").await;
+    create_test_file(
+        tmp_dir.to_path_buf(),
+        "subapp/Towerfile",
+        "[app]\nname = \"subapp\"",
+    )
+    .await;
     create_test_file(tmp_dir.to_path_buf(), "subapp/main.py", "print('subapp')").await;
 
     let spec = PackageSpec {
@@ -506,15 +515,23 @@ hidden = true
     let package = Package::build(spec).await.expect("Failed to build package");
     let files = read_package_files(package).await;
 
-    let manifest = Manifest::from_json(files.get("MANIFEST").unwrap())
-        .expect("Manifest was not valid JSON");
+    let manifest =
+        Manifest::from_json(files.get("MANIFEST").unwrap()).expect("Manifest was not valid JSON");
 
     assert_eq!(manifest.parameters.len(), 2);
 
-    let visible = manifest.parameters.iter().find(|p| p.name == "visible_param").unwrap();
+    let visible = manifest
+        .parameters
+        .iter()
+        .find(|p| p.name == "visible_param")
+        .unwrap();
     assert!(!visible.hidden, "visible_param should not be hidden");
 
-    let hidden = manifest.parameters.iter().find(|p| p.name == "hidden_param").unwrap();
+    let hidden = manifest
+        .parameters
+        .iter()
+        .find(|p| p.name == "hidden_param")
+        .unwrap();
     assert!(hidden.hidden, "hidden_param should be hidden");
     assert_eq!(hidden.default, "secret");
 }

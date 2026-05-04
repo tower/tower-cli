@@ -179,7 +179,11 @@ fn should_use_color(destination: &LogDestination) -> bool {
     }
 }
 
-fn create_fmt_layer(level: &LogLevel, format: LogFormat, destination: LogDestination) -> BoxedFmtLayer {
+fn create_fmt_layer(
+    level: &LogLevel,
+    format: LogFormat,
+    destination: LogDestination,
+) -> BoxedFmtLayer {
     let use_color = should_use_color(&destination);
     let with_target = *level < LogLevel::Warn;
 
@@ -242,7 +246,8 @@ pub fn enable_logging(level: LogLevel, format: LogFormat, destination: LogDestin
     let filter = EnvFilter::new(&level)
         .add_directive("h2=off".parse().unwrap())
         .add_directive("tower::buffer=off".parse().unwrap())
-        .add_directive("hyper_util=off".parse().unwrap());
+        .add_directive("hyper_util=off".parse().unwrap())
+        .add_directive("opentelemetry=off".parse().unwrap());
 
     let subscriber = tracing_subscriber::registry()
         .with(create_fmt_layer(&level, format, destination))
