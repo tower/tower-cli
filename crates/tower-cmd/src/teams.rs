@@ -109,7 +109,9 @@ async fn do_list_via_session(config: &Config) {
 }
 
 pub async fn do_switch(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("team_name").expect("team_name is required");
+    let name = args
+        .get_one::<String>("team_name")
+        .expect("team_name is required");
 
     // Refresh the session first to ensure we have the latest teams data
     let session = refresh_session(&config).await;
@@ -140,4 +142,3 @@ pub async fn do_switch(config: Config, args: &ArgMatches) {
         }
     }
 }
-

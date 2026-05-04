@@ -134,9 +134,10 @@ impl Towerfile {
         use crate::error::Error as OuterError;
 
         let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
-        let serialized = toml::to_string_pretty(self).map_err(|err| OuterError::InvalidTowerfile {
-            message: err.to_string(),
-        })?;
+        let serialized =
+            toml::to_string_pretty(self).map_err(|err| OuterError::InvalidTowerfile {
+                message: err.to_string(),
+            })?;
         std::fs::write(target_path, serialized).map_err(|source| OuterError::Io { source })?;
         Ok(())
     }
@@ -315,12 +316,15 @@ mod test {
         let mut towerfile = crate::Towerfile::default();
         assert_eq!(towerfile.parameters.len(), 0);
 
-        towerfile.set_parameter("test-param", crate::Parameter {
-            name: "test-param".to_string(),
-            description: "A test parameter".to_string(),
-            default: "default-value".to_string(),
-            hidden: false,
-        });
+        towerfile.set_parameter(
+            "test-param",
+            crate::Parameter {
+                name: "test-param".to_string(),
+                description: "A test parameter".to_string(),
+                default: "default-value".to_string(),
+                hidden: false,
+            },
+        );
 
         assert_eq!(towerfile.parameters.len(), 1);
         assert_eq!(towerfile.parameters[0].name, "test-param");
@@ -329,12 +333,15 @@ mod test {
         assert!(!towerfile.parameters[0].hidden);
 
         // upsert should replace, not duplicate
-        towerfile.set_parameter("test-param", crate::Parameter {
-            name: "test-param".to_string(),
-            description: "Updated".to_string(),
-            default: "new-value".to_string(),
-            hidden: false,
-        });
+        towerfile.set_parameter(
+            "test-param",
+            crate::Parameter {
+                name: "test-param".to_string(),
+                description: "Updated".to_string(),
+                default: "new-value".to_string(),
+                hidden: false,
+            },
+        );
 
         assert_eq!(towerfile.parameters.len(), 1);
         assert_eq!(towerfile.parameters[0].description, "Updated");
@@ -343,12 +350,15 @@ mod test {
     #[test]
     fn test_remove_parameter() {
         let mut towerfile = crate::Towerfile::default();
-        towerfile.set_parameter("param1", crate::Parameter {
-            name: "param1".to_string(),
-            description: "".to_string(),
-            default: "".to_string(),
-            hidden: false,
-        });
+        towerfile.set_parameter(
+            "param1",
+            crate::Parameter {
+                name: "param1".to_string(),
+                description: "".to_string(),
+                default: "".to_string(),
+                hidden: false,
+            },
+        );
 
         assert!(towerfile.remove_parameter("param1"));
         assert_eq!(towerfile.parameters.len(), 0);

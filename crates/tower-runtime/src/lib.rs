@@ -56,7 +56,10 @@ pub enum Status {
 impl Status {
     /// Returns true if this status represents a terminal state (run is finished)
     pub fn is_terminal(&self) -> bool {
-        matches!(self, Status::Exited | Status::Crashed { .. } | Status::Failed { .. })
+        matches!(
+            self,
+            Status::Exited | Status::Crashed { .. } | Status::Failed { .. }
+        )
     }
 }
 

@@ -859,12 +859,15 @@ impl TowerService {
         }
         let name = request.name.clone();
         Self::modify_towerfile(&request.common, |tf| {
-            tf.set_parameter(&name, Parameter {
-                name: name.clone(),
-                description: request.description.unwrap_or_default(),
-                default: request.default.unwrap_or_default(),
-                hidden: request.hidden,
-            });
+            tf.set_parameter(
+                &name,
+                Parameter {
+                    name: name.clone(),
+                    description: request.description.unwrap_or_default(),
+                    default: request.default.unwrap_or_default(),
+                    hidden: request.hidden,
+                },
+            );
             Ok(format!("Added parameter '{name}'"))
         })
     }
@@ -878,7 +881,10 @@ impl TowerService {
     ) -> Result<CallToolResult, McpError> {
         let name = request.name.clone();
         Self::modify_towerfile(&request.common, |tf| {
-            let existing = tf.parameters.iter().find(|p| p.name == name)
+            let existing = tf
+                .parameters
+                .iter()
+                .find(|p| p.name == name)
                 .ok_or_else(|| format!("Parameter '{name}' not found"))?;
             let target_name = request
                 .new_name
@@ -889,7 +895,9 @@ impl TowerService {
             }
             let param = Parameter {
                 name: target_name,
-                description: request.description.unwrap_or_else(|| existing.description.clone()),
+                description: request
+                    .description
+                    .unwrap_or_else(|| existing.description.clone()),
                 default: request.default.unwrap_or_else(|| existing.default.clone()),
                 hidden: request.hidden.unwrap_or(existing.hidden),
             };
@@ -901,9 +909,7 @@ impl TowerService {
         })
     }
 
-    #[tool(
-        description = "Remove a parameter from the Towerfile. Optional: working_directory."
-    )]
+    #[tool(description = "Remove a parameter from the Towerfile. Optional: working_directory.")]
     async fn tower_file_remove_parameter(
         &self,
         Parameters(request): Parameters<RemoveParameterRequest>,

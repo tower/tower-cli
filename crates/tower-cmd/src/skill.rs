@@ -29,10 +29,7 @@ fn generate_skill_md(root: Command) -> String {
 }
 
 fn append_command(out: &mut String, cmd: &Command, path: &[&str], depth: usize) {
-    let subcommands: Vec<_> = cmd
-        .get_subcommands()
-        .filter(|c| !c.is_hide_set())
-        .collect();
+    let subcommands: Vec<_> = cmd.get_subcommands().filter(|c| !c.is_hide_set()).collect();
 
     for sub in &subcommands {
         let name = sub.get_name();
@@ -71,12 +68,7 @@ fn append_command(out: &mut String, cmd: &Command, path: &[&str], depth: usize) 
                     .get_help()
                     .map(|h| format!(" — {}", h))
                     .unwrap_or_default();
-                out.push_str(&format!(
-                    "- `<{}>` {}{}\n",
-                    arg.get_id(),
-                    req,
-                    help
-                ));
+                out.push_str(&format!("- `<{}>` {}{}\n", arg.get_id(), req, help));
             }
             for arg in &named {
                 let long = arg.get_long().unwrap();
@@ -98,10 +90,7 @@ fn append_command(out: &mut String, cmd: &Command, path: &[&str], depth: usize) 
             out.push('\n');
         }
 
-        let child_subs: Vec<_> = sub
-            .get_subcommands()
-            .filter(|c| !c.is_hide_set())
-            .collect();
+        let child_subs: Vec<_> = sub.get_subcommands().filter(|c| !c.is_hide_set()).collect();
 
         if !child_subs.is_empty() {
             append_command(out, sub, &full_path, depth + 1);

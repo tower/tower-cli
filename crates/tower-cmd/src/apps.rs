@@ -97,9 +97,13 @@ pub fn apps_cmd() -> Command {
 }
 
 pub async fn do_logs(config: Config, cmd: &ArgMatches) {
-    let app_name_raw = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let app_name_raw = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name is required");
     let (name, seq) = if let Some((name, num_str)) = app_name_raw.split_once('#') {
-        let num = num_str.parse::<i64>().unwrap_or_else(|_| output::die("Run number must be a number"));
+        let num = num_str
+            .parse::<i64>()
+            .unwrap_or_else(|_| output::die("Run number must be a number"));
         (name.to_string(), num)
     } else {
         let num = match cmd.get_one::<i64>("run_number").copied() {
@@ -123,7 +127,9 @@ pub async fn do_logs(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_show(config: Config, cmd: &ArgMatches) {
-    let name = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let name = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name is required");
 
     match api::describe_app(&config, &name).await {
         Ok(app_response) => {
@@ -236,7 +242,9 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, cmd: &ArgMatches) {
-    let name = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let name = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name is required");
 
     output::with_spinner("Deleting app", api::delete_app(&config, name)).await;
 }
@@ -263,7 +271,8 @@ pub async fn do_cancel(config: Config, cmd: &ArgMatches) {
 
 async fn latest_run_number(config: &Config, name: &str) -> i64 {
     match api::describe_app(config, name).await {
-        Ok(resp) => resp.runs
+        Ok(resp) => resp
+            .runs
             .iter()
             .map(|r| r.number)
             .max()
@@ -307,7 +316,9 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 sleep(RUN_START_POLL_INTERVAL).await;
 
                 if wait_started.elapsed() > RUN_START_TIMEOUT {
-                    output::error("Timed out waiting for run to start. The runner may be unavailable.");
+                    output::error(
+                        "Timed out waiting for run to start. The runner may be unavailable.",
+                    );
                     return;
                 }
 
@@ -585,7 +596,9 @@ mod tests {
         assert_eq!(cmd, "logs");
         assert_eq!(sub_matches.get_one::<bool>("follow"), Some(&true));
         assert_eq!(
-            sub_matches.get_one::<String>("app_name").map(|s| s.as_str()),
+            sub_matches
+                .get_one::<String>("app_name")
+                .map(|s| s.as_str()),
             Some("hello-world#11")
         );
         assert_eq!(sub_matches.get_one::<i64>("run_number"), None);
@@ -599,7 +612,9 @@ mod tests {
         let (_, sub_matches) = matches.subcommand().unwrap();
 
         assert_eq!(
-            sub_matches.get_one::<String>("app_name").map(|s| s.as_str()),
+            sub_matches
+                .get_one::<String>("app_name")
+                .map(|s| s.as_str()),
             Some("hello-world")
         );
         assert_eq!(sub_matches.get_one::<i64>("run_number"), Some(&11));
@@ -607,7 +622,12 @@ mod tests {
 
     #[test]
     fn test_terminal_statuses_explicit() {
-        let non_terminal = [Status::Scheduled, Status::Pending, Status::Running, Status::Retrying];
+        let non_terminal = [
+            Status::Scheduled,
+            Status::Pending,
+            Status::Running,
+            Status::Retrying,
+        ];
         for status in non_terminal {
             let run = Run {
                 status,
