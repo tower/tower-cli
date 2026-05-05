@@ -107,10 +107,7 @@ pub async fn do_run(config: Config, args: &ArgMatches) {
 
 /// do_run is the primary entrypoint into running apps both locally and remotely in Tower. It will
 /// use the configuration to determine the requested way of running a Tower app.
-pub async fn do_run_inner(
-    config: Config,
-    args: &ArgMatches,
-) -> Result<(), Error> {
+pub async fn do_run_inner(config: Config, args: &ArgMatches) -> Result<(), Error> {
     let res = get_run_parameters(args);
 
     // We always expect there to be an environment due to the fact that there is a
@@ -855,7 +852,10 @@ mod tests {
     #[test]
     fn app_name_parsed_as_positional_arg() {
         let m = parse(&["my-app"]).unwrap();
-        assert_eq!(m.get_one::<String>("app_name").map(|s| s.as_str()), Some("my-app"));
+        assert_eq!(
+            m.get_one::<String>("app_name").map(|s| s.as_str()),
+            Some("my-app")
+        );
     }
 
     #[test]
@@ -868,8 +868,14 @@ mod tests {
     fn unknown_flags_are_rejected() {
         let err = parse(&["--param", "x=y"]).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("--param"), "should mention the bad flag: {msg}");
-        assert!(msg.contains("--parameter"), "should suggest the correct flag: {msg}");
+        assert!(
+            msg.contains("--param"),
+            "should mention the bad flag: {msg}"
+        );
+        assert!(
+            msg.contains("--parameter"),
+            "should suggest the correct flag: {msg}"
+        );
     }
 
     #[test]
@@ -887,7 +893,10 @@ mod tests {
     #[test]
     fn parameters_after_app_name() {
         let m = parse(&["my-app", "-p", "key=val"]).unwrap();
-        assert_eq!(m.get_one::<String>("app_name").map(|s| s.as_str()), Some("my-app"));
+        assert_eq!(
+            m.get_one::<String>("app_name").map(|s| s.as_str()),
+            Some("my-app")
+        );
         let params: Vec<&String> = m.get_many::<String>("parameters").unwrap().collect();
         assert_eq!(params, vec!["key=val"]);
     }
@@ -895,7 +904,10 @@ mod tests {
     #[test]
     fn parameters_before_app_name() {
         let m = parse(&["-p", "key=val", "my-app"]).unwrap();
-        assert_eq!(m.get_one::<String>("app_name").map(|s| s.as_str()), Some("my-app"));
+        assert_eq!(
+            m.get_one::<String>("app_name").map(|s| s.as_str()),
+            Some("my-app")
+        );
         let params: Vec<&String> = m.get_many::<String>("parameters").unwrap().collect();
         assert_eq!(params, vec!["key=val"]);
     }

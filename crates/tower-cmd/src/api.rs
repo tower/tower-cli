@@ -404,10 +404,8 @@ pub async fn refresh_session(
 
 pub async fn list_teams(
     config: &Config,
-) -> Result<
-    tower_api::models::ListTeamsResponse,
-    Error<tower_api::apis::default_api::ListTeamsError>,
-> {
+) -> Result<tower_api::models::ListTeamsResponse, Error<tower_api::apis::default_api::ListTeamsError>>
+{
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::ListTeamsParams {
@@ -1079,10 +1077,8 @@ pub async fn cancel_run(
     config: &Config,
     name: &str,
     seq: i64,
-) -> Result<
-    tower_api::models::CancelRunResponse,
-    Error<tower_api::apis::default_api::CancelRunError>,
-> {
+) -> Result<tower_api::models::CancelRunResponse, Error<tower_api::apis::default_api::CancelRunError>>
+{
     let api_config = &config.into();
 
     let params = tower_api::apis::default_api::CancelRunParams {
@@ -1090,10 +1086,7 @@ pub async fn cancel_run(
         seq,
     };
 
-    unwrap_api_response(tower_api::apis::default_api::cancel_run(
-        api_config, params,
-    ))
-    .await
+    unwrap_api_response(tower_api::apis::default_api::cancel_run(api_config, params)).await
 }
 
 impl ResponseEntity for tower_api::apis::default_api::CancelRunSuccess {

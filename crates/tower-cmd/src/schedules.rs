@@ -171,7 +171,9 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_update(config: Config, args: &ArgMatches) {
-    let id_or_name = args.get_one::<String>("id_or_name").expect("id_or_name is required");
+    let id_or_name = args
+        .get_one::<String>("id_or_name")
+        .expect("id_or_name is required");
     let cron = args.get_one::<String>("cron");
     let parameters = parse_parameters(args);
 
@@ -185,7 +187,9 @@ pub async fn do_update(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
-    let schedule_id = args.get_one::<String>("schedule_id").expect("schedule_id is required");
+    let schedule_id = args
+        .get_one::<String>("schedule_id")
+        .expect("schedule_id is required");
 
     output::with_spinner(
         "Deleting schedule",
