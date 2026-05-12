@@ -358,7 +358,7 @@ async def cancel_run(name: str, seq: int):
             run_data["status"] = "cancelled"
             run_data["status_group"] = "successful"
             run_data["cancelled_at"] = now_iso()
-            return {"run": run_data}
+            return {"run": run_data, "cancelled_child_runs": 0}
 
     raise HTTPException(
         status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
