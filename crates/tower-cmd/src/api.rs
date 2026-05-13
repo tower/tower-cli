@@ -682,11 +682,23 @@ where
                 if let Some(data) = entity.extract_data() {
                     Ok(data)
                 } else {
+                    let truncated = if response.content.len() > 500 {
+                        format!("{}...(truncated)", &response.content[..500])
+                    } else {
+                        response.content.clone()
+                    };
+                    debug!(
+                        "Failed to extract data from API response: {}",
+                        truncated
+                    );
                     let err = Error::ResponseError(
                         tower_api::apis::ResponseContent {
                             tower_trace_id: "".to_string(),
                             status: StatusCode::NO_CONTENT,
-                            content: "Received a response from the server that the CLI wasn't able to understand".to_string(),
+                            content: format!(
+                                "Received a response from the server that the CLI wasn't able to understand: {}",
+                                truncated
+                            ),
                             entity: None,
                         },
                     );

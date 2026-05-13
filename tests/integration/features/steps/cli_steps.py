@@ -464,7 +464,7 @@ def step_output_should_contain_all_seeded_apps(context, count):
             missing.append(name)
     assert not missing, (
         f"Missing {len(missing)} apps from output (first 5): {missing[:5]}\n"
-        f"Output snippet: {output[:500]}"
+        f"Full output: {output[:2000]}"
     )
 
 
