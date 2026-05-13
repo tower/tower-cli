@@ -663,6 +663,7 @@ async fn unwrap_api_response<T, F, V>(api_call: F) -> Result<T::Data, Error<V>>
 where
     F: std::future::Future<Output = Result<ResponseContent<T>, Error<V>>>,
     T: ResponseEntity,
+    T::Data: serde::de::DeserializeOwned,
 {
     match api_call.await {
         Ok(response) => {
@@ -687,17 +688,22 @@ where
                     } else {
                         response.content.clone()
                     };
+                    // Try explicit deserialization to get the actual error message
+                    let deser_error = serde_json::from_str::<T::Data>(&response.content)
+                        .err()
+                        .map(|e| format!(" Deserialization error: {}", e))
+                        .unwrap_or_default();
                     debug!(
-                        "Failed to extract data from API response: {}",
-                        truncated
+                        "Failed to extract data from API response:{} Content: {}",
+                        deser_error, truncated
                     );
                     let err = Error::ResponseError(
                         tower_api::apis::ResponseContent {
                             tower_trace_id: "".to_string(),
                             status: StatusCode::NO_CONTENT,
                             content: format!(
-                                "Received a response from the server that the CLI wasn't able to understand: {}",
-                                truncated
+                                "Received a response from the server that the CLI wasn't able to understand.{} Response: {}",
+                                deser_error, truncated
                             ),
                             entity: None,
                         },
