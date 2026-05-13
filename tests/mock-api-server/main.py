@@ -48,6 +48,7 @@ mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
 mock_deployed_apps = set()  # Track which apps have been deployed
+mock_max_page_size: Optional[int] = None  # Override max page size for testing pagination
 
 # Pre-populate with test-app for CLI validation/spinner tests
 mock_apps_db["predeployed-test-app"] = {
@@ -111,20 +112,17 @@ async def read_root():
 
 # Placeholder for /v1/apps endpoints
 @app.get("/v1/apps")
-async def list_apps():
+async def list_apps(page: Optional[int] = None, page_size: Optional[int] = None):
     # Format apps as AppSummary objects
     app_summaries = []
     for app_data in mock_apps_db.values():
         app_summaries.append({"app": app_data, "runs": []})  # Empty runs for list view
 
+    page_items, pages = paginate(app_summaries, page, page_size)
+
     return {
-        "apps": app_summaries,
-        "pages": {
-            "page": 1,
-            "total": len(mock_apps_db),
-            "num_pages": 1,
-            "page_size": 20,
-        },
+        "apps": page_items,
+        "pages": pages,
     }
 
 
@@ -364,15 +362,11 @@ async def cancel_run(name: str, seq: int):
 
 # Placeholder for /secrets endpoints
 @app.get("/v1/secrets")
-async def list_secrets():
+async def list_secrets(page: Optional[int] = None, page_size: Optional[int] = None):
+    items, pages = paginate(list(mock_secrets_db.values()), page, page_size)
     return {
-        "secrets": list(mock_secrets_db.values()),
-        "pages": {
-            "page": 1,
-            "total": len(mock_secrets_db),
-            "num_pages": 1,
-            "page_size": 20,
-        },
+        "secrets": items,
+        "pages": pages,
     }
 
 
@@ -413,8 +407,9 @@ async def delete_secret(name: str, environment: str = "default"):
 
 # Placeholder for /teams endpoints
 @app.get("/v1/teams")
-async def list_teams():
-    return {"teams": list(mock_teams_db.values())}
+async def list_teams(page: Optional[int] = None, page_size: Optional[int] = None):
+    items, pages = paginate(list(mock_teams_db.values()), page, page_size)
+    return {"teams": items, "pages": pages}
 
 
 @app.post("/v1/teams")
@@ -456,6 +451,31 @@ YzZjYzZkYzZlYzZmYzc0YzQ1YzQ2YzQ3YzQ4YzQ5YzUwYzUxYzUyYzUzYzU0YzU1
 QIDAQAB
 -----END RSA PUBLIC KEY-----"""
     return {"public_key": mock_public_key}
+
+
+def paginate(items: list, page: Optional[int], page_size: Optional[int]) -> tuple:
+    """Apply pagination to a list of items. Returns (page_items, pages_metadata)."""
+    global mock_max_page_size
+    if page_size is None:
+        page_size = 20
+    # Cap page_size if mock override is set (simulates server-side limit)
+    if mock_max_page_size is not None:
+        page_size = min(page_size, mock_max_page_size)
+    if page is None:
+        page = 0
+
+    total = len(items)
+    num_pages = max(1, (total + page_size - 1) // page_size)
+    start = page * page_size
+    end = start + page_size
+    page_items = items[start:end]
+
+    return page_items, {
+        "page": page,
+        "total": total,
+        "num_pages": num_pages,
+        "page_size": page_size,
+    }
 
 
 def empty_paginated_response(key: str):
@@ -638,16 +658,12 @@ async def stream_run_logs(name: str, seq: int):
 
 # Schedule endpoints
 @app.get("/v1/schedules")
-async def list_schedules():
+async def list_schedules(page: Optional[int] = None, page_size: Optional[int] = None):
     """Mock endpoint for listing schedules."""
+    items, pages = paginate(list(mock_schedules_db.values()), page, page_size)
     return {
-        "schedules": list(mock_schedules_db.values()),
-        "pages": {
-            "page": 1,
-            "total": len(mock_schedules_db),
-            "num_pages": 1,
-            "page_size": 20,
-        },
+        "schedules": items,
+        "pages": pages,
     }
 
 
@@ -708,3 +724,83 @@ async def delete_schedule(schedule_data: Dict[str, Any]):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.datetime.now().isoformat()}
+
+
+# Test helper endpoints (for seeding data in integration tests)
+@app.post("/test/seed-apps")
+async def seed_apps(data: Dict[str, Any]):
+    """Seed the mock apps DB with a specified number of apps."""
+    global mock_max_page_size
+    count = data.get("count", 10)
+    page_size_override = data.get("page_size_override")
+    if page_size_override is not None:
+        mock_max_page_size = page_size_override
+
+    for i in range(count):
+        name = f"paginated-app-{i:03d}"
+        mock_apps_db[name] = {
+            "name": name,
+            "owner": "mock_owner",
+            "short_description": f"App number {i}",
+            "version": None,
+            "schedule": None,
+            "created_at": now_iso(),
+            "next_run_at": None,
+            "health_status": "healthy",
+            "pending_timeout": 300,
+            "running_timeout": 0,
+            "run_results": {
+                "cancelled": 0,
+                "crashed": 0,
+                "errored": 0,
+                "exited": 0,
+                "pending": 0,
+                "retrying": 0,
+                "running": 0,
+            },
+            "subdomain": None,
+            "is_externally_accessible": False,
+            "status": "active",
+        }
+
+    return {"seeded": count}
+
+
+@app.post("/test/reset")
+async def reset_test_data():
+    """Reset all mock data stores to initial state."""
+    global mock_max_page_size
+    mock_max_page_size = None
+    mock_apps_db.clear()
+    mock_secrets_db.clear()
+    mock_teams_db.clear()
+    mock_runs_db.clear()
+    mock_schedules_db.clear()
+    mock_deployed_apps.clear()
+
+    # Re-add the pre-populated test app
+    mock_apps_db["predeployed-test-app"] = {
+        "name": "predeployed-test-app",
+        "owner": "mock_owner",
+        "short_description": "Pre-existing test app for CLI tests",
+        "version": None,
+        "schedule": None,
+        "created_at": now_iso(),
+        "next_run_at": None,
+        "health_status": "healthy",
+        "pending_timeout": 300,
+        "running_timeout": 0,
+        "run_results": {
+            "cancelled": 0,
+            "crashed": 0,
+            "errored": 0,
+            "exited": 0,
+            "pending": 0,
+            "retrying": 0,
+            "running": 0,
+        },
+        "subdomain": None,
+        "is_externally_accessible": False,
+    }
+    mock_deployed_apps.add("predeployed-test-app")
+    return {"status": "reset"}
