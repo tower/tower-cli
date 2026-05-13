@@ -188,10 +188,34 @@ def main():
         else:
             log("Running integration tests...")
 
-        result = subprocess.run(
-            ["behave", str(test_dir)] + args, cwd=Path(__file__).parent, env=env
+        # Run parallel tests first (exclude @serial tagged features)
+        parallel_result = subprocess.run(
+            ["behave", str(test_dir), "--tags=~@serial"] + args,
+            cwd=Path(__file__).parent,
+            env=env,
         )
-        return result.returncode
+
+        # Run @serial tagged features sequentially (no --jobs flag)
+        serial_args = [a for a in args if a not in ("--jobs", "-j") and not a.isdigit()]
+        # Remove --jobs N pair from args
+        serial_args = []
+        skip_next = False
+        for a in args:
+            if skip_next:
+                skip_next = False
+                continue
+            if a in ("--jobs", "-j"):
+                skip_next = True
+                continue
+            serial_args.append(a)
+
+        serial_result = subprocess.run(
+            ["behave", str(test_dir), "--tags=@serial"] + serial_args,
+            cwd=Path(__file__).parent,
+            env=env,
+        )
+
+        return parallel_result.returncode or serial_result.returncode
 
     except KeyboardInterrupt:
         log("Tests interrupted by user")

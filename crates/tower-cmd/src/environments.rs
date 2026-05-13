@@ -23,18 +23,18 @@ pub fn environments_cmd() -> Command {
 }
 
 pub async fn do_list(config: Config) {
-    let resp = output::with_spinner("Listing environments", api::list_environments(&config)).await;
+    let environments =
+        output::with_spinner("Listing environments", api::list_environments(&config)).await;
 
     let headers = vec!["Name".to_string()];
 
-    let envs_data: Vec<Vec<String>> = resp
-        .environments
+    let envs_data: Vec<Vec<String>> = environments
         .iter()
         .map(|env| vec![env.name.clone()])
         .collect();
 
     // Display the table using the existing table function
-    output::table(headers, envs_data, Some(&resp.environments));
+    output::table(headers, envs_data, Some(&environments));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {

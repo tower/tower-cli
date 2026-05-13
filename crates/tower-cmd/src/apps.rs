@@ -210,10 +210,9 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_list_apps(config: Config) {
-    let resp = output::with_spinner("Listing apps", api::list_apps(&config)).await;
+    let apps = output::with_spinner("Listing apps", api::list_apps(&config)).await;
 
-    let items = resp
-        .apps
+    let items = apps
         .iter()
         .map(|app_summary| {
             let app = &app_summary.app;
@@ -225,7 +224,7 @@ pub async fn do_list_apps(config: Config) {
             format!("{}\n{}", output::title(&app.name), desc)
         })
         .collect();
-    output::list(items, Some(&resp.apps));
+    output::list(items, Some(&apps));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {

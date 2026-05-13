@@ -3,10 +3,12 @@ use futures_util::StreamExt;
 use http::StatusCode;
 use reqwest_eventsource::{Event, EventSource};
 use std::collections::HashMap;
+use std::future::Future;
 use tokio::sync::mpsc;
 use tower_api::apis::configuration;
 use tower_api::apis::Error;
 use tower_api::apis::ResponseContent;
+use tower_api::models::Pagination;
 use tower_api::models::RunParameter;
 use tower_telemetry::debug;
 
@@ -17,6 +19,74 @@ pub trait ResponseEntity {
 
     /// Extract the data from the response, returning None if it's not the expected type
     fn extract_data(self) -> Option<Self::Data>;
+}
+
+/// Trait for API responses that contain paginated items.
+trait PaginatedResponse {
+    type Item;
+    fn pagination(&self) -> &Pagination;
+    fn into_items(self) -> Vec<Self::Item>;
+}
+
+impl PaginatedResponse for tower_api::models::ListAppsResponse {
+    type Item = tower_api::models::AppSummary;
+    fn pagination(&self) -> &Pagination { &self.pages }
+    fn into_items(self) -> Vec<Self::Item> { self.apps }
+}
+
+impl PaginatedResponse for tower_api::models::ListTeamsResponse {
+    type Item = tower_api::models::Team;
+    fn pagination(&self) -> &Pagination { &self.pages }
+    fn into_items(self) -> Vec<Self::Item> { self.teams }
+}
+
+impl PaginatedResponse for tower_api::models::ListSecretsResponse {
+    type Item = tower_api::models::Secret;
+    fn pagination(&self) -> &Pagination { &self.pages }
+    fn into_items(self) -> Vec<Self::Item> { self.secrets }
+}
+
+impl PaginatedResponse for tower_api::models::ListCatalogsResponse {
+    type Item = tower_api::models::Catalog;
+    fn pagination(&self) -> &Pagination { &self.pages }
+    fn into_items(self) -> Vec<Self::Item> { self.catalogs }
+}
+
+impl PaginatedResponse for tower_api::models::ListEnvironmentsResponse {
+    type Item = tower_api::models::Environment;
+    fn pagination(&self) -> &Pagination { &self.pages }
+    fn into_items(self) -> Vec<Self::Item> { self.environments }
+}
+
+impl PaginatedResponse for tower_api::models::ListSchedulesResponse {
+    type Item = tower_api::models::Schedule;
+    fn pagination(&self) -> &Pagination { &self.pages }
+    fn into_items(self) -> Vec<Self::Item> { self.schedules }
+}
+
+/// Fetches all pages from a paginated API endpoint.
+async fn fetch_all_pages<R, E, F, Fut>(fetch: F) -> Result<Vec<R::Item>, Error<E>>
+where
+    R: PaginatedResponse,
+    F: Fn(i64, i64) -> Fut,
+    Fut: Future<Output = Result<R, Error<E>>>,
+{
+    let page_size: i64 = 100;
+    let mut all_items = Vec::new();
+    let mut page: i64 = 0;
+
+    loop {
+        let response = fetch(page, page_size).await?;
+        let num_pages = response.pagination().num_pages;
+        all_items.extend(response.into_items());
+
+        page += 1;
+        if page >= num_pages || page >= 100 {
+            break;
+        }
+    }
+
+    Ok(all_items)
 }
 
 pub async fn describe_app(
@@ -45,21 +115,26 @@ pub async fn describe_app(
 
 pub async fn list_apps(
     config: &Config,
-) -> Result<tower_api::models::ListAppsResponse, Error<tower_api::apis::default_api::ListAppsError>>
+) -> Result<Vec<tower_api::models::AppSummary>, Error<tower_api::apis::default_api::ListAppsError>>
 {
-    let api_config = &config.into();
+    let api_config: configuration::Configuration = config.into();
 
-    let params = tower_api::apis::default_api::ListAppsParams {
-        query: None,
-        page: None,
-        page_size: None,
-        num_runs: Some(0),
-        sort: None,
-        filter: None,
-        environment: None,
-    };
-
-    unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
+    fetch_all_pages(|page, page_size| {
+        let api_config = &api_config;
+        async move {
+            let params = tower_api::apis::default_api::ListAppsParams {
+                query: None,
+                page: Some(page),
+                page_size: Some(page_size),
+                num_runs: Some(0),
+                sort: None,
+                filter: None,
+                environment: None,
+            };
+            unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
+        }
+    })
+    .await
 }
 
 pub async fn create_app(
@@ -225,22 +300,27 @@ pub async fn list_catalogs(
     config: &Config,
     env: &str,
     all: bool,
-) -> Result<
-    tower_api::models::ListCatalogsResponse,
-    Error<tower_api::apis::default_api::ListCatalogsError>,
-> {
-    let api_config = &config.into();
+) -> Result<Vec<tower_api::models::Catalog>, Error<tower_api::apis::default_api::ListCatalogsError>>
+{
+    let api_config: configuration::Configuration = config.into();
+    let env = env.to_string();
 
-    let params = tower_api::apis::default_api::ListCatalogsParams {
-        environment: Some(env.to_string()),
-        all: Some(all),
-        page: None,
-        page_size: None,
-    };
-
-    unwrap_api_response(tower_api::apis::default_api::list_catalogs(
-        api_config, params,
-    ))
+    fetch_all_pages(|page, page_size| {
+        let api_config = &api_config;
+        let env = &env;
+        async move {
+            let params = tower_api::apis::default_api::ListCatalogsParams {
+                environment: Some(env.to_string()),
+                all: Some(all),
+                page: Some(page),
+                page_size: Some(page_size),
+            };
+            unwrap_api_response(tower_api::apis::default_api::list_catalogs(
+                api_config, params,
+            ))
+            .await
+        }
+    })
     .await
 }
 
@@ -269,22 +349,27 @@ pub async fn list_secrets(
     config: &Config,
     env: &str,
     all: bool,
-) -> Result<
-    tower_api::models::ListSecretsResponse,
-    Error<tower_api::apis::default_api::ListSecretsError>,
-> {
-    let api_config = &config.into();
+) -> Result<Vec<tower_api::models::Secret>, Error<tower_api::apis::default_api::ListSecretsError>>
+{
+    let api_config: configuration::Configuration = config.into();
+    let env = env.to_string();
 
-    let params = tower_api::apis::default_api::ListSecretsParams {
-        environment: Some(env.to_string()),
-        all: Some(all),
-        page: None,
-        page_size: None,
-    };
-
-    unwrap_api_response(tower_api::apis::default_api::list_secrets(
-        api_config, params,
-    ))
+    fetch_all_pages(|page, page_size| {
+        let api_config = &api_config;
+        let env = &env;
+        async move {
+            let params = tower_api::apis::default_api::ListSecretsParams {
+                environment: Some(env.to_string()),
+                all: Some(all),
+                page: Some(page),
+                page_size: Some(page_size),
+            };
+            unwrap_api_response(tower_api::apis::default_api::list_secrets(
+                api_config, params,
+            ))
+            .await
+        }
+    })
     .await
 }
 
@@ -405,16 +490,20 @@ pub async fn refresh_session(
 
 pub async fn list_teams(
     config: &Config,
-) -> Result<tower_api::models::ListTeamsResponse, Error<tower_api::apis::default_api::ListTeamsError>>
-{
-    let api_config = &config.into();
+) -> Result<Vec<tower_api::models::Team>, Error<tower_api::apis::default_api::ListTeamsError>> {
+    let api_config: configuration::Configuration = config.into();
 
-    let params = tower_api::apis::default_api::ListTeamsParams {
-        page: None,
-        page_size: None,
-    };
-
-    unwrap_api_response(tower_api::apis::default_api::list_teams(api_config, params)).await
+    fetch_all_pages(|page, page_size| {
+        let api_config = &api_config;
+        async move {
+            let params = tower_api::apis::default_api::ListTeamsParams {
+                page: Some(page),
+                page_size: Some(page_size),
+            };
+            unwrap_api_response(tower_api::apis::default_api::list_teams(api_config, params)).await
+        }
+    })
+    .await
 }
 
 pub enum LogStreamEvent {
@@ -575,6 +664,7 @@ async fn unwrap_api_response<T, F, V>(api_call: F) -> Result<T::Data, Error<V>>
 where
     F: std::future::Future<Output = Result<ResponseContent<T>, Error<V>>>,
     T: ResponseEntity,
+    T::Data: serde::de::DeserializeOwned,
 {
     match api_call.await {
         Ok(response) => {
@@ -594,11 +684,28 @@ where
                 if let Some(data) = entity.extract_data() {
                     Ok(data)
                 } else {
+                    let truncated = if response.content.len() > 500 {
+                        format!("{}...(truncated)", &response.content[..500])
+                    } else {
+                        response.content.clone()
+                    };
+                    // Try explicit deserialization to get the actual error message
+                    let deser_error = serde_json::from_str::<T::Data>(&response.content)
+                        .err()
+                        .map(|e| format!(" Deserialization error: {}", e))
+                        .unwrap_or_default();
+                    debug!(
+                        "Failed to extract data from API response:{} Content: {}",
+                        deser_error, truncated
+                    );
                     let err = Error::ResponseError(
                         tower_api::apis::ResponseContent {
                             tower_trace_id: "".to_string(),
                             status: StatusCode::NO_CONTENT,
-                            content: "Received a response from the server that the CLI wasn't able to understand".to_string(),
+                            content: format!(
+                                "Received a response from the server that the CLI wasn't able to understand.{} Response: {}",
+                                deser_error, truncated
+                            ),
                             entity: None,
                         },
                     );
@@ -859,18 +966,24 @@ impl ResponseEntity for tower_api::apis::default_api::ListEnvironmentsSuccess {
 pub async fn list_environments(
     config: &Config,
 ) -> Result<
-    tower_api::models::ListEnvironmentsResponse,
+    Vec<tower_api::models::Environment>,
     Error<tower_api::apis::default_api::ListEnvironmentsError>,
 > {
-    let api_config = &config.into();
-    let params = tower_api::apis::default_api::ListEnvironmentsParams {
-        page: Some(0),
-        page_size: Some(1000),
-    };
+    let api_config: configuration::Configuration = config.into();
 
-    unwrap_api_response(tower_api::apis::default_api::list_environments(
-        api_config, params,
-    ))
+    fetch_all_pages(|page, page_size| {
+        let api_config = &api_config;
+        async move {
+            let params = tower_api::apis::default_api::ListEnvironmentsParams {
+                page: Some(page),
+                page_size: Some(page_size),
+            };
+            unwrap_api_response(tower_api::apis::default_api::list_environments(
+                api_config, params,
+            ))
+            .await
+        }
+    })
     .await
 }
 
@@ -900,21 +1013,26 @@ pub async fn list_schedules(
     config: &Config,
     _app_name: Option<&str>,
     environment: Option<&str>,
-) -> Result<
-    tower_api::models::ListSchedulesResponse,
-    Error<tower_api::apis::default_api::ListSchedulesError>,
-> {
-    let api_config = &config.into();
+) -> Result<Vec<tower_api::models::Schedule>, Error<tower_api::apis::default_api::ListSchedulesError>>
+{
+    let api_config: configuration::Configuration = config.into();
+    let environment = environment.map(String::from);
 
-    let params = tower_api::apis::default_api::ListSchedulesParams {
-        environment: environment.map(String::from),
-        page: None,
-        page_size: None,
-    };
-
-    unwrap_api_response(tower_api::apis::default_api::list_schedules(
-        api_config, params,
-    ))
+    fetch_all_pages(|page, page_size| {
+        let api_config = &api_config;
+        let environment = &environment;
+        async move {
+            let params = tower_api::apis::default_api::ListSchedulesParams {
+                environment: environment.clone(),
+                page: Some(page),
+                page_size: Some(page_size),
+            };
+            unwrap_api_response(tower_api::apis::default_api::list_schedules(
+                api_config, params,
+            ))
+            .await
+        }
+    })
     .await
 }
 

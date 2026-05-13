@@ -133,15 +133,14 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
             .collect();
         output::table(headers, data, Some(&list_response.secrets));
     } else {
-        let list_response =
+        let secrets =
             output::with_spinner("Listing secrets", api::list_secrets(&config, &env, all)).await;
 
         let headers = vec!["Secret", "Environment", "Preview"]
             .into_iter()
             .map(str::to_string)
             .collect();
-        let data = list_response
-            .secrets
+        let data = secrets
             .iter()
             .map(|secret| {
                 vec![
@@ -151,7 +150,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                 ]
             })
             .collect();
-        output::table(headers, data, Some(&list_response.secrets));
+        output::table(headers, data, Some(&secrets));
     }
 }
 

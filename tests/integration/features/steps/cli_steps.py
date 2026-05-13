@@ -9,7 +9,8 @@ import shlex
 import re
 from datetime import datetime
 from pathlib import Path
-from behave import given, when, then
+import requests
+from behave import given, when, then, step
 from dirty_equals import IsStr, IsPartialDict
 
 
@@ -432,3 +433,46 @@ def step_app_description_should_be(context, expected_description):
     assert (
         actual_description == expected_description
     ), f"Expected description '{expected_description}', got '{actual_description}'"
+
+
+# Pagination test steps
+
+
+@step("the mock API has {count:d} seeded apps")
+def step_seed_apps(context, count):
+    """Seed the mock API with a number of apps to test pagination."""
+    # Reset first to get a clean slate
+    requests.post(f"{context.tower_url}/test/reset")
+    # Seed apps (no page_size override — uses default 20, so >20 apps forces pagination)
+    resp = requests.post(
+        f"{context.tower_url}/test/seed-apps",
+        json={"count": count},
+    )
+    assert resp.status_code == 200, f"Failed to seed apps: {resp.text}"
+    context.seeded_app_count = count
+
+
+@step("the output should contain all {count:d} seeded app names")
+def step_output_should_contain_all_seeded_apps(context, count):
+    """Verify the CLI output contains all seeded app names."""
+    # Strip ANSI codes for checking
+    output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", context.cli_output)
+    missing = []
+    for i in range(count):
+        name = f"paginated-app-{i:03d}"
+        if name not in output:
+            missing.append(name)
+    assert not missing, (
+        f"Missing {len(missing)} apps from output (first 5): {missing[:5]}\n"
+        f"Full output: {output[:2000]}"
+    )
+
+
+@step("the JSON should contain at least {count:d} apps")
+def step_json_should_contain_at_least_n_apps(context, count):
+    """Verify JSON output contains at least the expected number of apps."""
+    data = parse_cli_json(context)
+    assert isinstance(data, list), f"Expected JSON array, got: {type(data)}"
+    assert (
+        len(data) >= count
+    ), f"Expected at least {count} apps in JSON, got {len(data)}"
