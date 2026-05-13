@@ -211,6 +211,8 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(&path).map_err(Error::IoError)?;
 
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
     // Download the file
     let response = reqwest::get(url)
         .await
