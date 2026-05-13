@@ -438,15 +438,15 @@ def step_app_description_should_be(context, expected_description):
 # Pagination test steps
 
 
-@step("the mock API has {count:d} seeded apps with page size {page_size:d}")
-def step_seed_apps_with_page_size(context, count, page_size):
-    """Seed the mock API with a number of apps and cap the page size."""
+@step("the mock API has {count:d} seeded apps")
+def step_seed_apps(context, count):
+    """Seed the mock API with a number of apps to test pagination."""
     # Reset first to get a clean slate
     requests.post(f"{context.tower_url}/test/reset")
-    # Seed apps with a small page_size to force multiple pages
+    # Seed apps (no page_size override — uses default 20, so >20 apps forces pagination)
     resp = requests.post(
         f"{context.tower_url}/test/seed-apps",
-        json={"count": count, "page_size_override": page_size},
+        json={"count": count},
     )
     assert resp.status_code == 200, f"Failed to seed apps: {resp.text}"
     context.seeded_app_count = count
