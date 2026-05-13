@@ -373,6 +373,9 @@ async fn test_abort_on_dependency_installation_failure() {
         Status::None => {
             panic!("App should have a status");
         }
+        Status::Cancelled => {
+            panic!("App should have crashed, not been cancelled");
+        }
         Status::Failed { .. } => {
             panic!("App should have crashed, not failed with a platform error");
         }

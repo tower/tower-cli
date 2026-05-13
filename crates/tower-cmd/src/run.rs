@@ -251,13 +251,22 @@ where
             output::error(&format!("Your local run crashed with exit code: {}", code));
             return Err(Error::AppCrashed);
         }
-        Status::Failed {
-            error_code,
-            error_message,
-        } => {
+        Status::Cancelled => {
+            output::error("Your local run was cancelled.");
+            return Err(Error::AppCrashed);
+        }
+        Status::Failed(failure) => {
+            let detail = match failure {
+                tower_runtime::AppFailure::Runtime(e) => format!("{:?}", e),
+                tower_runtime::AppFailure::Panic(msg) => format!("panic: {}", msg),
+                tower_runtime::AppFailure::Platform {
+                    error_code,
+                    error_message,
+                } => format!("{} ({})", error_message, error_code),
+            };
             output::error(&format!(
-                "Your local run failed due to a platform error (code: {}, message: {})",
-                error_code, error_message
+                "Your local run failed due to a platform error: {}",
+                detail
             ));
             return Err(Error::AppCrashed);
         }

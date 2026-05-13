@@ -45,9 +45,34 @@ pub enum Status {
     Crashed {
         code: i32,
     },
+    /// The app was explicitly terminated via the `CancellationToken` — a
+    /// deliberate stop, not a failure or a crash. Distinct from `Crashed`
+    /// because there's no meaningful exit code to report.
+    Cancelled,
     /// A platform-level failure (not the user's app). For example, pod scheduling
     /// failures, image pull errors, or other infrastructure issues.
-    Failed {
+    Failed(AppFailure),
+}
+
+/// A platform-level failure — distinct from a child-process crash
+/// (`Status::Crashed`) because the user's app never ran to completion.
+/// Consumers (currently `tower-runtime-entrypoint` and the runner-side k8s
+/// backend) translate this into the `error_code` / `error_message` strings
+/// that flow through the termination-log → control-plane log pipeline.
+#[derive(Clone, Debug, PartialEq)]
+pub enum AppFailure {
+    /// A structured runtime error from `tower_runtime` (e.g.
+    /// `UnsupportedPlatform`, `SpawnFailed`, `DependencyInstallationFailed`).
+    Runtime(Error),
+    /// A panic inside the spawned task. `catch_unwind` only returns
+    /// `Box<dyn Any + Send>`, so we surface the best-effort textual payload.
+    Panic(String),
+    /// A platform failure surfaced from outside `tower_runtime` (e.g. the
+    /// kubelet refusing to pull an image, an init container failing, or a
+    /// parsed entrypoint termination message). The `error_code` is opaque
+    /// to `tower_runtime` — the consumer that constructed this variant owns
+    /// the vocabulary.
+    Platform {
         error_code: String,
         error_message: String,
     },
@@ -58,7 +83,10 @@ impl Status {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
-            Status::Exited | Status::Crashed { .. } | Status::Failed { .. }
+            Status::Exited
+                | Status::Crashed { .. }
+                | Status::Cancelled
+                | Status::Failed(_)
         )
     }
 }
