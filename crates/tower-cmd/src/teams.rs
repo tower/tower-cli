@@ -56,12 +56,11 @@ pub async fn do_list(config: Config) {
 }
 
 async fn do_list_via_api(config: &Config) {
-    let resp = output::with_spinner("Fetching teams", api::list_teams(config)).await;
+    let teams = output::with_spinner("Fetching teams", api::list_teams(config)).await;
 
     let headers = vec!["Name".to_string()];
 
-    let teams_data: Vec<Vec<String>> = resp
-        .teams
+    let teams_data: Vec<Vec<String>> = teams
         .iter()
         .map(|team| vec![team.name.clone()])
         .collect();

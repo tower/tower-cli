@@ -335,15 +335,14 @@ impl TowerService {
     }
 
     async fn list_teams_via_api(&self) -> Result<CallToolResult, McpError> {
-        let response = api::list_teams(&self.config).await.map_err(|e| {
+        let teams = api::list_teams(&self.config).await.map_err(|e| {
             McpError::internal_error(
                 "Failed to list teams",
                 Some(json!({"error": e.to_string()})),
             )
         })?;
 
-        let teams: Vec<Value> = response
-            .teams
+        let teams: Vec<Value> = teams
             .into_iter()
             .map(|team| json!({"name": team.name}))
             .collect();
@@ -467,9 +466,8 @@ impl TowerService {
     #[tool(description = "List all apps in your Tower account")]
     async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_apps(&self.config).await {
-            Ok(response) => {
-                let apps: Vec<Value> = response
-                    .apps
+            Ok(apps) => {
+                let apps: Vec<Value> = apps
                     .into_iter()
                     .map(|app_summary| {
                         let app = app_summary.app;
@@ -594,7 +592,7 @@ impl TowerService {
         let all = request.all.as_deref() == Some("true");
 
         match api::list_secrets(&self.config, environment, all).await {
-            Ok(response) => Self::json_success(json!({"secrets": response.secrets})),
+            Ok(secrets) => Self::json_success(json!({"secrets": secrets})),
             Err(e) => Self::error_result("Failed to list secrets", e),
         }
     }
@@ -1036,9 +1034,8 @@ IMPORTANT REMINDERS:
     #[tool(description = "List all schedules for apps")]
     async fn tower_schedules_list(&self) -> Result<CallToolResult, McpError> {
         match api::list_schedules(&self.config, None, None).await {
-            Ok(response) => {
-                let schedules = response
-                    .schedules
+            Ok(schedules) => {
+                let schedules = schedules
                     .into_iter()
                     .map(|mut schedule| {
                         if let Some(parameters) = schedule.parameters.as_mut() {

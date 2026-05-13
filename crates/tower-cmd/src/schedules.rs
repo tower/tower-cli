@@ -114,13 +114,13 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let app = args.get_one::<String>("app").map(|s| s.as_str());
     let environment = args.get_one::<String>("environment").map(|s| s.as_str());
 
-    let response = output::with_spinner(
+    let schedules = output::with_spinner(
         "Listing schedules",
         api::list_schedules(&config, app, environment),
     )
     .await;
 
-    if response.schedules.is_empty() {
+    if schedules.is_empty() {
         output::write("No schedules found.\n");
         return;
     }
@@ -130,8 +130,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         .map(str::to_string)
         .collect();
 
-    let rows: Vec<Vec<String>> = response
-        .schedules
+    let rows: Vec<Vec<String>> = schedules
         .iter()
         .map(|schedule| {
             let status = match schedule.status {
@@ -149,7 +148,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         })
         .collect();
 
-    output::table(headers, rows, Some(&response.schedules));
+    output::table(headers, rows, Some(&schedules));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {

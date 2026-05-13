@@ -54,15 +54,14 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let all = cmd::get_bool_flag(args, "all");
     let env = cmd::get_string_flag(args, "environment");
 
-    let list_response =
+    let catalogs =
         output::with_spinner("Listing catalogs", api::list_catalogs(&config, &env, all)).await;
 
     let headers = vec!["Name", "Type", "Environment"]
         .into_iter()
         .map(str::to_string)
         .collect();
-    let data = list_response
-        .catalogs
+    let data = catalogs
         .iter()
         .map(|catalog| {
             vec![
@@ -72,7 +71,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
             ]
         })
         .collect();
-    output::table(headers, data, Some(&list_response.catalogs));
+    output::table(headers, data, Some(&catalogs));
 }
 
 pub async fn do_show(config: Config, args: &ArgMatches) {
