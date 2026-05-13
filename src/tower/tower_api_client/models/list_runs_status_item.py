@@ -9,6 +9,7 @@ class ListRunsStatusItem(str, Enum):
     PENDING = "pending"
     RETRYING = "retrying"
     RUNNING = "running"
+    STARTING = "starting"
 
     def __str__(self) -> str:
         return str(self.value)

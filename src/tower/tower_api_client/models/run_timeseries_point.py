@@ -23,6 +23,7 @@ class RunTimeseriesPoint:
         retrying (int):
         running (int):
         scheduled (int):
+        starting (int):
     """
 
     cancelled: int
@@ -34,6 +35,7 @@ class RunTimeseriesPoint:
     retrying: int
     running: int
     scheduled: int
+    starting: int
 
     def to_dict(self) -> dict[str, Any]:
         cancelled = self.cancelled
@@ -54,6 +56,8 @@ class RunTimeseriesPoint:
 
         scheduled = self.scheduled
 
+        starting = self.starting
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -67,6 +71,7 @@ class RunTimeseriesPoint:
                 "retrying": retrying,
                 "running": running,
                 "scheduled": scheduled,
+                "starting": starting,
             }
         )
 
@@ -93,6 +98,8 @@ class RunTimeseriesPoint:
 
         scheduled = d.pop("scheduled")
 
+        starting = d.pop("starting")
+
         run_timeseries_point = cls(
             cancelled=cancelled,
             crashed=crashed,
@@ -103,6 +110,7 @@ class RunTimeseriesPoint:
             retrying=retrying,
             running=running,
             scheduled=scheduled,
+            starting=starting,
         )
 
         return run_timeseries_point

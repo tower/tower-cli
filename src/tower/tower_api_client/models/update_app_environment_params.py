@@ -7,23 +7,23 @@ from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="CreatePasswordResetResponse")
+T = TypeVar("T", bound="UpdateAppEnvironmentParams")
 
 
 @_attrs_define
-class CreatePasswordResetResponse:
+class UpdateAppEnvironmentParams:
     """
     Attributes:
-        ok (bool): A boolean indicating the request was successfully processed.
+        version (str): The version to deploy to this environment, e.g. 'v1', 'v2'.
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
-            https://api.tower.dev/v1/schemas/CreatePasswordResetResponse.json.
+            https://api.tower.dev/v1/schemas/UpdateAppEnvironmentParams.json.
     """
 
-    ok: bool
+    version: str
     schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        ok = self.ok
+        version = self.version
 
         schema = self.schema
 
@@ -31,7 +31,7 @@ class CreatePasswordResetResponse:
 
         field_dict.update(
             {
-                "ok": ok,
+                "version": version,
             }
         )
         if schema is not UNSET:
@@ -42,13 +42,13 @@ class CreatePasswordResetResponse:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        ok = d.pop("ok")
+        version = d.pop("version")
 
         schema = d.pop("$schema", UNSET)
 
-        create_password_reset_response = cls(
-            ok=ok,
+        update_app_environment_params = cls(
+            version=version,
             schema=schema,
         )
 
-        return create_password_reset_response
+        return update_app_environment_params

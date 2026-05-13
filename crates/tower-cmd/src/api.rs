@@ -34,6 +34,7 @@ pub async fn describe_app(
         start_at: None,
         end_at: None,
         timezone: None,
+        environment: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_app(
@@ -933,6 +934,7 @@ pub async fn create_schedule(
         params
             .into_iter()
             .map(|(key, value)| RunParameter {
+                is_override: None,
                 name: key,
                 value,
                 hidden: None,
@@ -971,6 +973,7 @@ pub async fn update_schedule(
         params
             .into_iter()
             .map(|(key, value)| RunParameter {
+                is_override: None,
                 name: key,
                 value,
                 hidden: None,

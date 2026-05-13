@@ -22,6 +22,7 @@ pub async fn ensure_app_exists(
             start_at: None,
             end_at: None,
             timezone: None,
+            environment: None,
         },
     )
     .await;

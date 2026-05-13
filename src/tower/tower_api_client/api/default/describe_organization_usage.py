@@ -48,7 +48,7 @@ def sync_detailed(
 ) -> Response[ErrorModel | OrganizationUsage]:
     """Describe organization usage
 
-     Describe usage statistics for the user's organization.
+     Describe usage statistics for the user's organization for the current billing cycle.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -73,7 +73,7 @@ def sync(
 ) -> ErrorModel | OrganizationUsage | None:
     """Describe organization usage
 
-     Describe usage statistics for the user's organization.
+     Describe usage statistics for the user's organization for the current billing cycle.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -94,7 +94,7 @@ async def asyncio_detailed(
 ) -> Response[ErrorModel | OrganizationUsage]:
     """Describe organization usage
 
-     Describe usage statistics for the user's organization.
+     Describe usage statistics for the user's organization for the current billing cycle.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -117,7 +117,7 @@ async def asyncio(
 ) -> ErrorModel | OrganizationUsage | None:
     """Describe organization usage
 
-     Describe usage statistics for the user's organization.
+     Describe usage statistics for the user's organization for the current billing cycle.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -69,6 +69,7 @@ mock_apps_db["predeployed-test-app"] = {
         "pending": 0,
         "retrying": 0,
         "running": 0,
+        "starting": 0,
     },
     "subdomain": None,
     "is_externally_accessible": False,
@@ -160,6 +161,7 @@ async def create_app(app_data: Dict[str, Any]):
             "pending": 0,
             "retrying": 0,
             "running": 0,
+            "starting": 0,
         },
         "schedule": None,
         "short_description": description or "",
@@ -283,6 +285,7 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         "created_at": datetime.datetime.now().isoformat(),
         "scheduled_at": datetime.datetime.now().isoformat(),
         "cancelled_at": None,
+        "starting_at": datetime.datetime.now().isoformat(),
         "started_at": datetime.datetime.now().isoformat(),
         "ended_at": None,
         "app_version": mock_apps_db[name].get("version", "1.0.0"),
@@ -355,7 +358,7 @@ async def cancel_run(name: str, seq: int):
             run_data["status"] = "cancelled"
             run_data["status_group"] = "successful"
             run_data["cancelled_at"] = now_iso()
-            return {"run": run_data}
+            return {"run": run_data, "cancelled_child_runs": 0}
 
     raise HTTPException(
         status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
