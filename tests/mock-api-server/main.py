@@ -113,10 +113,13 @@ async def read_root():
 # Placeholder for /v1/apps endpoints
 @app.get("/v1/apps")
 async def list_apps(page: Optional[int] = None, page_size: Optional[int] = None):
-    # Format apps as AppSummary objects
+    # Format apps as AppSummary objects (matching real API list format)
     app_summaries = []
+    # Fields to exclude from list view (real API doesn't return these in list)
+    list_excluded_fields = {"run_results"}
     for app_data in mock_apps_db.values():
-        app_summaries.append({"app": app_data, "runs": []})  # Empty runs for list view
+        app_for_list = {k: v for k, v in app_data.items() if k not in list_excluded_fields}
+        app_summaries.append({"app": app_for_list, "runs": []})
 
     page_items, pages = paginate(app_summaries, page, page_size)
 
