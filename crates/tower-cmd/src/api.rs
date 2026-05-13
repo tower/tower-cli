@@ -116,11 +116,11 @@ pub async fn describe_app(
 
 pub async fn list_apps(
     config: &Config,
-    environment: &str,
+    environment: Option<&str>,
 ) -> Result<Vec<tower_api::models::AppSummary>, Error<tower_api::apis::default_api::ListAppsError>>
 {
     let api_config: configuration::Configuration = config.into();
-    let environment = environment.to_string();
+    let environment = environment.map(|s| s.to_string());
 
     fetch_all_pages(|page, page_size| {
         let api_config = &api_config;
@@ -133,7 +133,7 @@ pub async fn list_apps(
                 num_runs: Some(0),
                 sort: None,
                 filter: None,
-                environment: Some(environment.to_string()),
+                environment: environment.clone(),
             };
             unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
         }

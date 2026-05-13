@@ -173,7 +173,7 @@ struct DeployRequest {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ListAppsRequest {
-    /// The environment to filter apps by (defaults to "default")
+    /// Filter apps by environment. If not provided, apps across all environments are returned.
     environment: Option<String>,
 }
 
@@ -506,7 +506,7 @@ impl TowerService {
         &self,
         Parameters(request): Parameters<ListAppsRequest>,
     ) -> Result<CallToolResult, McpError> {
-        let environment = request.environment.as_deref().unwrap_or("default");
+        let environment = request.environment.as_deref();
         match api::list_apps(&self.config, environment).await {
             Ok(apps) => {
                 let apps: Vec<Value> = apps
@@ -516,6 +516,7 @@ impl TowerService {
                         json!({
                             "name": app.name,
                             "description": app.short_description,
+                            "version": app.version,
                             "created_at": app.created_at,
                             "status": format!("{:?}", app.status)
                         })

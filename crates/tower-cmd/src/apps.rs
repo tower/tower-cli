@@ -17,9 +17,8 @@ pub fn apps_cmd() -> Command {
                     Arg::new("environment")
                         .short('e')
                         .long("environment")
-                        .default_value("default")
                         .value_parser(value_parser!(String))
-                        .help("List apps in this environment")
+                        .help("Filter apps by environment")
                         .action(clap::ArgAction::Set),
                 )
                 .about("List all apps in your Tower account"),
@@ -232,8 +231,8 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_list_apps(config: Config, args: &ArgMatches) {
-    let env = cmd::get_string_flag(args, "environment");
-    let apps = output::with_spinner("Listing apps", api::list_apps(&config, &env)).await;
+    let env = args.get_one::<String>("environment").map(|s| s.as_str());
+    let apps = output::with_spinner("Listing apps", api::list_apps(&config, env)).await;
 
     let items = apps
         .iter()
@@ -833,16 +832,13 @@ mod tests {
     }
 
     #[test]
-    fn list_defaults_to_default_environment() {
+    fn list_defaults_to_no_environment_filter() {
         let matches = apps_cmd()
             .try_get_matches_from(["apps", "list"])
             .unwrap();
         let (_, list_args) = matches.subcommand().unwrap();
 
-        assert_eq!(
-            list_args.get_one::<String>("environment").unwrap(),
-            "default"
-        );
+        assert_eq!(list_args.get_one::<String>("environment"), None);
     }
 
     #[test]
@@ -853,8 +849,8 @@ mod tests {
         let (_, list_args) = matches.subcommand().unwrap();
 
         assert_eq!(
-            list_args.get_one::<String>("environment").unwrap(),
-            "production"
+            list_args.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("production")
         );
     }
 
