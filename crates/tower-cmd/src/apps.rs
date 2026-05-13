@@ -5,13 +5,25 @@ use tokio::time::{sleep, Duration, Instant};
 
 use tower_api::models::{Run, RunLogLine};
 
-use crate::{api, output};
+use crate::{api, output, util::cmd};
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
         .about("Manage the apps in your current Tower account")
         .arg_required_else_help(true)
-        .subcommand(Command::new("list").about("List all apps in your Tower account"))
+        .subcommand(
+            Command::new("list")
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .help("List apps in this environment")
+                        .action(clap::ArgAction::Set),
+                )
+                .about("List all apps in your Tower account"),
+        )
         .subcommand(
             Command::new("show")
                 .arg(
@@ -20,6 +32,15 @@ pub fn apps_cmd() -> Command {
                         .index(1)
                         .required(true)
                         .help("Name of the app"),
+                )
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .help("The environment to resolve the app against")
+                        .action(clap::ArgAction::Set),
                 )
                 .about("Show details for a Tower app and its recent runs"),
         )
@@ -130,8 +151,9 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
     let name = cmd
         .get_one::<String>("app_name")
         .expect("app_name is required");
+    let env = cmd::get_string_flag(cmd, "environment");
 
-    match api::describe_app(&config, &name).await {
+    match api::describe_app(&config, &name, Some(&env)).await {
         Ok(app_response) => {
             if output::get_output_mode().is_json() {
                 output::json(&app_response);
@@ -209,8 +231,9 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
     }
 }
 
-pub async fn do_list_apps(config: Config) {
-    let apps = output::with_spinner("Listing apps", api::list_apps(&config)).await;
+pub async fn do_list_apps(config: Config, args: &ArgMatches) {
+    let env = cmd::get_string_flag(args, "environment");
+    let apps = output::with_spinner("Listing apps", api::list_apps(&config, &env)).await;
 
     let items = apps
         .iter()
@@ -269,7 +292,7 @@ pub async fn do_cancel(config: Config, cmd: &ArgMatches) {
 }
 
 async fn latest_run_number(config: &Config, name: &str) -> i64 {
-    match api::describe_app(config, name).await {
+    match api::describe_app(config, name, None).await {
         Ok(resp) => resp
             .runs
             .iter()
@@ -807,5 +830,57 @@ mod tests {
 
         let result = apps_cmd().try_get_matches_from(["apps", "cancel"]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn list_defaults_to_default_environment() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "list"])
+            .unwrap();
+        let (_, list_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            list_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn list_accepts_environment_flag() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "list", "-e", "production"])
+            .unwrap();
+        let (_, list_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            list_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
+    }
+
+    #[test]
+    fn show_defaults_to_default_environment() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "show", "my-app"])
+            .unwrap();
+        let (_, show_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn show_accepts_environment_flag() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "show", "my-app", "-e", "production"])
+            .unwrap();
+        let (_, show_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
     }
 }
