@@ -1,3 +1,4 @@
+@serial
 Feature: CLI Pagination
   As a developer using Tower CLI
   I want all items to be returned from list commands
