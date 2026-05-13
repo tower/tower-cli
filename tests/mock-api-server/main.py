@@ -118,7 +118,9 @@ async def list_apps(page: Optional[int] = None, page_size: Optional[int] = None)
     # Fields to exclude from list view (real API doesn't return these in list)
     list_excluded_fields = {"run_results"}
     for app_data in mock_apps_db.values():
-        app_for_list = {k: v for k, v in app_data.items() if k not in list_excluded_fields}
+        app_for_list = {
+            k: v for k, v in app_data.items() if k not in list_excluded_fields
+        }
         app_summaries.append({"app": app_for_list, "runs": []})
 
     page_items, pages = paginate(app_summaries, page, page_size)
