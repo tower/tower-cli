@@ -48,7 +48,9 @@ mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
 mock_deployed_apps = set()  # Track which apps have been deployed
-mock_max_page_size: Optional[int] = None  # Override max page size for testing pagination
+mock_max_page_size: Optional[int] = (
+    None  # Override max page size for testing pagination
+)
 
 # Pre-populate with test-app for CLI validation/spinner tests
 mock_apps_db["predeployed-test-app"] = {

@@ -473,6 +473,6 @@ def step_json_should_contain_at_least_n_apps(context, count):
     """Verify JSON output contains at least the expected number of apps."""
     data = parse_cli_json(context)
     assert isinstance(data, list), f"Expected JSON array, got: {type(data)}"
-    assert len(data) >= count, (
-        f"Expected at least {count} apps in JSON, got {len(data)}"
-    )
+    assert (
+        len(data) >= count
+    ), f"Expected at least {count} apps in JSON, got {len(data)}"
