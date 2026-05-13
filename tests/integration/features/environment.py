@@ -26,6 +26,24 @@ def before_scenario(context, scenario):
 def after_scenario(context, scenario):
     import shutil
 
+    # Delete any apps created by the scenario via "I have created N apps via CLI".
+    if getattr(context, "created_app_names", None):
+        env = os.environ.copy()
+        env["TOWER_URL"] = context.tower_url
+        test_home = Path(__file__).parent.parent / "test-home"
+        env["HOME"] = str(test_home.absolute())
+        for name in context.created_app_names:
+            try:
+                subprocess.run(
+                    [context.tower_binary, "apps", "delete", name],
+                    env=env,
+                    capture_output=True,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired:
+                pass
+        context.created_app_names = []
+
     # Clean up any MCP servers started by this scenario
     for attr in ["http_mcp_process", "sse_mcp_process"]:
         if hasattr(context, attr):

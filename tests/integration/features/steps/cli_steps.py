@@ -438,41 +438,62 @@ def step_app_description_should_be(context, expected_description):
 # Pagination test steps
 
 
-@step("the mock API has {count:d} seeded apps")
-def step_seed_apps(context, count):
-    """Seed the mock API with a number of apps to test pagination."""
-    # Reset first to get a clean slate
-    requests.post(f"{context.tower_url}/test/reset")
-    # Seed apps (no page_size override — uses default 20, so >20 apps forces pagination)
-    resp = requests.post(
-        f"{context.tower_url}/test/seed-apps",
-        json={"count": count},
-    )
-    assert resp.status_code == 200, f"Failed to seed apps: {resp.text}"
-    context.seeded_app_count = count
+def _pagination_env(context):
+    env = os.environ.copy()
+    env["TOWER_URL"] = context.tower_url
+    test_home = Path(__file__).parent.parent.parent / "test-home"
+    env["HOME"] = str(test_home.absolute())
+    return env
 
 
-@step("the output should contain all {count:d} seeded app names")
-def step_output_should_contain_all_seeded_apps(context, count):
-    """Verify the CLI output contains all seeded app names."""
-    # Strip ANSI codes for checking
-    output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", context.cli_output)
-    missing = []
+@step("I have created {count:d} apps via CLI")
+def step_create_apps_via_cli(context, count):
+    """Create a number of apps via the real CLI so the list command has something to return."""
+    env = _pagination_env(context)
+    context.created_app_names = []
     for i in range(count):
-        name = f"paginated-app-{i:03d}"
-        if name not in output:
-            missing.append(name)
+        name = f"pagination-test-app-{i:03d}"
+        # Best-effort delete in case a prior run left this name behind.
+        subprocess.run(
+            [context.tower_binary, "apps", "delete", name],
+            env=env,
+            capture_output=True,
+        )
+        result = subprocess.run(
+            [context.tower_binary, "apps", "create", "--name", name],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"Failed to create {name}: {result.stdout}\n{result.stderr}"
+        )
+        context.created_app_names.append(name)
+
+
+@step("the output should contain all created app names")
+def step_output_should_contain_all_created_apps(context):
+    output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", context.cli_output)
+    missing = [name for name in context.created_app_names if name not in output]
     assert not missing, (
-        f"Missing {len(missing)} apps from output (first 5): {missing[:5]}\n"
+        f"Missing {len(missing)} apps from output: {missing}\n"
         f"Full output: {output[:2000]}"
     )
 
 
-@step("the JSON should contain at least {count:d} apps")
-def step_json_should_contain_at_least_n_apps(context, count):
-    """Verify JSON output contains at least the expected number of apps."""
+@step("the JSON should contain all created app names")
+def step_json_should_contain_all_created_apps(context):
     data = parse_cli_json(context)
     assert isinstance(data, list), f"Expected JSON array, got: {type(data)}"
-    assert (
-        len(data) >= count
-    ), f"Expected at least {count} apps in JSON, got {len(data)}"
+    listed = set()
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        # apps list returns AppSummary objects shaped as {"app": {"name": ...}, "runs": [...]}.
+        if "app" in entry and isinstance(entry["app"], dict):
+            listed.add(entry["app"].get("name"))
+        else:
+            listed.add(entry.get("name"))
+    missing = [name for name in context.created_app_names if name not in listed]
+    assert not missing, f"Missing {len(missing)} apps from JSON: {missing}"

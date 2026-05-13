@@ -64,24 +64,46 @@ impl PaginatedResponse for tower_api::models::ListSchedulesResponse {
     fn into_items(self) -> Vec<Self::Item> { self.schedules }
 }
 
-/// Fetches all pages from a paginated API endpoint.
-async fn fetch_all_pages<R, E, F, Fut>(fetch: F) -> Result<Vec<R::Item>, Error<E>>
+/// Fetches pages from a paginated API endpoint, honoring the caller's
+/// page_size / paginate / page / max_items settings on Config.
+///
+/// Page numbers follow the API convention: pages are 1-indexed, and `page = 0`
+/// (or unset on the server side) means "no pagination, return everything in one
+/// response". The loop sends `page = 0` exactly once if the caller did not opt
+/// into a starting page, otherwise it iterates 1..=num_pages.
+async fn fetch_all_pages<R, E, F, Fut>(config: &Config, fetch: F) -> Result<Vec<R::Item>, Error<E>>
 where
     R: PaginatedResponse,
     F: Fn(i64, i64) -> Fut,
     Fut: Future<Output = Result<R, Error<E>>>,
 {
-    let page_size: i64 = 100;
+    let page_size = config.page_size();
     let mut all_items = Vec::new();
-    let mut page: i64 = 0;
+    let mut page: i64 = config.page.unwrap_or(0);
 
     loop {
         let response = fetch(page, page_size).await?;
         let num_pages = response.pagination().num_pages;
         all_items.extend(response.into_items());
 
+        if let Some(max) = config.max_items {
+            if all_items.len() as i64 >= max {
+                all_items.truncate(max as usize);
+                break;
+            }
+        }
+
+        // page == 0 means the server returned all items in a single response.
+        if page == 0 {
+            break;
+        }
+
+        if !config.paginate {
+            break;
+        }
+
         page += 1;
-        if page >= num_pages || page >= 100 {
+        if page > num_pages || page > 100 {
             break;
         }
     }
@@ -119,7 +141,7 @@ pub async fn list_apps(
 {
     let api_config: configuration::Configuration = config.into();
 
-    fetch_all_pages(|page, page_size| {
+    fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         async move {
             let params = tower_api::apis::default_api::ListAppsParams {
@@ -305,7 +327,7 @@ pub async fn list_catalogs(
     let api_config: configuration::Configuration = config.into();
     let env = env.to_string();
 
-    fetch_all_pages(|page, page_size| {
+    fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         let env = &env;
         async move {
@@ -354,7 +376,7 @@ pub async fn list_secrets(
     let api_config: configuration::Configuration = config.into();
     let env = env.to_string();
 
-    fetch_all_pages(|page, page_size| {
+    fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         let env = &env;
         async move {
@@ -493,7 +515,7 @@ pub async fn list_teams(
 ) -> Result<Vec<tower_api::models::Team>, Error<tower_api::apis::default_api::ListTeamsError>> {
     let api_config: configuration::Configuration = config.into();
 
-    fetch_all_pages(|page, page_size| {
+    fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         async move {
             let params = tower_api::apis::default_api::ListTeamsParams {
@@ -971,7 +993,7 @@ pub async fn list_environments(
 > {
     let api_config: configuration::Configuration = config.into();
 
-    fetch_all_pages(|page, page_size| {
+    fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         async move {
             let params = tower_api::apis::default_api::ListEnvironmentsParams {
@@ -1018,7 +1040,7 @@ pub async fn list_schedules(
     let api_config: configuration::Configuration = config.into();
     let environment = environment.map(String::from);
 
-    fetch_all_pages(|page, page_size| {
+    fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         let environment = &environment;
         async move {
