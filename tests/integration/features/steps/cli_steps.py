@@ -466,9 +466,9 @@ def step_create_apps_via_cli(context, count):
             text=True,
             timeout=60,
         )
-        assert result.returncode == 0, (
-            f"Failed to create {name}: {result.stdout}\n{result.stderr}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Failed to create {name}: {result.stdout}\n{result.stderr}"
         context.created_app_names.append(name)
 
 

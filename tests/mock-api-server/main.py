@@ -738,5 +738,3 @@ async def delete_schedule(schedule_data: Dict[str, Any]):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.datetime.now().isoformat()}
-
-
