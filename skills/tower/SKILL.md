@@ -151,6 +151,10 @@ Manage the apps in your current Tower account
 
 List all apps in your Tower account
 
+**Arguments:**
+
+- `-e`, `--environment` — Filter apps by environment
+
 #### `tower apps show`
 
 Show details for a Tower app and its recent runs
@@ -158,6 +162,7 @@ Show details for a Tower app and its recent runs
 **Arguments:**
 
 - `<app_name>`  *(required)* — Name of the app
+- `-e`, `--environment` — The environment to resolve the app against
 
 #### `tower apps logs`
 
