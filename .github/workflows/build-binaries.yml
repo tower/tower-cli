@@ -75,19 +75,25 @@ jobs:
         with:
           submodules: recursive
       - name: "Install fresh upstream rustup"
-        # As of 2026-05-14, the macos-15-arm64 runner image (20260511.0048+)
-        # ships a broken Homebrew rustup whose `+toolchain` proxy fails. A
-        # plain `curl https://sh.rustup.rs | sh` ends up linking back to that
-        # binary, so we have to scrub Homebrew's rustup AND any stale upstream
-        # rustup before reinstalling cleanly. Pin the toolchain to what
-        # rust-toolchain.toml requests so setup-rust-toolchain has nothing
-        # to do but verify.
+        # The macos-15-arm64 runner image (20260511.0048+) ships a broken
+        # Homebrew rustup whose bundled rustup-init rejects standard argv
+        # forwarded from the rustup proxy, breaking `rustup component add`
+        # and other commands maturin-action invokes. Upstream:
+        # https://github.com/actions/runner-images/issues/14097
+        # Scrub Homebrew's rustup AND any stale upstream rustup, then
+        # reinstall cleanly with 1.88 as the default so setup-rust-toolchain
+        # has nothing left to do but verify.
         run: |
           brew uninstall --ignore-dependencies rustup || true
           rm -f "$HOME/.cargo/bin/rustup" "$HOME/.cargo/bin/rustup-init"
           curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL https://sh.rustup.rs | sh -s -- --default-toolchain 1.88 --profile minimal -y
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+        with:
+          # Don't restore ~/.cargo/bin from cache — it'd clobber the
+          # freshly-installed upstream rustup with a stale (and possibly
+          # Homebrew-linked) binary from a previous run.
+          cache-bin: false
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -116,19 +122,25 @@ jobs:
         with:
           submodules: recursive
       - name: "Install fresh upstream rustup"
-        # As of 2026-05-14, the macos-15-arm64 runner image (20260511.0048+)
-        # ships a broken Homebrew rustup whose `+toolchain` proxy fails. A
-        # plain `curl https://sh.rustup.rs | sh` ends up linking back to that
-        # binary, so we have to scrub Homebrew's rustup AND any stale upstream
-        # rustup before reinstalling cleanly. Pin the toolchain to what
-        # rust-toolchain.toml requests so setup-rust-toolchain has nothing
-        # to do but verify.
+        # The macos-15-arm64 runner image (20260511.0048+) ships a broken
+        # Homebrew rustup whose bundled rustup-init rejects standard argv
+        # forwarded from the rustup proxy, breaking `rustup component add`
+        # and other commands maturin-action invokes. Upstream:
+        # https://github.com/actions/runner-images/issues/14097
+        # Scrub Homebrew's rustup AND any stale upstream rustup, then
+        # reinstall cleanly with 1.88 as the default so setup-rust-toolchain
+        # has nothing left to do but verify.
         run: |
           brew uninstall --ignore-dependencies rustup || true
           rm -f "$HOME/.cargo/bin/rustup" "$HOME/.cargo/bin/rustup-init"
           curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL https://sh.rustup.rs | sh -s -- --default-toolchain 1.88 --profile minimal -y
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+        with:
+          # Don't restore ~/.cargo/bin from cache — it'd clobber the
+          # freshly-installed upstream rustup with a stale (and possibly
+          # Homebrew-linked) binary from a previous run.
+          cache-bin: false
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
