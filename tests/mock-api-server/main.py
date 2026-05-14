@@ -48,7 +48,6 @@ mock_teams_db = {}
 mock_runs_db = {}
 mock_schedules_db = {}
 mock_deployed_apps = set()  # Track which apps have been deployed
-mock_max_page_size: Optional[int] = None  # Override max page size for testing
 
 # Pre-populate with test-app for CLI validation/spinner tests
 mock_apps_db["predeployed-test-app"] = {
@@ -462,19 +461,26 @@ QIDAQAB
 
 
 def paginate(items: list, page: Optional[int], page_size: Optional[int]) -> tuple:
-    """Apply pagination to a list of items. Returns (page_items, pages_metadata)."""
-    global mock_max_page_size
-    if page_size is None:
+    """Apply pagination to a list of items. Returns (page_items, pages_metadata).
+
+    Matches the real API: page is 1-indexed; page=0 or page=None means
+    "no pagination, return everything".
+    """
+    if page_size is None or page_size <= 0:
         page_size = 20
-    # Cap page_size if mock override is set (simulates server-side limit)
-    if mock_max_page_size is not None:
-        page_size = min(page_size, mock_max_page_size)
-    if page is None:
-        page = 0
 
     total = len(items)
+
+    if page is None or page == 0:
+        return items, {
+            "page": 0,
+            "total": total,
+            "num_pages": 1,
+            "page_size": page_size,
+        }
+
     num_pages = max(1, (total + page_size - 1) // page_size)
-    start = page * page_size
+    start = (page - 1) * page_size
     end = start + page_size
     page_items = items[start:end]
 
@@ -732,83 +738,3 @@ async def delete_schedule(schedule_data: Dict[str, Any]):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.datetime.now().isoformat()}
-
-
-# Test helper endpoints (for seeding data in integration tests)
-@app.post("/test/seed-apps")
-async def seed_apps(data: Dict[str, Any]):
-    """Seed the mock apps DB with a specified number of apps."""
-    global mock_max_page_size
-    count = data.get("count", 10)
-    page_size_override = data.get("page_size_override")
-    if page_size_override is not None:
-        mock_max_page_size = page_size_override
-
-    for i in range(count):
-        name = f"paginated-app-{i:03d}"
-        mock_apps_db[name] = {
-            "name": name,
-            "owner": "mock_owner",
-            "short_description": f"App number {i}",
-            "version": None,
-            "schedule": None,
-            "created_at": now_iso(),
-            "next_run_at": None,
-            "health_status": "healthy",
-            "pending_timeout": 300,
-            "running_timeout": 0,
-            "run_results": {
-                "cancelled": 0,
-                "crashed": 0,
-                "errored": 0,
-                "exited": 0,
-                "pending": 0,
-                "retrying": 0,
-                "running": 0,
-            },
-            "subdomain": None,
-            "is_externally_accessible": False,
-            "status": "active",
-        }
-
-    return {"seeded": count}
-
-
-@app.post("/test/reset")
-async def reset_test_data():
-    """Reset all mock data stores to initial state."""
-    global mock_max_page_size
-    mock_max_page_size = None
-    mock_apps_db.clear()
-    mock_secrets_db.clear()
-    mock_teams_db.clear()
-    mock_runs_db.clear()
-    mock_schedules_db.clear()
-    mock_deployed_apps.clear()
-
-    # Re-add the pre-populated test app
-    mock_apps_db["predeployed-test-app"] = {
-        "name": "predeployed-test-app",
-        "owner": "mock_owner",
-        "short_description": "Pre-existing test app for CLI tests",
-        "version": None,
-        "schedule": None,
-        "created_at": now_iso(),
-        "next_run_at": None,
-        "health_status": "healthy",
-        "pending_timeout": 300,
-        "running_timeout": 0,
-        "run_results": {
-            "cancelled": 0,
-            "crashed": 0,
-            "errored": 0,
-            "exited": 0,
-            "pending": 0,
-            "retrying": 0,
-            "running": 0,
-        },
-        "subdomain": None,
-        "is_externally_accessible": False,
-    }
-    mock_deployed_apps.add("predeployed-test-app")
-    return {"status": "reset"}
