@@ -75,6 +75,12 @@ jobs:
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+      - name: "Remove Homebrew rustup"
+        # Homebrew's rustup on macos-15-arm64 runner image 20260511.0048+ breaks
+        # PyO3/maturin-action's `+toolchain` self-exec with
+        # `unexpected argument '+1.88' found`. Force the upstream rustup
+        # installed by setup-rust-toolchain (at ~/.cargo/bin) to win.
+        run: brew uninstall --ignore-dependencies rustup || true
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -103,6 +109,12 @@ jobs:
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
+      - name: "Remove Homebrew rustup"
+        # Homebrew's rustup on macos-15-arm64 runner image 20260511.0048+ breaks
+        # PyO3/maturin-action's `+toolchain` self-exec with
+        # `unexpected argument '+1.88' found`. Force the upstream rustup
+        # installed by setup-rust-toolchain (at ~/.cargo/bin) to win.
+        run: brew uninstall --ignore-dependencies rustup || true
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
