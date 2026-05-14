@@ -6,7 +6,7 @@ use std::process::Stdio;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::{errors::Error, OutputSender, StartOptions, Status};
+use crate::{errors::Error, AppFailure, OutputSender, StartOptions, Status};
 
 use tokio::{
     fs,
@@ -35,18 +35,51 @@ use tower_uv::Uv;
 
 use crate::{App, Channel, Output, FD};
 
+/// Result of running an app to completion. The spawned execution task always
+/// sends one of these on its waiter channel before exiting, so `status()` can
+/// distinguish a real platform failure from a closed channel.
+///
+/// `Failed(AppFailure)` preserves the structured `Error` (or panic payload)
+/// so consumers can act on the variant directly — `error_code` / `error_message`
+/// stringification is the consumer's responsibility.
+#[derive(Clone, Debug)]
+enum AppCompletion {
+    /// Child process exited (0 = clean, non-zero = crashed).
+    Exit(i32),
+    /// The cancellation token fired — explicit termination, not a failure.
+    /// Distinct from `Exit(non_zero)` so consumers can tell a deliberate stop
+    /// apart from a real crash.
+    Cancelled,
+    /// Platform-level failure inside the spawned task before/around the child
+    /// process (e.g. `tower_uv::Error`, env join failure, panic).
+    Failed(AppFailure),
+}
+
+/// Best-effort extraction of a panic message from a `catch_unwind` payload.
+fn panic_payload_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "execute_local_app panicked with non-string payload".to_string()
+    }
+}
+
 pub struct LocalApp {
     status: Mutex<Option<Status>>,
 
     // waiter is what we use to communicate that the overall process is finished by the execution
-    // handle.
-    waiter: Mutex<oneshot::Receiver<i32>>,
+    // handle. The spawned task always sends an `AppCompletion` before it ends; if the channel
+    // ever closes without a send, that's a real bug (task aborted, runtime dropped) and surfaces
+    // as `Error::WaiterClosed`.
+    waiter: Mutex<oneshot::Receiver<AppCompletion>>,
 
     // terminator is what we use to flag that we want to terminate the child process.
     terminator: CancellationToken,
 
     // execute_handle keeps track of the current state of the execution lifecycle.
-    execute_handle: Option<JoinHandle<Result<(), Error>>>,
+    execute_handle: Option<JoinHandle<()>>,
 }
 
 // Helper function to check if a file is executable
@@ -99,11 +132,18 @@ async fn find_bash() -> Result<PathBuf, Error> {
     }
 }
 
-async fn execute_local_app(
+/// Run the app to completion, returning the child's exit code on success or an
+/// `Error` for any platform failure. Cancellation is reported as `Ok(-1)` to
+/// preserve the historical `Status::Crashed { code: -1 }` semantic.
+///
+/// The caller is responsible for delivering the result on the waiter channel —
+/// see `LocalApp::start`, which wraps this in `catch_unwind` and an unconditional
+/// `sx.send(AppCompletion::...)` so that no failure path can silently close the
+/// channel.
+async fn inner_execute_local_app(
     opts: StartOptions,
-    sx: oneshot::Sender<i32>,
     cancel_token: CancellationToken,
-) -> Result<(), Error> {
+) -> Result<i32, Error> {
     let ctx = opts.ctx.clone();
     let package = opts.package;
     let environment = opts.environment;
@@ -157,9 +197,6 @@ async fn execute_local_app(
     // We do this before instantiating `Uv` because that can be somewhat time consuming. Likewise
     // this stops us from instantiating a bash process.
     if cancel_token.is_cancelled() {
-        // if there's a waiter, we want them to know that the process was cancelled so we have
-        // to return something on the relevant channel.
-        let _ = sx.send(-1);
         return Err(Error::Cancelled);
     }
 
@@ -176,7 +213,14 @@ async fn execute_local_app(
         )
         .await?;
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        let code = wait_for_process(ctx.clone(), &cancel_token, child).await;
+        // `wait_for_process` returns -1 on both cancellation and IO error;
+        // disambiguate so a cancellation surfaces as `Status::Cancelled`
+        // rather than `Status::Crashed { code: -1 }`.
+        if cancel_token.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+        Ok(code)
     } else {
         // we put Uv in to protected mode when there's no caching configured/enabled.
         let protected_mode = opts.cache_dir.is_none();
@@ -197,8 +241,6 @@ async fn execute_local_app(
         // Quickly do a check to see if there was a cancellation before we do a subprocess spawn to
         // ensure everything is in place.
         if cancel_token.is_cancelled() {
-            // again tell any waiters that we cancelled.
-            let _ = sx.send(-1);
             return Err(Error::Cancelled);
         }
 
@@ -224,17 +266,21 @@ async fn execute_local_app(
         // Wait for venv to finish up.
         let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
 
+        // Distinguish cancellation from a real uv-venv non-zero exit.
+        if cancel_token.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+
         if res != 0 {
-            // If the venv process failed, we want to return an error.
-            let _ = sx.send(res);
-            return Err(Error::VirtualEnvCreationFailed);
+            // `uv venv` exited non-zero — surface as a crash with the child's
+            // exit code. `Status::Failed` is reserved for platform errors
+            // where the child never ran at all.
+            return Ok(res);
         }
 
         // Check once more if the process was cancelled before we do a uv sync. The sync itself,
         // once started, will take a while and we have logic for checking for cancellation.
         if cancel_token.is_cancelled() {
-            // again tell any waiters that we cancelled.
-            let _ = sx.send(-1);
             return Err(Error::Cancelled);
         }
 
@@ -259,6 +305,13 @@ async fn execute_local_app(
             Ok(child) => {
                 let mut res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, child).await;
 
+                // If sync was cancelled, don't bother retrying — bail out
+                // cleanly so the receiver sees `Status::Cancelled` instead of
+                // `Status::Crashed { code: -1 }`.
+                if cancel_token.is_cancelled() {
+                    return Err(Error::Cancelled);
+                }
+
                 // If the install failed, retry with the legacy setuptools<82
                 // pin. Some apps (those whose transitive deps rely on
                 // pkg_resources) need that pin to install successfully; we don't
@@ -276,21 +329,22 @@ async fn execute_local_app(
                         .sync_with_legacy_setuptools_pin(&working_dir, &env_vars)
                         .await?;
                     res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, retry_child).await;
+                    if cancel_token.is_cancelled() {
+                        return Err(Error::Cancelled);
+                    }
                 }
 
                 if res != 0 {
-                    // If the sync process failed, we want to return an error.
-                    let _ = sx.send(res);
-                    return Err(Error::DependencyInstallationFailed);
+                    // `uv sync` exited non-zero — surface as a crash with the
+                    // child's exit code. `Status::Failed` is reserved for
+                    // platform errors where the child never ran at all.
+                    return Ok(res);
                 }
             }
         }
 
         // Check once more to see if the process was cancelled, this will bail us out early.
         if cancel_token.is_cancelled() {
-            // if there's a waiter, we want them to know that the process was cancelled so we have
-            // to return something on the relevant channel.
-            let _ = sx.send(-1);
             return Err(Error::Cancelled);
         }
 
@@ -313,11 +367,12 @@ async fn execute_local_app(
             BufReader::new(stderr),
         ));
 
-        let _ = sx.send(wait_for_process(ctx.clone(), &cancel_token, child).await);
+        let code = wait_for_process(ctx.clone(), &cancel_token, child).await;
+        if cancel_token.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+        Ok(code)
     }
-
-    // Everything was properly executed I suppose.
-    return Ok(());
 }
 
 impl Drop for LocalApp {
@@ -338,12 +393,36 @@ impl Drop for LocalApp {
 
 impl App for LocalApp {
     async fn start(opts: StartOptions) -> Result<Self, Error> {
+        use futures::FutureExt;
+        use std::panic::AssertUnwindSafe;
+
         let terminator = CancellationToken::new();
 
-        let (sx, rx) = oneshot::channel::<i32>();
+        let (sx, rx) = oneshot::channel::<AppCompletion>();
         let waiter = Mutex::new(rx);
 
-        let handle = tokio::spawn(execute_local_app(opts, sx, terminator.clone()));
+        let task_terminator = terminator.clone();
+        let handle = tokio::spawn(async move {
+            // `catch_unwind` turns a panic inside the spawned task into a normal
+            // `Err(payload)` so we can still report it on the waiter channel
+            // instead of leaving the receiver to observe a silently-closed
+            // channel (the historical `WaiterClosed` bug).
+            //
+            // `Err(Error::Cancelled)` is special-cased: cancellation is a
+            // deliberate stop, not a failure, so it surfaces as
+            // `AppCompletion::Cancelled` → `Status::Cancelled` rather than
+            // `AppCompletion::Failed(AppFailure::Runtime(Error::Cancelled))`.
+            let completion = match AssertUnwindSafe(inner_execute_local_app(opts, task_terminator))
+                .catch_unwind()
+                .await
+            {
+                Ok(Ok(code)) => AppCompletion::Exit(code),
+                Ok(Err(Error::Cancelled)) => AppCompletion::Cancelled,
+                Ok(Err(e)) => AppCompletion::Failed(AppFailure::Runtime(e)),
+                Err(panic) => AppCompletion::Failed(AppFailure::Panic(panic_payload_message(&panic))),
+            };
+            let _ = sx.send(completion);
+        });
         let execute_handle = Some(handle);
 
         Ok(Self {
@@ -377,17 +456,28 @@ impl App for LocalApp {
 
             match res {
                 Err(TryRecvError::Empty) => Ok(Status::Running),
+                // The spawned task always sends an `AppCompletion` before
+                // exiting, so a closed channel here means the task was
+                // aborted or the runtime dropped — a real bug worth
+                // surfacing as-is.
                 Err(TryRecvError::Closed) => Err(Error::WaiterClosed),
-                Ok(t) => {
-                    // We save this for the next time this gets called.
-                    if t == 0 {
-                        *status = Some(Status::Exited);
-                        Ok(Status::Exited)
-                    } else {
-                        let next_status = Status::Crashed { code: t };
-                        *status = Some(next_status.clone());
-                        Ok(next_status)
-                    }
+                Ok(AppCompletion::Exit(0)) => {
+                    *status = Some(Status::Exited);
+                    Ok(Status::Exited)
+                }
+                Ok(AppCompletion::Exit(code)) => {
+                    let next_status = Status::Crashed { code };
+                    *status = Some(next_status.clone());
+                    Ok(next_status)
+                }
+                Ok(AppCompletion::Cancelled) => {
+                    *status = Some(Status::Cancelled);
+                    Ok(Status::Cancelled)
+                }
+                Ok(AppCompletion::Failed(failure)) => {
+                    let next_status = Status::Failed(failure);
+                    *status = Some(next_status.clone());
+                    Ok(next_status)
                 }
             }
         }

@@ -1,6 +1,6 @@
 use snafu::prelude::*;
 
-#[derive(Debug, Snafu)]
+#[derive(Clone, Debug, PartialEq, Eq, Snafu)]
 pub enum Error {
     #[snafu(display("failed to RPC server"))]
     RuntimeStartFailed,
