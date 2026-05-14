@@ -159,6 +159,44 @@ struct RunRequest {
     #[serde(flatten)]
     common: CommonParams,
     parameters: Option<std::collections::HashMap<String, String>>,
+    /// The environment to run the app in (defaults to "default")
+    environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct DeployRequest {
+    #[serde(flatten)]
+    common: CommonParams,
+    /// The environment to deploy to (defaults to "default")
+    environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ListAppsRequest {
+    /// Filter apps by environment. If not provided, apps across all environments are returned.
+    environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ShowAppRequest {
+    /// Name of the app
+    name: String,
+    /// The environment to resolve the app against (defaults to "default")
+    environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ListCatalogsRequest {
+    /// The environment to list catalogs from (defaults to "default")
+    environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ShowCatalogRequest {
+    /// Name of the catalog
+    name: String,
+    /// The environment the catalog belongs to (defaults to "default")
+    environment: Option<String>,
 }
 
 pub fn mcp_cmd() -> Command {
@@ -464,8 +502,12 @@ impl TowerService {
     // share constants directly. MCP-only descriptions (with Prerequisites/Optional) are
     // intentionally more detailed and don't need a CLI counterpart.
     #[tool(description = "List all apps in your Tower account")]
-    async fn tower_apps_list(&self) -> Result<CallToolResult, McpError> {
-        match api::list_apps(&self.config).await {
+    async fn tower_apps_list(
+        &self,
+        Parameters(request): Parameters<ListAppsRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref();
+        match api::list_apps(&self.config, environment).await {
             Ok(apps) => {
                 let apps: Vec<Value> = apps
                     .into_iter()
@@ -474,6 +516,7 @@ impl TowerService {
                         json!({
                             "name": app.name,
                             "description": app.short_description,
+                            "version": app.version,
                             "created_at": app.created_at,
                             "status": format!("{:?}", app.status)
                         })
@@ -499,9 +542,10 @@ impl TowerService {
     #[tool(description = "Show details for a Tower app and its recent runs")]
     async fn tower_apps_show(
         &self,
-        Parameters(request): Parameters<NameRequest>,
+        Parameters(request): Parameters<ShowAppRequest>,
     ) -> Result<CallToolResult, McpError> {
-        match api::describe_app(&self.config, &request.name).await {
+        let environment = request.environment.as_deref().unwrap_or("default");
+        match api::describe_app(&self.config, &request.name, Some(environment)).await {
             Ok(response) => {
                 let data = json!({
                     "app": {
@@ -657,6 +701,61 @@ impl TowerService {
         }
     }
 
+    #[tool(description = "List catalogs in your Tower account")]
+    async fn tower_catalogs_list(
+        &self,
+        Parameters(request): Parameters<ListCatalogsRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref().unwrap_or("default");
+        match api::list_catalogs(&self.config, environment, false).await {
+            Ok(catalogs) => {
+                let catalogs: Vec<Value> = catalogs
+                    .into_iter()
+                    .map(|catalog| {
+                        json!({
+                            "name": catalog.name,
+                            "type": catalog.r#type,
+                            "environment": catalog.environment,
+                        })
+                    })
+                    .collect();
+                Self::json_success(json!({"catalogs": catalogs}))
+            }
+            Err(e) => Self::error_result("Failed to list catalogs", e),
+        }
+    }
+
+    #[tool(description = "Show details for a catalog, including its property names")]
+    async fn tower_catalogs_show(
+        &self,
+        Parameters(request): Parameters<ShowCatalogRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref().unwrap_or("default");
+        match api::describe_catalog(&self.config, &request.name, environment).await {
+            Ok(response) => {
+                let catalog = &response.catalog;
+                let properties: Vec<Value> = catalog
+                    .properties
+                    .iter()
+                    .map(|prop| {
+                        json!({
+                            "name": prop.name,
+                            "environment_variable": prop.environment_variable,
+                            "preview": prop.preview,
+                        })
+                    })
+                    .collect();
+                Self::json_success(json!({
+                    "name": catalog.name,
+                    "type": catalog.r#type,
+                    "environment": catalog.environment,
+                    "properties": properties,
+                }))
+            }
+            Err(e) => Self::error_result("Failed to show catalog", e),
+        }
+    }
+
     #[tool(description = "List teams you belong to")]
     async fn tower_teams_list(&self) -> Result<CallToolResult, McpError> {
         if self.config.api_key.is_some() {
@@ -703,14 +802,15 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Deploy to Tower cloud. Prerequisites: Towerfile, tower_apps_create. Optional: working_directory."
+        description = "Deploy to Tower cloud. Prerequisites: Towerfile, tower_apps_create. Optional: working_directory, environment."
     )]
     async fn tower_deploy(
         &self,
-        Parameters(request): Parameters<EmptyRequest>,
+        Parameters(request): Parameters<DeployRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        let deploy_target = deploy::DeployTarget::Environment("default".to_string());
+        let env = request.environment.unwrap_or_else(|| "default".to_string());
+        let deploy_target = deploy::DeployTarget::Environment(env);
 
         match deploy::deploy_from_dir(self.config.clone(), working_dir, true, deploy_target).await {
             Ok(_) => Self::text_success("Deploy completed successfully".to_string()),
@@ -770,7 +870,7 @@ impl TowerService {
         let config = self.config.clone();
         let working_dir = Self::resolve_working_directory(&request.common);
         let path = working_dir;
-        let env = "default";
+        let env = request.environment.unwrap_or_else(|| "default".to_string());
         let params = request.parameters.unwrap_or_default();
 
         // Load Towerfile to get app name
@@ -782,7 +882,7 @@ impl TowerService {
         let app_name = towerfile.app.name.clone();
 
         let (result, output) = Self::execute_with_streaming(&ctx, || {
-            run::do_run_remote(config, path, env, params, None, true)
+            run::do_run_remote(config, path, &env, params, None, true)
         })
         .await;
         match result {

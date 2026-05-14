@@ -92,6 +92,7 @@ where
 pub async fn describe_app(
     config: &Config,
     name: &str,
+    environment: Option<&str>,
 ) -> Result<
     tower_api::models::DescribeAppResponse,
     Error<tower_api::apis::default_api::DescribeAppError>,
@@ -104,7 +105,7 @@ pub async fn describe_app(
         start_at: None,
         end_at: None,
         timezone: None,
-        environment: None,
+        environment: environment.map(|s| s.to_string()),
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_app(
@@ -115,12 +116,15 @@ pub async fn describe_app(
 
 pub async fn list_apps(
     config: &Config,
+    environment: Option<&str>,
 ) -> Result<Vec<tower_api::models::AppSummary>, Error<tower_api::apis::default_api::ListAppsError>>
 {
     let api_config: configuration::Configuration = config.into();
+    let environment = environment.map(|s| s.to_string());
 
     fetch_all_pages(|page, page_size| {
         let api_config = &api_config;
+        let environment = &environment;
         async move {
             let params = tower_api::apis::default_api::ListAppsParams {
                 query: None,
@@ -129,7 +133,7 @@ pub async fn list_apps(
                 num_runs: Some(0),
                 sort: None,
                 filter: None,
-                environment: None,
+                environment: environment.clone(),
             };
             unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
         }

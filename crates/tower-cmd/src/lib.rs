@@ -123,7 +123,7 @@ impl App {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(sessionized_config).await,
+                    Some(("list", args)) => apps::do_list_apps(sessionized_config, args).await,
                     Some(("create", args)) => apps::do_create(sessionized_config, args).await,
                     Some(("show", args)) => apps::do_show(sessionized_config, args).await,
                     Some(("logs", args)) => apps::do_logs(sessionized_config, args).await,
