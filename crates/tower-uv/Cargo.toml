@@ -15,6 +15,7 @@ futures-lite = { workspace = true }
 hex = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+rustls = { workspace = true }
 seahash = { workspace = true }
 tokio = { workspace = true }
 tokio-tar = { workspace = true }

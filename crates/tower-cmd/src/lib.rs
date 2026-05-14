@@ -30,6 +30,8 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         let cmd = root_cmd();
 
         // When TOWER_API_KEY is set, skip session entirely — the API key is self-contained

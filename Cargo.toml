@@ -43,8 +43,9 @@ pyo3 = { version = "0.28", features = ["extension-module"] }
 promptly = "0.3"
 rand = "0.8"
 regex = "1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots-no-provider", "stream"] }
 reqwest-eventsource = { version = "0.6" }
+rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std", "tls12"] }
 rpassword = "7"
 rsa = "0.9"
 seahash = "4.1"
