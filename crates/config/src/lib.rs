@@ -26,7 +26,26 @@ pub struct Config {
 
     // cache_dir is the directory that we should cache uv artifacts within.
     pub cache_dir: Option<PathBuf>,
+
+    // Override for the page size used when fetching paginated list endpoints.
+    // None means use the built-in default.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub page_size: Option<i64>,
+
+    // When false, only the first page of paginated endpoints is fetched.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub paginate: bool,
+
+    // Hard upper bound on the number of items returned by a paginated list call.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub max_items: Option<i64>,
+
+    // Starting page (0-indexed) for paginated list calls.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub page: Option<i64>,
 }
+
+pub const DEFAULT_PAGE_SIZE: i64 = 100;
 
 impl Config {
     pub fn default() -> Self {
@@ -37,7 +56,15 @@ impl Config {
             session: None,
             api_key: None,
             cache_dir: Some(default_cache_dir()),
+            page_size: None,
+            paginate: true,
+            max_items: None,
+            page: None,
         }
+    }
+
+    pub fn page_size(&self) -> i64 {
+        self.page_size.unwrap_or(DEFAULT_PAGE_SIZE)
     }
 
     pub fn from_env() -> Self {
@@ -56,6 +83,10 @@ impl Config {
             session: None,
             api_key,
             cache_dir: Some(default_cache_dir()),
+            page_size: None,
+            paginate: true,
+            max_items: None,
+            page: None,
         }
     }
 
@@ -74,6 +105,22 @@ impl Config {
             config.tower_url = Url::parse(tower_url).unwrap();
         }
 
+        if let Some(page_size) = matches.get_one::<i64>("page_size") {
+            config.page_size = Some(*page_size);
+        }
+
+        if matches.get_flag("no_paginate") {
+            config.paginate = false;
+        }
+
+        if let Some(max_items) = matches.get_one::<i64>("max_items") {
+            config.max_items = Some(*max_items);
+        }
+
+        if let Some(page) = matches.get_one::<i64>("page") {
+            config.page = Some(*page);
+        }
+
         config
     }
 
@@ -85,6 +132,10 @@ impl Config {
             session: Some(sess),
             api_key: self.api_key,
             cache_dir: Some(default_cache_dir()),
+            page_size: self.page_size,
+            paginate: self.paginate,
+            max_items: self.max_items,
+            page: self.page,
         }
     }
 

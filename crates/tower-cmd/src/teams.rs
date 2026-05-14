@@ -56,12 +56,11 @@ pub async fn do_list(config: Config) {
 }
 
 async fn do_list_via_api(config: &Config) {
-    let resp = output::with_spinner("Fetching teams", api::list_teams(config)).await;
+    let teams = output::with_spinner("Fetching teams", api::list_teams(config)).await;
 
     let headers = vec!["Name".to_string()];
 
-    let teams_data: Vec<Vec<String>> = resp
-        .teams
+    let teams_data: Vec<Vec<String>> = teams
         .iter()
         .map(|team| vec![team.name.clone()])
         .collect();
@@ -109,7 +108,9 @@ async fn do_list_via_session(config: &Config) {
 }
 
 pub async fn do_switch(config: Config, args: &ArgMatches) {
-    let name = args.get_one::<String>("team_name").expect("team_name is required");
+    let name = args
+        .get_one::<String>("team_name")
+        .expect("team_name is required");
 
     // Refresh the session first to ensure we have the latest teams data
     let session = refresh_session(&config).await;
@@ -140,4 +141,3 @@ pub async fn do_switch(config: Config, args: &ArgMatches) {
         }
     }
 }
-

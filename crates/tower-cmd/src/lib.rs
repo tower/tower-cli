@@ -30,6 +30,8 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         let cmd = root_cmd();
 
         // When TOWER_API_KEY is set, skip session entirely — the API key is self-contained
@@ -123,7 +125,7 @@ impl App {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", _)) => apps::do_list_apps(sessionized_config).await,
+                    Some(("list", args)) => apps::do_list_apps(sessionized_config, args).await,
                     Some(("create", args)) => apps::do_create(sessionized_config, args).await,
                     Some(("show", args)) => apps::do_show(sessionized_config, args).await,
                     Some(("logs", args)) => apps::do_logs(sessionized_config, args).await,
@@ -248,6 +250,37 @@ fn root_cmd() -> Command {
                 .hide(true)
                 .value_parser(value_parser!(String))
                 .action(clap::ArgAction::Set),
+        )
+        .arg(
+            Arg::new("page_size")
+                .long("page-size")
+                .hide(true)
+                .value_parser(value_parser!(i64))
+                .action(clap::ArgAction::Set)
+                .global(true),
+        )
+        .arg(
+            Arg::new("no_paginate")
+                .long("no-paginate")
+                .help("Fetch only the first page of paginated results")
+                .action(clap::ArgAction::SetTrue)
+                .global(true),
+        )
+        .arg(
+            Arg::new("max_items")
+                .long("max-items")
+                .help("Maximum number of items to return from paginated list commands")
+                .value_parser(value_parser!(i64))
+                .action(clap::ArgAction::Set)
+                .global(true),
+        )
+        .arg(
+            Arg::new("page")
+                .long("page")
+                .help("Page number to start at for paginated list commands; 0 (the default) requests all results without pagination")
+                .value_parser(value_parser!(i64))
+                .action(clap::ArgAction::Set)
+                .global(true),
         )
         .subcommand_required(false)
         .arg_required_else_help(false)

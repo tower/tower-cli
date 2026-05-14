@@ -114,13 +114,13 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     let app = args.get_one::<String>("app").map(|s| s.as_str());
     let environment = args.get_one::<String>("environment").map(|s| s.as_str());
 
-    let response = output::with_spinner(
+    let schedules = output::with_spinner(
         "Listing schedules",
         api::list_schedules(&config, app, environment),
     )
     .await;
 
-    if response.schedules.is_empty() {
+    if schedules.is_empty() {
         output::write("No schedules found.\n");
         return;
     }
@@ -130,8 +130,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         .map(str::to_string)
         .collect();
 
-    let rows: Vec<Vec<String>> = response
-        .schedules
+    let rows: Vec<Vec<String>> = schedules
         .iter()
         .map(|schedule| {
             let status = match schedule.status {
@@ -149,7 +148,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         })
         .collect();
 
-    output::table(headers, rows, Some(&response.schedules));
+    output::table(headers, rows, Some(&schedules));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {
@@ -171,7 +170,9 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_update(config: Config, args: &ArgMatches) {
-    let id_or_name = args.get_one::<String>("id_or_name").expect("id_or_name is required");
+    let id_or_name = args
+        .get_one::<String>("id_or_name")
+        .expect("id_or_name is required");
     let cron = args.get_one::<String>("cron");
     let parameters = parse_parameters(args);
 
@@ -185,7 +186,9 @@ pub async fn do_update(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
-    let schedule_id = args.get_one::<String>("schedule_id").expect("schedule_id is required");
+    let schedule_id = args
+        .get_one::<String>("schedule_id")
+        .expect("schedule_id is required");
 
     output::with_spinner(
         "Deleting schedule",

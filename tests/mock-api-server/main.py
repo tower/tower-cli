@@ -69,6 +69,7 @@ mock_apps_db["predeployed-test-app"] = {
         "pending": 0,
         "retrying": 0,
         "running": 0,
+        "starting": 0,
     },
     "subdomain": None,
     "is_externally_accessible": False,
@@ -111,20 +112,22 @@ async def read_root():
 
 # Placeholder for /v1/apps endpoints
 @app.get("/v1/apps")
-async def list_apps():
-    # Format apps as AppSummary objects
+async def list_apps(page: Optional[int] = None, page_size: Optional[int] = None):
+    # Format apps as AppSummary objects (matching real API list format)
     app_summaries = []
+    # Fields to exclude from list view (real API doesn't return these in list)
+    list_excluded_fields = {"run_results"}
     for app_data in mock_apps_db.values():
-        app_summaries.append({"app": app_data, "runs": []})  # Empty runs for list view
+        app_for_list = {
+            k: v for k, v in app_data.items() if k not in list_excluded_fields
+        }
+        app_summaries.append({"app": app_for_list, "runs": []})
+
+    page_items, pages = paginate(app_summaries, page, page_size)
 
     return {
-        "apps": app_summaries,
-        "pages": {
-            "page": 1,
-            "total": len(mock_apps_db),
-            "num_pages": 1,
-            "page_size": 20,
-        },
+        "apps": page_items,
+        "pages": pages,
     }
 
 
@@ -160,6 +163,7 @@ async def create_app(app_data: Dict[str, Any]):
             "pending": 0,
             "retrying": 0,
             "running": 0,
+            "starting": 0,
         },
         "schedule": None,
         "short_description": description or "",
@@ -283,6 +287,7 @@ async def run_app(name: str, run_params: Dict[str, Any]):
         "created_at": datetime.datetime.now().isoformat(),
         "scheduled_at": datetime.datetime.now().isoformat(),
         "cancelled_at": None,
+        "starting_at": datetime.datetime.now().isoformat(),
         "started_at": datetime.datetime.now().isoformat(),
         "ended_at": None,
         "app_version": mock_apps_db[name].get("version", "1.0.0"),
@@ -355,7 +360,7 @@ async def cancel_run(name: str, seq: int):
             run_data["status"] = "cancelled"
             run_data["status_group"] = "successful"
             run_data["cancelled_at"] = now_iso()
-            return {"run": run_data}
+            return {"run": run_data, "cancelled_child_runs": 0}
 
     raise HTTPException(
         status_code=404, detail=f"Run sequence {seq} not found for app '{name}'"
@@ -364,15 +369,11 @@ async def cancel_run(name: str, seq: int):
 
 # Placeholder for /secrets endpoints
 @app.get("/v1/secrets")
-async def list_secrets():
+async def list_secrets(page: Optional[int] = None, page_size: Optional[int] = None):
+    items, pages = paginate(list(mock_secrets_db.values()), page, page_size)
     return {
-        "secrets": list(mock_secrets_db.values()),
-        "pages": {
-            "page": 1,
-            "total": len(mock_secrets_db),
-            "num_pages": 1,
-            "page_size": 20,
-        },
+        "secrets": items,
+        "pages": pages,
     }
 
 
@@ -413,8 +414,9 @@ async def delete_secret(name: str, environment: str = "default"):
 
 # Placeholder for /teams endpoints
 @app.get("/v1/teams")
-async def list_teams():
-    return {"teams": list(mock_teams_db.values())}
+async def list_teams(page: Optional[int] = None, page_size: Optional[int] = None):
+    items, pages = paginate(list(mock_teams_db.values()), page, page_size)
+    return {"teams": items, "pages": pages}
 
 
 @app.post("/v1/teams")
@@ -456,6 +458,38 @@ YzZjYzZkYzZlYzZmYzc0YzQ1YzQ2YzQ3YzQ4YzQ5YzUwYzUxYzUyYzUzYzU0YzU1
 QIDAQAB
 -----END RSA PUBLIC KEY-----"""
     return {"public_key": mock_public_key}
+
+
+def paginate(items: list, page: Optional[int], page_size: Optional[int]) -> tuple:
+    """Apply pagination to a list of items. Returns (page_items, pages_metadata).
+
+    Matches the real API: page is 1-indexed; page=0 or page=None means
+    "no pagination, return everything".
+    """
+    if page_size is None or page_size <= 0:
+        page_size = 20
+
+    total = len(items)
+
+    if page is None or page == 0:
+        return items, {
+            "page": 0,
+            "total": total,
+            "num_pages": 1,
+            "page_size": page_size,
+        }
+
+    num_pages = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_items = items[start:end]
+
+    return page_items, {
+        "page": page,
+        "total": total,
+        "num_pages": num_pages,
+        "page_size": page_size,
+    }
 
 
 def empty_paginated_response(key: str):
@@ -638,16 +672,12 @@ async def stream_run_logs(name: str, seq: int):
 
 # Schedule endpoints
 @app.get("/v1/schedules")
-async def list_schedules():
+async def list_schedules(page: Optional[int] = None, page_size: Optional[int] = None):
     """Mock endpoint for listing schedules."""
+    items, pages = paginate(list(mock_schedules_db.values()), page, page_size)
     return {
-        "schedules": list(mock_schedules_db.values()),
-        "pages": {
-            "page": 1,
-            "total": len(mock_schedules_db),
-            "num_pages": 1,
-            "page_size": 20,
-        },
+        "schedules": items,
+        "pages": pages,
     }
 
 

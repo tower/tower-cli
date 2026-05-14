@@ -9,7 +9,8 @@ import shlex
 import re
 from datetime import datetime
 from pathlib import Path
-from behave import given, when, then
+import requests
+from behave import given, when, then, step
 from dirty_equals import IsStr, IsPartialDict
 
 
@@ -432,3 +433,67 @@ def step_app_description_should_be(context, expected_description):
     assert (
         actual_description == expected_description
     ), f"Expected description '{expected_description}', got '{actual_description}'"
+
+
+# Pagination test steps
+
+
+def _pagination_env(context):
+    env = os.environ.copy()
+    env["TOWER_URL"] = context.tower_url
+    test_home = Path(__file__).parent.parent.parent / "test-home"
+    env["HOME"] = str(test_home.absolute())
+    return env
+
+
+@step("I have created {count:d} apps via CLI")
+def step_create_apps_via_cli(context, count):
+    """Create a number of apps via the real CLI so the list command has something to return."""
+    env = _pagination_env(context)
+    context.created_app_names = []
+    for i in range(count):
+        name = f"pagination-test-app-{i:03d}"
+        # Best-effort delete in case a prior run left this name behind.
+        subprocess.run(
+            [context.tower_binary, "apps", "delete", name],
+            env=env,
+            capture_output=True,
+        )
+        result = subprocess.run(
+            [context.tower_binary, "apps", "create", "--name", name],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert (
+            result.returncode == 0
+        ), f"Failed to create {name}: {result.stdout}\n{result.stderr}"
+        context.created_app_names.append(name)
+
+
+@step("the output should contain all created app names")
+def step_output_should_contain_all_created_apps(context):
+    output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", context.cli_output)
+    missing = [name for name in context.created_app_names if name not in output]
+    assert not missing, (
+        f"Missing {len(missing)} apps from output: {missing}\n"
+        f"Full output: {output[:2000]}"
+    )
+
+
+@step("the JSON should contain all created app names")
+def step_json_should_contain_all_created_apps(context):
+    data = parse_cli_json(context)
+    assert isinstance(data, list), f"Expected JSON array, got: {type(data)}"
+    listed = set()
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        # apps list returns AppSummary objects shaped as {"app": {"name": ...}, "runs": [...]}.
+        if "app" in entry and isinstance(entry["app"], dict):
+            listed.add(entry["app"].get("name"))
+        else:
+            listed.add(entry.get("name"))
+    missing = [name for name in context.created_app_names if name not in listed]
+    assert not missing, f"Missing {len(missing)} apps from JSON: {missing}"

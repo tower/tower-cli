@@ -150,7 +150,10 @@ impl Package {
             let archive_path = app_dir.join(logical_path);
             let archive_name = normalize_path(&archive_path)?;
             let bytes = tokio::fs::read(&physical_path).await?;
-            app_files.push(Entry { archive_name, bytes });
+            app_files.push(Entry {
+                archive_name,
+                bytes,
+            });
         }
 
         // Resolve modules. Archive names use the raw import_path basename so they stay in sync
@@ -158,9 +161,13 @@ impl Package {
         let module_dir = PathBuf::from("modules");
         let mut module_files: Vec<Entry> = Vec::new();
 
-        for (raw_import, canonical_import) in spec.import_paths.iter().zip(canonical_import_paths.iter()) {
+        for (raw_import, canonical_import) in
+            spec.import_paths.iter().zip(canonical_import_paths.iter())
+        {
             let mut module_file_paths: HashMap<PathBuf, PathBuf> = HashMap::new();
-            resolver.resolve_path(canonical_import, &mut module_file_paths).await;
+            resolver
+                .resolve_path(canonical_import, &mut module_file_paths)
+                .await;
 
             let raw_basename = Path::new(raw_import)
                 .file_name()
@@ -175,7 +182,10 @@ impl Package {
                 };
                 let archive_name = normalize_path(&archive_prefix.join(rel))?;
                 let bytes = tokio::fs::read(&physical_path).await?;
-                module_files.push(Entry { archive_name, bytes });
+                module_files.push(Entry {
+                    archive_name,
+                    bytes,
+                });
             }
         }
 

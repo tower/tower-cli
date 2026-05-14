@@ -5,13 +5,24 @@ use tokio::time::{sleep, Duration, Instant};
 
 use tower_api::models::{Run, RunLogLine};
 
-use crate::{api, output};
+use crate::{api, output, util::cmd};
 
 pub fn apps_cmd() -> Command {
     Command::new("apps")
         .about("Manage the apps in your current Tower account")
         .arg_required_else_help(true)
-        .subcommand(Command::new("list").about("List all apps in your Tower account"))
+        .subcommand(
+            Command::new("list")
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .value_parser(value_parser!(String))
+                        .help("Filter apps by environment")
+                        .action(clap::ArgAction::Set),
+                )
+                .about("List all apps in your Tower account"),
+        )
         .subcommand(
             Command::new("show")
                 .arg(
@@ -20,6 +31,15 @@ pub fn apps_cmd() -> Command {
                         .index(1)
                         .required(true)
                         .help("Name of the app"),
+                )
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .help("The environment to resolve the app against")
+                        .action(clap::ArgAction::Set),
                 )
                 .about("Show details for a Tower app and its recent runs"),
         )
@@ -97,9 +117,13 @@ pub fn apps_cmd() -> Command {
 }
 
 pub async fn do_logs(config: Config, cmd: &ArgMatches) {
-    let app_name_raw = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let app_name_raw = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name is required");
     let (name, seq) = if let Some((name, num_str)) = app_name_raw.split_once('#') {
-        let num = num_str.parse::<i64>().unwrap_or_else(|_| output::die("Run number must be a number"));
+        let num = num_str
+            .parse::<i64>()
+            .unwrap_or_else(|_| output::die("Run number must be a number"));
         (name.to_string(), num)
     } else {
         let num = match cmd.get_one::<i64>("run_number").copied() {
@@ -123,9 +147,12 @@ pub async fn do_logs(config: Config, cmd: &ArgMatches) {
 }
 
 pub async fn do_show(config: Config, cmd: &ArgMatches) {
-    let name = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let name = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name is required");
+    let env = cmd::get_string_flag(cmd, "environment");
 
-    match api::describe_app(&config, &name).await {
+    match api::describe_app(&config, &name, Some(&env)).await {
         Ok(app_response) => {
             if output::get_output_mode().is_json() {
                 output::json(&app_response);
@@ -203,11 +230,11 @@ pub async fn do_show(config: Config, cmd: &ArgMatches) {
     }
 }
 
-pub async fn do_list_apps(config: Config) {
-    let resp = output::with_spinner("Listing apps", api::list_apps(&config)).await;
+pub async fn do_list_apps(config: Config, args: &ArgMatches) {
+    let env = args.get_one::<String>("environment").map(|s| s.as_str());
+    let apps = output::with_spinner("Listing apps", api::list_apps(&config, env)).await;
 
-    let items = resp
-        .apps
+    let items = apps
         .iter()
         .map(|app_summary| {
             let app = &app_summary.app;
@@ -219,7 +246,7 @@ pub async fn do_list_apps(config: Config) {
             format!("{}\n{}", output::title(&app.name), desc)
         })
         .collect();
-    output::list(items, Some(&resp.apps));
+    output::list(items, Some(&apps));
 }
 
 pub async fn do_create(config: Config, args: &ArgMatches) {
@@ -236,7 +263,9 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, cmd: &ArgMatches) {
-    let name = cmd.get_one::<String>("app_name").expect("app_name is required");
+    let name = cmd
+        .get_one::<String>("app_name")
+        .expect("app_name is required");
 
     output::with_spinner("Deleting app", api::delete_app(&config, name)).await;
 }
@@ -262,8 +291,9 @@ pub async fn do_cancel(config: Config, cmd: &ArgMatches) {
 }
 
 async fn latest_run_number(config: &Config, name: &str) -> i64 {
-    match api::describe_app(config, name).await {
-        Ok(resp) => resp.runs
+    match api::describe_app(config, name, None).await {
+        Ok(resp) => resp
+            .runs
             .iter()
             .map(|r| r.number)
             .max()
@@ -307,7 +337,9 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 sleep(RUN_START_POLL_INTERVAL).await;
 
                 if wait_started.elapsed() > RUN_START_TIMEOUT {
-                    output::error("Timed out waiting for run to start. The runner may be unavailable.");
+                    output::error(
+                        "Timed out waiting for run to start. The runner may be unavailable.",
+                    );
                     return;
                 }
 
@@ -552,9 +584,9 @@ fn is_run_finished(run: &Run) -> bool {
 
 fn is_run_started(run: &Run) -> bool {
     match run.status {
-        tower_api::models::run::Status::Scheduled | tower_api::models::run::Status::Pending => {
-            false
-        }
+        tower_api::models::run::Status::Scheduled
+        | tower_api::models::run::Status::Pending
+        | tower_api::models::run::Status::Starting => false,
         _ => true,
     }
 }
@@ -585,7 +617,9 @@ mod tests {
         assert_eq!(cmd, "logs");
         assert_eq!(sub_matches.get_one::<bool>("follow"), Some(&true));
         assert_eq!(
-            sub_matches.get_one::<String>("app_name").map(|s| s.as_str()),
+            sub_matches
+                .get_one::<String>("app_name")
+                .map(|s| s.as_str()),
             Some("hello-world#11")
         );
         assert_eq!(sub_matches.get_one::<i64>("run_number"), None);
@@ -599,7 +633,9 @@ mod tests {
         let (_, sub_matches) = matches.subcommand().unwrap();
 
         assert_eq!(
-            sub_matches.get_one::<String>("app_name").map(|s| s.as_str()),
+            sub_matches
+                .get_one::<String>("app_name")
+                .map(|s| s.as_str()),
             Some("hello-world")
         );
         assert_eq!(sub_matches.get_one::<i64>("run_number"), Some(&11));
@@ -607,7 +643,12 @@ mod tests {
 
     #[test]
     fn test_terminal_statuses_explicit() {
-        let non_terminal = [Status::Scheduled, Status::Pending, Status::Running, Status::Retrying];
+        let non_terminal = [
+            Status::Scheduled,
+            Status::Pending,
+            Status::Running,
+            Status::Retrying,
+        ];
         for status in non_terminal {
             let run = Run {
                 status,
@@ -636,6 +677,7 @@ mod tests {
         let status = Status::Scheduled;
         match status {
             Status::Scheduled => {}
+            Status::Starting => {}
             Status::Pending => {}
             Status::Running => {}
             Status::Retrying => {}
@@ -648,7 +690,7 @@ mod tests {
 
     #[test]
     fn test_run_started_statuses() {
-        let not_started = [Status::Scheduled, Status::Pending];
+        let not_started = [Status::Scheduled, Status::Pending, Status::Starting];
         for status in not_started {
             let run = Run {
                 status,
@@ -787,5 +829,54 @@ mod tests {
 
         let result = apps_cmd().try_get_matches_from(["apps", "cancel"]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn list_defaults_to_no_environment_filter() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "list"])
+            .unwrap();
+        let (_, list_args) = matches.subcommand().unwrap();
+
+        assert_eq!(list_args.get_one::<String>("environment"), None);
+    }
+
+    #[test]
+    fn list_accepts_environment_flag() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "list", "-e", "production"])
+            .unwrap();
+        let (_, list_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            list_args.get_one::<String>("environment").map(|s| s.as_str()),
+            Some("production")
+        );
+    }
+
+    #[test]
+    fn show_defaults_to_default_environment() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "show", "my-app"])
+            .unwrap();
+        let (_, show_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn show_accepts_environment_flag() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "show", "my-app", "-e", "production"])
+            .unwrap();
+        let (_, show_args) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
     }
 }

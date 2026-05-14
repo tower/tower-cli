@@ -357,56 +357,31 @@ impl Uv {
                 &self.uv_path, cwd
             );
 
-            self.spawn_requirements_install(cwd, env_vars, false).await
+            let mut cmd = self.pip_install(cwd);
+            cmd.arg("-r")
+                .arg(cwd.join("requirements.txt"))
+                .envs(env_vars);
+
+            #[cfg(unix)]
+            {
+                cmd.process_group(0);
+            }
+
+            if let Some(dir) = &self.cache_dir {
+                cmd.arg("--cache-dir").arg(dir);
+            }
+
+            Ok(cmd.spawn()?)
         } else {
             // If there is no pyproject.toml or requirements.txt, then we can't sync.
             Err(Error::MissingPyprojectToml)
         }
     }
 
-    /// Returns whether a failed `sync()` for this directory is eligible for a
-    /// retry via [`sync_with_legacy_setuptools_pin`]. Only applies to projects
-    /// driven by `requirements.txt`; pyproject-based projects manage their own
-    /// setuptools dependency.
-    pub fn should_use_legacy_setuptools_pin(&self, cwd: &Path) -> bool {
-        cwd.join("requirements.txt").exists()
-    }
-
-    /// Re-runs the `requirements.txt` install with a `setuptools<82` pin appended.
-    ///
-    /// setuptools 82 removed `pkg_resources`, but many legacy packages still import
-    /// it without declaring the dependency. Pinning `setuptools<82` keeps it
-    /// available. Some modern packages (e.g. dlt's transitive graph pinning
-    /// `setuptools==82.0.1`) make this pin unsatisfiable, so it isn't applied up
-    /// front — callers should fall back to this only after a plain `sync()`
-    /// fails for a project using `requirements.txt`.
-    ///
-    /// https://github.com/pypa/setuptools/issues/5174
-    pub async fn sync_with_legacy_setuptools_pin(
-        &self,
-        cwd: &PathBuf,
-        env_vars: &HashMap<String, String>,
-    ) -> Result<Child, Error> {
-        if !cwd.join("requirements.txt").exists() {
-            return Err(Error::MissingPyprojectToml);
-        }
-
-        debug!(
-            "Retrying UV ({:?}) sync with setuptools<82 pin in {:?}",
-            &self.uv_path, cwd
-        );
-
-        self.spawn_requirements_install(cwd, env_vars, true).await
-    }
-
-    async fn spawn_requirements_install(
-        &self,
-        cwd: &PathBuf,
-        env_vars: &HashMap<String, String>,
-        pin_legacy_setuptools: bool,
-    ) -> Result<Child, Error> {
-        let req_path = cwd.join("requirements.txt");
-
+    /// Builds a `uv pip install` command with our standard stdio/color setup.
+    /// Callers append source args (e.g. `-r requirements.txt` or `.`), any extra
+    /// packages, and `envs` before spawning.
+    fn pip_install(&self, cwd: &Path) -> Command {
         let mut cmd = Command::new(&self.uv_path);
         cmd.kill_on_drop(true)
             .stdin(Stdio::null())
@@ -416,15 +391,44 @@ impl Uv {
             .arg("--color")
             .arg("never")
             .arg("pip")
-            .arg("install")
-            .arg("-r")
-            .arg(&req_path);
+            .arg("install");
+        cmd
+    }
 
-        if pin_legacy_setuptools {
-            cmd.arg("setuptools<82");
+    /// Re-runs the install with a `setuptools<82` pin appended.
+    ///
+    /// setuptools 82 removed `pkg_resources`, but many legacy packages still import
+    /// it without declaring the dependency. Pinning `setuptools<82` keeps it
+    /// available. Some modern packages (e.g. dlt's transitive graph pinning
+    /// `setuptools==82.0.1`) make this pin unsatisfiable, so it isn't applied up
+    /// front — callers should fall back to this only after a plain `sync()` fails.
+    ///
+    /// Drops out of `uv sync` (which can't accept a CLI constraint) into `uv pip
+    /// install`, which can. The project source is `.` for a pyproject project or
+    /// `-r requirements.txt` otherwise.
+    ///
+    /// https://github.com/pypa/setuptools/issues/5174
+    pub async fn sync_with_legacy_setuptools_pin(
+        &self,
+        cwd: &PathBuf,
+        env_vars: &HashMap<String, String>,
+    ) -> Result<Child, Error> {
+        debug!(
+            "Retrying UV ({:?}) install with setuptools<82 pin in {:?}",
+            &self.uv_path, cwd
+        );
+
+        let mut cmd = self.pip_install(cwd);
+
+        if cwd.join("pyproject.toml").exists() {
+            cmd.arg(".");
+        } else if cwd.join("requirements.txt").exists() {
+            cmd.arg("-r").arg(cwd.join("requirements.txt"));
+        } else {
+            return Err(Error::MissingPyprojectToml);
         }
 
-        cmd.envs(env_vars);
+        cmd.arg("setuptools<82").envs(env_vars);
 
         #[cfg(unix)]
         {

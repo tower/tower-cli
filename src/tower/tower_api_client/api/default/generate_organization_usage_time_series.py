@@ -4,36 +4,29 @@ from typing import Any
 import httpx
 
 from ...client import AuthenticatedClient, Client
-from ...models.delete_authenticator_params import DeleteAuthenticatorParams
-from ...models.delete_authenticator_response import DeleteAuthenticatorResponse
 from ...models.error_model import ErrorModel
+from ...models.generate_organization_usage_time_series_response import (
+    GenerateOrganizationUsageTimeSeriesResponse,
+)
 from ...types import Response
 
 
-def _get_kwargs(
-    *,
-    body: DeleteAuthenticatorParams,
-) -> dict[str, Any]:
-    headers: dict[str, Any] = {}
-
+def _get_kwargs() -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
-        "method": "delete",
-        "url": "/authenticators",
+        "method": "get",
+        "url": "/usage/time-series",
     }
 
-    _kwargs["json"] = body.to_dict()
-
-    headers["Content-Type"] = "application/json"
-
-    _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> DeleteAuthenticatorResponse | ErrorModel:
+) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse:
     if response.status_code == 200:
-        response_200 = DeleteAuthenticatorResponse.from_dict(response.json())
+        response_200 = GenerateOrganizationUsageTimeSeriesResponse.from_dict(
+            response.json()
+        )
 
         return response_200
 
@@ -44,7 +37,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[DeleteAuthenticatorResponse | ErrorModel]:
+) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,26 +49,20 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: DeleteAuthenticatorParams,
-) -> Response[DeleteAuthenticatorResponse | ErrorModel]:
-    """Delete authenticator
+) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
+    """Get organization usage as time series
 
-     Removes an authenticator from your account so you're no longer required to provide it at login.
-
-    Args:
-        body (DeleteAuthenticatorParams):
+     Get the current billing cycle usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteAuthenticatorResponse | ErrorModel]
+        Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]
     """
 
-    kwargs = _get_kwargs(
-        body=body,
-    )
+    kwargs = _get_kwargs()
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -87,52 +74,41 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: DeleteAuthenticatorParams,
-) -> DeleteAuthenticatorResponse | ErrorModel | None:
-    """Delete authenticator
+) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse | None:
+    """Get organization usage as time series
 
-     Removes an authenticator from your account so you're no longer required to provide it at login.
-
-    Args:
-        body (DeleteAuthenticatorParams):
+     Get the current billing cycle usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteAuthenticatorResponse | ErrorModel
+        ErrorModel | GenerateOrganizationUsageTimeSeriesResponse
     """
 
     return sync_detailed(
         client=client,
-        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: DeleteAuthenticatorParams,
-) -> Response[DeleteAuthenticatorResponse | ErrorModel]:
-    """Delete authenticator
+) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
+    """Get organization usage as time series
 
-     Removes an authenticator from your account so you're no longer required to provide it at login.
-
-    Args:
-        body (DeleteAuthenticatorParams):
+     Get the current billing cycle usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteAuthenticatorResponse | ErrorModel]
+        Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]
     """
 
-    kwargs = _get_kwargs(
-        body=body,
-    )
+    kwargs = _get_kwargs()
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -142,26 +118,21 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: DeleteAuthenticatorParams,
-) -> DeleteAuthenticatorResponse | ErrorModel | None:
-    """Delete authenticator
+) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse | None:
+    """Get organization usage as time series
 
-     Removes an authenticator from your account so you're no longer required to provide it at login.
-
-    Args:
-        body (DeleteAuthenticatorParams):
+     Get the current billing cycle usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteAuthenticatorResponse | ErrorModel
+        ErrorModel | GenerateOrganizationUsageTimeSeriesResponse
     """
 
     return (
         await asyncio_detailed(
             client=client,
-            body=body,
         )
     ).parsed

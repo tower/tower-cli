@@ -33,7 +33,8 @@ pub async fn do_login(config: Config, args: &ArgMatches) {
 
         eprint!("Do you want to continue? [y/N] ");
         let mut input = String::new();
-        if std::io::stdin().read_line(&mut input).is_err() || !input.trim().eq_ignore_ascii_case("y")
+        if std::io::stdin().read_line(&mut input).is_err()
+            || !input.trim().eq_ignore_ascii_case("y")
         {
             return;
         }

@@ -133,15 +133,14 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
             .collect();
         output::table(headers, data, Some(&list_response.secrets));
     } else {
-        let list_response =
+        let secrets =
             output::with_spinner("Listing secrets", api::list_secrets(&config, &env, all)).await;
 
         let headers = vec!["Secret", "Environment", "Preview"]
             .into_iter()
             .map(str::to_string)
             .collect();
-        let data = list_response
-            .secrets
+        let data = secrets
             .iter()
             .map(|secret| {
                 vec![
@@ -151,7 +150,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                 ]
             })
             .collect();
-        output::table(headers, data, Some(&list_response.secrets));
+        output::table(headers, data, Some(&secrets));
     }
 }
 
@@ -185,11 +184,15 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_delete(config: Config, args: &ArgMatches) {
-    let secret_name_arg = args.get_one::<String>("secret_name").expect("secret_name is required");
+    let secret_name_arg = args
+        .get_one::<String>("secret_name")
+        .expect("secret_name is required");
     let (environment, name) = if let Some((env, name)) = secret_name_arg.split_once('/') {
         (env.to_string(), name.to_string())
     } else {
-        let env = args.get_one::<String>("environment").expect("environment has default");
+        let env = args
+            .get_one::<String>("environment")
+            .expect("environment has default");
         (env.clone(), secret_name_arg.clone())
     };
     debug!("deleting secret, environment={} name={}", environment, name);
@@ -240,4 +243,3 @@ async fn encrypt_and_create_secret(
         .await
         .map_err(SecretCreationError::CreateFailed)
 }
-

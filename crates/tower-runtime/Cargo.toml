@@ -9,6 +9,7 @@ license = { workspace = true }
 [dependencies]
 async-trait = { workspace = true }
 chrono = { workspace = true }
+futures = { workspace = true }
 nix = { workspace = true }
 snafu = { workspace = true }
 tmpdir = { workspace = true }

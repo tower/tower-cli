@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use crate::core::{build_package, Entry, PackageInputs};
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize)]
@@ -52,7 +52,7 @@ pub fn build_package_wasm(inputs: JsValue) -> Result<Vec<u8>, JsError> {
         towerfile_bytes: js.towerfile_bytes.into_vec(),
     };
 
-    let built = build_package(core_inputs)
-        .map_err(|e| JsError::new(&format!("build failed: {}", e)))?;
+    let built =
+        build_package(core_inputs).map_err(|e| JsError::new(&format!("build failed: {}", e)))?;
     Ok(built.bytes)
 }
