@@ -177,13 +177,10 @@ async fn inner_execute_local_app(
             .to_string_lossy()
             .to_string();
 
-        if other_env_vars.contains_key("PYTHONPATH") {
-            // If we already have a PYTHONPATH, we need to append to it.
-            let existing = other_env_vars.get("PYTHONPATH").unwrap();
-            let pythonpath = std::env::join_paths(vec![existing, &import_paths])?
-                .to_string_lossy()
-                .to_string();
-
+        if let Some(existing) = other_env_vars.get("PYTHONPATH") {
+            // A user-supplied PYTHONPATH may itself contain multiple entries, so we split it
+            // before re-joining to avoid `join_paths` rejecting the pre-joined string.
+            let pythonpath = append_to_path_list(existing, &import_paths);
             other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
         } else {
             // Otherwise, we just set it.
@@ -519,6 +516,19 @@ async fn execute_bash_program(
     Ok(child)
 }
 
+/// Appends `new_entry` to a PATH-style list (e.g. PYTHONPATH) that may already contain multiple
+/// entries separated by the platform path separator. The existing value is decomposed with
+/// `split_paths` so that `join_paths` only sees individual entries (which never contain the
+/// separator), making the join infallible.
+fn append_to_path_list(existing: &str, new_entry: &str) -> String {
+    let mut entries: Vec<PathBuf> = env::split_paths(existing).collect();
+    entries.push(PathBuf::from(new_entry));
+    env::join_paths(&entries)
+        .expect("split path entries should never contain the platform path separator")
+        .to_string_lossy()
+        .to_string()
+}
+
 fn make_env_var_key(src: &str) -> String {
     // TODO: We have this special case defined for dltHub, and I'm not sure that we want to...
     if src.starts_with("dlt.") {
@@ -561,11 +571,12 @@ fn make_env_vars(
     // We also need a PYTHONPATH that is set to the current working directory to help with the
     // dependency resolution problem at runtime.
     let pythonpath = cwd.to_string_lossy().to_string();
-    let pythonpath = if res.contains_key("PYTHONPATH") {
-        // If we already have a PYTHONPATH, we need to append to it.
-        let existing = res.get("PYTHONPATH").unwrap();
-        let joined_paths = std::env::join_paths([existing, &pythonpath]).unwrap();
-        joined_paths.to_string_lossy().to_string()
+    let pythonpath = if let Some(existing) = res.get("PYTHONPATH") {
+        // If we already have a PYTHONPATH, we need to append to it. The existing value may itself
+        // contain multiple entries separated by the platform path separator, so split it before
+        // re-joining — passing a pre-joined string into `join_paths` directly would fail because
+        // it rejects any component containing the separator.
+        append_to_path_list(existing, &pythonpath)
     } else {
         // There was no previously set PYTHONPATH, so we just include our current directory.
         pythonpath
