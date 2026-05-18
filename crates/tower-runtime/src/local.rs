@@ -161,31 +161,17 @@ async fn inner_execute_local_app(
     let manifest = &package.manifest;
     let secrets = opts.secrets;
     let params = opts.parameters;
-    let mut other_env_vars = opts.env_vars;
+    let other_env_vars = opts.env_vars;
 
-    if !package.manifest.import_paths.is_empty() {
-        debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
+    let import_paths: Vec<PathBuf> = package
+        .manifest
+        .import_paths
+        .iter()
+        .map(|p| package_path.join(p))
+        .collect();
 
-        let import_paths = package
-            .manifest
-            .import_paths
-            .iter()
-            .map(|p| package_path.join(p))
-            .collect::<Vec<_>>();
-
-        let import_paths = std::env::join_paths(import_paths)?
-            .to_string_lossy()
-            .to_string();
-
-        if let Some(existing) = other_env_vars.get("PYTHONPATH") {
-            // A user-supplied PYTHONPATH may itself contain multiple entries, so we split it
-            // before re-joining to avoid `join_paths` rejecting the pre-joined string.
-            let pythonpath = append_to_path_list(existing, &import_paths);
-            other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
-        } else {
-            // Otherwise, we just set it.
-            other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
-        }
+    if !import_paths.is_empty() {
+        debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", import_paths);
     }
 
     // We insert these checks for cancellation along the way to see if the process was
@@ -207,6 +193,7 @@ async fn inner_execute_local_app(
             secrets,
             params,
             other_env_vars,
+            &import_paths,
         )
         .await?;
 
@@ -230,6 +217,7 @@ async fn inner_execute_local_app(
             &secrets,
             &params,
             &other_env_vars,
+            &import_paths,
         );
 
         // Now we also need to find the program to execute.
@@ -490,6 +478,7 @@ async fn execute_bash_program(
     secrets: HashMap<String, String>,
     params: HashMap<String, String>,
     other_env_vars: HashMap<String, String>,
+    import_paths: &[PathBuf],
 ) -> Result<Child, Error> {
     let bash_path = find_bash().await?;
     debug!(ctx: &ctx, "using bash at {:?}", bash_path);
@@ -509,24 +498,12 @@ async fn execute_bash_program(
             &secrets,
             &params,
             &other_env_vars,
+            import_paths,
         ))
         .kill_on_drop(true)
         .spawn()?;
 
     Ok(child)
-}
-
-/// Appends `new_entry` to a PATH-style list (e.g. PYTHONPATH) that may already contain multiple
-/// entries separated by the platform path separator. The existing value is decomposed with
-/// `split_paths` so that `join_paths` only sees individual entries (which never contain the
-/// separator), making the join infallible.
-fn append_to_path_list(existing: &str, new_entry: &str) -> String {
-    let mut entries: Vec<PathBuf> = env::split_paths(existing).collect();
-    entries.push(PathBuf::from(new_entry));
-    env::join_paths(&entries)
-        .expect("split path entries should never contain the platform path separator")
-        .to_string_lossy()
-        .to_string()
 }
 
 fn make_env_var_key(src: &str) -> String {
@@ -548,6 +525,7 @@ fn make_env_vars(
     secs: &HashMap<String, String>,
     params: &HashMap<String, String>,
     other_env_vars: &HashMap<String, String>,
+    import_paths: &[PathBuf],
 ) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
@@ -568,20 +546,20 @@ fn make_env_vars(
     let added_keys = res.keys().map(|s| &**s).collect::<Vec<&str>>().join(", ");
     debug!(ctx: &ctx, "added keys {}", &added_keys);
 
-    // We also need a PYTHONPATH that is set to the current working directory to help with the
-    // dependency resolution problem at runtime.
-    let pythonpath = cwd.to_string_lossy().to_string();
-    let pythonpath = if let Some(existing) = res.get("PYTHONPATH") {
-        // If we already have a PYTHONPATH, we need to append to it. The existing value may itself
-        // contain multiple entries separated by the platform path separator, so split it before
-        // re-joining — passing a pre-joined string into `join_paths` directly would fail because
-        // it rejects any component containing the separator.
-        append_to_path_list(existing, &pythonpath)
-    } else {
-        // There was no previously set PYTHONPATH, so we just include our current directory.
-        pythonpath
-    };
+    let mut path_entries: Vec<PathBuf> = res
+        .remove("PYTHONPATH")
+        .as_deref()
+        .map(env::split_paths)
+        .into_iter()
+        .flatten()
+        .collect();
+    path_entries.extend(import_paths.iter().cloned());
+    path_entries.push(cwd.clone());
 
+    let pythonpath = env::join_paths(&path_entries)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
     res.insert("PYTHONPATH".to_string(), pythonpath);
 
     // Inject a TOWER_ENVIRONMENT parameter so you know what environment you're running in. Empty
