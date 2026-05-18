@@ -381,3 +381,53 @@ async fn test_abort_on_dependency_installation_failure() {
         }
     }
 }
+
+// Regression test: when a Towerfile declares multiple `import_paths`, the runtime used to panic
+// while building PYTHONPATH because the already-joined value was fed back into
+// `std::env::join_paths`, which rejects components containing the path separator.
+#[tokio::test]
+async fn test_running_app_with_multiple_import_paths() {
+    debug!("Running 06-multiple-import-paths");
+    let dir = get_example_app_dir("06-multiple-import-paths");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir()),
+    };
+
+    let app = LocalApp::start(opts)
+        .await
+        .expect("Failed to start app with multiple import_paths");
+
+    let mut outputs = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        outputs.push(output.line);
+    }
+
+    assert!(
+        outputs.iter().any(|line| line.contains("hello from mod_a")),
+        "expected output from lib_a/mod_a; got {:?}",
+        outputs
+    );
+    assert!(
+        outputs.iter().any(|line| line.contains("hello from mod_b")),
+        "expected output from lib_b/mod_b; got {:?}",
+        outputs
+    );
+
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Exited,
+        "App should have exited cleanly, got {:?}",
+        status
+    );
+}

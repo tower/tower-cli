@@ -1,0 +1,7 @@
+[app]
+name = "06-multiple-import-paths"
+script = "./task.py"
+import_paths = [
+    "./lib_a",
+    "./lib_b",
+]
