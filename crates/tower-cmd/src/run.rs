@@ -713,22 +713,22 @@ async fn monitor_cli_status(
         );
 
         match handle.lock().await.status().await {
-            Ok(status) => {
+            Ok(exec_status) => {
                 // We reset the error count to indicate that we can intermittently get statuses.
                 err_count = 0;
 
-                match status {
+                match exec_status.status {
                     Status::Exited => {
                         debug!("Run exited cleanly, stopping status monitoring");
-                        return status;
+                        return exec_status.status;
                     }
                     Status::Crashed { .. } => {
                         debug!("Run crashed, stopping status monitoring");
-                        return status;
+                        return exec_status.status;
                     }
                     Status::Failed { .. } => {
                         debug!("Run failed at platform layer, stopping status monitoring");
-                        return status;
+                        return exec_status.status;
                     }
                     _ => {
                         debug!("Handle status: other, continuing to monitor");

@@ -60,10 +60,7 @@ async fn do_list_via_api(config: &Config) {
 
     let headers = vec!["Name".to_string()];
 
-    let teams_data: Vec<Vec<String>> = teams
-        .iter()
-        .map(|team| vec![team.name.clone()])
-        .collect();
+    let teams_data: Vec<Vec<String>> = teams.iter().map(|team| vec![team.name.clone()]).collect();
 
     output::newline();
     output::table(headers, teams_data, None::<&Vec<config::Team>>);

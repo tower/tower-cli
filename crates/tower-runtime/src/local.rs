@@ -303,7 +303,8 @@ async fn inner_execute_local_app(
                 }
             }
             Ok(child) => {
-                let mut res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, child).await;
+                let mut res =
+                    run_setup_child(&ctx, &cancel_token, &opts.output_sender, child).await;
 
                 // If sync was cancelled, don't bother retrying — bail out
                 // cleanly so the receiver sees `Status::Cancelled` instead of
@@ -328,7 +329,8 @@ async fn inner_execute_local_app(
                     let retry_child = uv
                         .sync_with_legacy_setuptools_pin(&working_dir, &env_vars)
                         .await?;
-                    res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, retry_child).await;
+                    res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, retry_child)
+                        .await;
                     if cancel_token.is_cancelled() {
                         return Err(Error::Cancelled);
                     }
@@ -419,7 +421,9 @@ impl App for LocalApp {
                 Ok(Ok(code)) => AppCompletion::Exit(code),
                 Ok(Err(Error::Cancelled)) => AppCompletion::Cancelled,
                 Ok(Err(e)) => AppCompletion::Failed(AppFailure::Runtime(e)),
-                Err(panic) => AppCompletion::Failed(AppFailure::Panic(panic_payload_message(&panic))),
+                Err(panic) => {
+                    AppCompletion::Failed(AppFailure::Panic(panic_payload_message(&panic)))
+                }
             };
             let _ = sx.send(completion);
         });

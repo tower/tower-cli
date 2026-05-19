@@ -5,6 +5,7 @@
 //! Kubernetes pods, etc.) through a uniform interface.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::io::AsyncRead;
@@ -198,14 +199,37 @@ pub struct BackendCapabilities {
 // Execution Handle Trait
 // ============================================================================
 
+/// Result of querying execution status, including optional timing and
+/// backend-specific metadata. The metadata map allows backends to surface
+/// arbitrary key-value data (e.g. node_type, scheduling_latency_ms) without
+/// requiring trait changes.
+#[derive(Clone, Debug)]
+pub struct ExecutionStatus {
+    pub status: Status,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub metadata: HashMap<String, String>,
+}
+
+impl From<Status> for ExecutionStatus {
+    fn from(status: Status) -> Self {
+        Self {
+            status,
+            started_at: None,
+            ended_at: None,
+            metadata: HashMap::new(),
+        }
+    }
+}
+
 /// ExecutionHandle represents a running execution
 #[async_trait]
 pub trait ExecutionHandle: Send + Sync {
     /// Get a unique identifier for this execution
     fn id(&self) -> &str;
 
-    /// Get current execution status
-    async fn status(&self) -> Result<Status, Error>;
+    /// Get current execution status with optional timing metadata
+    async fn status(&self) -> Result<ExecutionStatus, Error>;
 
     /// Subscribe to log stream
     async fn logs(&self) -> Result<OutputReceiver, Error>;

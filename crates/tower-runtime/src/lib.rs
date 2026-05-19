@@ -83,10 +83,7 @@ impl Status {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
-            Status::Exited
-                | Status::Crashed { .. }
-                | Status::Cancelled
-                | Status::Failed(_)
+            Status::Exited | Status::Crashed { .. } | Status::Cancelled | Status::Failed(_)
         )
     }
 }
