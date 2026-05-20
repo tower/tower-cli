@@ -673,8 +673,16 @@ pub async fn stream_run_logs(
         builder = builder.header(reqwest::header::USER_AGENT, user_agent.clone());
     }
 
+    // Mirrors the generated tower-api client: prefer a bearer token (interactive session),
+    // otherwise fall back to the API key header set when TOWER_API_KEY is configured.
     if let Some(ref token) = api_config.bearer_access_token {
         builder = builder.bearer_auth(token.to_owned());
+    } else if let Some(ref apikey) = api_config.api_key {
+        let value = match &apikey.prefix {
+            Some(prefix) => format!("{} {}", prefix, apikey.key),
+            None => apikey.key.clone(),
+        };
+        builder = builder.header("X-API-Key", value);
     };
 
     // Now let's try to open the event source with the server.
