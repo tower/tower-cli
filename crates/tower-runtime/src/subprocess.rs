@@ -247,12 +247,12 @@ impl ExecutionHandle for SubprocessHandle {
 
     async fn wait_for_completion(&self) -> Result<Status, Error> {
         loop {
-            let exec_status = self.status().await?;
-            match exec_status.status {
+            let status = self.status().await?.status;
+            match status {
                 Status::None | Status::Running => {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                 }
-                _ => return Ok(exec_status.status),
+                _ => return Ok(status),
             }
         }
     }
