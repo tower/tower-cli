@@ -76,9 +76,28 @@ impl Towerfile {
             return Err(Error::MissingRequiredAppField {
                 field: "name".to_string(),
             });
-        } else {
-            Ok(towerfile)
         }
+
+        for import_path in &towerfile.app.import_paths {
+            let as_str = import_path.to_string_lossy();
+            if as_str.is_empty() {
+                return Err(Error::InvalidTowerfile {
+                    message: "import_paths entries must not be empty".to_string(),
+                });
+            }
+            // PATH-style separators in a single entry would break PYTHONPATH construction at
+            // runtime, since each entry is joined with the platform path separator.
+            if as_str.contains(|c: char| c == ':' || c == ';') {
+                return Err(Error::InvalidTowerfile {
+                    message: format!(
+                        "import_paths entry {:?} contains an illegal character (':' or ';')",
+                        as_str
+                    ),
+                });
+            }
+        }
+
+        Ok(towerfile)
     }
 
     /// set_parameter upserts a parameter by lookup name. If a parameter with the given name

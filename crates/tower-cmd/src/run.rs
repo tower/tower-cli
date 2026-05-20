@@ -713,9 +713,10 @@ async fn monitor_cli_status(
         );
 
         match handle.lock().await.status().await {
-            Ok(status) => {
+            Ok(exec_status) => {
                 // We reset the error count to indicate that we can intermittently get statuses.
                 err_count = 0;
+                let status = exec_status.status;
 
                 match status {
                     Status::Exited => {

@@ -4,7 +4,7 @@ use crate::auto_cleanup;
 use crate::errors::Error;
 use crate::execution::{
     BackendCapabilities, CacheBackend, ExecutionBackend, ExecutionHandle, ExecutionSpec,
-    ServiceEndpoint,
+    ExecutionStatus, ServiceEndpoint,
 };
 use crate::local::LocalApp;
 use crate::{App, OutputReceiver, StartOptions, Status};
@@ -212,9 +212,9 @@ impl ExecutionHandle for SubprocessHandle {
         &self.id
     }
 
-    async fn status(&self) -> Result<Status, Error> {
+    async fn status(&self) -> Result<ExecutionStatus, Error> {
         let app = self.app.lock().await;
-        app.status().await
+        Ok(app.status().await?.into())
     }
 
     async fn logs(&self) -> Result<OutputReceiver, Error> {
@@ -247,7 +247,7 @@ impl ExecutionHandle for SubprocessHandle {
 
     async fn wait_for_completion(&self) -> Result<Status, Error> {
         loop {
-            let status = self.status().await?;
+            let status = self.status().await?.status;
             match status {
                 Status::None | Status::Running => {
                     tokio::time::sleep(Duration::from_millis(100)).await;

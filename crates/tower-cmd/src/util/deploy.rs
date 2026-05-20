@@ -57,9 +57,17 @@ pub async fn upload_file_with_progress(
         .header("Content-Encoding", "gzip")
         .body(Body::wrap_stream(progress_stream));
 
-    // Add authorization if available
+    // Add authorization if available. Mirrors the generated tower-api client: prefer a
+    // bearer token (interactive session), otherwise fall back to the API key header set
+    // when TOWER_API_KEY is configured.
     if let Some(token) = &api_config.bearer_access_token {
         req = req.header("Authorization", format!("Bearer {}", token));
+    } else if let Some(apikey) = &api_config.api_key {
+        let value = match &apikey.prefix {
+            Some(prefix) => format!("{} {}", prefix, apikey.key),
+            None => apikey.key.clone(),
+        };
+        req = req.header("X-API-Key", value);
     }
 
     // Send the request

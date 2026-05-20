@@ -161,34 +161,17 @@ async fn inner_execute_local_app(
     let manifest = &package.manifest;
     let secrets = opts.secrets;
     let params = opts.parameters;
-    let mut other_env_vars = opts.env_vars;
+    let other_env_vars = opts.env_vars;
 
-    if !package.manifest.import_paths.is_empty() {
-        debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", package.manifest.import_paths);
+    let import_paths: Vec<PathBuf> = package
+        .manifest
+        .import_paths
+        .iter()
+        .map(|p| package_path.join(p))
+        .collect();
 
-        let import_paths = package
-            .manifest
-            .import_paths
-            .iter()
-            .map(|p| package_path.join(p))
-            .collect::<Vec<_>>();
-
-        let import_paths = std::env::join_paths(import_paths)?
-            .to_string_lossy()
-            .to_string();
-
-        if other_env_vars.contains_key("PYTHONPATH") {
-            // If we already have a PYTHONPATH, we need to append to it.
-            let existing = other_env_vars.get("PYTHONPATH").unwrap();
-            let pythonpath = std::env::join_paths(vec![existing, &import_paths])?
-                .to_string_lossy()
-                .to_string();
-
-            other_env_vars.insert("PYTHONPATH".to_string(), pythonpath);
-        } else {
-            // Otherwise, we just set it.
-            other_env_vars.insert("PYTHONPATH".to_string(), import_paths);
-        }
+    if !import_paths.is_empty() {
+        debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", import_paths);
     }
 
     // We insert these checks for cancellation along the way to see if the process was
@@ -210,6 +193,7 @@ async fn inner_execute_local_app(
             secrets,
             params,
             other_env_vars,
+            &import_paths,
         )
         .await?;
 
@@ -233,6 +217,7 @@ async fn inner_execute_local_app(
             &secrets,
             &params,
             &other_env_vars,
+            &import_paths,
         );
 
         // Now we also need to find the program to execute.
@@ -303,7 +288,8 @@ async fn inner_execute_local_app(
                 }
             }
             Ok(child) => {
-                let mut res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, child).await;
+                let mut res =
+                    run_setup_child(&ctx, &cancel_token, &opts.output_sender, child).await;
 
                 // If sync was cancelled, don't bother retrying — bail out
                 // cleanly so the receiver sees `Status::Cancelled` instead of
@@ -328,7 +314,8 @@ async fn inner_execute_local_app(
                     let retry_child = uv
                         .sync_with_legacy_setuptools_pin(&working_dir, &env_vars)
                         .await?;
-                    res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, retry_child).await;
+                    res = run_setup_child(&ctx, &cancel_token, &opts.output_sender, retry_child)
+                        .await;
                     if cancel_token.is_cancelled() {
                         return Err(Error::Cancelled);
                     }
@@ -419,7 +406,9 @@ impl App for LocalApp {
                 Ok(Ok(code)) => AppCompletion::Exit(code),
                 Ok(Err(Error::Cancelled)) => AppCompletion::Cancelled,
                 Ok(Err(e)) => AppCompletion::Failed(AppFailure::Runtime(e)),
-                Err(panic) => AppCompletion::Failed(AppFailure::Panic(panic_payload_message(&panic))),
+                Err(panic) => {
+                    AppCompletion::Failed(AppFailure::Panic(panic_payload_message(&panic)))
+                }
             };
             let _ = sx.send(completion);
         });
@@ -493,6 +482,7 @@ async fn execute_bash_program(
     secrets: HashMap<String, String>,
     params: HashMap<String, String>,
     other_env_vars: HashMap<String, String>,
+    import_paths: &[PathBuf],
 ) -> Result<Child, Error> {
     let bash_path = find_bash().await?;
     debug!(ctx: &ctx, "using bash at {:?}", bash_path);
@@ -512,6 +502,7 @@ async fn execute_bash_program(
             &secrets,
             &params,
             &other_env_vars,
+            import_paths,
         ))
         .kill_on_drop(true)
         .spawn()?;
@@ -538,6 +529,7 @@ fn make_env_vars(
     secs: &HashMap<String, String>,
     params: &HashMap<String, String>,
     other_env_vars: &HashMap<String, String>,
+    import_paths: &[PathBuf],
 ) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
@@ -558,19 +550,20 @@ fn make_env_vars(
     let added_keys = res.keys().map(|s| &**s).collect::<Vec<&str>>().join(", ");
     debug!(ctx: &ctx, "added keys {}", &added_keys);
 
-    // We also need a PYTHONPATH that is set to the current working directory to help with the
-    // dependency resolution problem at runtime.
-    let pythonpath = cwd.to_string_lossy().to_string();
-    let pythonpath = if res.contains_key("PYTHONPATH") {
-        // If we already have a PYTHONPATH, we need to append to it.
-        let existing = res.get("PYTHONPATH").unwrap();
-        let joined_paths = std::env::join_paths([existing, &pythonpath]).unwrap();
-        joined_paths.to_string_lossy().to_string()
-    } else {
-        // There was no previously set PYTHONPATH, so we just include our current directory.
-        pythonpath
-    };
+    let mut path_entries: Vec<PathBuf> = res
+        .remove("PYTHONPATH")
+        .as_deref()
+        .map(env::split_paths)
+        .into_iter()
+        .flatten()
+        .collect();
+    path_entries.extend(import_paths.iter().cloned());
+    path_entries.push(cwd.clone());
 
+    let pythonpath = env::join_paths(&path_entries)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
     res.insert("PYTHONPATH".to_string(), pythonpath);
 
     // Inject a TOWER_ENVIRONMENT parameter so you know what environment you're running in. Empty
