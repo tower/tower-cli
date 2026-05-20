@@ -30,38 +30,62 @@ trait PaginatedResponse {
 
 impl PaginatedResponse for tower_api::models::ListAppsResponse {
     type Item = tower_api::models::AppSummary;
-    fn pagination(&self) -> &Pagination { &self.pages }
-    fn into_items(self) -> Vec<Self::Item> { self.apps }
+    fn pagination(&self) -> &Pagination {
+        &self.pages
+    }
+    fn into_items(self) -> Vec<Self::Item> {
+        self.apps
+    }
 }
 
 impl PaginatedResponse for tower_api::models::ListTeamsResponse {
     type Item = tower_api::models::Team;
-    fn pagination(&self) -> &Pagination { &self.pages }
-    fn into_items(self) -> Vec<Self::Item> { self.teams }
+    fn pagination(&self) -> &Pagination {
+        &self.pages
+    }
+    fn into_items(self) -> Vec<Self::Item> {
+        self.teams
+    }
 }
 
 impl PaginatedResponse for tower_api::models::ListSecretsResponse {
     type Item = tower_api::models::Secret;
-    fn pagination(&self) -> &Pagination { &self.pages }
-    fn into_items(self) -> Vec<Self::Item> { self.secrets }
+    fn pagination(&self) -> &Pagination {
+        &self.pages
+    }
+    fn into_items(self) -> Vec<Self::Item> {
+        self.secrets
+    }
 }
 
 impl PaginatedResponse for tower_api::models::ListCatalogsResponse {
     type Item = tower_api::models::Catalog;
-    fn pagination(&self) -> &Pagination { &self.pages }
-    fn into_items(self) -> Vec<Self::Item> { self.catalogs }
+    fn pagination(&self) -> &Pagination {
+        &self.pages
+    }
+    fn into_items(self) -> Vec<Self::Item> {
+        self.catalogs
+    }
 }
 
 impl PaginatedResponse for tower_api::models::ListEnvironmentsResponse {
     type Item = tower_api::models::Environment;
-    fn pagination(&self) -> &Pagination { &self.pages }
-    fn into_items(self) -> Vec<Self::Item> { self.environments }
+    fn pagination(&self) -> &Pagination {
+        &self.pages
+    }
+    fn into_items(self) -> Vec<Self::Item> {
+        self.environments
+    }
 }
 
 impl PaginatedResponse for tower_api::models::ListSchedulesResponse {
     type Item = tower_api::models::Schedule;
-    fn pagination(&self) -> &Pagination { &self.pages }
-    fn into_items(self) -> Vec<Self::Item> { self.schedules }
+    fn pagination(&self) -> &Pagination {
+        &self.pages
+    }
+    fn into_items(self) -> Vec<Self::Item> {
+        self.schedules
+    }
 }
 
 /// Fetches pages from a paginated API endpoint, honoring the caller's
@@ -375,8 +399,7 @@ pub async fn list_secrets(
     config: &Config,
     env: &str,
     all: bool,
-) -> Result<Vec<tower_api::models::Secret>, Error<tower_api::apis::default_api::ListSecretsError>>
-{
+) -> Result<Vec<tower_api::models::Secret>, Error<tower_api::apis::default_api::ListSecretsError>> {
     let api_config: configuration::Configuration = config.into();
     let env = env.to_string();
 

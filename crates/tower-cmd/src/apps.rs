@@ -833,9 +833,7 @@ mod tests {
 
     #[test]
     fn list_defaults_to_no_environment_filter() {
-        let matches = apps_cmd()
-            .try_get_matches_from(["apps", "list"])
-            .unwrap();
+        let matches = apps_cmd().try_get_matches_from(["apps", "list"]).unwrap();
         let (_, list_args) = matches.subcommand().unwrap();
 
         assert_eq!(list_args.get_one::<String>("environment"), None);
@@ -849,7 +847,9 @@ mod tests {
         let (_, list_args) = matches.subcommand().unwrap();
 
         assert_eq!(
-            list_args.get_one::<String>("environment").map(|s| s.as_str()),
+            list_args
+                .get_one::<String>("environment")
+                .map(|s| s.as_str()),
             Some("production")
         );
     }
