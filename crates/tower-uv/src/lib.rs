@@ -26,6 +26,20 @@ pub enum Error {
     UnsupportedPlatform,
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::IoError(e) => write!(f, "IO error: {}", e),
+            Error::NotFound(msg) => write!(f, "not found: {}", msg),
+            Error::PermissionDenied(msg) => write!(f, "permission denied: {}", msg),
+            Error::Other(msg) => write!(f, "{}", msg),
+            Error::MissingPyprojectToml => write!(f, "missing pyproject.toml"),
+            Error::InvalidUv => write!(f, "invalid uv installation"),
+            Error::UnsupportedPlatform => write!(f, "unsupported platform"),
+        }
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         // Convert std::fs::Error to your custom Error type

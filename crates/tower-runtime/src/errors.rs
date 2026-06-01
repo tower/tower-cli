@@ -5,8 +5,8 @@ pub enum Error {
     #[snafu(display("failed to RPC server"))]
     RuntimeStartFailed,
 
-    #[snafu(display("spawning process"))]
-    SpawnFailed,
+    #[snafu(display("spawning process: {detail}"))]
+    SpawnFailed { detail: String },
 
     #[snafu(display("no app running"))]
     NoRunningApp,
@@ -23,8 +23,8 @@ pub enum Error {
     #[snafu(display("package create failed"))]
     PackageCreateFailed,
 
-    #[snafu(display("package unpack failed"))]
-    PackageUnpackFailed,
+    #[snafu(display("package unpack failed: {detail}"))]
+    PackageUnpackFailed { detail: String },
 
     #[snafu(display("container already initialized"))]
     AlreadyInitialized,
@@ -79,8 +79,10 @@ pub enum Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
-        Error::SpawnFailed
+    fn from(err: std::io::Error) -> Self {
+        Error::SpawnFailed {
+            detail: err.to_string(),
+        }
     }
 }
 
@@ -93,19 +95,18 @@ impl From<std::env::JoinPathsError> for Error {
 impl From<tower_uv::Error> for Error {
     fn from(err: tower_uv::Error) -> Self {
         match err {
-            tower_uv::Error::IoError(_) => Error::SpawnFailed,
-            tower_uv::Error::NotFound(_) => Error::SpawnFailed,
-            tower_uv::Error::PermissionDenied(_) => Error::SpawnFailed,
-            tower_uv::Error::Other(_) => Error::SpawnFailed,
-            tower_uv::Error::MissingPyprojectToml => Error::SpawnFailed,
-            tower_uv::Error::InvalidUv => Error::SpawnFailed,
             tower_uv::Error::UnsupportedPlatform => Error::UnsupportedPlatform,
+            other => Error::SpawnFailed {
+                detail: other.to_string(),
+            },
         }
     }
 }
 
 impl From<tower_package::Error> for Error {
-    fn from(_: tower_package::Error) -> Self {
-        Error::PackageUnpackFailed
+    fn from(err: tower_package::Error) -> Self {
+        Error::PackageUnpackFailed {
+            detail: err.to_string(),
+        }
     }
 }
