@@ -487,6 +487,25 @@ pub fn list<T: Serialize>(items: Vec<String>, json_data: Option<&T>) {
     }
 }
 
+/// Writes a human-readable rendering of some data, or the data itself as JSON when
+/// in JSON mode. Use this when a command's output is data that has both a plain text
+/// and a JSON representation, mirroring `table` and `list`.
+pub fn text<T: Serialize>(msg: &str, json_data: &T) {
+    if get_output_mode().is_json() {
+        json(json_data);
+    } else {
+        write(msg);
+    }
+}
+
+/// Writes presentation-only text that accompanies human-formatted output, like table
+/// legends or hints. Suppressed in JSON mode so stdout stays machine-parseable.
+pub fn note(msg: &str) {
+    if !get_output_mode().is_json() {
+        write(msg);
+    }
+}
+
 pub fn banner() {
     write(&BANNER_TEXT);
 }
