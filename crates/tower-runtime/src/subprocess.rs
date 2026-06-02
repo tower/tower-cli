@@ -81,7 +81,9 @@ impl SubprocessBackend {
         package.tmp_dir = Some(temp_dir);
         package.unpack().await.map_err(|e| {
             error!(ctx: ctx, "Failed to unpack package: {:?}", e);
-            Error::PackageUnpackFailed
+            Error::PackageUnpackFailed {
+                detail: format!("{:?}", e),
+            }
         })?;
 
         info!(ctx: ctx, "Successfully unpacked package");
@@ -124,7 +126,9 @@ impl ExecutionBackend for SubprocessBackend {
         let unpacked_path = package
             .unpacked_path
             .clone()
-            .ok_or(Error::PackageUnpackFailed)?;
+            .ok_or(Error::PackageUnpackFailed {
+                detail: "no unpacked_path after unpack".to_string(),
+            })?;
 
         // Extract tmp_dir from package for cleanup tracking
         // We need to keep this alive until execution completes
