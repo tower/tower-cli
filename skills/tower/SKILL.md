@@ -1,4 +1,5 @@
 ---
+name: tower
 description: Use Tower to build, run, and deploy Python data apps, pipelines, and AI agents. Covers MCP tools, Towerfile setup, local development, cloud deployment, scheduling, and secrets management.
 ---
 
