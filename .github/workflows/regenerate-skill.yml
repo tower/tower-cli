@@ -6,7 +6,7 @@ on:
     paths:
       - 'crates/tower-cmd/**'
       - 'crates/tower/**'
-      - 'skills/tower/SKILL.md'
+      - 'plugin/skills/tower/SKILL.md'
       - '.github/workflows/regenerate-skill.yml'
 
 concurrency:
@@ -30,7 +30,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Regenerate SKILL.md
-        run: cargo run --quiet --bin tower -- skill generate > skills/tower/SKILL.md
+        run: cargo run --quiet --bin tower -- skill generate > plugin/skills/tower/SKILL.md
 
       - name: Open PR if SKILL.md changed
         uses: peter-evans/create-pull-request@v7
@@ -44,4 +44,4 @@ jobs:
           branch: chore/regenerate-skill
           base: develop
           delete-branch: true
-          add-paths: skills/tower/SKILL.md
+          add-paths: plugin/skills/tower/SKILL.md
