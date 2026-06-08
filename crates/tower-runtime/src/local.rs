@@ -146,7 +146,6 @@ async fn inner_execute_local_app(
 ) -> Result<i32, Error> {
     let ctx = opts.ctx.clone();
     let package = opts.package;
-    let environment = opts.environment;
     let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
 
     // set for later on.
@@ -186,7 +185,6 @@ async fn inner_execute_local_app(
     if is_bash_package(&package) {
         let child = execute_bash_program(
             &ctx,
-            &environment,
             working_dir,
             package_path,
             &manifest,
@@ -212,7 +210,6 @@ async fn inner_execute_local_app(
         let uv = Uv::new(opts.cache_dir, protected_mode).await?;
         let env_vars = make_env_vars(
             &ctx,
-            &environment,
             &package_path,
             &secrets,
             &params,
@@ -475,7 +472,6 @@ impl App for LocalApp {
 
 async fn execute_bash_program(
     ctx: &tower_telemetry::Context,
-    env: &str,
     cwd: PathBuf,
     package_path: PathBuf,
     manifest: &Manifest,
@@ -497,7 +493,6 @@ async fn execute_bash_program(
         .stderr(Stdio::piped())
         .envs(make_env_vars(
             &ctx,
-            env,
             &cwd,
             &secrets,
             &params,
@@ -524,7 +519,6 @@ fn make_env_var_key(src: &str) -> String {
 
 fn make_env_vars(
     ctx: &tower_telemetry::Context,
-    env: &str,
     cwd: &PathBuf,
     secs: &HashMap<String, String>,
     params: &HashMap<String, String>,
@@ -565,14 +559,6 @@ fn make_env_vars(
         .to_string_lossy()
         .to_string();
     res.insert("PYTHONPATH".to_string(), pythonpath);
-
-    // Inject a TOWER_ENVIRONMENT parameter so you know what environment you're running in. Empty
-    // environment is "default" by default.
-    if env.is_empty() {
-        res.insert("TOWER_ENVIRONMENT".to_string(), "default".to_string());
-    } else {
-        res.insert("TOWER_ENVIRONMENT".to_string(), env.to_string());
-    }
 
     res.insert("PYTHONUNBUFFERED".to_string(), "x".to_string());
 
