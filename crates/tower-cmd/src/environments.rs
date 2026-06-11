@@ -50,3 +50,18 @@ pub async fn do_create(config: Config, args: &ArgMatches) {
 
     output::success(&format!("Environment '{}' created", name));
 }
+
+pub async fn do_delete(config: Config, args: &ArgMatches) {
+    let name = args.get_one::<String>("name").unwrap_or_else(|| {
+        output::die("Environment name (--name) is required");
+    });
+
+    output::with_spinner(
+        "Deleting environment",
+        api::delete_environment(&config, name),
+    )
+    .await;
+
+    output::success(&format!("Environment '{}' deleted", name));
+
+}
