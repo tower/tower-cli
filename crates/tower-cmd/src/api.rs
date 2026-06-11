@@ -364,6 +364,7 @@ pub async fn list_catalogs(
                 all: Some(all),
                 page: Some(page),
                 page_size: Some(page_size),
+                r#type: None,
             };
             unwrap_api_response(tower_api::apis::default_api::list_catalogs(
                 api_config, params,
@@ -1068,7 +1069,7 @@ pub async fn create_environment(
 
 pub async fn list_schedules(
     config: &Config,
-    _app_name: Option<&str>,
+    app_name: Option<&str>,
     environment: Option<&str>,
 ) -> Result<Vec<tower_api::models::Schedule>, Error<tower_api::apis::default_api::ListSchedulesError>>
 {
@@ -1078,11 +1079,14 @@ pub async fn list_schedules(
     fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         let environment = &environment;
+        let app = app_name.map(String::from);
+
         async move {
             let params = tower_api::apis::default_api::ListSchedulesParams {
                 environment: environment.clone(),
                 page: Some(page),
                 page_size: Some(page_size),
+                app: app,
             };
             unwrap_api_response(tower_api::apis::default_api::list_schedules(
                 api_config, params,
