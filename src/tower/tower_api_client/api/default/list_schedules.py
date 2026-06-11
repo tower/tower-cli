@@ -14,6 +14,7 @@ def _get_kwargs(
     page: int | Unset = 1,
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
+    app: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -22,6 +23,8 @@ def _get_kwargs(
     params["page_size"] = page_size
 
     params["environment"] = environment
+
+    params["app"] = app
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -64,16 +67,19 @@ def sync_detailed(
     page: int | Unset = 1,
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
+    app: str | Unset = UNSET,
 ) -> Response[ErrorModel | ListSchedulesResponse]:
     """List schedules
 
-     List all schedules for an app.
+     Lists all schedules for the current account, optionally filtered by environment and app.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
         environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
+        app (str | Unset): Filter schedules by app name. If not provided, schedules across all
+            apps will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -87,6 +93,7 @@ def sync_detailed(
         page=page,
         page_size=page_size,
         environment=environment,
+        app=app,
     )
 
     response = client.get_httpx_client().request(
@@ -102,16 +109,19 @@ def sync(
     page: int | Unset = 1,
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
+    app: str | Unset = UNSET,
 ) -> ErrorModel | ListSchedulesResponse | None:
     """List schedules
 
-     List all schedules for an app.
+     Lists all schedules for the current account, optionally filtered by environment and app.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
         environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
+        app (str | Unset): Filter schedules by app name. If not provided, schedules across all
+            apps will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,6 +136,7 @@ def sync(
         page=page,
         page_size=page_size,
         environment=environment,
+        app=app,
     ).parsed
 
 
@@ -135,16 +146,19 @@ async def asyncio_detailed(
     page: int | Unset = 1,
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
+    app: str | Unset = UNSET,
 ) -> Response[ErrorModel | ListSchedulesResponse]:
     """List schedules
 
-     List all schedules for an app.
+     Lists all schedules for the current account, optionally filtered by environment and app.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
         environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
+        app (str | Unset): Filter schedules by app name. If not provided, schedules across all
+            apps will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -158,6 +172,7 @@ async def asyncio_detailed(
         page=page,
         page_size=page_size,
         environment=environment,
+        app=app,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -171,16 +186,19 @@ async def asyncio(
     page: int | Unset = 1,
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
+    app: str | Unset = UNSET,
 ) -> ErrorModel | ListSchedulesResponse | None:
     """List schedules
 
-     List all schedules for an app.
+     Lists all schedules for the current account, optionally filtered by environment and app.
 
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
         environment (str | Unset): Filter schedules by environment. If not provided, all
             environments will be included.
+        app (str | Unset): Filter schedules by app name. If not provided, schedules across all
+            apps will be included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,5 +214,6 @@ async def asyncio(
             page=page,
             page_size=page_size,
             environment=environment,
+            app=app,
         )
     ).parsed

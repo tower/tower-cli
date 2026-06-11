@@ -14,6 +14,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_parameter import RunParameter
+    from ..models.schedule_owner import ScheduleOwner
 
 
 T = TypeVar("T", bound="Schedule")
@@ -37,6 +38,7 @@ class Schedule:
         updated_at (datetime.datetime): The timestamp when the schedule was last updated
         app_version (str | Unset): This property is deprecated. Schedules inherit the version from their environment.
             This field returns the environment's current version.
+        owner (ScheduleOwner | Unset):
         parameters (list[RunParameter] | Unset): The parameters to pass when running the app
     """
 
@@ -52,6 +54,7 @@ class Schedule:
     timezone: str
     updated_at: datetime.datetime
     app_version: str | Unset = UNSET
+    owner: ScheduleOwner | Unset = UNSET
     parameters: list[RunParameter] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,6 +82,10 @@ class Schedule:
 
         app_version = self.app_version
 
+        owner: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.owner, Unset):
+            owner = self.owner.to_dict()
+
         parameters: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
             parameters = []
@@ -105,6 +112,8 @@ class Schedule:
         )
         if app_version is not UNSET:
             field_dict["app_version"] = app_version
+        if owner is not UNSET:
+            field_dict["owner"] = owner
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
 
@@ -113,6 +122,7 @@ class Schedule:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_parameter import RunParameter
+        from ..models.schedule_owner import ScheduleOwner
 
         d = dict(src_dict)
         app_name = d.pop("app_name")
@@ -139,6 +149,13 @@ class Schedule:
 
         app_version = d.pop("app_version", UNSET)
 
+        _owner = d.pop("owner", UNSET)
+        owner: ScheduleOwner | Unset
+        if isinstance(_owner, Unset):
+            owner = UNSET
+        else:
+            owner = ScheduleOwner.from_dict(_owner)
+
         _parameters = d.pop("parameters", UNSET)
         parameters: list[RunParameter] | Unset = UNSET
         if _parameters is not UNSET:
@@ -161,6 +178,7 @@ class Schedule:
             timezone=timezone,
             updated_at=updated_at,
             app_version=app_version,
+            owner=owner,
             parameters=parameters,
         )
 

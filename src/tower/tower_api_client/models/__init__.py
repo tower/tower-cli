@@ -5,6 +5,8 @@ from .acknowledge_alert_response import AcknowledgeAlertResponse
 from .acknowledge_all_alerts_response import AcknowledgeAllAlertsResponse
 from .alert import Alert
 from .api_key import APIKey
+from .api_key_owner import APIKeyOwner
+from .api_key_owner_type import APIKeyOwnerType
 from .app import App
 from .app_health_status import AppHealthStatus
 from .app_statistics import AppStatistics
@@ -16,6 +18,7 @@ from .batch_schedule_params import BatchScheduleParams
 from .batch_schedule_response import BatchScheduleResponse
 from .cancel_run_response import CancelRunResponse
 from .catalog import Catalog
+from .catalog_credentials import CatalogCredentials
 from .catalog_property import CatalogProperty
 from .claim_device_login_ticket_params import ClaimDeviceLoginTicketParams
 from .claim_device_login_ticket_response import ClaimDeviceLoginTicketResponse
@@ -42,6 +45,11 @@ from .create_schedule_params_status import CreateScheduleParamsStatus
 from .create_schedule_response import CreateScheduleResponse
 from .create_secret_params import CreateSecretParams
 from .create_secret_response import CreateSecretResponse
+from .create_service_account_api_key_params import CreateServiceAccountAPIKeyParams
+from .create_service_account_api_key_response import CreateServiceAccountAPIKeyResponse
+from .create_service_account_params import CreateServiceAccountParams
+from .create_service_account_params_role import CreateServiceAccountParamsRole
+from .create_service_account_response import CreateServiceAccountResponse
 from .create_session_params import CreateSessionParams
 from .create_session_response import CreateSessionResponse
 from .create_team_params import CreateTeamParams
@@ -52,10 +60,12 @@ from .delete_api_key_params import DeleteAPIKeyParams
 from .delete_api_key_response import DeleteAPIKeyResponse
 from .delete_app_response import DeleteAppResponse
 from .delete_catalog_response import DeleteCatalogResponse
+from .delete_environment_response import DeleteEnvironmentResponse
 from .delete_guest_output_body import DeleteGuestOutputBody
 from .delete_schedule_params import DeleteScheduleParams
 from .delete_schedule_response import DeleteScheduleResponse
 from .delete_secret_response import DeleteSecretResponse
+from .delete_service_account_api_key_params import DeleteServiceAccountAPIKeyParams
 from .delete_session_params import DeleteSessionParams
 from .delete_session_response import DeleteSessionResponse
 from .delete_team_invitation_params import DeleteTeamInvitationParams
@@ -78,9 +88,11 @@ from .describe_run_links import DescribeRunLinks
 from .describe_run_logs_response import DescribeRunLogsResponse
 from .describe_run_response import DescribeRunResponse
 from .describe_secrets_key_response import DescribeSecretsKeyResponse
+from .describe_service_account_response import DescribeServiceAccountResponse
 from .describe_session_response import DescribeSessionResponse
 from .describe_team_response import DescribeTeamResponse
 from .describe_webhook_response import DescribeWebhookResponse
+from .describe_whoami_response import DescribeWhoamiResponse
 from .email_subscriptions import EmailSubscriptions
 from .encrypted_catalog_property import EncryptedCatalogProperty
 from .environment import Environment
@@ -128,6 +140,8 @@ from .list_runs_status_item import ListRunsStatusItem
 from .list_schedules_response import ListSchedulesResponse
 from .list_secret_environments_response import ListSecretEnvironmentsResponse
 from .list_secrets_response import ListSecretsResponse
+from .list_service_account_api_keys_response import ListServiceAccountAPIKeysResponse
+from .list_service_accounts_response import ListServiceAccountsResponse
 from .list_team_invitations_response import ListTeamInvitationsResponse
 from .list_team_members_response import ListTeamMembersResponse
 from .list_teams_response import ListTeamsResponse
@@ -152,6 +166,8 @@ from .run_app_params import RunAppParams
 from .run_app_params_parameters import RunAppParamsParameters
 from .run_app_response import RunAppResponse
 from .run_attempt import RunAttempt
+from .run_creator import RunCreator
+from .run_creator_type import RunCreatorType
 from .run_failure_alert import RunFailureAlert
 from .run_graph_node import RunGraphNode
 from .run_graph_run_id import RunGraphRunID
@@ -171,11 +187,17 @@ from .runner_credentials import RunnerCredentials
 from .schedule import Schedule
 from .schedule_app_status import ScheduleAppStatus
 from .schedule_overlap_policy import ScheduleOverlapPolicy
+from .schedule_owner import ScheduleOwner
+from .schedule_owner_type import ScheduleOwnerType
 from .schedule_run_initiator_details import ScheduleRunInitiatorDetails
 from .schedule_status import ScheduleStatus
 from .search_runs_response import SearchRunsResponse
 from .search_runs_status_item import SearchRunsStatusItem
 from .secret import Secret
+from .service_account import ServiceAccount
+from .service_account_creator import ServiceAccountCreator
+from .service_account_creator_type import ServiceAccountCreatorType
+from .service_account_role import ServiceAccountRole
 from .session import Session
 from .shoulder_tap import ShoulderTap
 from .sse_warning import SSEWarning
@@ -217,6 +239,9 @@ from .update_schedule_params_status import UpdateScheduleParamsStatus
 from .update_schedule_response import UpdateScheduleResponse
 from .update_secret_params import UpdateSecretParams
 from .update_secret_response import UpdateSecretResponse
+from .update_service_account_params import UpdateServiceAccountParams
+from .update_service_account_params_role import UpdateServiceAccountParamsRole
+from .update_service_account_response import UpdateServiceAccountResponse
 from .update_team_member_params import UpdateTeamMemberParams
 from .update_team_member_params_role import UpdateTeamMemberParamsRole
 from .update_team_member_response import UpdateTeamMemberResponse
@@ -231,6 +256,9 @@ from .usage_limit import UsageLimit
 from .usage_metric_time_series_point import UsageMetricTimeSeriesPoint
 from .usage_metric_time_series_point_name import UsageMetricTimeSeriesPointName
 from .user import User
+from .vend_catalog_credentials_body import VendCatalogCredentialsBody
+from .vend_catalog_credentials_body_mode import VendCatalogCredentialsBodyMode
+from .vend_catalog_credentials_response import VendCatalogCredentialsResponse
 from .webhook import Webhook
 from .webhook_state import WebhookState
 
@@ -240,6 +268,8 @@ __all__ = (
     "AcknowledgeAllAlertsResponse",
     "Alert",
     "APIKey",
+    "APIKeyOwner",
+    "APIKeyOwnerType",
     "App",
     "AppHealthStatus",
     "AppStatistics",
@@ -251,6 +281,7 @@ __all__ = (
     "BatchScheduleResponse",
     "CancelRunResponse",
     "Catalog",
+    "CatalogCredentials",
     "CatalogProperty",
     "ClaimDeviceLoginTicketParams",
     "ClaimDeviceLoginTicketResponse",
@@ -277,6 +308,11 @@ __all__ = (
     "CreateScheduleResponse",
     "CreateSecretParams",
     "CreateSecretResponse",
+    "CreateServiceAccountAPIKeyParams",
+    "CreateServiceAccountAPIKeyResponse",
+    "CreateServiceAccountParams",
+    "CreateServiceAccountParamsRole",
+    "CreateServiceAccountResponse",
     "CreateSessionParams",
     "CreateSessionResponse",
     "CreateTeamParams",
@@ -287,10 +323,12 @@ __all__ = (
     "DeleteAPIKeyResponse",
     "DeleteAppResponse",
     "DeleteCatalogResponse",
+    "DeleteEnvironmentResponse",
     "DeleteGuestOutputBody",
     "DeleteScheduleParams",
     "DeleteScheduleResponse",
     "DeleteSecretResponse",
+    "DeleteServiceAccountAPIKeyParams",
     "DeleteSessionParams",
     "DeleteSessionResponse",
     "DeleteTeamInvitationParams",
@@ -313,9 +351,11 @@ __all__ = (
     "DescribeRunLogsResponse",
     "DescribeRunResponse",
     "DescribeSecretsKeyResponse",
+    "DescribeServiceAccountResponse",
     "DescribeSessionResponse",
     "DescribeTeamResponse",
     "DescribeWebhookResponse",
+    "DescribeWhoamiResponse",
     "EmailSubscriptions",
     "EncryptedCatalogProperty",
     "Environment",
@@ -359,6 +399,8 @@ __all__ = (
     "ListSchedulesResponse",
     "ListSecretEnvironmentsResponse",
     "ListSecretsResponse",
+    "ListServiceAccountAPIKeysResponse",
+    "ListServiceAccountsResponse",
     "ListTeamInvitationsResponse",
     "ListTeamMembersResponse",
     "ListTeamsResponse",
@@ -383,6 +425,8 @@ __all__ = (
     "RunAppParamsParameters",
     "RunAppResponse",
     "RunAttempt",
+    "RunCreator",
+    "RunCreatorType",
     "RunFailureAlert",
     "RunGraphNode",
     "RunGraphRunID",
@@ -402,11 +446,17 @@ __all__ = (
     "Schedule",
     "ScheduleAppStatus",
     "ScheduleOverlapPolicy",
+    "ScheduleOwner",
+    "ScheduleOwnerType",
     "ScheduleRunInitiatorDetails",
     "ScheduleStatus",
     "SearchRunsResponse",
     "SearchRunsStatusItem",
     "Secret",
+    "ServiceAccount",
+    "ServiceAccountCreator",
+    "ServiceAccountCreatorType",
+    "ServiceAccountRole",
     "Session",
     "ShoulderTap",
     "SSEWarning",
@@ -448,6 +498,9 @@ __all__ = (
     "UpdateScheduleResponse",
     "UpdateSecretParams",
     "UpdateSecretResponse",
+    "UpdateServiceAccountParams",
+    "UpdateServiceAccountParamsRole",
+    "UpdateServiceAccountResponse",
     "UpdateTeamMemberParams",
     "UpdateTeamMemberParamsRole",
     "UpdateTeamMemberResponse",
@@ -462,6 +515,9 @@ __all__ = (
     "UsageMetricTimeSeriesPoint",
     "UsageMetricTimeSeriesPointName",
     "User",
+    "VendCatalogCredentialsBody",
+    "VendCatalogCredentialsBodyMode",
+    "VendCatalogCredentialsResponse",
     "Webhook",
     "WebhookState",
 )

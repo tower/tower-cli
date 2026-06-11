@@ -13,6 +13,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_parameter import RunParameter
+    from ..models.schedule_owner import ScheduleOwner
 
 
 T = TypeVar("T", bound="UpdateScheduleParams")
@@ -28,8 +29,9 @@ class UpdateScheduleParams:
             their environment.
         cron (str | Unset): The cron expression defining when the app should run
         environment (str | Unset): The environment to run the app in Default: 'default'.
-        name (None | str | Unset): The name for this schedule. Must be unique per team.
+        name (None | str | Unset): The name for this schedule. Must be unique per environment.
         overlap_policy (UpdateScheduleParamsOverlapPolicy | Unset): The overlap policy for the schedule
+        owner (ScheduleOwner | Unset):
         parameters (list[RunParameter] | Unset): Parameters to pass when running the app
         status (UpdateScheduleParamsStatus | Unset): The status of the schedule
         timezone (None | str | Unset): The IANA timezone identifier that the cron expression should be evaluated in
@@ -42,6 +44,7 @@ class UpdateScheduleParams:
     environment: str | Unset = "default"
     name: None | str | Unset = UNSET
     overlap_policy: UpdateScheduleParamsOverlapPolicy | Unset = UNSET
+    owner: ScheduleOwner | Unset = UNSET
     parameters: list[RunParameter] | Unset = UNSET
     status: UpdateScheduleParamsStatus | Unset = UNSET
     timezone: None | str | Unset = UNSET
@@ -68,6 +71,10 @@ class UpdateScheduleParams:
         overlap_policy: str | Unset = UNSET
         if not isinstance(self.overlap_policy, Unset):
             overlap_policy = self.overlap_policy.value
+
+        owner: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.owner, Unset):
+            owner = self.owner.to_dict()
 
         parameters: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
@@ -101,6 +108,8 @@ class UpdateScheduleParams:
             field_dict["name"] = name
         if overlap_policy is not UNSET:
             field_dict["overlap_policy"] = overlap_policy
+        if owner is not UNSET:
+            field_dict["owner"] = owner
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
         if status is not UNSET:
@@ -113,6 +122,7 @@ class UpdateScheduleParams:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_parameter import RunParameter
+        from ..models.schedule_owner import ScheduleOwner
 
         d = dict(src_dict)
         schema = d.pop("$schema", UNSET)
@@ -146,6 +156,13 @@ class UpdateScheduleParams:
         else:
             overlap_policy = UpdateScheduleParamsOverlapPolicy(_overlap_policy)
 
+        _owner = d.pop("owner", UNSET)
+        owner: ScheduleOwner | Unset
+        if isinstance(_owner, Unset):
+            owner = UNSET
+        else:
+            owner = ScheduleOwner.from_dict(_owner)
+
         _parameters = d.pop("parameters", UNSET)
         parameters: list[RunParameter] | Unset = UNSET
         if _parameters is not UNSET:
@@ -178,6 +195,7 @@ class UpdateScheduleParams:
             environment=environment,
             name=name,
             overlap_policy=overlap_policy,
+            owner=owner,
             parameters=parameters,
             status=status,
             timezone=timezone,

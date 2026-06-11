@@ -15,6 +15,7 @@ def _get_kwargs(
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
     all_: bool | Unset = UNSET,
+    type_: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -25,6 +26,8 @@ def _get_kwargs(
     params["environment"] = environment
 
     params["all"] = all_
+
+    params["type"] = type_
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -68,6 +71,7 @@ def sync_detailed(
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
     all_: bool | Unset = UNSET,
+    type_: str | Unset = UNSET,
 ) -> Response[ErrorModel | ListCatalogsResponse]:
     """List catalogs
 
@@ -76,9 +80,12 @@ def sync_detailed(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by.
+        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
+            environments are returned.
         all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
             current environment.
+        type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
+            catalog types are returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -93,6 +100,7 @@ def sync_detailed(
         page_size=page_size,
         environment=environment,
         all_=all_,
+        type_=type_,
     )
 
     response = client.get_httpx_client().request(
@@ -109,6 +117,7 @@ def sync(
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
     all_: bool | Unset = UNSET,
+    type_: str | Unset = UNSET,
 ) -> ErrorModel | ListCatalogsResponse | None:
     """List catalogs
 
@@ -117,9 +126,12 @@ def sync(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by.
+        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
+            environments are returned.
         all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
             current environment.
+        type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
+            catalog types are returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -135,6 +147,7 @@ def sync(
         page_size=page_size,
         environment=environment,
         all_=all_,
+        type_=type_,
     ).parsed
 
 
@@ -145,6 +158,7 @@ async def asyncio_detailed(
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
     all_: bool | Unset = UNSET,
+    type_: str | Unset = UNSET,
 ) -> Response[ErrorModel | ListCatalogsResponse]:
     """List catalogs
 
@@ -153,9 +167,12 @@ async def asyncio_detailed(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by.
+        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
+            environments are returned.
         all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
             current environment.
+        type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
+            catalog types are returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -170,6 +187,7 @@ async def asyncio_detailed(
         page_size=page_size,
         environment=environment,
         all_=all_,
+        type_=type_,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -184,6 +202,7 @@ async def asyncio(
     page_size: int | Unset = 20,
     environment: str | Unset = UNSET,
     all_: bool | Unset = UNSET,
+    type_: str | Unset = UNSET,
 ) -> ErrorModel | ListCatalogsResponse | None:
     """List catalogs
 
@@ -192,9 +211,12 @@ async def asyncio(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by.
+        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
+            environments are returned.
         all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
             current environment.
+        type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
+            catalog types are returned.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -211,5 +233,6 @@ async def asyncio(
             page_size=page_size,
             environment=environment,
             all_=all_,
+            type_=type_,
         )
     ).parsed

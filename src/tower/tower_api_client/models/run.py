@@ -13,6 +13,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_attempt import RunAttempt
+    from ..models.run_creator import RunCreator
     from ..models.run_initiator import RunInitiator
     from ..models.run_parameter import RunParameter
     from ..models.run_retry_policy import RunRetryPolicy
@@ -47,6 +48,7 @@ class Run:
         status_group (RunStatusGroup):
         app_slug (str | Unset): This property is deprecated. Use app_name instead.
         attempts (list[RunAttempt] | Unset): Previous attempt details. Populated on describe, omitted on list.
+        created_by (RunCreator | Unset):
         hostname (str | Unset): hostname is deprecated, use subdomain
         retry_policy (RunRetryPolicy | Unset):
         subdomain (None | str | Unset): If app is externally accessible, then you can access this run with this
@@ -74,6 +76,7 @@ class Run:
     status_group: RunStatusGroup
     app_slug: str | Unset = UNSET
     attempts: list[RunAttempt] | Unset = UNSET
+    created_by: RunCreator | Unset = UNSET
     hostname: str | Unset = UNSET
     retry_policy: RunRetryPolicy | Unset = UNSET
     subdomain: None | str | Unset = UNSET
@@ -146,6 +149,10 @@ class Run:
                 attempts_item = attempts_item_data.to_dict()
                 attempts.append(attempts_item)
 
+        created_by: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.created_by, Unset):
+            created_by = self.created_by.to_dict()
+
         hostname = self.hostname
 
         retry_policy: dict[str, Any] | Unset = UNSET
@@ -187,6 +194,8 @@ class Run:
             field_dict["app_slug"] = app_slug
         if attempts is not UNSET:
             field_dict["attempts"] = attempts
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
         if hostname is not UNSET:
             field_dict["hostname"] = hostname
         if retry_policy is not UNSET:
@@ -199,6 +208,7 @@ class Run:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.run_attempt import RunAttempt
+        from ..models.run_creator import RunCreator
         from ..models.run_initiator import RunInitiator
         from ..models.run_parameter import RunParameter
         from ..models.run_retry_policy import RunRetryPolicy
@@ -315,6 +325,13 @@ class Run:
 
                 attempts.append(attempts_item)
 
+        _created_by = d.pop("created_by", UNSET)
+        created_by: RunCreator | Unset
+        if isinstance(_created_by, Unset):
+            created_by = UNSET
+        else:
+            created_by = RunCreator.from_dict(_created_by)
+
         hostname = d.pop("hostname", UNSET)
 
         _retry_policy = d.pop("retry_policy", UNSET)
@@ -355,6 +372,7 @@ class Run:
             status_group=status_group,
             app_slug=app_slug,
             attempts=attempts,
+            created_by=created_by,
             hostname=hostname,
             retry_policy=retry_policy,
             subdomain=subdomain,
