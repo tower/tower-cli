@@ -19,11 +19,15 @@ def _get_kwargs(
     environment: str | Unset = UNSET,
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
+    x_tower_idempotency_key: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
     if not isinstance(x_tower_checksum_sha256, Unset):
         headers["X-Tower-Checksum-SHA256"] = x_tower_checksum_sha256
+
+    if not isinstance(x_tower_idempotency_key, Unset):
+        headers["X-Tower-Idempotency-Key"] = x_tower_idempotency_key
 
     if not isinstance(content_length, Unset):
         headers["Content-Length"] = str(content_length)
@@ -105,6 +109,7 @@ def sync_detailed(
     environment: str | Unset = UNSET,
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
+    x_tower_idempotency_key: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> Response[DeployAppResponse | ErrorModel]:
     """Deploy app
@@ -119,6 +124,10 @@ def sync_detailed(
             true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
+        x_tower_idempotency_key (str | Unset): Optional opaque key (typically a git commit SHA or
+            CI build ID). If a prior deploy for this app supplied the same value, the server reuses
+            that AppVersion instead of creating a new one — letting consecutive deploys to different
+            environments share a single version when the source hasn't changed.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -139,6 +148,7 @@ def sync_detailed(
         environment=environment,
         all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
+        x_tower_idempotency_key=x_tower_idempotency_key,
         content_length=content_length,
     )
 
@@ -157,6 +167,7 @@ def sync(
     environment: str | Unset = UNSET,
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
+    x_tower_idempotency_key: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> DeployAppResponse | ErrorModel | None:
     """Deploy app
@@ -171,6 +182,10 @@ def sync(
             true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
+        x_tower_idempotency_key (str | Unset): Optional opaque key (typically a git commit SHA or
+            CI build ID). If a prior deploy for this app supplied the same value, the server reuses
+            that AppVersion instead of creating a new one — letting consecutive deploys to different
+            environments share a single version when the source hasn't changed.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -192,6 +207,7 @@ def sync(
         environment=environment,
         all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
+        x_tower_idempotency_key=x_tower_idempotency_key,
         content_length=content_length,
     ).parsed
 
@@ -204,6 +220,7 @@ async def asyncio_detailed(
     environment: str | Unset = UNSET,
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
+    x_tower_idempotency_key: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> Response[DeployAppResponse | ErrorModel]:
     """Deploy app
@@ -218,6 +235,10 @@ async def asyncio_detailed(
             true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
+        x_tower_idempotency_key (str | Unset): Optional opaque key (typically a git commit SHA or
+            CI build ID). If a prior deploy for this app supplied the same value, the server reuses
+            that AppVersion instead of creating a new one — letting consecutive deploys to different
+            environments share a single version when the source hasn't changed.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -238,6 +259,7 @@ async def asyncio_detailed(
         environment=environment,
         all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
+        x_tower_idempotency_key=x_tower_idempotency_key,
         content_length=content_length,
     )
 
@@ -254,6 +276,7 @@ async def asyncio(
     environment: str | Unset = UNSET,
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
+    x_tower_idempotency_key: str | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> DeployAppResponse | ErrorModel | None:
     """Deploy app
@@ -268,6 +291,10 @@ async def asyncio(
             true, the 'environment' query parameter is ignored. Default: False.
         x_tower_checksum_sha256 (str | Unset): The SHA256 hash of the content, used to verify
             integrity.
+        x_tower_idempotency_key (str | Unset): Optional opaque key (typically a git commit SHA or
+            CI build ID). If a prior deploy for this app supplied the same value, the server reuses
+            that AppVersion instead of creating a new one — letting consecutive deploys to different
+            environments share a single version when the source hasn't changed.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -290,6 +317,7 @@ async def asyncio(
             environment=environment,
             all_environments=all_environments,
             x_tower_checksum_sha256=x_tower_checksum_sha256,
+            x_tower_idempotency_key=x_tower_idempotency_key,
             content_length=content_length,
         )
     ).parsed

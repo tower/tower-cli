@@ -50,7 +50,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
-    """Get organization usage as time series
+    """Generate organization usage
 
      Get the current billing cycle usage as a time series.
 
@@ -75,7 +75,7 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse | None:
-    """Get organization usage as time series
+    """Generate organization usage
 
      Get the current billing cycle usage as a time series.
 
@@ -96,7 +96,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
-    """Get organization usage as time series
+    """Generate organization usage
 
      Get the current billing cycle usage as a time series.
 
@@ -119,7 +119,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse | None:
-    """Get organization usage as time series
+    """Generate organization usage
 
      Get the current billing cycle usage as a time series.
 

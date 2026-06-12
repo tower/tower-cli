@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from dateutil.parser import isoparse
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.parameter import Parameter
 
@@ -22,12 +24,17 @@ class AppVersion:
         parameters (list[Parameter]):
         towerfile (str): The Towerfile that this version was created from.
         version (str):
+        content_checksum (str | Unset): Server-computed SHA256 of the bundle contents for this version.
+        idempotency_key (str | Unset): Client-supplied key (e.g. git SHA) that produced this version, or empty if none
+            was supplied at deploy time.
     """
 
     created_at: datetime.datetime
     parameters: list[Parameter]
     towerfile: str
     version: str
+    content_checksum: str | Unset = UNSET
+    idempotency_key: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
@@ -41,6 +48,10 @@ class AppVersion:
 
         version = self.version
 
+        content_checksum = self.content_checksum
+
+        idempotency_key = self.idempotency_key
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -51,6 +62,10 @@ class AppVersion:
                 "version": version,
             }
         )
+        if content_checksum is not UNSET:
+            field_dict["content_checksum"] = content_checksum
+        if idempotency_key is not UNSET:
+            field_dict["idempotency_key"] = idempotency_key
 
         return field_dict
 
@@ -72,11 +87,17 @@ class AppVersion:
 
         version = d.pop("version")
 
+        content_checksum = d.pop("content_checksum", UNSET)
+
+        idempotency_key = d.pop("idempotency_key", UNSET)
+
         app_version = cls(
             created_at=created_at,
             parameters=parameters,
             towerfile=towerfile,
             version=version,
+            content_checksum=content_checksum,
+            idempotency_key=idempotency_key,
         )
 
         return app_version
