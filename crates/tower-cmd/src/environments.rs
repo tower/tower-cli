@@ -1,5 +1,6 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use config::Config;
+use inquire::Confirm;
 
 use crate::{api, output};
 
@@ -8,6 +9,18 @@ pub fn environments_cmd() -> Command {
         .about("Manage the environments in your current Tower account")
         .arg_required_else_help(true)
         .subcommand(Command::new("list").about("List all of your environments"))
+        .subcommand(
+            Command::new("delete")
+                .arg(
+                    Arg::new("name")
+                        .short('n')
+                        .long("name")
+                        .value_parser(value_parser!(String))
+                        .required(true)
+                        .action(clap::ArgAction::Set),
+                )
+                .about("Delete an environment"),
+        )
         .subcommand(
             Command::new("create")
                 .arg(
@@ -56,12 +69,27 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
         output::die("Environment name (--name) is required");
     });
 
-    output::with_spinner(
-        "Deleting environment",
-        api::delete_environment(&config, name),
-    )
-    .await;
+    let ans = Confirm::new(&format!(
+        "Are you sure you want to delete your {name} environment?"
+    ))
+    .with_default(false)
+    .prompt();
 
-    output::success(&format!("Environment '{}' deleted", name));
+    match ans {
+        Ok(true) => {
+            output::with_spinner(
+                &format!("Deleting environment {name}"),
+                api::delete_environment(&config, name),
+            )
+            .await;
 
+            output::success(&format!("Environment '{name}' deleted"));
+        }
+        Ok(false) => output::write("Ok.\n"),
+        Err(_) => {
+            output::error(
+                "Something went wrong. Please try again, and contact us if the issue persists.",
+            );
+        }
+    }
 }
