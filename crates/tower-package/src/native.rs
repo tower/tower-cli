@@ -102,6 +102,15 @@ impl Package {
 
         // Validate the invoke script exists on disk.
         if !manifest.invoke.is_empty() {
+            if manifest.invoke.contains("..") || Path::new(&manifest.invoke).is_absolute() {
+                return Err(Error::InvalidTowerfile {
+                    message: format!(
+                        "Invalid script path '{}': must be a relative path within the package",
+                        manifest.invoke
+                    ),
+                });
+            }
+
             let working_dir = if manifest.version == Some(1) {
                 path.clone()
             } else {
