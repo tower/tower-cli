@@ -100,6 +100,21 @@ impl Package {
         file.read_to_string(&mut contents).await?;
         let manifest = Manifest::from_json(&contents)?;
 
+        // Validate the invoke script exists on disk.
+        if !manifest.invoke.is_empty() {
+            let working_dir = if manifest.version == Some(1) {
+                path.clone()
+            } else {
+                path.join(&manifest.app_dir_name)
+            };
+            let invoke_path = working_dir.join(&manifest.invoke);
+            if !invoke_path.exists() {
+                return Err(Error::MissingScript {
+                    script: manifest.invoke,
+                });
+            }
+        }
+
         Ok(Self {
             tmp_dir: None,
             package_file_path: None,

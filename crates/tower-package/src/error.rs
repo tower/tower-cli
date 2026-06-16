@@ -24,6 +24,9 @@ pub enum Error {
     #[snafu(display("Missing required app field `{field}` in Towerfile"))]
     MissingRequiredAppField { field: String },
 
+    #[snafu(display("Script '{script}' not found. Check that the 'script' field in your Towerfile points to a file that exists in your project."))]
+    MissingScript { script: String },
+
     #[snafu(display("IO error: {source}"))]
     Io { source: std::io::Error },
 }
