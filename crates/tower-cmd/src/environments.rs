@@ -1,8 +1,7 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use config::Config;
-use inquire::Confirm;
 
-use crate::{api, output};
+use crate::{api, output, util::prompt};
 
 pub fn environments_cmd() -> Command {
     Command::new("environments")
@@ -69,11 +68,13 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
         output::die("Environment name (--name) is required");
     });
 
-    let ans = Confirm::new(&format!(
-        "Are you sure you want to delete your {name} environment?"
-    ))
-    .with_default(false)
-    .prompt();
+    // TODO: describe the environment and list resources that will be deleted 
+    //       once the API is deployed
+
+    let ans = prompt::confirm(
+        &format!("Are you sure you want to delete your {name} environment?"),
+        false,
+    );
 
     match ans {
         Ok(true) => {
@@ -85,7 +86,10 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
 
             output::success(&format!("Environment '{name}' deleted"));
         }
-        Ok(false) => output::write("Ok.\n"),
+        Ok(false) => output::write("Aborting environment deletion.\n"),
+        Err(prompt::Error::ConfirmationPromptCancelled) => {
+            output::write("Aborting environment deletion.\n")
+        }
         Err(_) => {
             output::error(
                 "Something went wrong. Please try again, and contact us if the issue persists.",
