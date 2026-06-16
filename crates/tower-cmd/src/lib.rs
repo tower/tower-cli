@@ -170,7 +170,9 @@ impl App {
                     Some(("create", args)) => {
                         environments::do_create(sessionized_config, args).await
                     }
-                    Some(("delete", args)) => environments::do_delete(sessionized_config, args).await,
+                    Some(("delete", args)) => {
+                        environments::do_delete(sessionized_config, args).await
+                    }
                     _ => {
                         environments::environments_cmd().print_help().unwrap();
                     }

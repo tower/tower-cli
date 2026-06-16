@@ -1,4 +1,7 @@
-use inquire::{Confirm, InquireError::{OperationCanceled, OperationInterrupted}};
+use inquire::{
+    Confirm,
+    InquireError::{OperationCanceled, OperationInterrupted},
+};
 use snafu::Snafu;
 
 #[derive(Debug, Snafu)]
@@ -6,7 +9,7 @@ pub enum Error {
     #[snafu(display("Something went wrong while attempting to confirm"))]
     ConfirmationPromptError,
 
-    ConfirmationPromptCancelled
+    ConfirmationPromptCancelled,
 }
 
 // Create a confirmation prompt with `message` and the default value `default`.
@@ -18,6 +21,6 @@ pub fn confirm(message: &str, default: bool) -> Result<bool, Error> {
         Err(OperationCanceled | OperationInterrupted) => Err(Error::ConfirmationPromptCancelled),
 
         // Any other error just treat as a generic error.
-        Err(_) => Err(Error::ConfirmationPromptError)
+        Err(_) => Err(Error::ConfirmationPromptError),
     }
 }
