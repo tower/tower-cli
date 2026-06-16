@@ -211,7 +211,7 @@ async fn download_uv_archive(path: &PathBuf, archive: String) -> Result<PathBuf,
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(&path).map_err(Error::IoError)?;
 
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    let _ = rustls::crypto::ring::default_provider().install_default();
 
     // Download the file
     let response = reqwest::get(url)
@@ -344,6 +344,95 @@ async fn find_uv_binary() -> Option<PathBuf> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    /// The ring CryptoProvider's install_default() must never panic regardless
+    /// of how many times it is called.  This mirrors the `let _ = ...` pattern
+    /// used inside download_uv_archive().
+    #[test]
+    fn test_ring_provider_install_default_does_not_panic() {
+        // May already be installed by another test in the binary; that is fine.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        // A second call must return Err (already installed), not panic.
+        let result = rustls::crypto::ring::default_provider().install_default();
+        assert!(
+            result.is_err(),
+            "install_default() should return Err when a provider is already registered"
+        );
+    }
+
+    /// After the ring provider is installed a global CryptoProvider must be
+    /// accessible — confirming the same postcondition that download_uv_archive
+    /// relies on before handing off to reqwest/rustls.
+    #[test]
+    fn test_ring_provider_is_registered_after_install() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        assert!(
+            rustls::crypto::CryptoProvider::get_default().is_some(),
+            "A CryptoProvider must be registered after install_default()"
+        );
+    }
+
+    /// Calling install_default() concurrently must not cause any panic.
+    /// This regression-tests the scenario where two async tasks both reach
+    /// the `let _ = rustls::crypto::ring::default_provider().install_default()`
+    /// line at the same time.
+    #[tokio::test]
+    async fn test_ring_provider_install_concurrent_calls_are_safe() {
+        use std::sync::Arc;
+        use tokio::task::JoinSet;
+
+        let barrier = Arc::new(tokio::sync::Barrier::new(8));
+        let mut set = JoinSet::new();
+
+        for _ in 0..8 {
+            let b = barrier.clone();
+            set.spawn(async move {
+                b.wait().await;
+                // Each task independently calls install_default(); at most one
+                // succeeds, the rest return Err.  None must panic.
+                let _ = rustls::crypto::ring::default_provider().install_default();
+            });
+        }
+
+        while let Some(res) = set.join_next().await {
+            res.expect("task panicked during concurrent install_default()");
+        }
+
+        assert!(
+            rustls::crypto::CryptoProvider::get_default().is_some(),
+            "CryptoProvider must be present after concurrent installs"
+        );
+    }
+
+    /// extract_package_name is a pure function used within download_uv_archive;
+    /// verify it correctly strips both .tar.gz and .zip suffixes.
+    #[test]
+    fn test_extract_package_name_tar_gz() {
+        assert_eq!(
+            super::extract_package_name("uv-x86_64-unknown-linux-gnu.tar.gz".to_string()),
+            "uv-x86_64-unknown-linux-gnu"
+        );
+    }
+
+    #[test]
+    fn test_extract_package_name_zip() {
+        assert_eq!(
+            super::extract_package_name("uv-x86_64-pc-windows-msvc.zip".to_string()),
+            "uv-x86_64-pc-windows-msvc"
+        );
+    }
+
+    /// A name with no recognised suffix must be returned unchanged.
+    #[test]
+    fn test_extract_package_name_no_suffix() {
+        assert_eq!(
+            super::extract_package_name("uv-binary".to_string()),
+            "uv-binary"
+        );
+    }
 }
 
 pub async fn find_or_setup_uv() -> Result<PathBuf, Error> {

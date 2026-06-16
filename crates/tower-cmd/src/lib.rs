@@ -30,7 +30,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let _ = rustls::crypto::ring::default_provider().install_default();
 
         let cmd = root_cmd();
 
@@ -222,6 +222,71 @@ impl App {
                 std::process::exit(2);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+
+    /// App::new() should succeed and install the ring crypto provider without panicking.
+    #[test]
+    fn test_app_new_installs_ring_provider() {
+        // App::new() calls rustls::crypto::ring::default_provider().install_default().
+        // The result is intentionally discarded; this must not panic.
+        let _app = App::new();
+
+        // After construction, a global CryptoProvider must be registered.
+        let provider = rustls::crypto::CryptoProvider::get_default();
+        assert!(
+            provider.is_some(),
+            "A rustls CryptoProvider should be installed after App::new()"
+        );
+    }
+
+    /// Calling App::new() multiple times must not panic even though
+    /// install_default() returns Err on subsequent calls (already installed).
+    #[test]
+    fn test_app_new_multiple_calls_are_idempotent() {
+        let _app1 = App::new();
+        let _app2 = App::new();
+        let _app3 = App::new();
+        // If any of the above panicked the test would fail automatically.
+    }
+
+    /// App::new_from_args() delegates to App::new() internally; confirm it
+    /// also survives with the ring provider already set by a prior call.
+    #[test]
+    fn test_app_new_from_args_does_not_panic() {
+        // Prime the provider from a plain new() first.
+        let _app = App::new();
+        // Then construct via new_from_args with a minimal arg list.
+        let _app2 = App::new_from_args(vec!["tower".to_string(), "version".to_string()]);
+    }
+
+    /// Directly verify that the ring CryptoProvider can be obtained and that
+    /// its install_default() either succeeds (first call) or returns a
+    /// harmless Err (already installed) — never panics.
+    #[test]
+    fn test_ring_provider_install_default_is_safe() {
+        // First call — may or may not be the very first in the test binary.
+        let result1 = rustls::crypto::ring::default_provider().install_default();
+        // Second call — must return Err because a provider is now registered.
+        let result2 = rustls::crypto::ring::default_provider().install_default();
+
+        // Both calls must complete without panicking; at most one can succeed.
+        // The first result is Ok if no provider was registered before, Err otherwise.
+        // The second result must always be Err.
+        assert!(
+            result2.is_err(),
+            "install_default() should return Err when a provider is already installed"
+        );
+        // Regardless of which call won, a provider must now be present.
+        assert!(
+            rustls::crypto::CryptoProvider::get_default().is_some(),
+            "A CryptoProvider must be installed after calling install_default()"
+        );
+        let _ = result1; // suppress unused-result warning
     }
 }
 
