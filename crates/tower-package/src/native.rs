@@ -118,7 +118,10 @@ impl Package {
             return Ok(());
         }
 
-        if manifest.invoke.contains("..") || Path::new(&manifest.invoke).is_absolute() {
+        if manifest.invoke.contains("..")
+            || Path::new(&manifest.invoke).is_absolute()
+            || manifest.invoke.starts_with('/')
+        {
             return Err(Error::InvalidTowerfile {
                 message: format!(
                     "Invalid script path '{}': must be a relative path within the package",
