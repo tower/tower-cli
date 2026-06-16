@@ -3709,6 +3709,7 @@ dependencies = [
  "sha2",
  "snafu",
  "tar",
+ "tempfile",
  "testutils",
  "tmpdir",
  "tokio",

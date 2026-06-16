@@ -48,3 +48,4 @@ wasm-bindgen = { version = "0.2", optional = true }
 
 [dev-dependencies]
 testutils = { workspace = true }
+tempfile = { workspace = true }

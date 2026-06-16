@@ -100,29 +100,7 @@ impl Package {
         file.read_to_string(&mut contents).await?;
         let manifest = Manifest::from_json(&contents)?;
 
-        // Validate the invoke script exists on disk.
-        if !manifest.invoke.is_empty() {
-            if manifest.invoke.contains("..") || Path::new(&manifest.invoke).is_absolute() {
-                return Err(Error::InvalidTowerfile {
-                    message: format!(
-                        "Invalid script path '{}': must be a relative path within the package",
-                        manifest.invoke
-                    ),
-                });
-            }
-
-            let working_dir = if manifest.version == Some(1) {
-                path.clone()
-            } else {
-                path.join(&manifest.app_dir_name)
-            };
-            let invoke_path = working_dir.join(&manifest.invoke);
-            if !invoke_path.exists() {
-                return Err(Error::MissingScript {
-                    script: manifest.invoke,
-                });
-            }
-        }
+        Self::validate_invoke_script(&manifest, &path)?;
 
         Ok(Self {
             tmp_dir: None,
@@ -130,6 +108,38 @@ impl Package {
             unpacked_path: Some(path),
             manifest,
         })
+    }
+
+    /// Validates that the manifest's invoke script path is safe and exists on disk.
+    /// Returns an error if the path contains traversal sequences, is absolute, or
+    /// the target file does not exist.
+    fn validate_invoke_script(manifest: &Manifest, package_path: &Path) -> Result<(), Error> {
+        if manifest.invoke.is_empty() {
+            return Ok(());
+        }
+
+        if manifest.invoke.contains("..") || Path::new(&manifest.invoke).is_absolute() {
+            return Err(Error::InvalidTowerfile {
+                message: format!(
+                    "Invalid script path '{}': must be a relative path within the package",
+                    manifest.invoke
+                ),
+            });
+        }
+
+        let working_dir = if manifest.version == Some(1) {
+            package_path.to_path_buf()
+        } else {
+            package_path.join(&manifest.app_dir_name)
+        };
+        let invoke_path = working_dir.join(&manifest.invoke);
+        if !invoke_path.exists() {
+            return Err(Error::MissingScript {
+                script: manifest.invoke.clone(),
+            });
+        }
+
+        Ok(())
     }
 
     // build creates a new package from a PackageSpec. PackageSpec is typically composed of fields
@@ -488,6 +498,7 @@ pub async fn compute_sha256_file(file_path: &PathBuf) -> Result<String, Error> {
 mod test {
     use super::*;
     use std::path::PathBuf;
+    use tempfile::TempDir;
 
     #[test]
     fn test_should_ignore_pyc_files() {
@@ -501,5 +512,68 @@ mod test {
 
         // A .py file should not be ignored
         assert!(!resolver.should_ignore(&PathBuf::from("/project/module.py")));
+    }
+
+    fn make_manifest(invoke: &str, version: Option<i32>) -> Manifest {
+        Manifest {
+            version,
+            invoke: invoke.to_string(),
+            parameters: vec![],
+            schedule: None,
+            import_paths: vec![],
+            app_dir_name: "app".to_string(),
+            modules_dir_name: "modules".to_string(),
+            checksum: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_validate_invoke_script_rejects_path_traversal() {
+        let dir = TempDir::new().unwrap();
+        let manifest = make_manifest("../../etc/passwd", None);
+        let err = Package::validate_invoke_script(&manifest, dir.path()).unwrap_err();
+        assert!(matches!(err, Error::InvalidTowerfile { .. }));
+    }
+
+    #[test]
+    fn test_validate_invoke_script_rejects_absolute_path() {
+        let dir = TempDir::new().unwrap();
+        let manifest = make_manifest("/usr/bin/python3", None);
+        let err = Package::validate_invoke_script(&manifest, dir.path()).unwrap_err();
+        assert!(matches!(err, Error::InvalidTowerfile { .. }));
+    }
+
+    #[test]
+    fn test_validate_invoke_script_rejects_missing_script() {
+        let dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join("app")).unwrap();
+        let manifest = make_manifest("./nonexistent.py", None);
+        let err = Package::validate_invoke_script(&manifest, dir.path()).unwrap_err();
+        assert!(matches!(err, Error::MissingScript { .. }));
+    }
+
+    #[test]
+    fn test_validate_invoke_script_accepts_valid_script() {
+        let dir = TempDir::new().unwrap();
+        let app_dir = dir.path().join("app");
+        std::fs::create_dir_all(&app_dir).unwrap();
+        std::fs::write(app_dir.join("main.py"), "print('hello')").unwrap();
+        let manifest = make_manifest("./main.py", None);
+        assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invoke_script_accepts_empty_invoke() {
+        let dir = TempDir::new().unwrap();
+        let manifest = make_manifest("", None);
+        assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invoke_script_v1_uses_root_as_working_dir() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("task.py"), "print('hello')").unwrap();
+        let manifest = make_manifest("./task.py", Some(1));
+        assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
     }
 }
