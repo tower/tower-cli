@@ -177,6 +177,9 @@ pub fn package_error(err: tower_package::Error) {
             format!("Missing required app field `{}` in Towerfile", field)
         }
         tower_package::Error::Io { source } => format!("IO error: {}", source),
+        tower_package::Error::MissingScript { script } => {
+            format!("Script '{}' not found. Check that the 'script' field in your Towerfile points to a file that exists in your project.", script)
+        }
     };
 
     let line = format!("{} {}\n", "Package error:".red(), msg);
