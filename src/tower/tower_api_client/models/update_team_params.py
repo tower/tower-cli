@@ -19,8 +19,7 @@ class UpdateTeamParams:
             team name.
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateTeamParams.json.
-        execution_region (UpdateTeamParamsExecutionRegion | Unset): The execution region for runs (eu-central-1 or us-
-            east-1)
+        execution_region (UpdateTeamParamsExecutionRegion | Unset): The execution region for runs
     """
 
     name: None | str

@@ -148,6 +148,8 @@ pub mod describe_device_login_session_response;
 pub use self::describe_device_login_session_response::DescribeDeviceLoginSessionResponse;
 pub mod describe_email_preferences_body;
 pub use self::describe_email_preferences_body::DescribeEmailPreferencesBody;
+pub mod describe_environment_response;
+pub use self::describe_environment_response::DescribeEnvironmentResponse;
 pub mod describe_plan_response;
 pub use self::describe_plan_response::DescribePlanResponse;
 pub mod describe_run_graph_response;

@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.65"
+version = "0.3.66"
 description = "Tower is the best way to host Python data apps in production"
 rust-version = "1.81"
 authors = ["Brad Heller <brad@tower.dev>", "Ben Lovell <ben@tower.dev>"]
@@ -45,7 +45,7 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots-no-provider", "stream"] }
 reqwest-eventsource = { version = "0.6" }
-rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rpassword = "7"
 rsa = "0.9"
 seahash = "4.1"
@@ -76,6 +76,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
+inquire = "0.9.4"
 
 # The profile that 'dist' will build with
 [profile.dist]

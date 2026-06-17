@@ -82,6 +82,7 @@ from .describe_authentication_context_body import DescribeAuthenticationContextB
 from .describe_catalog_response import DescribeCatalogResponse
 from .describe_device_login_session_response import DescribeDeviceLoginSessionResponse
 from .describe_email_preferences_body import DescribeEmailPreferencesBody
+from .describe_environment_response import DescribeEnvironmentResponse
 from .describe_plan_response import DescribePlanResponse
 from .describe_run_graph_response import DescribeRunGraphResponse
 from .describe_run_links import DescribeRunLinks
@@ -345,6 +346,7 @@ __all__ = (
     "DescribeCatalogResponse",
     "DescribeDeviceLoginSessionResponse",
     "DescribeEmailPreferencesBody",
+    "DescribeEnvironmentResponse",
     "DescribePlanResponse",
     "DescribeRunGraphResponse",
     "DescribeRunLinks",

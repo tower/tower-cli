@@ -30,7 +30,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let _ = rustls::crypto::ring::default_provider().install_default();
 
         let cmd = root_cmd();
 
@@ -169,6 +169,9 @@ impl App {
                     Some(("list", _)) => environments::do_list(sessionized_config).await,
                     Some(("create", args)) => {
                         environments::do_create(sessionized_config, args).await
+                    }
+                    Some(("delete", args)) => {
+                        environments::do_delete(sessionized_config, args).await
                     }
                     _ => {
                         environments::environments_cmd().print_help().unwrap();

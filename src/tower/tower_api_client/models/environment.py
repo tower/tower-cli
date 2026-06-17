@@ -12,18 +12,23 @@ T = TypeVar("T", bound="Environment")
 class Environment:
     """
     Attributes:
+        is_deletable (bool): If this environment is able to be deleted.
         name (str): The human readable name for the environment
     """
 
+    is_deletable: bool
     name: str
 
     def to_dict(self) -> dict[str, Any]:
+        is_deletable = self.is_deletable
+
         name = self.name
 
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
             {
+                "is_deletable": is_deletable,
                 "name": name,
             }
         )
@@ -33,9 +38,12 @@ class Environment:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
+        is_deletable = d.pop("is_deletable")
+
         name = d.pop("name")
 
         environment = cls(
+            is_deletable=is_deletable,
             name=name,
         )
 
