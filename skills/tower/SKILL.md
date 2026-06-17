@@ -306,6 +306,14 @@ Manage the environments in your current Tower account
 
 List all of your environments
 
+#### `tower environments delete`
+
+Delete an environment
+
+**Arguments:**
+
+- `-n`, `--name` *(required)*
+
 #### `tower environments create`
 
 Create a new environment in Tower
