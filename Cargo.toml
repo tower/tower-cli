@@ -76,6 +76,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["serde"] }
 webbrowser = "1"
+inquire = "0.9.4"
 
 # The profile that 'dist' will build with
 [profile.dist]

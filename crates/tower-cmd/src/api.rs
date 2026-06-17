@@ -1010,8 +1010,30 @@ impl ResponseEntity for tower_api::apis::default_api::DescribeRunSuccess {
     }
 }
 
+impl ResponseEntity for tower_api::apis::default_api::DescribeEnvironmentSuccess {
+    type Data = tower_api::models::DescribeEnvironmentResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
 impl ResponseEntity for tower_api::apis::default_api::ListEnvironmentsSuccess {
     type Data = tower_api::models::ListEnvironmentsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(resp) => Some(resp),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DeleteEnvironmentSuccess {
+    type Data = tower_api::models::DeleteEnvironmentResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
@@ -1045,6 +1067,25 @@ pub async fn list_environments(
     .await
 }
 
+pub async fn describe_environment(
+    config: &Config,
+    name: &str,
+) -> Result<
+    tower_api::models::DescribeEnvironmentResponse,
+    Error<tower_api::apis::default_api::DescribeEnvironmentError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeEnvironmentParams {
+        name: name.to_string(),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::describe_environment(
+        api_config, params,
+    ))
+    .await
+}
+
 pub async fn create_environment(
     config: &Config,
     name: &str,
@@ -1062,6 +1103,25 @@ pub async fn create_environment(
     };
 
     unwrap_api_response(tower_api::apis::default_api::create_environment(
+        api_config, params,
+    ))
+    .await
+}
+
+pub async fn delete_environment(
+    config: &Config,
+    name: &str,
+) -> Result<
+    tower_api::models::DeleteEnvironmentResponse,
+    Error<tower_api::apis::default_api::DeleteEnvironmentError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DeleteEnvironmentParams {
+        name: name.to_string(),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::delete_environment(
         api_config, params,
     ))
     .await
