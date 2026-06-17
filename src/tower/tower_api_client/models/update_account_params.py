@@ -19,8 +19,7 @@ class UpdateAccountParams:
     Attributes:
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateAccountParams.json.
-        execution_region (UpdateAccountParamsExecutionRegion | Unset): The execution region for runs (eu-central-1 or
-            us-east-1)
+        execution_region (UpdateAccountParamsExecutionRegion | Unset): The execution region for runs
         is_self_hosted_only (bool | Unset): Whether the account is for self-hosted use only
         name (str | Unset): The new name for the account, if any
     """

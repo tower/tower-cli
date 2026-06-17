@@ -13,32 +13,37 @@ use serde_with::{serde_as, DefaultOnNull};
 
 #[serde_as]
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct UpdateSecretParams {
+pub struct DescribeEnvironmentResponse {
     /// A URL to the JSON Schema for this object.
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     #[serde_as(as = "DefaultOnNull")]
-    #[serde(rename = "encrypted_value")]
-    pub encrypted_value: String,
-    #[serde_as(as = "DefaultOnNull")]
     #[serde(rename = "environment")]
-    pub environment: String,
+    pub environment: models::Environment,
     #[serde_as(as = "DefaultOnNull")]
-    #[serde(rename = "preview")]
-    pub preview: String,
+    #[serde(rename = "number_catalogs")]
+    pub number_catalogs: i64,
+    #[serde_as(as = "DefaultOnNull")]
+    #[serde(rename = "number_schedules")]
+    pub number_schedules: i64,
+    #[serde_as(as = "DefaultOnNull")]
+    #[serde(rename = "number_secrets")]
+    pub number_secrets: i64,
 }
 
-impl UpdateSecretParams {
+impl DescribeEnvironmentResponse {
     pub fn new(
-        encrypted_value: String,
-        environment: String,
-        preview: String,
-    ) -> UpdateSecretParams {
-        UpdateSecretParams {
+        environment: models::Environment,
+        number_catalogs: i64,
+        number_schedules: i64,
+        number_secrets: i64,
+    ) -> DescribeEnvironmentResponse {
+        DescribeEnvironmentResponse {
             schema: None,
-            encrypted_value,
             environment,
-            preview,
+            number_catalogs,
+            number_schedules,
+            number_secrets,
         }
     }
 }
