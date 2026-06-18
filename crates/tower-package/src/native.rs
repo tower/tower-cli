@@ -228,6 +228,24 @@ impl Package {
 
         let towerfile_bytes = tokio::fs::read(&spec.towerfile_path).await?;
 
+        // Validate the invoke script is included in the resolved app files.
+        // This catches misconfigured source globs or typos in the script field
+        // at deploy time rather than at runtime.
+        let towerfile: Towerfile = toml::from_str(&String::from_utf8_lossy(&towerfile_bytes))
+            .map_err(|e| Error::InvalidTowerfile {
+                message: e.to_string(),
+            })?;
+        if !towerfile.app.script.is_empty() {
+            let normalized_script = towerfile.app.script.trim_start_matches("./");
+            let expected_archive = format!("app/{}", normalized_script);
+            let script_in_bundle = app_files.iter().any(|e| e.archive_name == expected_archive);
+            if !script_in_bundle {
+                return Err(Error::MissingScript {
+                    script: towerfile.app.script.clone(),
+                });
+            }
+        }
+
         let inputs = PackageInputs {
             app_files,
             module_files,

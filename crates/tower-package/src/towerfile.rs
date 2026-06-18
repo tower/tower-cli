@@ -78,6 +78,12 @@ impl Towerfile {
             });
         }
 
+        if towerfile.app.script.is_empty() {
+            return Err(Error::MissingRequiredAppField {
+                field: "script".to_string(),
+            });
+        }
+
         for import_path in &towerfile.app.import_paths {
             let as_str = import_path.to_string_lossy();
             if as_str.is_empty() {
