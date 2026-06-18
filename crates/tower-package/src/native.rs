@@ -111,17 +111,16 @@ impl Package {
     }
 
     /// Validates that the manifest's invoke script path is safe and exists on disk.
-    /// Returns an error if the path contains traversal sequences, is absolute, or
+    /// Returns an error if the path contains traversal components, is absolute, or
     /// the target file does not exist.
     fn validate_invoke_script(manifest: &Manifest, package_path: &Path) -> Result<(), Error> {
         if manifest.invoke.is_empty() {
             return Ok(());
         }
 
-        if manifest.invoke.contains("..")
-            || Path::new(&manifest.invoke).is_absolute()
-            || manifest.invoke.starts_with('/')
-        {
+        // Reject absolute paths (both unix and windows style)
+        let invoke_path_ref = Path::new(&manifest.invoke);
+        if invoke_path_ref.is_absolute() || manifest.invoke.starts_with('/') {
             return Err(Error::InvalidTowerfile {
                 message: format!(
                     "Invalid script path '{}': must be a relative path within the package",
@@ -130,15 +129,48 @@ impl Package {
             });
         }
 
-        let working_dir = if manifest.version == Some(1) {
-            package_path.to_path_buf()
+        // Reject path traversal using component inspection (avoids false positives
+        // on filenames like "model..v2.py" that contain ".." as a substring)
+        use std::path::Component;
+        if invoke_path_ref
+            .components()
+            .any(|c| matches!(c, Component::ParentDir))
+        {
+            return Err(Error::InvalidTowerfile {
+                message: format!(
+                    "Invalid script path '{}': must not contain parent directory references",
+                    manifest.invoke
+                ),
+            });
+        }
+
+        // Shell scripts (.sh) are executed relative to package_path, while Python
+        // scripts are executed relative to the app working directory. Check the
+        // path that matches the runtime's actual execution behavior.
+        let resolved_path = if manifest.invoke.ends_with(".sh") {
+            package_path.join(&manifest.invoke)
         } else {
-            package_path.join(&manifest.app_dir_name)
+            let working_dir = if manifest.version == Some(1) {
+                package_path.to_path_buf()
+            } else {
+                package_path.join(&manifest.app_dir_name)
+            };
+            working_dir.join(&manifest.invoke)
         };
-        let invoke_path = working_dir.join(&manifest.invoke);
-        if !invoke_path.exists() {
+
+        if !resolved_path.exists() {
             return Err(Error::MissingScript {
                 script: manifest.invoke.clone(),
+            });
+        }
+
+        // Ensure it's a file, not a directory
+        if !resolved_path.is_file() {
+            return Err(Error::InvalidTowerfile {
+                message: format!(
+                    "Script path '{}' is a directory, not a file",
+                    manifest.invoke
+                ),
             });
         }
 
@@ -596,5 +628,51 @@ mod test {
         std::fs::write(dir.path().join("task.py"), "print('hello')").unwrap();
         let manifest = make_manifest("./task.py", Some(1));
         assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invoke_script_allows_double_dots_in_filename() {
+        let dir = TempDir::new().unwrap();
+        let app_dir = dir.path().join("app");
+        std::fs::create_dir_all(&app_dir).unwrap();
+        std::fs::write(app_dir.join("model..v2.py"), "print('hello')").unwrap();
+        let manifest = make_manifest("./model..v2.py", None);
+        assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invoke_script_rejects_directory() {
+        let dir = TempDir::new().unwrap();
+        let app_dir = dir.path().join("app");
+        let sub_dir = app_dir.join("scripts");
+        std::fs::create_dir_all(&sub_dir).unwrap();
+        let manifest = make_manifest("./scripts", None);
+        let err = Package::validate_invoke_script(&manifest, dir.path()).unwrap_err();
+        assert!(matches!(err, Error::InvalidTowerfile { .. }));
+    }
+
+    #[test]
+    fn test_validate_invoke_script_shell_resolves_from_package_root() {
+        let dir = TempDir::new().unwrap();
+        let app_dir = dir.path().join("app");
+        std::fs::create_dir_all(&app_dir).unwrap();
+        // Shell script placed at package root level (not inside app/)
+        std::fs::write(dir.path().join("run.sh"), "#!/bin/bash").unwrap();
+        let manifest = make_manifest("./run.sh", None);
+        // Should resolve from package_path for .sh files
+        assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invoke_script_shell_not_in_app_dir() {
+        let dir = TempDir::new().unwrap();
+        let app_dir = dir.path().join("app");
+        std::fs::create_dir_all(&app_dir).unwrap();
+        // Shell script placed inside app/ but runtime looks at package root
+        std::fs::write(app_dir.join("run.sh"), "#!/bin/bash").unwrap();
+        let manifest = make_manifest("./run.sh", None);
+        // Should fail because runtime looks at package_path.join(invoke), not working_dir
+        let err = Package::validate_invoke_script(&manifest, dir.path()).unwrap_err();
+        assert!(matches!(err, Error::MissingScript { .. }));
     }
 }
