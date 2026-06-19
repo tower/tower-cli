@@ -247,6 +247,7 @@ jobs:
             # see https://github.com/astral-sh/ruff/issues/3791
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16 -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
+        python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v6
@@ -255,41 +256,45 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: "Build wheels"
+          python-version: ${{ matrix.python-version }}
+      - name: Build wheels
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: 2_28
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist -i python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i ${{ format('python{0}', matrix.python-version) }}
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
-      - uses: uraimo/run-on-arch-action@v2
+      - uses: uraimo/run-on-arch-action@v3
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}
-          distro: ubuntu22.04
+          distro: ubuntu24.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip python3-venv python3-dev cargo libffi-dev
+            apt-get install -y software-properties-common
+            add-apt-repository ppa:deadsnakes/ppa
+            apt-get update
+            apt-get install -y --no-install-recommends ${{ format('python{0}-full', matrix.python-version) }} ${{ format('python{0}-venv', matrix.python-version) }} cargo libffi-dev
           # Create and use a virtual environment to avoid the externally-managed-environment error
           run: |
+            ln -s -f /usr/bin/${{ format('python{0}', matrix.python-version) }} /usr/bin/python3
+            ln -s -f /usr/bin/${{ format('pip{0}', matrix.python-version) }} /usr/bin/pip3
             # Workaround for QEMU bug when emulating 32-bit on 64-bit hosts
             # See: https://github.com/docker/buildx/issues/395
             # Use /tmp for CARGO_HOME (often tmpfs, which avoids the QEMU filesystem bug)
             export CARGO_HOME=/tmp/cargo-home
             python3 -m venv /tmp/venv
             . /tmp/venv/bin/activate
-            PYTAG="cp$(python3 -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")"
-            pip3 install dist/*-${PYTAG}-*.whl --force-reinstall
+            pip3 install dist/*.whl --force-reinstall
             ${{ env.EXECUTABLE_NAME }} --help
-      - name: "Upload wheels"
+      - name: Upload wheels
         uses: actions/upload-artifact@v6
         with:
-          name: wheels-${{ matrix.platform.target }}
+          name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
   musllinux:
