@@ -67,9 +67,7 @@ jobs:
     runs-on: macos-15
     strategy:
       matrix:
-        # Python 3.9/3.10 macOS builds require libintl from Homebrew gettext,
-        # which is not available on macos-15 runners
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -114,9 +112,7 @@ jobs:
     runs-on: macos-15
     strategy:
       matrix:
-        # Python 3.9/3.10 macOS builds require libintl from Homebrew gettext,
-        # which is not available on macos-15 runners
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -169,10 +165,7 @@ jobs:
         platform:
           - target: x86_64-pc-windows-msvc
             arch: x64
-          # NOTE: i686 disabled due to poor support in PyArrow and friends.
-          #- target: i686-pc-windows-msvc
-          #  arch: x86
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -199,38 +192,6 @@ jobs:
           name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
-  windows-aarch64:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: windows-11-arm
-    strategy:
-      matrix:
-        # Python ARM64 Windows builds started with 3.11
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: "Build wheels"
-        uses: PyO3/maturin-action@v1.50.1
-        with:
-          target: aarch64-pc-windows-msvc
-          args: --release --locked --out dist -i python${{ matrix.python-version }}
-      - name: "Test wheel"
-        shell: bash
-        run: |
-          python -m pip install dist/*.whl --force-reinstall
-          ${{ env.EXECUTABLE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
-      - name: "Upload wheels"
-        uses: actions/upload-artifact@v6
-        with:
-          name: wheels-aarch64-pc-windows-msvc-py${{ matrix.python-version }}
-          path: dist
-
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
@@ -238,7 +199,6 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
-          - i686-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v6
         with:
@@ -253,17 +213,11 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.12 python3.13 python3.14
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
                 yum update -y && yum install -y perl-core openssl openssl-devel pkgconfig libatomic
-
-                # If we're running on i686 we need to symlink libatomic
-                # in order to build openssl with -latomic flag.
-                if [[ ! -d "/usr/lib64" ]]; then
-                    ln -s /usr/lib/libatomic.so.1 /usr/lib/libatomic.so
-                fi
             else
                 # If we're running on debian-based system.
                 sudo apt update -y
@@ -308,7 +262,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: 2_28
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.12 python3.13 python3.14
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
       - uses: uraimo/run-on-arch-action@v2
@@ -345,7 +299,6 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-musl
-          - i686-unknown-linux-musl
     steps:
       - uses: actions/checkout@v6
         with:
@@ -360,7 +313,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.12 python3.13 python3.14
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -399,7 +352,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.10 python3.11 python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python3.12 python3.13 python3.14
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
         with:
