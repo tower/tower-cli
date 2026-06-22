@@ -96,12 +96,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - name: "Build wheels - x86_64"
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: x86_64
           args: --release --locked --out dist -i python${{ matrix.python-version }}
-      - name: "Upload wheels"
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-macos-x86_64-py${{ matrix.python-version }}
@@ -141,17 +141,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: arm64
-      - name: "Build wheels - aarch64"
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: aarch64
           args: --release --locked --out dist -i python${{ matrix.python-version }}
-      - name: "Test wheel - aarch64"
+      - name: Test wheel
         run: |
           pip install dist/*.whl --force-reinstall
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
-      - name: "Upload wheels"
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-aarch64-apple-darwin-py${{ matrix.python-version }}
@@ -175,18 +175,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.platform.arch }}
-      - name: "Build wheels"
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist -i python${{ matrix.python-version }}
-      - name: "Test wheel"
+      - name: Test wheel
         shell: bash
         run: |
           python -m pip install dist/*.whl --force-reinstall
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
-      - name: "Upload wheels"
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
@@ -209,7 +209,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - name: "Build wheels"
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.target }}
@@ -224,14 +224,14 @@ jobs:
                 sudo apt update -y
                 sudo apt-get install -y libssl-dev openssl pkg-config
             fi
-      - name: "Test wheel"
+      - name: Test wheel
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
           PYTAG="cp$(python -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")"
           pip install dist/*-${PYTAG}-*.whl --force-reinstall
           ${{ env.EXECUTABLE_NAME }} --help
           python -m ${{ env.MODULE_NAME }} --help
-      - name: "Upload wheels"
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.target }}
@@ -257,7 +257,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build wheels
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
@@ -291,7 +291,7 @@ jobs:
             . /tmp/venv/bin/activate
             pip3 install dist/*.whl --force-reinstall
             ${{ env.EXECUTABLE_NAME }} --help
-      - name: Upload wheels
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
@@ -312,15 +312,15 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: "Install OpenSSL"
+      - name: Install OpenSSL
         run: sudo apt-get update && sudo apt-get install libssl-dev openssl
-      - name: "Build wheels"
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist -i python${{ matrix.python-version }}
-      - name: "Test wheel"
+      - name: Test wheel
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
         with:
@@ -331,7 +331,7 @@ jobs:
             python -m venv .venv
             .venv/bin/pip3 install dist/*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
-      - name: "Upload wheels"
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.target }}
@@ -353,7 +353,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: "Build wheels"
+      - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
@@ -373,7 +373,7 @@ jobs:
             python3 -m venv .venv
             .venv/bin/pip3 install dist/*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
-      - name: "Upload wheels"
+      - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}
