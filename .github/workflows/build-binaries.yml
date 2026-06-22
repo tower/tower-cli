@@ -199,6 +199,7 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -206,14 +207,14 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           architecture: x64
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --locked --out dist -i python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
@@ -304,13 +305,14 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-musl
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
       - name: "Install OpenSSL"
         run: sudo apt-get update && sudo apt-get install libssl-dev openssl
       - name: "Build wheels"
@@ -318,18 +320,17 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
         with:
-          image: alpine:latest
+          image: python:${{ matrix.python-version}}-alpine
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            apk add python3 python3-dev py3-pip rust
+            apk add rust
             python -m venv .venv
-            PYTAG="cp$(python -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")"
-            .venv/bin/pip3 install dist/*-${PYTAG}-*.whl --force-reinstall
+            .venv/bin/pip3 install dist/*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v6
