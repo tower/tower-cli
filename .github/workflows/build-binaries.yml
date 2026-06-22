@@ -249,7 +249,6 @@ jobs:
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16 -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
         python-version: ["3.12", "3.13", "3.14"]
-
     steps:
       - uses: actions/checkout@v6
         with:
@@ -346,19 +345,20 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-musl
             arch: aarch64
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist -i python3.12 python3.13 python3.14
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
         with:
@@ -366,11 +366,12 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add python3 python3-dev py3-pip rust
+            apk add uv rust
           run: |
-            python -m venv .venv
-            PYTAG="cp$(python3 -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")"
-            .venv/bin/pip3 install dist/*-${PYTAG}-*.whl --force-reinstall
+            uv python install ${{ matrix.python-version }} --default
+            export PATH="/root/.local/bin:$PATH"
+            python3 -m venv .venv
+            .venv/bin/pip3 install dist/*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v6
