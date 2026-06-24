@@ -526,7 +526,9 @@ def _last_deploy(context):
     # assertion can't pick up a deploy from another scenario.
     if hasattr(context, "app_name"):
         deploys = [d for d in deploys if d.get("name") == context.app_name]
-    assert deploys, "Expected at least one deploy to have been recorded by the mock server"
+    assert (
+        deploys
+    ), "Expected at least one deploy to have been recorded by the mock server"
     return deploys[-1]
 
 

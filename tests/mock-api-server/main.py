@@ -262,8 +262,7 @@ async def deploy_app(name: str, request: Request, response: Response):
     if idempotency_key:
         stored = dict(deployed_version)
         stored["created_at"] = (
-            datetime.datetime.now(datetime.timezone.utc)
-            - datetime.timedelta(hours=1)
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
         ).isoformat()
         mock_idempotent_versions[(name, idempotency_key)] = stored
 
