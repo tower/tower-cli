@@ -18,8 +18,8 @@ class VendCatalogCredentialsBody:
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/VendCatalogCredentialsBody.json.
         mode (VendCatalogCredentialsBodyMode | Unset): Access level for the vended token. "read" (default) binds the
-            token to the catalog's read-only principal; "read-write" requires the catalogs:update scope and binds it to the
-            read-write principal. Default: VendCatalogCredentialsBodyMode.READ.
+            token to the catalog's read-only principal; "read-write" requires the catalogs:data:write scope and binds it to
+            the read-write principal. Default: VendCatalogCredentialsBodyMode.READ.
     """
 
     schema: str | Unset = UNSET

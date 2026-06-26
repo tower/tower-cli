@@ -52,7 +52,7 @@ def sync_detailed(
 ) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
     """Generate organization usage
 
-     Get the current billing cycle usage as a time series.
+     Get the previous 30 days of usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -77,7 +77,7 @@ def sync(
 ) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse | None:
     """Generate organization usage
 
-     Get the current billing cycle usage as a time series.
+     Get the previous 30 days of usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,7 +98,7 @@ async def asyncio_detailed(
 ) -> Response[ErrorModel | GenerateOrganizationUsageTimeSeriesResponse]:
     """Generate organization usage
 
-     Get the current billing cycle usage as a time series.
+     Get the previous 30 days of usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -121,7 +121,7 @@ async def asyncio(
 ) -> ErrorModel | GenerateOrganizationUsageTimeSeriesResponse | None:
     """Generate organization usage
 
-     Get the current billing cycle usage as a time series.
+     Get the previous 30 days of usage as a time series.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
