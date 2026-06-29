@@ -110,6 +110,14 @@ pub fn success(msg: &str) {
     success_with_data(msg, None::<serde_json::Value>);
 }
 
+pub fn render_human_or_json<T: Serialize>(json_data: &T, render_human: impl FnOnce()) {
+    if get_output_mode().is_json() {
+        json(json_data);
+    } else {
+        render_human();
+    }
+}
+
 pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
     if get_output_mode().is_json() {
         let mut response = serde_json::json!({

@@ -1,33 +1,35 @@
-from typing import Optional, Generic, TypeVar, Union, List
-from dataclasses import dataclass
+from __future__ import annotations
 
-from pyiceberg.exceptions import NoSuchTableError
-from pyiceberg.exceptions import CommitFailedException
+from dataclasses import dataclass
+from typing import List, Optional, TypeVar, Union
+
+from pyiceberg.exceptions import CommitFailedException, NoSuchTableError
 
 TTable = TypeVar("TTable", bound="Table")
+
+import random
+import time
 
 import polars as pl
 import pyarrow as pa
 import pyarrow.compute as pc
-
-from pyiceberg.table import Table as IcebergTable
 from pyiceberg.catalog import (
     Catalog,
     load_catalog,
 )
+from pyiceberg.table import Table as IcebergTable
 
 from ._context import TowerContext
+from ._storage import get_tower_catalog_credentials, load_vended_catalog
+from .tower_api_client.models import CatalogCredentials
 from .utils.pyarrow import (
-    convert_pyarrow_schema,
     convert_pyarrow_expressions,
+    convert_pyarrow_schema,
 )
 from .utils.tables import (
     make_table_name,
     namespace_or_default,
 )
-
-import time
-import random
 
 
 @dataclass
@@ -36,13 +38,42 @@ class RowsAffectedInformation:
     updates: int
 
 
+_VendedCatalogIdentity = tuple[str, str, str]
+
+
+def _vended_catalog_identity(
+    credentials: CatalogCredentials,
+) -> _VendedCatalogIdentity:
+    return (
+        credentials.catalog_uri,
+        credentials.warehouse,
+        credentials.oauth_token,
+    )
+
+
+def _load_tower_catalog(
+    name: str,
+    environment: Optional[str],
+    mode: str,
+) -> tuple[Catalog, _VendedCatalogIdentity]:
+    credentials = get_tower_catalog_credentials(name, environment, mode)
+    return load_vended_catalog(name, credentials), _vended_catalog_identity(credentials)
+
+
 class Table:
     """
     `Table` is a wrapper around an Iceberg table. It provides methods to read and
     write data to the table.
     """
 
-    def __init__(self, context: TowerContext, table: IcebergTable):
+    def __init__(
+        self,
+        context: TowerContext,
+        table: IcebergTable,
+        table_reference: Optional[TableReference] = None,
+        table_identifier: Optional[str] = None,
+        catalog_mode: str = "read",
+    ):
         """
         Initialize a new Table instance that wraps an Iceberg table.
 
@@ -70,6 +101,22 @@ class Table:
         self._stats = RowsAffectedInformation(0, 0)
         self._context = context
         self._table = table
+        self._table_reference = table_reference
+        self._table_identifier = table_identifier
+        self._catalog_mode = catalog_mode
+        self._loaded_from = (
+            table_reference._catalog if table_reference is not None else None
+        )
+
+    def _ensure_read_write_table(self) -> None:
+        if self._table_reference is None or self._table_identifier is None:
+            return
+
+        catalog = self._table_reference._ensure_catalog_mode("read-write")
+        if catalog is not self._loaded_from:
+            self._table = catalog.load_table(self._table_identifier)
+            self._loaded_from = catalog
+        self._catalog_mode = "read-write"
 
     def read(self) -> pl.DataFrame:
         """
@@ -202,6 +249,7 @@ class Table:
             >>> print(f"Inserted {stats.inserts} rows")
         """
         self._validate_retry_args(max_retries, retry_delay_seconds)
+        self._ensure_read_write_table()
 
         last_exception = None
 
@@ -275,6 +323,7 @@ class Table:
             >>> print(f"Inserted {stats.inserts} rows")
         """
         self._validate_retry_args(max_retries, retry_delay_seconds)
+        self._ensure_read_write_table()
 
         last_exception = None
 
@@ -354,6 +403,7 @@ class Table:
             >>> table.delete("age > 30 AND department = 'IT'")
         """
         self._validate_retry_args(max_retries, retry_delay_seconds)
+        self._ensure_read_write_table()
 
         if isinstance(filters, list):
             # We need to convert the pc.Expression into PyIceberg
@@ -441,11 +491,43 @@ class TableReference:
         catalog: Catalog,
         name: str,
         namespace: Optional[str] = None,
+        catalog_name: Optional[str] = None,
+        catalog_environment: Optional[str] = None,
+        tower_vended: bool = False,
+        catalog_mode: str = "read",
+        vended_catalog_identity: Optional[_VendedCatalogIdentity] = None,
     ):
         self._context = ctx
         self._catalog = catalog
         self._name = name
         self._namespace = namespace
+        self._catalog_name = catalog_name
+        self._catalog_environment = catalog_environment
+        self._tower_vended = tower_vended
+        self._catalog_mode = catalog_mode
+        self._vended_catalog_identity = vended_catalog_identity
+
+    def _ensure_catalog_mode(self, mode: str) -> Catalog:
+        if not self._tower_vended or self._catalog_name is None:
+            return self._catalog
+
+        # Keep references read-first; write credentials are vended only on write paths.
+        credentials = get_tower_catalog_credentials(
+            self._catalog_name,
+            environment=self._catalog_environment,
+            mode=mode,
+        )
+        identity = _vended_catalog_identity(credentials)
+
+        if self._catalog_mode != mode or self._vended_catalog_identity != identity:
+            self._catalog = load_vended_catalog(
+                self._catalog_name,
+                credentials,
+            )
+            self._catalog_mode = mode
+            self._vended_catalog_identity = identity
+
+        return self._catalog
 
     def load(self) -> Table:
         """
@@ -471,7 +553,13 @@ class TableReference:
         namespace = namespace_or_default(self._namespace)
         table_name = make_table_name(self._name, namespace)
         table = self._catalog.load_table(table_name)
-        return Table(self._context, table)
+        return Table(
+            self._context,
+            table,
+            table_reference=self if self._tower_vended else None,
+            table_identifier=table_name,
+            catalog_mode=self._catalog_mode,
+        )
 
     def create(self, schema: pa.Schema) -> Table:
         """
@@ -509,20 +597,27 @@ class TableReference:
 
         namespace = namespace_or_default(self._namespace)
         table_name = make_table_name(self._name, namespace)
+        catalog = self._ensure_catalog_mode("read-write")
 
         # We need to create the relevant namespace if it's missing from the
         # resolved namespace.
-        self._catalog.create_namespace_if_not_exists(namespace)
+        catalog.create_namespace_if_not_exists(namespace)
 
         # Now that we're certain the namespace exists, we can create the
         # underlying table. This will return an error if something went wrong
         # along the way.
-        table = self._catalog.create_table(
+        table = catalog.create_table(
             identifier=table_name,
             schema=convert_pyarrow_schema(schema),
         )
 
-        return Table(self._context, table)
+        return Table(
+            self._context,
+            table,
+            table_reference=self if self._tower_vended else None,
+            table_identifier=table_name,
+            catalog_mode=self._catalog_mode,
+        )
 
     def create_if_not_exists(self, schema: pa.Schema) -> Table:
         """
@@ -564,20 +659,27 @@ class TableReference:
 
         namespace = namespace_or_default(self._namespace)
         table_name = make_table_name(self._name, namespace)
+        catalog = self._ensure_catalog_mode("read-write")
 
         # We need to create the relevant namespace if it's missing from the
         # resolved namespace.
-        self._catalog.create_namespace_if_not_exists(namespace)
+        catalog.create_namespace_if_not_exists(namespace)
 
         # We have the catalog, so let's attempt to create the table. It should
         # not return an error and instead just return the table if it already
         # exists.
-        table = self._catalog.create_table_if_not_exists(
+        table = catalog.create_table_if_not_exists(
             identifier=table_name,
             schema=convert_pyarrow_schema(schema),
         )
 
-        return Table(self._context, table)
+        return Table(
+            self._context,
+            table,
+            table_reference=self if self._tower_vended else None,
+            table_identifier=table_name,
+            catalog_mode=self._catalog_mode,
+        )
 
     def drop(self) -> bool:
         """
@@ -605,9 +707,10 @@ class TableReference:
         """
         namespace = namespace_or_default(self._namespace)
         table_name = make_table_name(self._name, namespace)
+        catalog = self._ensure_catalog_mode("read-write")
 
         try:
-            self._catalog.drop_table(table_name)
+            catalog.drop_table(table_name)
             return True
         except NoSuchTableError:
             # If the table doesn't exist or there's any other issue, return False
@@ -617,7 +720,10 @@ class TableReference:
 
 
 def tables(
-    name: str, catalog: Union[str, Catalog] = "default", namespace: Optional[str] = None
+    name: str,
+    catalog: Union[str, Catalog] = "default",
+    namespace: Optional[str] = None,
+    tower_credentials: Optional[bool] = None,
 ) -> TableReference:
     """
     Creates a reference to an Iceberg table that can be used to load or create tables.
@@ -636,6 +742,11 @@ def tables(
             Defaults to "default".
         namespace (Optional[str], optional): The namespace in which the table exists or
             should be created. If not provided, a default namespace will be used.
+        tower_credentials (Optional[bool], optional): Credential resolution for string
+            catalogs. By default (None) and when True, credentials are vended from
+            Tower. Set False to fall back to existing PyIceberg configuration (the
+            legacy ``PYICEBERG_CATALOG__*`` env vars) — a temporary rollback hatch.
+            Ignored when a Catalog instance is passed.
 
     Returns:
         TableReference: A reference object that can be used to:
@@ -671,8 +782,34 @@ def tables(
         >>> if success:
         ...     print("Table dropped successfully")
     """
-    if isinstance(catalog, str):
-        catalog = load_catalog(catalog)
-
     ctx = TowerContext.build()
-    return TableReference(ctx, catalog, name, namespace)
+    tower_vended = False
+    catalog_name = catalog if isinstance(catalog, str) else None
+    vended_catalog_identity = None
+
+    if isinstance(catalog, str):
+        # Tower-managed catalogs always resolve through credential vending.
+        # `tower_credentials=False` is a rollback hatch to the legacy
+        # PYICEBERG_CATALOG__* env-var config (still injected by the runner);
+        # remove it once that injection is gone.
+        if tower_credentials is False:
+            catalog = load_catalog(catalog)
+        else:
+            catalog, vended_catalog_identity = _load_tower_catalog(
+                catalog,
+                environment=ctx.environment,
+                mode="read",
+            )
+            tower_vended = True
+
+    return TableReference(
+        ctx,
+        catalog,
+        name,
+        namespace,
+        catalog_name=catalog_name,
+        catalog_environment=ctx.environment,
+        tower_vended=tower_vended,
+        catalog_mode="read",
+        vended_catalog_identity=vended_catalog_identity,
+    )
