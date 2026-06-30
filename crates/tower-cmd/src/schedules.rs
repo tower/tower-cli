@@ -121,7 +121,7 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     .await;
 
     if schedules.is_empty() {
-        output::write("No schedules found.\n");
+        output::text("No schedules found.\n", &schedules);
         return;
     }
 
