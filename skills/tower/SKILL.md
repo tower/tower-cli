@@ -332,6 +332,8 @@ Deploy your latest code to Tower
 - `-f`, `--create` — Automatically force creation of the app if it doesn't already exist
 - `-e`, `--environment` — The environment to deploy to
 - `--all` — Deploy to all environments
+- `--idempotency-key <value>` — Reuse the existing version deployed with this key instead of creating a new one. Defaults to the current git commit SHA when the working tree is clean, so deploying unchanged source to multiple environments collapses to a single version.
+- `--no-idempotency-key` — Never send an idempotency key, even on a clean git tree
 
 ### `tower run`
 

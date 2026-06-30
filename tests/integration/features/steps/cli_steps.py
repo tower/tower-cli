@@ -526,3 +526,84 @@ def step_json_should_contain_all_created_apps(context):
             listed.add(entry.get("name"))
     missing = [name for name in context.created_app_names if name not in listed]
     assert not missing, f"Missing {len(missing)} apps from JSON: {missing}"
+
+
+# Deploy idempotency key steps (X-Tower-Idempotency-Key)
+
+
+def _strip_ansi(text):
+    return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text)
+
+
+def _git(context, *args):
+    """Run a git command in the scenario's temp working directory."""
+    result = subprocess.run(
+        ["git", "-C", context.temp_dir, *args],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, f"git {args} failed: {result.stderr}"
+    return result.stdout.strip()
+
+
+def _last_deploy(context):
+    resp = requests.get(f"{context.tower_url}/test/deploy-log", timeout=10)
+    resp.raise_for_status()
+    deploys = resp.json().get("deploys", [])
+    # Filter to this scenario's app (names are unique per scenario) so the
+    # assertion can't pick up a deploy from another scenario.
+    if hasattr(context, "app_name"):
+        deploys = [d for d in deploys if d.get("name") == context.app_name]
+    assert (
+        deploys
+    ), "Expected at least one deploy to have been recorded by the mock server"
+    return deploys[-1]
+
+
+@given("the deploy log is reset")
+def step_reset_deploy_log(context):
+    """Clear the mock server's record of received deploys/idempotency keys."""
+    resp = requests.post(f"{context.tower_url}/test/reset-deploy-log", timeout=10)
+    resp.raise_for_status()
+
+
+@given("the current directory is a clean git repository")
+def step_init_clean_git_repo(context):
+    """Initialize a git repo in the temp dir and commit everything so the tree is clean."""
+    _git(context, "init", "--quiet")
+    _git(context, "config", "user.email", "test@example.com")
+    _git(context, "config", "user.name", "Test User")
+    _git(context, "add", "-A")
+    _git(context, "commit", "--quiet", "-m", "initial")
+
+
+@given("the working tree has uncommitted changes")
+def step_make_working_tree_dirty(context):
+    """Add an untracked file so the git working tree is dirty."""
+    Path(context.temp_dir, "uncommitted.txt").write_text("dirty")
+
+
+@then('the last deploy should have been sent with idempotency key "{key}"')
+def step_last_deploy_has_key(context, key):
+    actual = _last_deploy(context).get("idempotency_key")
+    assert actual == key, f"Expected idempotency key '{key}', got '{actual}'"
+
+
+@then("the last deploy should have been sent without an idempotency key")
+def step_last_deploy_has_no_key(context):
+    actual = _last_deploy(context).get("idempotency_key")
+    assert actual is None, f"Expected no idempotency key, got '{actual}'"
+
+
+@then("the last deploy should have been sent with the current git commit SHA")
+def step_last_deploy_has_git_sha(context):
+    expected = _git(context, "rev-parse", "HEAD")
+    actual = _last_deploy(context).get("idempotency_key")
+    assert actual == expected, f"Expected git SHA '{expected}', got '{actual}'"
+
+
+@then("the CLI output should indicate the version was reused")
+def step_output_indicates_reuse(context):
+    output = _strip_ansi(context.cli_output)
+    assert "Reusing version" in output, f"Expected a reuse hint, got: {output}"
