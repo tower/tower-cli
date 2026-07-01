@@ -38,7 +38,7 @@ jobs:
           commit-message: "chore: regenerate SKILL.md"
           title: "chore: regenerate SKILL.md"
           body: |
-            `tower skill generate` output has drifted from the checked-in `skills/tower/SKILL.md`.
+            `tower skill generate` output has drifted from the checked-in `plugin/skills/tower/SKILL.md`.
 
             This PR was opened automatically by the `Regenerate SKILL.md` workflow after a merge to `develop`.
           branch: chore/regenerate-skill
