@@ -1,7 +1,9 @@
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
-use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
+use tower_api::models::{
+    vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
+};
 
 use crate::{api, output, util::cmd};
 
@@ -162,17 +164,16 @@ pub async fn do_credentials(config: Config, args: &ArgMatches) {
     )
     .await;
 
-    output::render_human_or_json(&response, || {
-        print_credentials(
-            name,
-            &env,
-            mode,
-            config.tower_url.as_str(),
-            &response.credentials,
-            format,
-            show_token,
-        );
-    });
+    let human = credentials_text(
+        name,
+        &env,
+        mode,
+        config.tower_url.as_str(),
+        &response.credentials,
+        format,
+        show_token,
+    );
+    output::text(&human, &response);
 }
 
 pub async fn do_show(config: Config, args: &ArgMatches) {
@@ -183,35 +184,8 @@ pub async fn do_show(config: Config, args: &ArgMatches) {
 
     match api::describe_catalog(&config, name, &env).await {
         Ok(response) => {
-            output::render_human_or_json(&response, || {
-                let catalog = &response.catalog;
-
-                output::detail("Catalog", &catalog.name);
-                output::detail("Type", &catalog.r#type);
-                output::detail("Environment", &catalog.environment);
-
-                if !catalog.properties.is_empty() {
-                    output::newline();
-                    output::header("Properties");
-
-                    let headers = vec!["Name", "Runtime Var", "Preview"]
-                        .into_iter()
-                        .map(str::to_string)
-                        .collect();
-                    let data = catalog
-                        .properties
-                        .iter()
-                        .map(|prop| {
-                            vec![
-                                prop.name.clone(),
-                                prop.environment_variable.clone().unwrap_or_default(),
-                                prop.preview.dimmed().to_string(),
-                            ]
-                        })
-                        .collect();
-                    output::table(headers, data, Some(&response));
-                }
-            });
+            let human = catalog_details_text(&response);
+            output::text(&human, &response);
         }
         Err(err) => output::tower_error_and_die(err, "Fetching catalog details failed"),
     }
@@ -250,7 +224,48 @@ fn token_export_command(name: &str, environment: &str, mode: &str, tower_url: &s
     )
 }
 
-fn print_credentials(
+fn detail_line(label: &str, value: &str) -> String {
+    format!("{} {}\n", format!("{}:", label).bold().green(), value)
+}
+
+fn header_line(text: &str) -> String {
+    format!("{}\n", text.bold().green())
+}
+
+fn catalog_details_text(response: &DescribeCatalogResponse) -> String {
+    let catalog = &response.catalog;
+    let mut out = String::new();
+
+    out.push_str(&detail_line("Catalog", &catalog.name));
+    out.push_str(&detail_line("Type", &catalog.r#type));
+    out.push_str(&detail_line("Environment", &catalog.environment));
+
+    if !catalog.properties.is_empty() {
+        out.push('\n');
+        out.push_str(&header_line("Properties"));
+
+        let headers = vec!["Name", "Runtime Var", "Preview"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let data = catalog
+            .properties
+            .iter()
+            .map(|prop| {
+                vec![
+                    prop.name.clone(),
+                    prop.environment_variable.clone().unwrap_or_default(),
+                    prop.preview.dimmed().to_string(),
+                ]
+            })
+            .collect();
+        out.push_str(&output::table_text(headers, data));
+    }
+
+    out
+}
+
+fn credentials_text(
     name: &str,
     environment: &str,
     mode: &str,
@@ -258,32 +273,42 @@ fn print_credentials(
     credentials: &CatalogCredentials,
     format: &str,
     show_token: bool,
-) {
-    output::detail("Catalog", name);
-    output::detail("Mode", &credentials.mode);
-    output::detail("Expires", &credentials.expires_at);
+) -> String {
+    let mut out = String::new();
+
+    out.push_str(&detail_line("Catalog", name));
+    out.push_str(&detail_line("Mode", &credentials.mode));
+    out.push_str(&detail_line("Expires", &credentials.expires_at));
     if show_token {
-        output::detail("Token", &credentials.oauth_token);
+        out.push_str(&detail_line("Token", &credentials.oauth_token));
     } else {
-        output::detail("Token", "not printed; snippets read $TOWER_CATALOG_TOKEN");
+        out.push_str(&detail_line(
+            "Token",
+            "not printed; snippets read $TOWER_CATALOG_TOKEN",
+        ));
     }
-    output::write(&output::paragraph(
+    out.push_str(&output::paragraph(
         "These credentials are short-lived and intended for ad-hoc development use.",
     ));
-    output::newline();
+    out.push('\n');
 
     if !show_token {
-        output::newline();
-        output::header("Shell setup");
-        output::write(token_export_command(name, environment, mode, tower_url).as_str());
+        out.push('\n');
+        out.push_str(&header_line("Shell setup"));
+        out.push_str(token_export_command(name, environment, mode, tower_url).as_str());
     }
 
     for snippet in snippets(name, credentials, format, show_token) {
-        output::newline();
-        output::header(snippet.title);
-        output::write(snippet.body.as_str());
-        output::newline();
+        out.push('\n');
+        out.push_str(&header_line(snippet.title));
+        out.push_str(snippet.body.as_str());
+        if !snippet.body.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push('\n');
     }
+
+    out
 }
 
 const PYICEBERG_TMPL: &str = include_str!("templates/pyiceberg.py.tmpl");

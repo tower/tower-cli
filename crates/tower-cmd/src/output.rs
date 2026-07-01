@@ -1,7 +1,7 @@
 pub use cli_table::{format::Justify, Cell};
 use cli_table::{
     format::{Border, HorizontalLine, Separator},
-    print_stdout, Table,
+    print_stdout, Table, TableStruct,
 };
 use colored::{control, Colorize};
 use http::StatusCode;
@@ -110,30 +110,18 @@ pub fn success(msg: &str) {
     success_with_data(msg, None::<serde_json::Value>);
 }
 
-pub fn render_human_or_json<T: Serialize>(json_data: &T, render_human: impl FnOnce()) {
-    if get_output_mode().is_json() {
-        json(json_data);
-    } else {
-        render_human();
-    }
-}
-
 pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
-    if get_output_mode().is_json() {
-        let mut response = serde_json::json!({
-            "result": "success",
-            "message": msg
-        });
+    let mut response = serde_json::json!({
+        "result": "success",
+        "message": msg
+    });
 
-        if let Some(data) = data {
-            response["data"] = serde_json::to_value(data).unwrap();
-        }
-
-        json(&response);
-    } else {
-        let line = format!("{} {}\n", "Success!".green(), msg);
-        write(&line);
+    if let Some(data) = data {
+        response["data"] = serde_json::to_value(data).unwrap();
     }
+
+    let line = format!("{} {}\n", "Success!".green(), msg);
+    text(&line, &response);
 }
 
 pub enum LogLineType {
@@ -440,6 +428,24 @@ where
     }
 }
 
+fn formatted_table(headers: Vec<String>, data: Vec<Vec<String>>) -> TableStruct {
+    let separator = Separator::builder()
+        .title(Some(HorizontalLine::default()))
+        .build();
+
+    data.table()
+        .border(Border::builder().build())
+        .separator(separator)
+        .title(headers.iter().map(|h| h.bold().yellow().to_string()))
+}
+
+pub fn table_text(headers: Vec<String>, data: Vec<Vec<String>>) -> String {
+    match formatted_table(headers, data).display() {
+        Ok(table) => format!("{}", table),
+        Err(err) => panic!("failed rendering table: {err}"),
+    }
+}
+
 pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_data: Option<&T>) {
     if get_output_mode().is_json() {
         if let Some(data) = json_data {
@@ -462,15 +468,7 @@ pub fn table<T: Serialize>(headers: Vec<String>, data: Vec<Vec<String>>, json_da
             json(&json_output);
         }
     } else {
-        let separator = Separator::builder()
-            .title(Some(HorizontalLine::default()))
-            .build();
-
-        let table = data
-            .table()
-            .border(Border::builder().build())
-            .separator(separator)
-            .title(headers.iter().map(|h| h.bold().yellow().to_string()));
+        let table = formatted_table(headers, data);
 
         if let Err(err) = print_stdout(table) {
             if err.kind() == io::ErrorKind::BrokenPipe {
