@@ -559,16 +559,48 @@ async def get_session():
 
 @app.post("/v1/session/refresh")
 async def refresh_session(refresh_params: Dict[str, Any] = None):
-    """Mock endpoint for refreshing session."""
+    """
+    Mock endpoint for refreshing session.
+
+    IMPORTANT: This response format must match the OpenAPI-generated models in:
+    - crates/tower-api/src/models/refresh_session_response.rs
+    - crates/tower-api/src/models/session.rs
+    - crates/tower-api/src/models/team.rs
+    """
     return {
-        "user": {"id": "mock_user_id", "email": "test@example.com"},
-        "teams": [
-            {"name": "default", "type": "user", "token": {"jwt": "mock_jwt_token"}}
-        ],
-        "active_team": {
-            "name": "default",
-            "type": "user",
-            "token": {"jwt": "mock_jwt_token"},
+        "refreshed_at": "2023-01-01T00:00:00Z",
+        "session": {
+            "featurebase_identity": {
+                "company_hash": "mock_company_hash",
+                "user_hash": "mock_user_hash",
+            },
+            "user": {
+                "company": "Mock Company",
+                "country": "US",
+                "created_at": "2023-01-01T00:00:00Z",
+                "email": "test@example.com",
+                "first_name": "Test",
+                "is_alerts_enabled": True,
+                "is_confirmed": True,
+                "is_invitation_claimed": True,
+                "is_subscribed_to_changelog": False,
+                "last_name": "User",
+                "profile_photo_url": "https://example.com/photo.jpg",
+                "promo_code": "",
+            },
+            "teams": [
+                {
+                    "name": "test-team",
+                    "type": "personal",
+                    "execution_region": "us-east-1",
+                    "organization": "",
+                    "token": {
+                        "access_token": "mock_access_token",
+                        "jwt": "mock_jwt_token",
+                    },
+                }
+            ],
+            "token": {"access_token": "mock_access_token", "jwt": "mock_jwt_token"},
         },
     }
 

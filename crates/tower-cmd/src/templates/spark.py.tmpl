@@ -1,0 +1,12 @@
+import os
+from pyspark.sql import SparkSession
+
+spark = (
+    SparkSession.builder
+    .config("spark.sql.catalog.__TOWER_NAME__", "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.__TOWER_NAME__.type", "rest")
+    .config("spark.sql.catalog.__TOWER_NAME__.uri", __TOWER_URI__)
+    .config("spark.sql.catalog.__TOWER_NAME__.warehouse", __TOWER_WAREHOUSE__)
+    .config("spark.sql.catalog.__TOWER_NAME__.token", __TOWER_TOKEN__)
+    .getOrCreate()
+)

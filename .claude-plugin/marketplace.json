@@ -1,0 +1,13 @@
+{
+  "name": "tower-cli",
+  "owner": {
+    "name": "Tower"
+  },
+  "plugins": [
+    {
+      "name": "tower",
+      "source": "./plugin",
+      "description": "Tower compute platform — run and deploy Python apps, pipelines, and AI agents"
+    }
+  ]
+}

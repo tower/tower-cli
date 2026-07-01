@@ -707,7 +707,7 @@ impl TowerService {
         Parameters(request): Parameters<ListCatalogsRequest>,
     ) -> Result<CallToolResult, McpError> {
         let environment = request.environment.as_deref().unwrap_or("default");
-        match api::list_catalogs(&self.config, environment, false).await {
+        match api::list_catalogs(&self.config, environment, false, None).await {
             Ok(catalogs) => {
                 let catalogs: Vec<Value> = catalogs
                     .into_iter()

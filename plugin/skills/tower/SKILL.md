@@ -49,7 +49,7 @@ uvx tower mcp-server          # if using uvx
 tower mcp-server              # if installed via pip/nix
 ```
 
-If you installed Tower via the Claude Code plugin, this is already configured. Otherwise, copy the `.mcp.json` from the [tower-cli repo](https://github.com/tower/tower-cli) into your project root.
+If you installed Tower via the Claude Code plugin, this is already configured. Otherwise, copy [`plugin/.mcp.json`](https://github.com/tower/tower-cli/blob/develop/plugin/.mcp.json) from the tower-cli repo into your project root.
 
 **If MCP tools are unavailable**, fall back to the CLI equivalents — every MCP tool has a direct CLI counterpart (e.g. `tower apps list`, `tower deploy`).
 
@@ -213,6 +213,8 @@ List all of your catalogs
 
 - `-e`, `--environment` — List catalogs in this environment
 - `-a`, `--all` — List catalogs across all environments
+- `--type` — Filter catalogs by type, e.g. tower-catalog
+- `--storage` — List Tower-managed storage catalogs
 
 #### `tower catalogs show`
 
@@ -222,6 +224,18 @@ Show the details of a catalog, including its property names
 
 - `<catalog_name>`  *(required)* — Name of the catalog
 - `-e`, `--environment` — Environment the catalog belongs to
+
+#### `tower catalogs credentials`
+
+Vend short-lived catalog credentials for external tools
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `-e`, `--environment` — Environment the catalog belongs to
+- `--mode` — Credential access mode
+- `--format` — Snippet format to print
+- `--show-token` — Print the vended OAuth token in normal output
 
 ### `tower schedules`
 
