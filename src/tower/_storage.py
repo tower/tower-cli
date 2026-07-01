@@ -12,11 +12,13 @@ from ._context import TowerContext
 from .tower_api_client.api.default import (
     describe_default_catalog as describe_default_catalog_api,
 )
+from .tower_api_client.api.default import describe_catalog as describe_catalog_api
 from .tower_api_client.api.default import (
     vend_catalog_credentials as vend_catalog_credentials_api,
 )
 from .tower_api_client.models import (
     CatalogCredentials,
+    DescribeCatalogResponse,
     ErrorModel,
     VendCatalogCredentialsBody,
     VendCatalogCredentialsBodyMode,
@@ -28,6 +30,7 @@ CREDENTIAL_REFRESH_WINDOW = timedelta(minutes=5)
 DEFAULT_CATALOG_PROVISION_RETRY_DELAYS = (0.25, 0.5, 1.0, 2.0)
 DEFAULT_CATALOG_NAME = "default"
 DEFAULT_ENVIRONMENT_NAME = "default"
+TOWER_CATALOG_TYPE = "tower-catalog"
 
 
 @dataclass
@@ -40,6 +43,7 @@ class _CachedCredentials:
 
 
 _credential_cache: dict[tuple[str, str, str, str, str], _CachedCredentials] = {}
+_catalog_type_cache: dict[tuple[str, str, str], str | None] = {}
 
 
 def get_tower_catalog(
@@ -121,6 +125,34 @@ def _vend_catalog_credentials(
         environment=environment,
         body=body,
     )
+
+
+def _describe_tower_catalog_type(
+    ctx: TowerContext, name: str, environment: str
+) -> str | None:
+    if not (ctx.api_key or ctx.jwt):
+        return None
+
+    cache_key = (ctx.tower_url, name, environment)
+    if cache_key in _catalog_type_cache:
+        return _catalog_type_cache[cache_key]
+
+    try:
+        result = describe_catalog_api.sync(
+            name=name,
+            client=_env_client(ctx),
+            environment=environment,
+        )
+    except Exception:
+        return None
+
+    if isinstance(result, DescribeCatalogResponse):
+        catalog_type = result.catalog.type_
+        _catalog_type_cache[cache_key] = catalog_type
+        return catalog_type
+
+    _catalog_type_cache[cache_key] = None
+    return None
 
 
 def _ensure_legacy_default_catalog(ctx: TowerContext) -> None:
@@ -210,3 +242,4 @@ def _ensure_aware(value: datetime) -> datetime:
 
 def _clear_credential_cache() -> None:
     _credential_cache.clear()
+    _catalog_type_cache.clear()
