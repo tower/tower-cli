@@ -213,6 +213,8 @@ List all of your catalogs
 
 - `-e`, `--environment` — List catalogs in this environment
 - `-a`, `--all` — List catalogs across all environments
+- `--type` — Filter catalogs by type, e.g. tower-catalog
+- `--storage` — List Tower-managed storage catalogs
 
 #### `tower catalogs show`
 
@@ -222,6 +224,18 @@ Show the details of a catalog, including its property names
 
 - `<catalog_name>`  *(required)* — Name of the catalog
 - `-e`, `--environment` — Environment the catalog belongs to
+
+#### `tower catalogs credentials`
+
+Vend short-lived catalog credentials for external tools
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `-e`, `--environment` — Environment the catalog belongs to
+- `--mode` — Credential access mode
+- `--format` — Snippet format to print
+- `--show-token` — Print the vended OAuth token in normal output
 
 ### `tower schedules`
 
