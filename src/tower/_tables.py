@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import List, Optional, TypeVar, Union
 
@@ -22,10 +21,9 @@ from pyiceberg.table import Table as IcebergTable
 
 from ._context import TowerContext
 from ._storage import (
-    TOWER_CATALOG_TYPE,
-    _describe_tower_catalog_type,
     get_tower_catalog_credentials,
     load_vended_catalog,
+    tower_manages_catalog,
 )
 from .tower_api_client.models import CatalogCredentials
 from .utils.pyarrow import (
@@ -55,46 +53,6 @@ def _vended_catalog_identity(
         credentials.warehouse,
         credentials.oauth_token,
     )
-
-
-def _load_tower_catalog(
-    name: str,
-    environment: Optional[str],
-    mode: str,
-) -> tuple[Catalog, _VendedCatalogIdentity]:
-    credentials = get_tower_catalog_credentials(name, environment, mode)
-    return load_vended_catalog(name, credentials), _vended_catalog_identity(credentials)
-
-
-def _pyiceberg_catalog_env_prefix(name: str) -> str:
-    catalog_name = name.replace("-", "_").replace(".", "_").replace(":", "_").upper()
-    return f"PYICEBERG_CATALOG__{catalog_name}__"
-
-
-def _has_pyiceberg_catalog_config(name: str) -> bool:
-    try:
-        from pyiceberg.catalog import _ENV_CONFIG
-
-        if _ENV_CONFIG.get_catalog_config(name) is not None:
-            return True
-    except Exception:
-        pass
-
-    prefix = _pyiceberg_catalog_env_prefix(name)
-    return any(key.upper().startswith(prefix) for key in os.environ)
-
-
-def _should_vend_tower_credentials(ctx: TowerContext, name: str) -> bool:
-    """Choose Tower vending only for managed catalogs.
-
-    BYO catalogs such as S3 Tables already receive PyIceberg config from the runner,
-    so the default path must preserve that instead of forcing Tower vending.
-    """
-    catalog_type = _describe_tower_catalog_type(ctx, name, ctx.environment)
-    if catalog_type is not None:
-        return catalog_type == TOWER_CATALOG_TYPE
-
-    return not _has_pyiceberg_catalog_config(name)
 
 
 class Table:
@@ -829,14 +787,14 @@ def tables(
         vend = (
             tower_credentials
             if tower_credentials is not None
-            else _should_vend_tower_credentials(ctx, catalog)
+            else tower_manages_catalog(ctx, catalog)
         )
         if vend:
-            catalog, vended_catalog_identity = _load_tower_catalog(
-                catalog,
-                environment=ctx.environment,
-                mode="read",
+            credentials = get_tower_catalog_credentials(
+                catalog, ctx.environment, mode="read"
             )
+            vended_catalog_identity = _vended_catalog_identity(credentials)
+            catalog = load_vended_catalog(catalog, credentials)
             tower_vended = True
         else:
             catalog = load_catalog(catalog)

@@ -1,12 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from tower._context import TowerContext
 from tower import _storage
-from tower.tower_api_client.models import (
-    CatalogCredentials,
-    ErrorModel,
-    VendCatalogCredentialsResponse,
-)
+from tower.tower_api_client.models import CatalogCredentials
 
 
 def clear_tower_env(monkeypatch):
@@ -46,32 +44,13 @@ def test_context_treats_blank_auth_env_as_missing(monkeypatch, tmp_path):
     assert ctx.jwt is None
 
 
-def test_ensure_tower_auth_requires_explicit_credentials():
+def test_vending_requires_explicit_credentials(monkeypatch):
+    _storage._clear_credential_cache()
     ctx = TowerContext(tower_url="https://api.example.com", environment="production")
+    monkeypatch.setattr(_storage.TowerContext, "build", staticmethod(lambda: ctx))
 
-    try:
-        _storage._ensure_tower_auth(ctx)
-    except RuntimeError as error:
-        assert str(error) == (
-            "No Tower authentication found. Set TOWER_API_KEY or TOWER_JWT."
-        )
-    else:
-        raise AssertionError("expected missing-auth error")
-
-    _storage._ensure_tower_auth(
-        TowerContext(
-            tower_url="https://api.example.com",
-            environment="production",
-            api_key="api-key",
-        )
-    )
-    _storage._ensure_tower_auth(
-        TowerContext(
-            tower_url="https://api.example.com",
-            environment="production",
-            jwt="jwt",
-        )
-    )
+    with pytest.raises(RuntimeError, match="No Tower authentication found"):
+        _storage.get_tower_catalog_credentials("default")
 
 
 def test_get_tower_catalog_credentials_caches_vended_credentials(monkeypatch):
@@ -91,12 +70,12 @@ def test_get_tower_catalog_credentials_caches_vended_credentials(monkeypatch):
     )
     calls = []
 
-    def vend(ctx, name, environment, mode):
+    def try_vend(ctx, name, environment, mode):
         calls.append((name, environment, mode))
-        return VendCatalogCredentialsResponse(credentials=credentials)
+        return credentials
 
     monkeypatch.setattr(_storage.TowerContext, "build", staticmethod(lambda: ctx))
-    monkeypatch.setattr(_storage, "_vend_catalog_credentials", vend)
+    monkeypatch.setattr(_storage, "_try_vend", try_vend)
 
     first = _storage.get_tower_catalog_credentials("default")
     second = _storage.get_tower_catalog_credentials("default")
@@ -127,16 +106,14 @@ def test_get_tower_catalog_credentials_prunes_expired_cache_entries(monkeypatch)
         oauth_token="oauth-token",
         warehouse="warehouse-id",
     )
-    expired_key = _storage._cache_key(ctx, "stale", "production", "read")
-    _storage._credential_cache[expired_key] = _storage._CachedCredentials(
-        expired_credentials
-    )
+    expired_key = (ctx.tower_url, "api-key", "stale", "production", "read")
+    _storage._credential_cache[expired_key] = expired_credentials
 
-    def vend(ctx, name, environment, mode):
-        return VendCatalogCredentialsResponse(credentials=fresh_credentials)
+    def try_vend(ctx, name, environment, mode):
+        return fresh_credentials
 
     monkeypatch.setattr(_storage.TowerContext, "build", staticmethod(lambda: ctx))
-    monkeypatch.setattr(_storage, "_vend_catalog_credentials", vend)
+    monkeypatch.setattr(_storage, "_try_vend", try_vend)
 
     result = _storage.get_tower_catalog_credentials("default")
 
@@ -144,7 +121,7 @@ def test_get_tower_catalog_credentials_prunes_expired_cache_entries(monkeypatch)
     assert expired_key not in _storage._credential_cache
 
 
-def test_default_catalog_vend_retries_after_legacy_provisioning(monkeypatch):
+def test_default_catalog_vend_retries_after_provisioning(monkeypatch):
     _storage._clear_credential_cache()
     ctx = TowerContext(
         tower_url="https://api.example.com",
@@ -159,25 +136,21 @@ def test_default_catalog_vend_retries_after_legacy_provisioning(monkeypatch):
         oauth_token="oauth-token",
         warehouse="warehouse-id",
     )
-    responses = [
-        ErrorModel(status=404, detail="not found"),
-        ErrorModel(status=404, detail="still provisioning"),
-        VendCatalogCredentialsResponse(credentials=credentials),
-    ]
-    legacy_calls = []
+    responses = [None, None, credentials]
+    provision_calls = []
 
-    def vend(ctx, name, environment, mode):
+    def try_vend(ctx, name, environment, mode):
         return responses.pop(0)
 
-    def legacy_default(ctx):
-        legacy_calls.append(ctx)
+    def provision_default(ctx):
+        provision_calls.append(ctx)
 
     monkeypatch.setattr(_storage.TowerContext, "build", staticmethod(lambda: ctx))
-    monkeypatch.setattr(_storage, "_vend_catalog_credentials", vend)
-    monkeypatch.setattr(_storage, "_ensure_legacy_default_catalog", legacy_default)
+    monkeypatch.setattr(_storage, "_try_vend", try_vend)
+    monkeypatch.setattr(_storage, "_provision_default_catalog", provision_default)
     monkeypatch.setattr(_storage.time, "sleep", lambda delay: None)
 
     result = _storage.get_tower_catalog_credentials("default")
 
     assert result is credentials
-    assert len(legacy_calls) == 2
+    assert len(provision_calls) == 2

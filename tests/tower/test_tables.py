@@ -177,7 +177,7 @@ def test_string_catalog_precedence(
             return None
         return make_describe_catalog_response(name, catalog_type)
 
-    def has_pyiceberg_catalog_config(name):
+    def fake_has_pyiceberg_config(name):
         calls.append(("has_pyiceberg_config", name))
         return has_pyiceberg_config
 
@@ -189,9 +189,7 @@ def test_string_catalog_precedence(
     monkeypatch.setattr(
         _storage.describe_catalog_api, "sync", describe_catalog_api_sync
     )
-    monkeypatch.setattr(
-        tables_module, "_has_pyiceberg_catalog_config", has_pyiceberg_catalog_config
-    )
+    monkeypatch.setattr(_storage, "_has_pyiceberg_config", fake_has_pyiceberg_config)
 
     ref = tables_module.tables(
         "events",
@@ -222,8 +220,8 @@ def test_string_catalog_precedence(
 def test_pyiceberg_catalog_config_detects_runner_env(monkeypatch):
     monkeypatch.setenv("PYICEBERG_CATALOG__S3_TABLES__URI", "https://example.com")
 
-    assert tables_module._has_pyiceberg_catalog_config("s3-tables") is True
-    assert tables_module._has_pyiceberg_catalog_config("other") is False
+    assert _storage._has_pyiceberg_config("s3-tables") is True
+    assert _storage._has_pyiceberg_config("other") is False
 
 
 def test_string_catalog_type_describe_is_cached(monkeypatch):
