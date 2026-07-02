@@ -21,11 +21,7 @@ import tower
 import tower._tables as tables_module
 from tower import _storage
 from tower._context import TowerContext
-from tower.tower_api_client.models import (
-    Catalog,
-    CatalogCredentials,
-    DescribeCatalogResponse,
-)
+from tower.tower_api_client.models import CatalogCredentials, ErrorModel
 
 
 class FakeLoadedTable:
@@ -65,18 +61,6 @@ def patch_tower_context(
     )
     monkeypatch.setattr(tables_module.TowerContext, "build", staticmethod(lambda: ctx))
     return ctx
-
-
-def make_describe_catalog_response(name: str, catalog_type: str):
-    return DescribeCatalogResponse(
-        catalog=Catalog(
-            created_at=datetime.datetime.now(datetime.timezone.utc),
-            environment="production",
-            name=name,
-            properties=[],
-            type_=catalog_type,
-        )
-    )
 
 
 def make_catalog_credentials(mode: str, token: str | None = None):
@@ -140,27 +124,29 @@ def sql_catalog():
 
 
 @pytest.mark.parametrize(
-    ("tower_credentials", "catalog_type", "has_pyiceberg_config", "expected_source"),
+    ("tower_credentials", "api_key", "vendable", "has_pyiceberg_config", "expected"),
     [
-        (None, "tower-catalog", True, "vend"),
-        (None, "s3-tables", True, "load_catalog"),
-        (None, None, True, "load_catalog"),
-        (None, None, False, "vend"),
-        (True, "s3-tables", True, "vend"),
-        (False, "tower-catalog", False, "load_catalog"),
+        (None, "api-key", True, False, "vend"),
+        (None, "api-key", False, True, "load_catalog"),
+        (None, None, True, True, "load_catalog"),
+        (None, None, True, False, "vend"),
+        (True, "api-key", False, True, "raise"),
+        (False, "api-key", True, False, "load_catalog"),
     ],
 )
 def test_string_catalog_precedence(
-    monkeypatch, tower_credentials, catalog_type, has_pyiceberg_config, expected_source
+    monkeypatch, tower_credentials, api_key, vendable, has_pyiceberg_config, expected
 ):
     _storage._clear_credential_cache()
-    patch_tower_context(monkeypatch)
+    patch_tower_context(monkeypatch, api_key=api_key)
     vend_catalog = FakeCatalog("vend")
     configured_catalog = FakeCatalog("configured")
     calls = []
 
     def get_tower_catalog_credentials(name, environment=None, mode="read"):
         calls.append(("vend", name, environment, mode))
+        if not vendable:
+            raise _storage.CatalogNotVendable("not tower-managed")
         return make_catalog_credentials(mode)
 
     def load_vended_catalog(name, credentials):
@@ -170,12 +156,6 @@ def test_string_catalog_precedence(
     def load_catalog(name):
         calls.append(("load_catalog", name))
         return configured_catalog
-
-    def describe_catalog_api_sync(name, client, environment):
-        calls.append(("describe_catalog", name, environment))
-        if catalog_type is None:
-            return None
-        return make_describe_catalog_response(name, catalog_type)
 
     def fake_has_pyiceberg_config(name):
         calls.append(("has_pyiceberg_config", name))
@@ -187,9 +167,15 @@ def test_string_catalog_precedence(
     monkeypatch.setattr(tables_module, "load_vended_catalog", load_vended_catalog)
     monkeypatch.setattr(tables_module, "load_catalog", load_catalog)
     monkeypatch.setattr(
-        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
+        tables_module, "_has_pyiceberg_config", fake_has_pyiceberg_config
     )
-    monkeypatch.setattr(_storage, "_has_pyiceberg_config", fake_has_pyiceberg_config)
+
+    if expected == "raise":
+        with pytest.raises(_storage.CatalogNotVendable):
+            tables_module.tables(
+                "events", catalog="default", tower_credentials=tower_credentials
+            )
+        return
 
     ref = tables_module.tables(
         "events",
@@ -197,7 +183,7 @@ def test_string_catalog_precedence(
         tower_credentials=tower_credentials,
     )
 
-    if expected_source == "vend":
+    if expected == "vend":
         assert ref._catalog is vend_catalog
         assert ref._tower_vended is True
         assert ("vend", "default", "production", "read") in calls
@@ -206,15 +192,10 @@ def test_string_catalog_precedence(
         assert ref._catalog is configured_catalog
         assert ref._tower_vended is False
         assert ("load_catalog", "default") in calls
-        assert ("vend", "default", "production", "read") not in calls
 
-    if tower_credentials is None:
-        assert ("describe_catalog", "default", "production") in calls
-        if catalog_type is None:
-            assert ("has_pyiceberg_config", "default") in calls
-    else:
-        assert ("describe_catalog", "default", "production") not in calls
-        assert ("has_pyiceberg_config", "default") not in calls
+    # Local PyIceberg config is only consulted when we cannot ask Tower.
+    consulted = ("has_pyiceberg_config", "default") in calls
+    assert consulted == (tower_credentials is None and api_key is None)
 
 
 def test_pyiceberg_catalog_config_detects_runner_env(monkeypatch):
@@ -224,40 +205,34 @@ def test_pyiceberg_catalog_config_detects_runner_env(monkeypatch):
     assert _storage._has_pyiceberg_config("other") is False
 
 
-def test_string_catalog_type_describe_is_cached(monkeypatch):
+def test_not_vendable_catalog_probes_once_then_uses_local_config(monkeypatch):
     _storage._clear_credential_cache()
     patch_tower_context(monkeypatch)
     calls = []
-    vend_catalogs = []
+    configured_catalog = FakeCatalog("configured")
 
-    def describe_catalog_api_sync(name, client, environment):
-        calls.append(("describe_catalog", name, environment))
-        return make_describe_catalog_response(name, "tower-catalog")
+    def vend_api_sync(name, client, environment, body):
+        calls.append(("vend_api", name, environment))
+        return ErrorModel(
+            status=422,
+            detail="Credentials can only be vended for tower-managed catalogs.",
+        )
 
-    def get_tower_catalog_credentials(name, environment=None, mode="read"):
-        calls.append(("vend", name, environment, mode))
-        return make_catalog_credentials(mode)
+    def load_catalog(name):
+        calls.append(("load_catalog", name))
+        return configured_catalog
 
-    def load_vended_catalog(name, credentials):
-        catalog = FakeCatalog(credentials.mode)
-        vend_catalogs.append(catalog)
-        return catalog
+    monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend_api_sync)
+    monkeypatch.setattr(tables_module, "load_catalog", load_catalog)
 
-    monkeypatch.setattr(
-        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
-    )
-    monkeypatch.setattr(
-        tables_module, "get_tower_catalog_credentials", get_tower_catalog_credentials
-    )
-    monkeypatch.setattr(tables_module, "load_vended_catalog", load_vended_catalog)
+    first = tables_module.tables("events", catalog="s3-tabs")
+    second = tables_module.tables("users", catalog="s3-tabs")
 
-    first = tables_module.tables("events", catalog="default")
-    second = tables_module.tables("users", catalog="default")
-
-    assert first._catalog is vend_catalogs[0]
-    assert second._catalog is vend_catalogs[1]
-    assert calls.count(("describe_catalog", "default", "production")) == 1
-    assert calls.count(("vend", "default", "production", "read")) == 2
+    assert first._catalog is configured_catalog
+    assert first._tower_vended is False
+    assert second._catalog is configured_catalog
+    assert calls.count(("vend_api", "s3-tabs", "production")) == 1
+    assert calls.count(("load_catalog", "s3-tabs")) == 2
 
 
 def test_vended_table_write_lazily_escalates_and_reuses_catalog(monkeypatch):

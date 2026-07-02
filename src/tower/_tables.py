@@ -21,9 +21,10 @@ from pyiceberg.table import Table as IcebergTable
 
 from ._context import TowerContext
 from ._storage import (
+    CatalogNotVendable,
+    _has_pyiceberg_config,
     get_tower_catalog_credentials,
     load_vended_catalog,
-    tower_manages_catalog,
 )
 from .tower_api_client.models import CatalogCredentials
 from .utils.pyarrow import (
@@ -739,10 +740,11 @@ def tables(
             should be created. If not provided, a default namespace will be used.
         tower_credentials (Optional[bool], optional): Credential resolution for string
             catalogs. By default (None), Tower-managed catalogs vend credentials and
-            other configured catalogs use existing PyIceberg configuration (including
-            runner-injected ``PYICEBERG_CATALOG__*`` env vars for S3 Tables). Set
-            True to force Tower credential vending or False to force PyIceberg
-            configuration. Ignored when a Catalog instance is passed.
+            bring-your-own catalogs (which Tower refuses to vend for, e.g. S3 Tables)
+            use existing PyIceberg configuration, including runner-injected
+            ``PYICEBERG_CATALOG__*`` env vars. Set True to force Tower credential
+            vending or False to force PyIceberg configuration. Ignored when a
+            Catalog instance is passed.
 
     Returns:
         TableReference: A reference object that can be used to:
@@ -784,18 +786,26 @@ def tables(
     vended_catalog_identity = None
 
     if isinstance(catalog, str):
-        vend = (
-            tower_credentials
-            if tower_credentials is not None
-            else tower_manages_catalog(ctx, catalog)
-        )
+        # Tower itself knows which catalogs it manages: vending either returns
+        # credentials or refuses, and refusal means bring-your-own PyIceberg
+        # config. Without Tower auth we cannot ask, so local config wins.
+        vend = tower_credentials
+        if vend is None:
+            vend = bool(ctx.api_key or ctx.jwt) or not _has_pyiceberg_config(catalog)
+
         if vend:
-            credentials = get_tower_catalog_credentials(
-                catalog, ctx.environment, mode="read"
-            )
-            vended_catalog_identity = _vended_catalog_identity(credentials)
-            catalog = load_vended_catalog(catalog, credentials)
-            tower_vended = True
+            try:
+                credentials = get_tower_catalog_credentials(
+                    catalog, ctx.environment, mode="read"
+                )
+            except CatalogNotVendable:
+                if tower_credentials is True:
+                    raise
+                catalog = load_catalog(catalog)
+            else:
+                vended_catalog_identity = _vended_catalog_identity(credentials)
+                catalog = load_vended_catalog(catalog, credentials)
+                tower_vended = True
         else:
             catalog = load_catalog(catalog)
 
