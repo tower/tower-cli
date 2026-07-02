@@ -146,13 +146,11 @@ def _describe_tower_catalog_type(
     except Exception:
         return None
 
-    if isinstance(result, DescribeCatalogResponse):
-        catalog_type = result.catalog.type_
-        _catalog_type_cache[cache_key] = catalog_type
-        return catalog_type
-
-    _catalog_type_cache[cache_key] = None
-    return None
+    catalog_type = (
+        result.catalog.type_ if isinstance(result, DescribeCatalogResponse) else None
+    )
+    _catalog_type_cache[cache_key] = catalog_type
+    return catalog_type
 
 
 def _ensure_legacy_default_catalog(ctx: TowerContext) -> None:

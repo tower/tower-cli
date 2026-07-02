@@ -84,21 +84,13 @@ def _has_pyiceberg_catalog_config(name: str) -> bool:
     return any(key.upper().startswith(prefix) for key in os.environ)
 
 
-def _should_vend_tower_credentials(
-    ctx: TowerContext,
-    name: str,
-    environment: str,
-    tower_credentials: Optional[bool],
-) -> bool:
-    """Choose Tower vending only for managed catalogs unless explicitly overridden.
+def _should_vend_tower_credentials(ctx: TowerContext, name: str) -> bool:
+    """Choose Tower vending only for managed catalogs.
 
     BYO catalogs such as S3 Tables already receive PyIceberg config from the runner,
     so the default path must preserve that instead of forcing Tower vending.
     """
-    if tower_credentials is not None:
-        return tower_credentials
-
-    catalog_type = _describe_tower_catalog_type(ctx, name, environment)
+    catalog_type = _describe_tower_catalog_type(ctx, name, ctx.environment)
     if catalog_type is not None:
         return catalog_type == TOWER_CATALOG_TYPE
 
@@ -834,12 +826,12 @@ def tables(
     vended_catalog_identity = None
 
     if isinstance(catalog, str):
-        if _should_vend_tower_credentials(
-            ctx,
-            catalog,
-            ctx.environment,
-            tower_credentials,
-        ):
+        vend = (
+            tower_credentials
+            if tower_credentials is not None
+            else _should_vend_tower_credentials(ctx, catalog)
+        )
+        if vend:
             catalog, vended_catalog_identity = _load_tower_catalog(
                 catalog,
                 environment=ctx.environment,
