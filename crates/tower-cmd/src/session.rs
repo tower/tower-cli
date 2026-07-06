@@ -20,11 +20,11 @@ pub fn login_cmd() -> Command {
         .about("Create a session with Tower")
 }
 
-pub async fn do_login(config: Config, args: &ArgMatches) {
-    output::banner();
+pub async fn do_login(out: &crate::output::Out, config: Config, args: &ArgMatches) {
+    out.banner();
 
     if std::env::var("TOWER_API_KEY").is_ok() {
-        output::write(&format!(
+        out.write(&format!(
             "{} TOWER_API_KEY is set. As long as this environment variable is present, \
              the CLI will authenticate using the API key and ignore the session \
              created by this login flow.\n",
@@ -43,21 +43,22 @@ pub async fn do_login(config: Config, args: &ArgMatches) {
     // Open a browser by default, unless the --no-browser flag is set.
     let open_browser = !args.get_flag("no-browser");
 
-    let mut spinner = output::spinner("Starting device login...");
+    let mut spinner = out.spinner("Starting device login...");
 
     match api::create_device_login_ticket(&config).await {
         Ok(resp) => {
-            spinner.success();
-            handle_device_login(config, open_browser, resp).await;
+            spinner.success(out);
+            handle_device_login(out, config, open_browser, resp).await;
         }
         Err(err) => {
-            spinner.failure();
-            output::error(&format!("Failed to create device login ticket: {}", err));
+            spinner.failure(out);
+            out.error(&format!("Failed to create device login ticket: {}", err));
         }
     }
 }
 
 async fn handle_device_login(
+    out: &crate::output::Out,
     config: Config,
     open_browser: bool,
     claim: CreateDeviceLoginTicketResponse,
@@ -74,23 +75,24 @@ async fn handle_device_login(
     if open_browser {
         if let Err(err) = webbrowser::open(&claim.login_url) {
             debug!("failed to open web browser: {}", err);
-            output::write(&login_instructions);
+            out.write(&login_instructions);
         } else {
             debug!("opened browser to {}", claim.login_url);
         }
     } else {
-        output::write(&login_instructions);
+        out.write(&login_instructions);
     }
 
-    let mut spinner = output::spinner("Waiting for login...");
+    let mut spinner = out.spinner("Waiting for login...");
 
-    if !poll_for_login(&config, &claim, &mut spinner).await {
-        spinner.failure();
-        output::error("Login request expired. Please try again.");
+    if !poll_for_login(out, &config, &claim, &mut spinner).await {
+        spinner.failure(out);
+        out.error("Login request expired. Please try again.");
     }
 }
 
 async fn poll_for_login(
+    out: &crate::output::Out,
     config: &Config,
     claim: &CreateDeviceLoginTicketResponse,
     spinner: &mut output::Spinner,
@@ -104,17 +106,17 @@ async fn poll_for_login(
     while chrono::Utc::now() < expires_at {
         match api::describe_device_login_session(&config, &claim.device_code).await {
             Ok(resp) => {
-                finalize_session(config, &resp, spinner);
+                finalize_session(out, config, &resp, spinner);
                 return true;
             }
             Err(err) => {
                 if let Some(api_err) = extract_api_error(&err) {
                     if api_err.status != 404 && !api_err.is_incomplete_device_login {
-                        output::error(&format!("{}", api_err.content));
+                        out.error(&format!("{}", api_err.content));
                         return false;
                     }
                 } else {
-                    output::error(&format!("An unexpected error happened! Error: {}", err));
+                    out.error(&format!("An unexpected error happened! Error: {}", err));
                     return false;
                 }
             }
@@ -127,6 +129,7 @@ async fn poll_for_login(
 }
 
 fn finalize_session(
+    out: &crate::output::Out,
     config: &Config,
     session_response: &tower_api::models::DescribeDeviceLoginSessionResponse,
     spinner: &mut output::Spinner,
@@ -141,12 +144,12 @@ fn finalize_session(
     session.tower_url = url;
 
     if let Err(err) = session.save() {
-        spinner.failure();
-        output::error(&format!("Failed to save session: {}", err));
+        spinner.failure(out);
+        out.error(&format!("Failed to save session: {}", err));
     } else {
-        spinner.success();
+        spinner.success(out);
         let message = format!("Hello, {}!", session_response.session.user.email.clone());
-        output::success(&message);
+        out.success(&message);
     }
 }
 

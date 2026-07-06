@@ -15,6 +15,7 @@ use tower_api::apis::ResponseContent;
 use tower_api::models::DeployAppResponse;
 
 pub async fn upload_file_with_progress(
+    out: &output::Out,
     api_config: &Configuration,
     endpoint_url: String,
     file_path: PathBuf,
@@ -26,7 +27,7 @@ pub async fn upload_file_with_progress(
         Ok(hash) => hash,
         Err(e) => {
             debug!("Failed to compute package hash: {}", e);
-            output::die("Tower CLI failed to properly prepare your package for deployment. Check that you have permissions to read/write to your temporary directory, and if it keeps happening contact Tower support at https://tower.dev");
+            out.die("Tower CLI failed to properly prepare your package for deployment. Check that you have permissions to read/write to your temporary directory, and if it keeps happening contact Tower support at https://tower.dev");
         }
     };
 
@@ -39,7 +40,7 @@ pub async fn upload_file_with_progress(
     if file_size > tower_package::MAX_PACKAGE_SIZE {
         let size_mb = file_size as f64 / (1024.0 * 1024.0);
         let max_mb = tower_package::MAX_PACKAGE_SIZE as f64 / (1024.0 * 1024.0);
-        output::die(&format!(
+        out.die(&format!(
             "Your App is too big! ({:.2} MB) exceeds maximum allowed size ({:.0} MB). Please consider reducing app size by removing unnecessary files or import_paths in the Towerfile.",
             size_mb, max_mb
         ));
@@ -110,6 +111,7 @@ pub async fn upload_file_with_progress(
 }
 
 pub async fn deploy_app_package(
+    out: &output::Out,
     api_config: &tower_api::apis::configuration::Configuration,
     app_name: &str,
     package: Package,
@@ -131,7 +133,7 @@ pub async fn deploy_app_package(
     // Get the package file path
     let package_path = package.package_file_path.unwrap_or_else(|| {
         debug!("No package file path found");
-        output::die("An error happened in Tower CLI that it couldn't recover from.");
+        out.die("An error happened in Tower CLI that it couldn't recover from.");
     });
 
     // Create the URL for the API endpoint
@@ -155,6 +157,7 @@ pub async fn deploy_app_package(
 
     // Upload the package
     let response = upload_file_with_progress(
+        out,
         api_config,
         url,
         package_path,
@@ -167,7 +170,7 @@ pub async fn deploy_app_package(
     // Finish the progress bar
     let progress_bar = progress_bar.lock().unwrap();
     progress_bar.finish();
-    output::newline();
+    out.newline();
 
     Ok(response)
 }

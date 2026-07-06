@@ -101,7 +101,7 @@ fn resolve_idempotency_key(args: &ArgMatches, dir: &Path) -> Option<String> {
     util::git::clean_head_sha(dir)
 }
 
-pub async fn do_deploy(config: Config, args: &ArgMatches) {
+pub async fn do_deploy(out: &output::Out, config: Config, args: &ArgMatches) {
     let dir = resolve_path(args);
     let create_app = args.get_flag("create");
     let idempotency_key = resolve_idempotency_key(args, &dir);
@@ -114,31 +114,32 @@ pub async fn do_deploy(config: Config, args: &ArgMatches) {
         DeployTarget::Environment("default".to_string())
     };
 
-    if let Err(err) = deploy_from_dir(config, dir, create_app, target, idempotency_key).await {
+    if let Err(err) = deploy_from_dir(out, config, dir, create_app, target, idempotency_key).await {
         match err {
             crate::Error::ApiDeployError { source } => {
-                output::tower_error_and_die(source, "Deploying app failed")
+                out.tower_error_and_die(source, "Deploying app failed")
             }
             crate::Error::ApiCreateAppError { source } => {
-                output::tower_error_and_die(source, "Creating app failed")
+                out.tower_error_and_die(source, "Creating app failed")
             }
             crate::Error::ApiDescribeAppError { source } => {
-                output::tower_error_and_die(source, "Fetching app details failed")
+                out.tower_error_and_die(source, "Fetching app details failed")
             }
             crate::Error::PackageError { source } => {
-                output::package_error(source);
+                out.package_error(source);
                 std::process::exit(1);
             }
             crate::Error::TowerfileLoadFailed { source, .. } => {
-                output::package_error(source);
+                out.package_error(source);
                 std::process::exit(1);
             }
-            _ => output::die(&err.to_string()),
+            _ => out.die(&err.to_string()),
         }
     }
 }
 
 pub async fn deploy_from_dir(
+    out: &output::Out,
     config: Config,
     dir: PathBuf,
     create_app: bool,
@@ -159,6 +160,7 @@ pub async fn deploy_from_dir(
 
     // Add app existence check before proceeding
     util::apps::ensure_app_exists(
+        out,
         &api_config,
         &towerfile.app.name,
         towerfile.app.description.as_deref(),
@@ -167,22 +169,31 @@ pub async fn deploy_from_dir(
     .await?;
 
     let spec = PackageSpec::from_towerfile(&towerfile);
-    let mut spinner = output::spinner("Building package...");
+    let mut spinner = out.spinner("Building package...");
 
     let package = match Package::build(spec).await {
         Ok(package) => package,
         Err(err) => {
-            spinner.failure();
+            spinner.failure(out);
             let error = crate::Error::PackageError { source: err };
             return Err(error);
         }
     };
 
-    spinner.success();
-    do_deploy_package(api_config, package, &towerfile, target, idempotency_key).await
+    spinner.success(out);
+    do_deploy_package(
+        out,
+        api_config,
+        package,
+        &towerfile,
+        target,
+        idempotency_key,
+    )
+    .await
 }
 
 async fn do_deploy_package(
+    out: &output::Out,
     api_config: Configuration,
     package: Package,
     towerfile: &Towerfile,
@@ -195,6 +206,7 @@ async fn do_deploy_package(
     };
 
     let res = util::deploy::deploy_app_package(
+        out,
         &api_config,
         &towerfile.app.name,
         package,
@@ -217,10 +229,10 @@ async fn do_deploy_package(
                     version.version, env
                 ),
             };
-            output::success(&line);
+            out.success(&line);
 
             if let Some(hint) = reuse_hint(&version, idempotency_key.as_deref()) {
-                output::muted(&hint);
+                out.muted(&hint);
             }
 
             Ok(())

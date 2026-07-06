@@ -7,13 +7,14 @@ use tower_api::apis::{
 use tower_api::models::CreateAppParams as CreateAppParamsModel;
 
 pub async fn ensure_app_exists(
+    out: &output::Out,
     api_config: &Configuration,
     app_name: &str,
     description: Option<&str>,
     create_app: bool,
 ) -> Result<(), crate::Error> {
     // Try to describe the app first (with spinner)
-    let mut spinner = output::spinner("Checking app...");
+    let mut spinner = out.spinner("Checking app...");
     let describe_result = default_api::describe_app(
         api_config,
         DescribeAppParams {
@@ -29,7 +30,7 @@ pub async fn ensure_app_exists(
 
     // If the app exists, return Ok (description is create-only).
     if describe_result.is_ok() {
-        spinner.success();
+        spinner.success(out);
         return Ok(());
     }
 
@@ -48,7 +49,7 @@ pub async fn ensure_app_exists(
 
     // If it's not a 404 error, fail the spinner and return the error
     if !is_not_found {
-        spinner.failure();
+        spinner.failure(out);
         return Err(crate::Error::ApiDescribeAppError { source: err });
     }
 
@@ -72,7 +73,7 @@ pub async fn ensure_app_exists(
     }
 
     // Try to create the app (with a new spinner)
-    let mut spinner = output::spinner("Creating app...");
+    let mut spinner = out.spinner("Creating app...");
     let create_result = default_api::create_app(
         api_config,
         CreateAppParams {
@@ -91,12 +92,12 @@ pub async fn ensure_app_exists(
 
     match create_result {
         Ok(_) => {
-            spinner.success();
-            output::success(&format!("Created app '{}'", app_name));
+            spinner.success(out);
+            out.success(&format!("Created app '{}'", app_name));
             Ok(())
         }
         Err(create_err) => {
-            spinner.failure();
+            spinner.failure(out);
             Err(crate::Error::ApiCreateAppError { source: create_err })
         }
     }

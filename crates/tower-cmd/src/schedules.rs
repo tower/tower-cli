@@ -3,7 +3,7 @@ use colored::Colorize;
 use config::Config;
 use std::collections::HashMap;
 
-use crate::{api, output};
+use crate::api;
 
 use tower_api::models::schedule::Status;
 
@@ -110,18 +110,19 @@ pub fn schedules_cmd() -> Command {
         )
 }
 
-pub async fn do_list(config: Config, args: &ArgMatches) {
+pub async fn do_list(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let app = args.get_one::<String>("app").map(|s| s.as_str());
     let environment = args.get_one::<String>("environment").map(|s| s.as_str());
 
-    let schedules = output::with_spinner(
-        "Listing schedules",
-        api::list_schedules(&config, app, environment),
-    )
-    .await;
+    let schedules = out
+        .with_spinner(
+            "Listing schedules",
+            api::list_schedules(&config, app, environment),
+        )
+        .await;
 
     if schedules.is_empty() {
-        output::text("No schedules found.\n", &schedules);
+        out.text("No schedules found.\n", &schedules);
         return;
     }
 
@@ -148,60 +149,64 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
         })
         .collect();
 
-    output::table(headers, rows, Some(&schedules));
+    out.table(headers, rows, Some(&schedules));
 }
 
-pub async fn do_create(config: Config, args: &ArgMatches) {
+pub async fn do_create(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let app_name = args.get_one::<String>("app").unwrap();
     let environment = args.get_one::<String>("environment").unwrap();
     let cron = args.get_one::<String>("cron").unwrap();
-    let parameters = parse_parameters(args);
+    let parameters = parse_parameters(out, args);
 
-    let response = output::with_spinner(
-        "Creating schedule",
-        api::create_schedule(&config, app_name, environment, cron, parameters),
-    )
-    .await;
+    let response = out
+        .with_spinner(
+            "Creating schedule",
+            api::create_schedule(&config, app_name, environment, cron, parameters),
+        )
+        .await;
 
-    output::success(&format!(
+    out.success(&format!(
         "Schedule created with ID: {}",
         response.schedule.id
     ));
 }
 
-pub async fn do_update(config: Config, args: &ArgMatches) {
+pub async fn do_update(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let id_or_name = args
         .get_one::<String>("id_or_name")
         .expect("id_or_name is required");
     let cron = args.get_one::<String>("cron");
-    let parameters = parse_parameters(args);
+    let parameters = parse_parameters(out, args);
 
-    output::with_spinner(
+    out.with_spinner(
         "Updating schedule",
         api::update_schedule(&config, id_or_name, cron, parameters),
     )
     .await;
 
-    output::success(&format!("Schedule {} updated", id_or_name));
+    out.success(&format!("Schedule {} updated", id_or_name));
 }
 
-pub async fn do_delete(config: Config, args: &ArgMatches) {
+pub async fn do_delete(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let schedule_id = args
         .get_one::<String>("schedule_id")
         .expect("schedule_id is required");
 
-    output::with_spinner(
+    out.with_spinner(
         "Deleting schedule",
         api::delete_schedule(&config, schedule_id),
     )
     .await;
 
-    output::success(&format!("Schedule {} deleted", schedule_id));
+    out.success(&format!("Schedule {} deleted", schedule_id));
 }
 
 /// Parses `--parameter` arguments into a HashMap of key-value pairs.
 /// Handles format like "--parameter key=value"
-fn parse_parameters(args: &ArgMatches) -> Option<HashMap<String, String>> {
+fn parse_parameters(
+    out: &crate::output::Out,
+    args: &ArgMatches,
+) -> Option<HashMap<String, String>> {
     let mut param_map = HashMap::new();
 
     if let Some(parameters) = args.get_many::<String>("parameters") {
@@ -209,7 +214,7 @@ fn parse_parameters(args: &ArgMatches) -> Option<HashMap<String, String>> {
             match param.split_once('=') {
                 Some((key, value)) => {
                     if key.is_empty() {
-                        output::error(&format!(
+                        out.error(&format!(
                             "Invalid parameter format: '{}'. Key cannot be empty.",
                             param
                         ));
@@ -218,7 +223,7 @@ fn parse_parameters(args: &ArgMatches) -> Option<HashMap<String, String>> {
                     param_map.insert(key.to_string(), value.to_string());
                 }
                 None => {
-                    output::error(&format!(
+                    out.error(&format!(
                         "Invalid parameter format: '{}'. Expected 'key=value'.",
                         param
                     ));
@@ -239,6 +244,7 @@ fn parse_parameters(args: &ArgMatches) -> Option<HashMap<String, String>> {
 #[cfg(test)]
 mod tests {
     use super::{parse_parameters, schedules_cmd};
+    use crate::output::Out;
 
     #[test]
     fn update_accepts_positional_schedule_id_and_flags() {
@@ -349,7 +355,8 @@ mod tests {
             panic!("expected update subcommand");
         };
 
-        let params = parse_parameters(update_args).expect("expected parsed parameters");
+        let params =
+            parse_parameters(&Out::sink(), update_args).expect("expected parsed parameters");
         assert_eq!(params.get("env"), Some(&"prod".to_string()));
         assert_eq!(params.get("team"), Some(&"platform".to_string()));
     }
@@ -373,7 +380,7 @@ mod tests {
             panic!("expected update subcommand");
         };
 
-        assert_eq!(parse_parameters(update_args), None);
+        assert_eq!(parse_parameters(&Out::sink(), update_args), None);
     }
 
     #[test]
@@ -395,7 +402,8 @@ mod tests {
             panic!("expected update subcommand");
         };
 
-        let params = parse_parameters(update_args).expect("expected parsed parameters");
+        let params =
+            parse_parameters(&Out::sink(), update_args).expect("expected parsed parameters");
         assert_eq!(params.get("env"), Some(&"prod".to_string()));
         assert_eq!(params.len(), 1);
     }
