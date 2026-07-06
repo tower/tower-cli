@@ -302,6 +302,20 @@ impl Uv {
         }
     }
 
+    // When no explicit cache dir is configured, uv uses its default cache
+    // (`~/.cache/uv`). In containerized/sandboxed execution that default often
+    // lives on a different filesystem than the target venv, so hardlinks across
+    // the two fail with EXDEV and uv prints a "Failed to hardlink files; falling
+    // back to full copy" warning into the setup logs. Force copy mode there so
+    // the warning is suppressed (uv was already copying anyway). Callers that
+    // pass an explicit cache dir on the same filesystem as the venv keep fast
+    // hardlink/clone.
+    fn apply_link_mode(&self, cmd: &mut Command) {
+        if self.cache_dir.is_none() {
+            cmd.env("UV_LINK_MODE", "copy");
+        }
+    }
+
     pub async fn venv(
         &self,
         cwd: &PathBuf,
@@ -361,6 +375,7 @@ impl Uv {
             if let Some(dir) = &self.cache_dir {
                 cmd.arg("--cache-dir").arg(dir);
             }
+            self.apply_link_mode(&mut cmd);
 
             let child = cmd.spawn()?;
 
@@ -406,6 +421,7 @@ impl Uv {
             .arg("never")
             .arg("pip")
             .arg("install");
+        self.apply_link_mode(&mut cmd);
         cmd
     }
 
@@ -494,6 +510,8 @@ impl Uv {
 
         // Need to do this after env_clear intentionally.
         cmd.envs(env_vars);
+        // Also after env_clear so protected mode doesn't wipe it.
+        self.apply_link_mode(&mut cmd);
 
         if let Some(dir) = &self.cache_dir {
             cmd.arg("--cache-dir").arg(dir);
