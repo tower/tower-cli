@@ -223,7 +223,7 @@ async fn do_deploy_package(
             // bare line would corrupt the structured output.
             if output::get_output_mode().is_normal() {
                 if let Some(hint) = reuse_hint(&version, idempotency_key.as_deref()) {
-                    output::write(&hint);
+                    output::muted(&hint);
                 }
             }
 
@@ -255,10 +255,9 @@ fn reuse_hint(version: &tower_api::models::AppVersion, sent_key: Option<&str>) -
     }
 
     Some(format!(
-        "Reusing version `{}` (deployed {}) — no source changes since key {}.",
-        version.version,
+        "No changes since commit {} (deployed on {})",
+        sent_key,
         util::dates::format(created_at),
-        sent_key
     ))
 }
 
@@ -441,7 +440,6 @@ mod tests {
     fn reuse_hint_present_for_old_matching_version() {
         let version = version_with(Some("abc123"), "2020-01-01T00:00:00Z");
         let hint = reuse_hint(&version, Some("abc123")).expect("expected a reuse hint");
-        assert!(hint.contains("Reusing version `v3`"));
-        assert!(hint.contains("abc123"));
+        assert!(hint.contains("No changes since commit abc123"));
     }
 }
