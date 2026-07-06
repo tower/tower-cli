@@ -3,7 +3,9 @@ from datetime import datetime, timedelta, timezone
 from tower._context import TowerContext
 from tower import _storage
 from tower.tower_api_client.models import (
+    Catalog,
     CatalogCredentials,
+    DescribeCatalogResponse,
     ErrorModel,
     VendCatalogCredentialsResponse,
 )
@@ -181,3 +183,69 @@ def test_default_catalog_vend_retries_after_legacy_provisioning(monkeypatch):
 
     assert result is credentials
     assert len(legacy_calls) == 2
+
+
+def test_describe_tower_catalog_type_uses_timeout_and_recovers_after_cooldown(
+    monkeypatch,
+):
+    _storage._clear_credential_cache()
+    ctx = TowerContext(
+        tower_url="https://api.example.com",
+        environment="production",
+        api_key="api-key",
+    )
+    now = {"value": 100.0}
+    calls = []
+
+    def describe_catalog_api_sync(name, client, environment):
+        calls.append((name, environment, client._timeout))
+        if len(calls) == 1:
+            raise TimeoutError("describe timed out")
+
+        return DescribeCatalogResponse(
+            catalog=Catalog(
+                created_at=datetime.now(timezone.utc),
+                environment=environment,
+                name=name,
+                properties=[],
+                type_="s3-tables",
+            )
+        )
+
+    monkeypatch.setattr(_storage.time, "monotonic", lambda: now["value"])
+    monkeypatch.setattr(
+        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
+    )
+
+    assert _storage._describe_tower_catalog_type(ctx, "s3-tables", "production") is None
+    assert _storage._describe_tower_catalog_type(ctx, "s3-tables", "production") is None
+    assert calls == [
+        (
+            "s3-tables",
+            "production",
+            _storage.CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS,
+        )
+    ]
+
+    now["value"] += _storage.CATALOG_TYPE_FAILURE_CACHE_TTL_SECONDS + 0.1
+
+    assert (
+        _storage._describe_tower_catalog_type(ctx, "s3-tables", "production")
+        == "s3-tables"
+    )
+    assert (
+        _storage._describe_tower_catalog_type(ctx, "s3-tables", "production")
+        == "s3-tables"
+    )
+    assert calls == [
+        (
+            "s3-tables",
+            "production",
+            _storage.CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS,
+        ),
+        (
+            "s3-tables",
+            "production",
+            _storage.CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS,
+        ),
+    ]
