@@ -197,8 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
+        platform:
+          - target: x86_64-unknown-linux-gnu
         python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
@@ -212,7 +212,7 @@ jobs:
       - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
-          target: ${{ matrix.target }}
+          target: ${{ matrix.platform.target }}
           manylinux: auto
           args: --release --locked --out dist -i python${{ matrix.python-version }}
           before-script-linux: |
@@ -225,7 +225,7 @@ jobs:
                 sudo apt-get install -y libssl-dev openssl pkg-config
             fi
       - name: Test wheel
-        if: ${{ startsWith(matrix.target, 'x86_64') }}
+        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         run: |
           PYTAG="cp$(python -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")"
           pip install dist/*-${PYTAG}-*.whl --force-reinstall
@@ -234,7 +234,7 @@ jobs:
       - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
-          name: wheels-${{ matrix.target }}
+          name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
   linux-cross:
@@ -302,8 +302,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - x86_64-unknown-linux-musl
+        platform:
+          - target: x86_64-unknown-linux-musl
         python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
@@ -317,11 +317,11 @@ jobs:
       - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
-          target: ${{ matrix.target }}
+          target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist -i python${{ matrix.python-version }}
       - name: Test wheel
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+        if: matrix.platform.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
         with:
           image: python:${{ matrix.python-version}}-alpine
@@ -334,7 +334,7 @@ jobs:
       - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
-          name: wheels-${{ matrix.target }}
+          name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
   musllinux-cross:
@@ -376,5 +376,5 @@ jobs:
       - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
-          name: wheels-${{ matrix.platform.target }}
+          name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist

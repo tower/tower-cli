@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -9,6 +10,7 @@ from typing import Any, Optional
 
 from ._client import _env_client
 from ._context import TowerContext
+from .tower_api_client.api.default import describe_catalog as describe_catalog_api
 from .tower_api_client.api.default import (
     describe_default_catalog as describe_default_catalog_api,
 )
@@ -17,6 +19,7 @@ from .tower_api_client.api.default import (
 )
 from .tower_api_client.models import (
     CatalogCredentials,
+    DescribeCatalogResponse,
     ErrorModel,
     VendCatalogCredentialsBody,
     VendCatalogCredentialsBodyMode,
@@ -25,9 +28,16 @@ from .tower_api_client.models import (
 from .tower_api_client.types import UNSET, Unset
 
 CREDENTIAL_REFRESH_WINDOW = timedelta(minutes=5)
+# how long to wait for a catalog type describe request to complete
+CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS = 2.0
+# only cache failed catalog type describe requests for this long
+# retry only after this period
+CATALOG_TYPE_FAILURE_CACHE_TTL_SECONDS = 30.0
 DEFAULT_CATALOG_PROVISION_RETRY_DELAYS = (0.25, 0.5, 1.0, 2.0)
 DEFAULT_CATALOG_NAME = "default"
 DEFAULT_ENVIRONMENT_NAME = "default"
+TOWER_CATALOG_TYPE = "tower-catalog"
+logger = logging.getLogger("tower.storage")
 
 
 @dataclass
@@ -39,7 +49,14 @@ class _CachedCredentials:
         return now < expires_at - CREDENTIAL_REFRESH_WINDOW
 
 
+@dataclass
+class _CachedCatalogType:
+    catalog_type: str | None
+    retry_at: float | None = None
+
+
 _credential_cache: dict[tuple[str, str, str, str, str], _CachedCredentials] = {}
+_catalog_type_cache: dict[tuple[str, str, str], _CachedCatalogType] = {}
 
 
 def get_tower_catalog(
@@ -120,6 +137,65 @@ def _vend_catalog_credentials(
         client=_env_client(ctx),
         environment=environment,
         body=body,
+    )
+
+
+def _describe_tower_catalog_type(
+    ctx: TowerContext, name: str, environment: str
+) -> str | None:
+    if not (ctx.api_key or ctx.jwt):
+        return None
+
+    cache_key = (ctx.tower_url, name, environment)
+    cached = _catalog_type_cache.get(cache_key)
+    if cached is not None:
+        if cached.retry_at is None:
+            return cached.catalog_type
+
+        if time.monotonic() < cached.retry_at:
+            return None
+
+        _catalog_type_cache.pop(cache_key, None)
+
+    try:
+        result = describe_catalog_api.sync(
+            name=name,
+            client=_env_client(ctx, timeout=CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS),
+            environment=environment,
+        )
+    except Exception:
+        logger.debug(
+            "Failed to describe Tower catalog %r in environment %r; "
+            "falling back to PyIceberg catalog configuration detection.",
+            name,
+            environment,
+            exc_info=True,
+        )
+        _catalog_type_cache[cache_key] = _failed_catalog_type_cache_entry()
+        return None
+
+    if isinstance(result, DescribeCatalogResponse):
+        catalog_type = result.catalog.type_
+        _catalog_type_cache[cache_key] = _CachedCatalogType(catalog_type=catalog_type)
+        return catalog_type
+
+    if isinstance(result, ErrorModel):
+        logger.debug(
+            "Tower catalog describe for %r in environment %r returned %s; "
+            "falling back to PyIceberg catalog configuration detection.",
+            name,
+            environment,
+            _error_text(result),
+        )
+
+    _catalog_type_cache[cache_key] = _failed_catalog_type_cache_entry()
+    return None
+
+
+def _failed_catalog_type_cache_entry() -> _CachedCatalogType:
+    return _CachedCatalogType(
+        catalog_type=None,
+        retry_at=time.monotonic() + CATALOG_TYPE_FAILURE_CACHE_TTL_SECONDS,
     )
 
 
@@ -210,3 +286,4 @@ def _ensure_aware(value: datetime) -> datetime:
 
 def _clear_credential_cache() -> None:
     _credential_cache.clear()
+    _catalog_type_cache.clear()
