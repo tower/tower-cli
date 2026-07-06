@@ -302,14 +302,10 @@ impl Uv {
         }
     }
 
-    // When no explicit cache dir is configured, uv uses its default cache
-    // (`~/.cache/uv`). In containerized/sandboxed execution that default often
-    // lives on a different filesystem than the target venv, so hardlinks across
-    // the two fail with EXDEV and uv prints a "Failed to hardlink files; falling
-    // back to full copy" warning into the setup logs. Force copy mode there so
-    // the warning is suppressed (uv was already copying anyway). Callers that
-    // pass an explicit cache dir on the same filesystem as the venv keep fast
-    // hardlink/clone.
+    // Without an explicit cache dir, uv's default cache may be on a different
+    // filesystem than the target venv, so hardlinking fails and uv warns before
+    // falling back to a copy. Force copy mode to skip the failed attempt and the
+    // warning.
     fn apply_link_mode(&self, cmd: &mut Command) {
         if self.cache_dir.is_none() {
             cmd.env("UV_LINK_MODE", "copy");
