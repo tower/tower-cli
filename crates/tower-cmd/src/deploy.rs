@@ -219,12 +219,8 @@ async fn do_deploy_package(
             };
             output::success(&line);
 
-            // Only emit the informational hint in normal mode; in JSON mode a
-            // bare line would corrupt the structured output.
-            if output::get_output_mode().is_normal() {
-                if let Some(hint) = reuse_hint(&version, idempotency_key.as_deref()) {
-                    output::muted(&hint);
-                }
+            if let Some(hint) = reuse_hint(&version, idempotency_key.as_deref()) {
+                output::muted(&hint);
             }
 
             Ok(())
