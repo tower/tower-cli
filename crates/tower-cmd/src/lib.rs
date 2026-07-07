@@ -143,6 +143,9 @@ impl App {
                 match catalogs_command {
                     Some(("list", args)) => catalogs::do_list(sessionized_config, args).await,
                     Some(("show", args)) => catalogs::do_show(sessionized_config, args).await,
+                    Some(("credentials", args)) => {
+                        catalogs::do_credentials(sessionized_config, args).await
+                    }
                     _ => {
                         catalogs::catalogs_cmd().print_help().unwrap();
                         std::process::exit(2);

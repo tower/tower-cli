@@ -1,4 +1,9 @@
 import os
+from typing import Optional
+
+
+def _getenv_or_none(name: str) -> Optional[str]:
+    return os.getenv(name) or None
 
 
 class TowerContext:
@@ -32,11 +37,15 @@ class TowerContext:
 
     @classmethod
     def build(cls):
-        tower_url = os.getenv("TOWER_URL", "https://api.tower.dev")
-        tower_environment = os.getenv("TOWER_ENVIRONMENT", "default")
-        tower_api_key = os.getenv("TOWER_API_KEY")
-        tower_jwt = os.getenv("TOWER_JWT")
-        tower_run_id = os.getenv("TOWER__RUNTIME__RUN_ID")
+        tower_url = _getenv_or_none("TOWER_URL") or "https://api.tower.dev"
+        tower_environment = (
+            os.getenv("TOWER__RUNTIME__ENVIRONMENT_NAME")
+            or os.getenv("TOWER_ENVIRONMENT")
+            or "default"
+        )
+        tower_api_key = _getenv_or_none("TOWER_API_KEY")
+        tower_jwt = _getenv_or_none("TOWER_JWT")
+        tower_run_id = _getenv_or_none("TOWER__RUNTIME__RUN_ID")
 
         # Replaces the deprecated hugging_face_provider and hugging_face_api_key
         inference_router = os.getenv("TOWER_INFERENCE_ROUTER")

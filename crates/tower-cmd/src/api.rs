@@ -350,21 +350,24 @@ pub async fn list_catalogs(
     config: &Config,
     env: &str,
     all: bool,
+    catalog_type: Option<&str>,
 ) -> Result<Vec<tower_api::models::Catalog>, Error<tower_api::apis::default_api::ListCatalogsError>>
 {
     let api_config: configuration::Configuration = config.into();
     let env = env.to_string();
+    let catalog_type = catalog_type.map(str::to_string);
 
     fetch_all_pages(config, |page, page_size| {
         let api_config = &api_config;
         let env = &env;
+        let catalog_type = &catalog_type;
         async move {
             let params = tower_api::apis::default_api::ListCatalogsParams {
                 environment: Some(env.to_string()),
                 all: Some(all),
                 page: Some(page),
                 page_size: Some(page_size),
-                r#type: None,
+                r#type: catalog_type.clone(),
             };
             unwrap_api_response(tower_api::apis::default_api::list_catalogs(
                 api_config, params,
@@ -372,6 +375,33 @@ pub async fn list_catalogs(
             .await
         }
     })
+    .await
+}
+
+pub async fn vend_catalog_credentials(
+    config: &Config,
+    name: &str,
+    env: &str,
+    mode: tower_api::models::vend_catalog_credentials_body::Mode,
+) -> Result<
+    tower_api::models::VendCatalogCredentialsResponse,
+    Error<tower_api::apis::default_api::VendCatalogCredentialsError>,
+> {
+    let api_config = config.into();
+
+    let params = tower_api::apis::default_api::VendCatalogCredentialsParams {
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+        vend_catalog_credentials_body: tower_api::models::VendCatalogCredentialsBody {
+            schema: None,
+            mode: Some(mode),
+        },
+    };
+
+    unwrap_api_response_redacted(tower_api::apis::default_api::vend_catalog_credentials(
+        &api_config,
+        params,
+    ))
     .await
 }
 
@@ -724,6 +754,27 @@ where
     T: ResponseEntity,
     T::Data: serde::de::DeserializeOwned,
 {
+    unwrap_api_response_inner(api_call, false).await
+}
+
+async fn unwrap_api_response_redacted<T, F, V>(api_call: F) -> Result<T::Data, Error<V>>
+where
+    F: std::future::Future<Output = Result<ResponseContent<T>, Error<V>>>,
+    T: ResponseEntity,
+    T::Data: serde::de::DeserializeOwned,
+{
+    unwrap_api_response_inner(api_call, true).await
+}
+
+async fn unwrap_api_response_inner<T, F, V>(
+    api_call: F,
+    redact_success_content: bool,
+) -> Result<T::Data, Error<V>>
+where
+    F: std::future::Future<Output = Result<ResponseContent<T>, Error<V>>>,
+    T: ResponseEntity,
+    T::Data: serde::de::DeserializeOwned,
+{
     match api_call.await {
         Ok(response) => {
             if response.status.is_client_error() || response.status.is_server_error() {
@@ -736,22 +787,32 @@ where
             }
 
             debug!("tower trace ID: {}", response.tower_trace_id);
-            debug!("Response from server: {}", response.content);
+            if redact_success_content {
+                debug!("Response from server: <redacted>");
+            } else {
+                debug!("Response from server: {}", response.content);
+            }
 
             if let Some(entity) = response.entity {
                 if let Some(data) = entity.extract_data() {
                     Ok(data)
                 } else {
-                    let truncated = if response.content.len() > 500 {
+                    let truncated = if redact_success_content {
+                        "<redacted>".to_string()
+                    } else if response.content.len() > 500 {
                         format!("{}...(truncated)", &response.content[..500])
                     } else {
                         response.content.clone()
                     };
                     // Try explicit deserialization to get the actual error message
-                    let deser_error = serde_json::from_str::<T::Data>(&response.content)
-                        .err()
-                        .map(|e| format!(" Deserialization error: {}", e))
-                        .unwrap_or_default();
+                    let deser_error = if redact_success_content {
+                        String::new()
+                    } else {
+                        serde_json::from_str::<T::Data>(&response.content)
+                            .err()
+                            .map(|e| format!(" Deserialization error: {}", e))
+                            .unwrap_or_default()
+                    };
                     debug!(
                         "Failed to extract data from API response:{} Content: {}",
                         deser_error, truncated
@@ -830,6 +891,17 @@ impl ResponseEntity for tower_api::apis::default_api::ListCatalogsSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::DescribeCatalogSuccess {
     type Data = tower_api::models::DescribeCatalogResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::VendCatalogCredentialsSuccess {
+    type Data = tower_api::models::VendCatalogCredentialsResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
@@ -1338,6 +1410,51 @@ impl ResponseEntity for tower_api::apis::default_api::CancelRunSuccess {
         match self {
             Self::Status200(data) => Some(data),
             Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{unwrap_api_response_redacted, ResponseEntity};
+    use http::StatusCode;
+    use tower_api::apis::{Error, ResponseContent};
+
+    enum SensitiveSuccess {
+        UnknownValue,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct SensitiveData {
+        _value: String,
+    }
+
+    impl ResponseEntity for SensitiveSuccess {
+        type Data = SensitiveData;
+
+        fn extract_data(self) -> Option<Self::Data> {
+            None
+        }
+    }
+
+    #[tokio::test]
+    async fn redacted_unwrap_does_not_return_sensitive_response_body() {
+        let response = ResponseContent {
+            tower_trace_id: "trace-id".to_string(),
+            status: StatusCode::OK,
+            content: r#"{"credentials":{"oauth_token":"secret-token"}}"#.to_string(),
+            entity: Some(SensitiveSuccess::UnknownValue),
+        };
+
+        let result =
+            unwrap_api_response_redacted::<SensitiveSuccess, _, ()>(async { Ok(response) }).await;
+
+        match result {
+            Err(Error::ResponseError(response)) => {
+                assert!(!response.content.contains("secret-token"));
+                assert!(response.content.contains("<redacted>"));
+            }
+            _ => panic!("expected redacted response error"),
         }
     }
 }

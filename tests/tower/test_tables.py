@@ -18,6 +18,76 @@ import concurrent.futures
 
 # Imports the library under test
 import tower
+import tower._tables as tables_module
+from tower import _storage
+from tower._context import TowerContext
+from tower.tower_api_client.models import (
+    Catalog,
+    CatalogCredentials,
+    DescribeCatalogResponse,
+)
+
+
+class FakeLoadedTable:
+    def __init__(self, mode: str, identifier: str):
+        self.mode = mode
+        self.identifier = identifier
+        self.append_calls = []
+
+    def append(self, data):
+        self.append_calls.append(data)
+
+
+class FakeCatalog:
+    def __init__(self, mode: str):
+        self.mode = mode
+        self.loaded_identifiers = []
+        self.loaded_tables = []
+
+    def load_table(self, identifier: str):
+        self.loaded_identifiers.append(identifier)
+        table = FakeLoadedTable(self.mode, identifier)
+        self.loaded_tables.append(table)
+        return table
+
+
+def patch_tower_context(
+    monkeypatch,
+    environment: str = "production",
+    api_key: str | None = "api-key",
+    run_id: str | None = None,
+):
+    ctx = TowerContext(
+        tower_url="https://api.example.com",
+        environment=environment,
+        api_key=api_key,
+        run_id=run_id,
+    )
+    monkeypatch.setattr(tables_module.TowerContext, "build", staticmethod(lambda: ctx))
+    return ctx
+
+
+def make_describe_catalog_response(name: str, catalog_type: str):
+    return DescribeCatalogResponse(
+        catalog=Catalog(
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+            environment="production",
+            name=name,
+            properties=[],
+            type_=catalog_type,
+        )
+    )
+
+
+def make_catalog_credentials(mode: str, token: str | None = None):
+    return CatalogCredentials(
+        catalog_uri="https://catalog.example.com",
+        expires_at=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(hours=1),
+        mode=mode,
+        oauth_token=token or f"{mode}-token",
+        warehouse="warehouse-id",
+    )
 
 
 def get_temp_dir():
@@ -67,6 +137,235 @@ def sql_catalog():
         shutil.rmtree(abs_path)
     except FileNotFoundError:
         pass
+
+
+@pytest.mark.parametrize(
+    ("tower_credentials", "catalog_type", "has_pyiceberg_config", "expected_source"),
+    [
+        (None, "tower-catalog", True, "vend"),
+        (None, "s3-tables", True, "load_catalog"),
+        (None, None, True, "load_catalog"),
+        (None, None, False, "vend"),
+        (True, "s3-tables", True, "vend"),
+        (False, "tower-catalog", False, "load_catalog"),
+    ],
+)
+def test_string_catalog_precedence(
+    monkeypatch, tower_credentials, catalog_type, has_pyiceberg_config, expected_source
+):
+    _storage._clear_credential_cache()
+    patch_tower_context(monkeypatch)
+    vend_catalog = FakeCatalog("vend")
+    configured_catalog = FakeCatalog("configured")
+    calls = []
+
+    def get_tower_catalog_credentials(name, environment=None, mode="read"):
+        calls.append(("vend", name, environment, mode))
+        return make_catalog_credentials(mode)
+
+    def load_vended_catalog(name, credentials):
+        calls.append(("load_vended_catalog", name, credentials.mode))
+        return vend_catalog
+
+    def load_catalog(name):
+        calls.append(("load_catalog", name))
+        return configured_catalog
+
+    def describe_catalog_api_sync(name, client, environment):
+        calls.append(("describe_catalog", name, environment))
+        if catalog_type is None:
+            return None
+        return make_describe_catalog_response(name, catalog_type)
+
+    def has_pyiceberg_catalog_config(name):
+        calls.append(("has_pyiceberg_config", name))
+        return has_pyiceberg_config
+
+    monkeypatch.setattr(
+        tables_module, "get_tower_catalog_credentials", get_tower_catalog_credentials
+    )
+    monkeypatch.setattr(tables_module, "load_vended_catalog", load_vended_catalog)
+    monkeypatch.setattr(tables_module, "load_catalog", load_catalog)
+    monkeypatch.setattr(
+        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
+    )
+    monkeypatch.setattr(
+        tables_module, "_has_pyiceberg_catalog_config", has_pyiceberg_catalog_config
+    )
+
+    ref = tables_module.tables(
+        "events",
+        catalog="default",
+        tower_credentials=tower_credentials,
+    )
+
+    if expected_source == "vend":
+        assert ref._catalog is vend_catalog
+        assert ref._tower_vended is True
+        assert ("vend", "default", "production", "read") in calls
+        assert ("load_vended_catalog", "default", "read") in calls
+    else:
+        assert ref._catalog is configured_catalog
+        assert ref._tower_vended is False
+        assert ("load_catalog", "default") in calls
+        assert ("vend", "default", "production", "read") not in calls
+
+    if tower_credentials is None:
+        assert ("describe_catalog", "default", "production") in calls
+        if catalog_type is None:
+            assert ("has_pyiceberg_config", "default") in calls
+    else:
+        assert ("describe_catalog", "default", "production") not in calls
+        assert ("has_pyiceberg_config", "default") not in calls
+
+
+def test_pyiceberg_catalog_config_detects_runner_env(monkeypatch):
+    monkeypatch.setenv("PYICEBERG_CATALOG__S3_TABLES__URI", "https://example.com")
+
+    assert tables_module._has_pyiceberg_catalog_config("s3-tables") is True
+    assert tables_module._has_pyiceberg_catalog_config("other") is False
+
+
+def test_string_catalog_type_describe_is_cached(monkeypatch):
+    _storage._clear_credential_cache()
+    patch_tower_context(monkeypatch)
+    calls = []
+    vend_catalogs = []
+
+    def describe_catalog_api_sync(name, client, environment):
+        calls.append(("describe_catalog", name, environment))
+        return make_describe_catalog_response(name, "tower-catalog")
+
+    def get_tower_catalog_credentials(name, environment=None, mode="read"):
+        calls.append(("vend", name, environment, mode))
+        return make_catalog_credentials(mode)
+
+    def load_vended_catalog(name, credentials):
+        catalog = FakeCatalog(credentials.mode)
+        vend_catalogs.append(catalog)
+        return catalog
+
+    monkeypatch.setattr(
+        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
+    )
+    monkeypatch.setattr(
+        tables_module, "get_tower_catalog_credentials", get_tower_catalog_credentials
+    )
+    monkeypatch.setattr(tables_module, "load_vended_catalog", load_vended_catalog)
+
+    first = tables_module.tables("events", catalog="default")
+    second = tables_module.tables("users", catalog="default")
+
+    assert first._catalog is vend_catalogs[0]
+    assert second._catalog is vend_catalogs[1]
+    assert calls.count(("describe_catalog", "default", "production")) == 1
+    assert calls.count(("vend", "default", "production", "read")) == 2
+
+
+def test_vended_table_write_lazily_escalates_and_reuses_catalog(monkeypatch):
+    patch_tower_context(monkeypatch)
+    catalogs = {}
+    credential_calls = []
+
+    def get_tower_catalog_credentials(name, environment=None, mode="read"):
+        credential_calls.append((name, environment, mode))
+        return make_catalog_credentials(mode)
+
+    def load_vended_catalog(name, credentials):
+        catalog = FakeCatalog(credentials.mode)
+        catalogs.setdefault(credentials.mode, []).append(catalog)
+        return catalog
+
+    monkeypatch.setattr(
+        tables_module, "get_tower_catalog_credentials", get_tower_catalog_credentials
+    )
+    monkeypatch.setattr(tables_module, "load_vended_catalog", load_vended_catalog)
+
+    ref = tables_module.tables("events", catalog="default", namespace="demo")
+
+    assert ref._tower_vended is True
+    assert credential_calls == [("default", "production", "read")]
+
+    table = ref.load()
+
+    assert table._catalog_mode == "read"
+    assert catalogs["read"][0].loaded_identifiers == ["demo.events"]
+    assert "read-write" not in catalogs
+
+    data = pa.table({"id": [1, 2, 3]})
+    table.insert(data)
+
+    assert credential_calls == [
+        ("default", "production", "read"),
+        ("default", "production", "read-write"),
+    ]
+    assert catalogs["read"][0].loaded_tables[0].append_calls == []
+    assert catalogs["read-write"][0].loaded_identifiers == ["demo.events"]
+    assert catalogs["read-write"][0].loaded_tables[0].append_calls == [data]
+    assert table._catalog_mode == "read-write"
+    assert table.rows_affected().inserts == 3
+
+    second_batch = pa.table({"id": [4]})
+    table.insert(second_batch)
+
+    assert credential_calls == [
+        ("default", "production", "read"),
+        ("default", "production", "read-write"),
+        ("default", "production", "read-write"),
+    ]
+    assert len(catalogs["read-write"]) == 1
+    assert catalogs["read-write"][0].loaded_identifiers == ["demo.events"]
+    assert catalogs["read-write"][0].loaded_tables[0].append_calls == [
+        data,
+        second_batch,
+    ]
+    assert table.rows_affected().inserts == 4
+
+
+def test_vended_table_write_reloads_when_credentials_change(monkeypatch):
+    patch_tower_context(monkeypatch)
+    catalogs = {}
+    credential_calls = []
+    read_write_credentials = [
+        make_catalog_credentials("read-write", token="write-token-1"),
+        make_catalog_credentials("read-write", token="write-token-2"),
+    ]
+
+    def get_tower_catalog_credentials(name, environment=None, mode="read"):
+        credential_calls.append((name, environment, mode))
+        if mode == "read-write":
+            return read_write_credentials.pop(0)
+        return make_catalog_credentials(mode)
+
+    def load_vended_catalog(name, credentials):
+        catalog = FakeCatalog(credentials.mode)
+        catalogs.setdefault(credentials.mode, []).append(catalog)
+        return catalog
+
+    monkeypatch.setattr(
+        tables_module, "get_tower_catalog_credentials", get_tower_catalog_credentials
+    )
+    monkeypatch.setattr(tables_module, "load_vended_catalog", load_vended_catalog)
+
+    table = tables_module.tables("events", catalog="default", namespace="demo").load()
+
+    first_batch = pa.table({"id": [1]})
+    table.insert(first_batch)
+
+    second_batch = pa.table({"id": [2]})
+    table.insert(second_batch)
+
+    assert credential_calls == [
+        ("default", "production", "read"),
+        ("default", "production", "read-write"),
+        ("default", "production", "read-write"),
+    ]
+    assert len(catalogs["read-write"]) == 2
+    assert catalogs["read-write"][0].loaded_identifiers == ["demo.events"]
+    assert catalogs["read-write"][1].loaded_identifiers == ["demo.events"]
+    assert catalogs["read-write"][0].loaded_tables[0].append_calls == [first_batch]
+    assert catalogs["read-write"][1].loaded_tables[0].append_calls == [second_batch]
+    assert table.rows_affected().inserts == 2
 
 
 def test_reading_and_writing_to_tables(in_memory_catalog):

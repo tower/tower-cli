@@ -86,11 +86,14 @@ pub async fn do_run(config: Config, args: &ArgMatches) {
                     tower_api::apis::Error::ResponseError(resp) if resp.status == reqwest::StatusCode::NOT_FOUND
                 );
                 if is_not_found {
-                    output::error("App not found. It may not exist or hasn't been deployed yet.");
-                    output::write("\nTo fix this:\n");
-                    output::write("  1. Check your app exists:  tower apps list\n");
-                    output::write("  2. Deploy your app:        tower deploy\n");
-                    output::write("  3. Then run it:            tower run\n");
+                    output::error(concat!(
+                        "App not found. It may not exist or hasn't been deployed yet.\n",
+                        "\n",
+                        "To fix this:\n",
+                        "  1. Check your app exists:  tower apps list\n",
+                        "  2. Deploy your app:        tower deploy\n",
+                        "  3. Then run it:            tower run"
+                    ));
                     std::process::exit(1);
                 }
                 if let Error::ApiRunError { source } = e {
@@ -375,14 +378,10 @@ pub async fn do_run_remote(
         do_follow_run(config, &run).await?;
     } else {
         let line = format!(
-            "Run #{} for app `{}` has been scheduled",
-            run.number, app_slug
+            "Run #{} for app `{}` has been scheduled\n  See more: {}",
+            run.number, app_slug, run.dollar_link
         );
-        output::success(&line);
-
-        let link_line = format!("  See more: {}", run.dollar_link);
-        output::write(&link_line);
-        output::newline();
+        output::success_with_data(&line, Some(&run));
     }
     Ok(())
 }

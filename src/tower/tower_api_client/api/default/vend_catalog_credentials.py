@@ -103,7 +103,7 @@ def sync_detailed(
 
      Mints a short-lived OAuth bearer token for browser or SDK access to a managed (tower-catalog)
     catalog. Defaults to read-only (`mode: \"read\"`); pass `mode: \"read-write\"` in the body (requires
-    the catalogs:update scope) for a token bound to the read-write principal. Team membership is
+    the catalogs:data:write scope) for a token bound to the read-write principal. Team membership is
     enforced before vending; the master Polaris credentials never leave Tower.
 
     Args:
@@ -143,7 +143,7 @@ def sync(
 
      Mints a short-lived OAuth bearer token for browser or SDK access to a managed (tower-catalog)
     catalog. Defaults to read-only (`mode: \"read\"`); pass `mode: \"read-write\"` in the body (requires
-    the catalogs:update scope) for a token bound to the read-write principal. Team membership is
+    the catalogs:data:write scope) for a token bound to the read-write principal. Team membership is
     enforced before vending; the master Polaris credentials never leave Tower.
 
     Args:
@@ -178,7 +178,7 @@ async def asyncio_detailed(
 
      Mints a short-lived OAuth bearer token for browser or SDK access to a managed (tower-catalog)
     catalog. Defaults to read-only (`mode: \"read\"`); pass `mode: \"read-write\"` in the body (requires
-    the catalogs:update scope) for a token bound to the read-write principal. Team membership is
+    the catalogs:data:write scope) for a token bound to the read-write principal. Team membership is
     enforced before vending; the master Polaris credentials never leave Tower.
 
     Args:
@@ -216,7 +216,7 @@ async def asyncio(
 
      Mints a short-lived OAuth bearer token for browser or SDK access to a managed (tower-catalog)
     catalog. Defaults to read-only (`mode: \"read\"`); pass `mode: \"read-write\"` in the body (requires
-    the catalogs:update scope) for a token bound to the read-write principal. Team membership is
+    the catalogs:data:write scope) for a token bound to the read-write principal. Team membership is
     enforced before vending; the master Polaris credentials never leave Tower.
 
     Args:

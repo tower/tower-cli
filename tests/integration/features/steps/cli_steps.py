@@ -94,6 +94,28 @@ def step_run_cli_command_with_api_key_and_input(context, command, input):
     return run_command_with_env(context, command, test_env, input=input)
 
 
+@step('I run "{command}" via CLI with a temporary session')
+def step_run_cli_command_with_temp_session(context, command):
+    """Run a Tower CLI command with HOME pointing at a copy of the test session.
+
+    Use this for commands that rewrite session.json (e.g. anything that refreshes
+    the session), so they don't modify the tracked test-home fixture.
+    """
+    test_env = os.environ.copy()
+    test_env["FORCE_COLOR"] = "1"
+    test_env["CLICOLOR_FORCE"] = "1"
+    test_env["TOWER_URL"] = context.tower_url
+
+    test_home = Path(__file__).parent.parent.parent / "test-home"
+    session_src = test_home / ".config" / "tower" / "session.json"
+    session_dst_dir = Path(context.temp_dir) / ".config" / "tower"
+    session_dst_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(session_src, session_dst_dir / "session.json")
+    test_env["HOME"] = context.temp_dir
+
+    return run_command_with_env(context, command, test_env)
+
+
 @step("no session.json should exist in the temp home")
 def step_no_session_json(context):
     """Verify that API key auth did not create a session.json file"""
@@ -344,6 +366,13 @@ def step_output_should_be_valid_json(context):
         raise AssertionError(
             f"Output is not valid JSON: {e}\nOutput: {context.cli_output}"
         )
+
+
+@step("the JSON should be an empty array")
+def step_json_should_be_empty_array(context):
+    """Verify JSON output is an empty array"""
+    data = parse_cli_json(context)
+    assert data == [], f"Expected an empty JSON array, got: {data}"
 
 
 @step("the JSON should contain app information")

@@ -1,0 +1,9 @@
+duckdb <<SQL
+INSTALL httpfs;
+LOAD httpfs;
+INSTALL iceberg;
+LOAD iceberg;
+SET s3_region='eu-central-1';
+CREATE OR REPLACE SECRET tower_cat (TYPE iceberg, TOKEN __TOWER_TOKEN__);
+ATTACH __TOWER_WAREHOUSE__ AS __TOWER_NAME__ (TYPE iceberg, SECRET tower_cat, ENDPOINT __TOWER_URI__, DEFAULT_REGION 'eu-central-1');
+SQL
