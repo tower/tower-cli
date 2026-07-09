@@ -42,6 +42,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v6
         with:
@@ -72,6 +73,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - name: "Install fresh upstream rustup"
         # The macos-15-arm64 runner image (20260511.0048+) ships a broken
         # Homebrew rustup whose bundled rustup-init rejects standard argv
@@ -117,6 +119,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - name: "Install fresh upstream rustup"
         # The macos-15-arm64 runner image (20260511.0048+) ships a broken
         # Homebrew rustup whose bundled rustup-init rejects standard argv
@@ -170,6 +173,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v6
         with:
@@ -204,16 +208,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: x64
       - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
           target: ${{ matrix.platform.target }}
-          manylinux: auto
+          manylinux: 2_28
           args: --release --locked --out dist -i python${{ matrix.python-version }}
           before-script-linux: |
             # If we're running on rhel centos, install needed packages.
@@ -237,23 +241,20 @@ jobs:
           name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
-  linux-cross:
+  linux-arm:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         platform:
           - target: aarch64-unknown-linux-gnu
-            arch: aarch64
-            # see https://github.com/astral-sh/ruff/issues/3791
-            # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16 -e PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
         python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.11.0
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -262,35 +263,14 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: 2_28
-          docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist -i ${{ format('python{0}', matrix.python-version) }}
-        env:
-          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
-      - uses: uraimo/run-on-arch-action@v3
-        if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
-        name: Test wheel
-        with:
-          arch: ${{ matrix.platform.arch }}
-          distro: ubuntu24.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y software-properties-common
-            add-apt-repository ppa:deadsnakes/ppa
-            apt-get update
-            apt-get install -y --no-install-recommends ${{ format('python{0}-full', matrix.python-version) }} ${{ format('python{0}-venv', matrix.python-version) }} cargo libffi-dev
-          # Create and use a virtual environment to avoid the externally-managed-environment error
-          run: |
-            ln -s -f /usr/bin/${{ format('python{0}', matrix.python-version) }} /usr/bin/python3
-            ln -s -f /usr/bin/${{ format('pip{0}', matrix.python-version) }} /usr/bin/pip3
-            # Workaround for QEMU bug when emulating 32-bit on 64-bit hosts
-            # See: https://github.com/docker/buildx/issues/395
-            # Use /tmp for CARGO_HOME (often tmpfs, which avoids the QEMU filesystem bug)
-            export CARGO_HOME=/tmp/cargo-home
-            python3 -m venv /tmp/venv
-            . /tmp/venv/bin/activate
-            pip3 install dist/*.whl --force-reinstall
-            ${{ env.EXECUTABLE_NAME }} --help
+          args: --release --locked --out dist -i python${{ matrix.python-version }}
+      - name: Test wheel
+        if: ${{ startsWith(matrix.platform.target, 'aarch64') }}
+        run: |
+          PYTAG="cp$(python -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")"
+          pip install dist/*-${PYTAG}-*.whl --force-reinstall
+          ${{ env.EXECUTABLE_NAME }} --help
+          python -m ${{ env.MODULE_NAME }} --help
       - name: Upload wheel
         uses: actions/upload-artifact@v6
         with:
@@ -309,6 +289,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -337,19 +318,19 @@ jobs:
           name: wheels-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
 
-  musllinux-cross:
+  musllinux-arm:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         platform:
           - target: aarch64-unknown-linux-musl
-            arch: aarch64
         python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -359,18 +340,15 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist -i python${{ matrix.python-version }}
-      - uses: uraimo/run-on-arch-action@v2
-        name: Test wheel
+      - name: Test wheel
+        if: matrix.platform.target == 'aarch64-unknown-linux-musl'
+        uses: addnab/docker-run-action@v3
         with:
-          arch: ${{ matrix.platform.arch }}
-          distro: alpine_latest
-          githubToken: ${{ github.token }}
-          install: |
-            apk add uv rust
+          image: python:${{ matrix.python-version}}-alpine
+          options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            uv python install ${{ matrix.python-version }} --default
-            export PATH="/root/.local/bin:$PATH"
-            python3 -m venv .venv
+            apk add rust
+            python -m venv .venv
             .venv/bin/pip3 install dist/*.whl --force-reinstall
             .venv/bin/${{ env.EXECUTABLE_NAME }} --help
       - name: Upload wheel
