@@ -321,8 +321,6 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2
         with:
           shared-key: py${{ matrix.python-version }}-${{ matrix.platform.target }}
-      - name: Install OpenSSL
-        run: sudo apt-get update && sudo apt-get install libssl-dev openssl
       - name: Build wheel
         uses: PyO3/maturin-action@v1.50.1
         with:
