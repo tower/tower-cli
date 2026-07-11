@@ -5,13 +5,17 @@ use tower_api::models::{
     vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
 };
 
-use crate::{api, output, util::cmd};
+use crate::{api, beta, output, util::cmd};
 
 const STORAGE_CATALOG_TYPE: &str = "tower-catalog";
 
 pub fn catalogs_cmd() -> Command {
     Command::new("catalogs")
-        .about("Interact with the catalogs in your Tower account")
+        .about(format!(
+            "Interact with the catalogs in your Tower account (includes {})",
+            beta::STORAGE.short_about("Storage")
+        ))
+        .after_help(beta::STORAGE.notice())
         .arg_required_else_help(true)
         .subcommand(
             Command::new("list")
@@ -41,7 +45,7 @@ pub fn catalogs_cmd() -> Command {
                 .arg(
                     Arg::new("storage")
                         .long("storage")
-                        .help("List Tower-managed storage catalogs")
+                        .help(beta::STORAGE.short_about("List Tower-managed storage catalogs"))
                         .conflicts_with("type")
                         .action(ArgAction::SetTrue),
                 )
@@ -107,7 +111,10 @@ pub fn catalogs_cmd() -> Command {
                         .help("Print the vended OAuth token in normal output")
                         .action(ArgAction::SetTrue),
                 )
-                .about("Vend short-lived catalog credentials for external tools"),
+                .about(
+                    beta::STORAGE
+                        .short_about("Vend short-lived catalog credentials for external tools"),
+                ),
         )
 }
 
@@ -119,6 +126,10 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     } else {
         args.get_one::<String>("type").map(String::as_str)
     };
+
+    if is_storage_catalog_type(catalog_type) {
+        beta::notify_once(&beta::STORAGE);
+    }
 
     let catalogs = output::with_spinner(
         "Listing catalogs",
@@ -144,6 +155,8 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_credentials(config: Config, args: &ArgMatches) {
+    beta::notify_once(&beta::STORAGE);
+
     let name = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
@@ -184,11 +197,18 @@ pub async fn do_show(config: Config, args: &ArgMatches) {
 
     match api::describe_catalog(&config, name, &env).await {
         Ok(response) => {
+            if is_storage_catalog_type(Some(&response.catalog.r#type)) {
+                beta::notify_once(&beta::STORAGE);
+            }
             let human = catalog_details_text(&response);
             output::text(&human, &response);
         }
         Err(err) => output::tower_error_and_die(err, "Fetching catalog details failed"),
     }
+}
+
+fn is_storage_catalog_type(catalog_type: Option<&str>) -> bool {
+    catalog_type == Some(STORAGE_CATALOG_TYPE)
 }
 
 fn parse_mode(mode: &str) -> vend_catalog_credentials_body::Mode {
@@ -420,7 +440,9 @@ fn snippets(
 
 #[cfg(test)]
 mod tests {
-    use super::{catalogs_cmd, parse_mode, snippets, token_export_command};
+    use super::{
+        catalogs_cmd, is_storage_catalog_type, parse_mode, snippets, token_export_command,
+    };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
 
     #[test]
@@ -493,6 +515,44 @@ mod tests {
         let result =
             catalogs_cmd().try_get_matches_from(["catalogs", "list", "--storage", "--type", "s3"]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn storage_catalog_type_detection_is_scoped() {
+        assert!(is_storage_catalog_type(Some("tower-catalog")));
+        assert!(!is_storage_catalog_type(Some("snowflake-open-catalog")));
+        assert!(!is_storage_catalog_type(None));
+    }
+
+    #[test]
+    fn catalog_help_marks_storage_beta_in_short_and_long_help() {
+        let short_help = catalogs_cmd().render_help().to_string();
+        let long_help = catalogs_cmd().render_long_help().to_string();
+
+        for help in [short_help, long_help] {
+            assert!(help.contains("includes Storage [beta]"));
+            assert!(help.contains("Tower Storage is in beta."));
+        }
+    }
+
+    #[test]
+    fn storage_specific_command_and_flag_are_marked_beta() {
+        let mut command = catalogs_cmd();
+        let credentials_help = command
+            .find_subcommand_mut("credentials")
+            .expect("credentials command should exist")
+            .render_help()
+            .to_string();
+        assert!(credentials_help
+            .contains("Vend short-lived catalog credentials for external tools [beta]"));
+
+        let mut command = catalogs_cmd();
+        let list_help = command
+            .find_subcommand_mut("list")
+            .expect("list command should exist")
+            .render_help()
+            .to_string();
+        assert!(list_help.contains("List Tower-managed storage catalogs [beta]"));
     }
 
     #[test]

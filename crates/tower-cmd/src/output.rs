@@ -68,6 +68,11 @@ fn write_to_stderr(msg: &str) {
     stderr.flush().ok();
 }
 
+pub(crate) fn notice_to_stderr(label: &str, msg: &str) {
+    let line = format!("{} {}\n", label.bold().yellow(), msg);
+    write_to_stderr(&line);
+}
+
 pub fn set_output_mode(mode: OutputMode) {
     OUTPUT_MODE.set(mode).ok();
     if mode.is_mcp() {

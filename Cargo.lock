@@ -501,6 +501,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
+ "tempfile",
  "testutils",
  "tokio",
  "tower-api",
