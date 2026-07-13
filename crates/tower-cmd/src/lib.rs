@@ -151,6 +151,9 @@ impl App {
                     Some(("credentials", args)) => {
                         catalogs::do_credentials(&out, sessionized_config, args).await
                     }
+                    Some(("query", args)) => {
+                        catalogs::do_query(&out, sessionized_config, args).await
+                    }
                     _ => {
                         catalogs::catalogs_cmd().print_help().unwrap();
                         std::process::exit(2);

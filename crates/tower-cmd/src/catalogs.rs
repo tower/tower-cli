@@ -1,6 +1,7 @@
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
+use std::io::{IsTerminal, Read};
 use tower_api::models::{
     vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
 };
@@ -69,7 +70,7 @@ pub fn catalogs_cmd() -> Command {
                         .help("Environment the catalog belongs to")
                         .action(ArgAction::Set),
                 )
-                .about("Show the details of a catalog, including its property names"),
+                .about("Show the details of a catalog, including its properties and tables"),
         )
         .subcommand(
             Command::new("credentials")
@@ -114,6 +115,37 @@ pub fn catalogs_cmd() -> Command {
                 .about(
                     beta::STORAGE
                         .short_about("Vend short-lived catalog credentials for external tools"),
+                ),
+        )
+        .subcommand(
+            Command::new("query")
+                .arg(
+                    Arg::new("catalog_name")
+                        .value_parser(value_parser!(String))
+                        .index(1)
+                        .required(true)
+                        .help("Name of the catalog to query"),
+                )
+                .arg(
+                    Arg::new("sql")
+                        .short('s')
+                        .long("sql")
+                        .value_parser(value_parser!(String))
+                        .help("SQL statement to execute; read from stdin when omitted")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("environment")
+                        .short('e')
+                        .long("environment")
+                        .default_value("default")
+                        .value_parser(value_parser!(String))
+                        .help("Environment the catalog belongs to")
+                        .action(ArgAction::Set),
+                )
+                .about(beta::STORAGE.short_about("Run a SQL query against a catalog using DuckDB"))
+                .after_help(
+                    "Reference tables as <catalog>.<namespace>.<table>, e.g.:\n  tower catalogs query default --sql 'SELECT * FROM \"default\".my_namespace.my_table LIMIT 10'",
                 ),
         )
 }
@@ -197,15 +229,354 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
         .expect("catalog_name is required");
     let env = cmd::get_string_flag(args, "environment");
 
-    match api::describe_catalog(&config, name, &env).await {
-        Ok(response) => {
-            if is_storage_catalog_type(Some(&response.catalog.r#type)) {
-                beta::notify_once(out, &beta::STORAGE);
-            }
-            let human = catalog_details_text(&response);
-            out.text(&human, &response);
-        }
+    let response = match api::describe_catalog(&config, name, &env).await {
+        Ok(response) => response,
         Err(err) => out.tower_error_and_die(err, "Fetching catalog details failed"),
+    };
+
+    let is_storage = is_storage_catalog_type(Some(&response.catalog.r#type));
+    if is_storage {
+        beta::notify_once(out, &beta::STORAGE);
+    }
+
+    let tables = if is_storage {
+        Some(fetch_catalog_tables(out, &config, name, &env).await)
+    } else {
+        None
+    };
+
+    let mut human = catalog_details_text(&response);
+    human.push('\n');
+    human.push_str(&header_line("Tables"));
+    match &tables {
+        None => {
+            human.push_str(&format!(
+                "  Table listing is not supported for {} catalogs.\n",
+                response.catalog.r#type
+            ));
+        }
+        Some(Ok(result)) if result.rows.is_empty() => {
+            human.push_str("  No tables found.\n");
+        }
+        Some(Ok(result)) => {
+            let headers = vec!["Schema".to_string(), "Table".to_string()];
+            let data = result
+                .rows
+                .iter()
+                .map(|row| row.iter().map(json_value_to_cell).collect())
+                .collect();
+            human.push_str(&output::table_text(headers, data));
+        }
+        Some(Err(err)) => {
+            human.push_str(&format!("  Unable to list tables: {}\n", err));
+        }
+    }
+
+    // `tables` is null when the catalog type doesn't support listing, and an
+    // array (possibly empty) when it does.
+    let json_tables = match tables {
+        None => serde_json::Value::Null,
+        Some(result) => serde_json::Value::Array(
+            result
+                .map(|result| {
+                    result
+                        .rows
+                        .iter()
+                        .map(|row| {
+                            serde_json::json!({
+                                "schema": row.first().cloned().unwrap_or(serde_json::Value::Null),
+                                "table": row.get(1).cloned().unwrap_or(serde_json::Value::Null),
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+        ),
+    };
+    let json_data = serde_json::json!({
+        "catalog": response.catalog,
+        "tables": json_tables,
+    });
+    out.text(&human, &json_data);
+}
+
+/// Lists the tables in a catalog by attaching it in DuckDB. Unlike the query
+/// path this never exits: `show` should still render catalog details when the
+/// tables can't be fetched.
+async fn fetch_catalog_tables(
+    out: &output::Out,
+    config: &Config,
+    name: &str,
+    env: &str,
+) -> Result<QueryResult, String> {
+    let response = out
+        .try_with_spinner(
+            "Vending catalog credentials",
+            api::vend_catalog_credentials(
+                config,
+                name,
+                env,
+                vend_catalog_credentials_body::Mode::Read,
+            ),
+        )
+        .await
+        .map_err(|err| err.to_string())?;
+
+    let setup_sql = attach_statements(name, &response.credentials);
+    let sql = format!(
+        "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = {} ORDER BY \"schema\", name",
+        sql_string(name),
+    );
+
+    let mut spinner = out.spinner("Listing tables...");
+    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
+    match result {
+        Ok(Ok(query_result)) => {
+            spinner.success(out);
+            Ok(query_result)
+        }
+        Ok(Err(err)) => {
+            spinner.failure(out);
+            Err(err.to_string())
+        }
+        Err(err) => {
+            spinner.failure(out);
+            Err(err.to_string())
+        }
+    }
+}
+
+pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let name = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let env = cmd::get_string_flag(args, "environment");
+
+    let sql = match args.get_one::<String>("sql") {
+        Some(sql) => sql.clone(),
+        None => read_sql_from_stdin(out),
+    };
+    let sql = sql.trim().to_string();
+    if sql.is_empty() {
+        out.die("No SQL statement provided. Pass one with --sql or pipe it via stdin.");
+    }
+
+    let response = match api::describe_catalog(&config, name, &env).await {
+        Ok(response) => response,
+        Err(err) => out.tower_error_and_die(err, "Fetching catalog details failed"),
+    };
+    if !is_storage_catalog_type(Some(&response.catalog.r#type)) {
+        out.die(&format!(
+            "Querying is only supported for {} catalogs; '{}' has type '{}'.",
+            STORAGE_CATALOG_TYPE, name, response.catalog.r#type
+        ));
+    }
+
+    let query_result = execute_catalog_query(out, &config, name, &env, sql).await;
+    output_query_result(out, &query_result);
+}
+
+/// Vends read-only credentials for the catalog, attaches it in an in-memory
+/// DuckDB, and runs `sql` against it. Dies with a user-facing error on failure.
+async fn execute_catalog_query(
+    out: &output::Out,
+    config: &Config,
+    name: &str,
+    env: &str,
+    sql: String,
+) -> QueryResult {
+    let response = out
+        .with_spinner(
+            "Vending catalog credentials",
+            api::vend_catalog_credentials(
+                config,
+                name,
+                env,
+                vend_catalog_credentials_body::Mode::Read,
+            ),
+        )
+        .await;
+
+    let setup_sql = attach_statements(name, &response.credentials);
+    let mut spinner = out.spinner("Running query...");
+    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
+
+    match result {
+        Ok(Ok(query_result)) => {
+            spinner.success(out);
+            query_result
+        }
+        Ok(Err(err)) => {
+            spinner.failure(out);
+            out.die(&format!("Query failed: {}", err));
+        }
+        Err(err) => {
+            spinner.failure(out);
+            out.die(&format!("Query execution panicked: {}", err));
+        }
+    }
+}
+
+fn read_sql_from_stdin(out: &output::Out) -> String {
+    let mut stdin = std::io::stdin();
+    if stdin.is_terminal() {
+        out.die("No SQL statement provided. Pass one with --sql or pipe it via stdin.");
+    }
+    let mut sql = String::new();
+    if let Err(err) = stdin.read_to_string(&mut sql) {
+        out.die(&format!("Failed reading SQL from stdin: {}", err));
+    }
+    sql
+}
+
+struct QueryResult {
+    columns: Vec<String>,
+    rows: Vec<Vec<serde_json::Value>>,
+}
+
+/// SQL that installs the Iceberg support and attaches the catalog under its
+/// Tower name — mirrors `templates/duckdb.sql.tmpl`. No `USE`: DuckDB's `USE`
+/// needs a `main` schema, which Iceberg catalogs don't have, so queries must
+/// qualify tables as <catalog>.<namespace>.<table>.
+fn attach_statements(name: &str, credentials: &CatalogCredentials) -> String {
+    format!(
+        "INSTALL httpfs;\n\
+         LOAD httpfs;\n\
+         INSTALL iceberg;\n\
+         LOAD iceberg;\n\
+         SET s3_region='eu-central-1';\n\
+         CREATE OR REPLACE SECRET tower_cat (TYPE iceberg, TOKEN {token});\n\
+         ATTACH {warehouse} AS {name} (TYPE iceberg, SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1');\n",
+        token = sql_string(&credentials.oauth_token),
+        warehouse = sql_string(&credentials.warehouse),
+        name = sql_ident(name),
+        uri = sql_string(&credentials.catalog_uri),
+    )
+}
+
+fn run_duckdb_query(setup_sql: &str, query: &str) -> Result<QueryResult, duckdb::Error> {
+    let conn = duckdb::Connection::open_in_memory()?;
+    conn.execute_batch(setup_sql)?;
+
+    let mut stmt = conn.prepare(query)?;
+    let mut columns: Vec<String> = Vec::new();
+    let mut rows = Vec::new();
+
+    {
+        let mut result_rows = stmt.query([])?;
+        while let Some(row) = result_rows.next()? {
+            if columns.is_empty() {
+                columns = row.as_ref().column_names();
+            }
+            let mut record = Vec::with_capacity(columns.len());
+            for idx in 0..columns.len() {
+                let value: duckdb::types::Value = row.get(idx)?;
+                record.push(duckdb_value_to_json(value));
+            }
+            rows.push(record);
+        }
+    }
+
+    // A query with no result rows never populates columns above.
+    if columns.is_empty() {
+        columns = stmt.column_names();
+    }
+
+    Ok(QueryResult { columns, rows })
+}
+
+fn duckdb_value_to_json(value: duckdb::types::Value) -> serde_json::Value {
+    use duckdb::types::{TimeUnit, Value};
+    use serde_json::json;
+
+    match value {
+        Value::Null => serde_json::Value::Null,
+        Value::Boolean(v) => json!(v),
+        Value::TinyInt(v) => json!(v),
+        Value::SmallInt(v) => json!(v),
+        Value::Int(v) => json!(v),
+        Value::BigInt(v) => json!(v),
+        Value::HugeInt(v) => json!(v.to_string()),
+        Value::UTinyInt(v) => json!(v),
+        Value::USmallInt(v) => json!(v),
+        Value::UInt(v) => json!(v),
+        Value::UBigInt(v) => json!(v),
+        Value::Float(v) => json!(v),
+        Value::Double(v) => json!(v),
+        Value::Decimal(v) => json!(v.to_string()),
+        Value::Text(v) => json!(v),
+        Value::Timestamp(unit, v) => {
+            let micros = match unit {
+                TimeUnit::Second => v.checked_mul(1_000_000),
+                TimeUnit::Millisecond => v.checked_mul(1_000),
+                TimeUnit::Microsecond => Some(v),
+                TimeUnit::Nanosecond => Some(v / 1_000),
+            };
+            match micros.and_then(chrono::DateTime::from_timestamp_micros) {
+                Some(ts) => json!(ts.naive_utc().to_string()),
+                None => json!(format!("{:?}", Value::Timestamp(unit, v))),
+            }
+        }
+        Value::Date32(days) => {
+            let date = chrono::DateTime::from_timestamp(i64::from(days) * 86_400, 0);
+            match date {
+                Some(d) => json!(d.date_naive().to_string()),
+                None => json!(format!("{:?}", Value::Date32(days))),
+            }
+        }
+        Value::Time64(unit, v) => {
+            let micros = match unit {
+                TimeUnit::Second => v.checked_mul(1_000_000),
+                TimeUnit::Millisecond => v.checked_mul(1_000),
+                TimeUnit::Microsecond => Some(v),
+                TimeUnit::Nanosecond => Some(v / 1_000),
+            };
+            let time = micros.and_then(|m| {
+                chrono::NaiveTime::from_num_seconds_from_midnight_opt(
+                    (m / 1_000_000) as u32,
+                    ((m % 1_000_000) * 1_000) as u32,
+                )
+            });
+            match time {
+                Some(t) => json!(t.to_string()),
+                None => json!(format!("{:?}", Value::Time64(unit, v))),
+            }
+        }
+        other => json!(format!("{:?}", other)),
+    }
+}
+
+fn output_query_result(out: &output::Out, result: &QueryResult) {
+    let json_rows: Vec<serde_json::Map<String, serde_json::Value>> = result
+        .rows
+        .iter()
+        .map(|row| {
+            result
+                .columns
+                .iter()
+                .cloned()
+                .zip(row.iter().cloned())
+                .collect()
+        })
+        .collect();
+
+    let data = result
+        .rows
+        .iter()
+        .map(|row| row.iter().map(json_value_to_cell).collect())
+        .collect();
+
+    out.table(result.columns.clone(), data, Some(&json_rows));
+    out.note(&format!("\n{} row(s)\n", result.rows.len()));
+}
+
+fn json_value_to_cell(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
     }
 }
 
@@ -443,7 +814,8 @@ fn snippets(
 #[cfg(test)]
 mod tests {
     use super::{
-        catalogs_cmd, is_storage_catalog_type, parse_mode, snippets, token_export_command,
+        attach_statements, catalogs_cmd, duckdb_value_to_json, is_storage_catalog_type,
+        parse_mode, run_duckdb_query, snippets, token_export_command,
     };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
 
@@ -635,6 +1007,149 @@ mod tests {
             parse_mode(credentials_args.get_one::<String>("mode").unwrap()),
             vend_catalog_credentials_body::Mode::ReadWrite
         );
+    }
+
+    #[test]
+    fn only_tower_catalogs_are_queryable() {
+        assert!(super::is_storage_catalog("tower-catalog"));
+        assert!(!super::is_storage_catalog("snowflake"));
+        assert!(!super::is_storage_catalog(""));
+    }
+
+    #[test]
+    fn show_all_tables_query_lists_tables() {
+        let result = run_duckdb_query(
+            "CREATE SCHEMA s; CREATE TABLE s.t1 (i INTEGER); CREATE TABLE s.t2 (i INTEGER);",
+            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = 'memory' ORDER BY \"schema\", name",
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.columns, vec!["schema", "name"]);
+        assert_eq!(
+            result.rows,
+            vec![
+                vec![serde_json::json!("s"), serde_json::json!("t1")],
+                vec![serde_json::json!("s"), serde_json::json!("t2")],
+            ]
+        );
+    }
+
+    #[test]
+    fn query_requires_catalog_name() {
+        let result = catalogs_cmd().try_get_matches_from(["catalogs", "query"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn query_accepts_sql_flag_and_environment() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "query",
+                "my-catalog",
+                "--sql",
+                "SELECT 1",
+                "-e",
+                "production",
+            ])
+            .expect("query with --sql should parse");
+
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+
+        assert_eq!(
+            query_args.get_one::<String>("catalog_name").unwrap(),
+            "my-catalog"
+        );
+        assert_eq!(query_args.get_one::<String>("sql").unwrap(), "SELECT 1");
+        assert_eq!(
+            query_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
+    }
+
+    #[test]
+    fn query_sql_flag_is_optional() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "query", "my-catalog"])
+            .expect("query without --sql should parse");
+
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+
+        assert!(query_args.get_one::<String>("sql").is_none());
+        assert_eq!(
+            query_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn attach_statements_escapes_values_and_uses_catalog() {
+        let credentials = CatalogCredentials::new(
+            "https://catalog.example.com".to_string(),
+            "2026-06-26T12:00:00Z".to_string(),
+            "read".to_string(),
+            "secret'token".to_string(),
+            "warehouse-id".to_string(),
+        );
+
+        let sql = attach_statements("my\"catalog", &credentials);
+
+        assert!(sql.contains("TOKEN 'secret''token'"));
+        assert!(sql.contains("ATTACH 'warehouse-id' AS \"my\"\"catalog\""));
+        assert!(sql.contains("ENDPOINT 'https://catalog.example.com'"));
+        assert!(!sql.contains("USE "));
+    }
+
+    #[test]
+    fn duckdb_values_convert_to_json() {
+        use duckdb::types::{TimeUnit, Value};
+
+        assert_eq!(duckdb_value_to_json(Value::Null), serde_json::Value::Null);
+        assert_eq!(
+            duckdb_value_to_json(Value::BigInt(42)),
+            serde_json::json!(42)
+        );
+        assert_eq!(
+            duckdb_value_to_json(Value::Text("hi".to_string())),
+            serde_json::json!("hi")
+        );
+        assert_eq!(
+            duckdb_value_to_json(Value::Timestamp(TimeUnit::Microsecond, 0)),
+            serde_json::json!("1970-01-01 00:00:00")
+        );
+        assert_eq!(
+            duckdb_value_to_json(Value::Date32(1)),
+            serde_json::json!("1970-01-02")
+        );
+    }
+
+    #[test]
+    fn run_duckdb_query_returns_columns_and_rows() {
+        let result = run_duckdb_query(
+            "CREATE TABLE t (id INTEGER, name VARCHAR); INSERT INTO t VALUES (1, 'a'), (2, NULL);",
+            "SELECT id, name FROM t ORDER BY id",
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.columns, vec!["id", "name"]);
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(
+            result.rows[0],
+            vec![serde_json::json!(1), serde_json::json!("a")]
+        );
+        assert_eq!(
+            result.rows[1],
+            vec![serde_json::json!(2), serde_json::Value::Null]
+        );
+    }
+
+    #[test]
+    fn run_duckdb_query_reports_columns_for_empty_results() {
+        let result =
+            run_duckdb_query("", "SELECT 1 AS x WHERE 1 = 0").expect("query should succeed");
+
+        assert_eq!(result.columns, vec!["x"]);
+        assert!(result.rows.is_empty());
     }
 
     #[test]
