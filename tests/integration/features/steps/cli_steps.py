@@ -606,4 +606,4 @@ def step_last_deploy_has_git_sha(context):
 @then("the CLI output should indicate the version was reused")
 def step_output_indicates_reuse(context):
     output = _strip_ansi(context.cli_output)
-    assert "Reusing version" in output, f"Expected a reuse hint, got: {output}"
+    assert "No changes since commit" in output, f"Expected a reuse hint, got: {output}"
