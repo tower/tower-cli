@@ -309,18 +309,22 @@ async fn fetch_catalog_tables(
     name: &str,
     env: &str,
 ) -> Result<QueryResult, String> {
-    let response = out
-        .try_with_spinner(
-            "Vending catalog credentials",
-            api::vend_catalog_credentials(
-                config,
-                name,
-                env,
-                vend_catalog_credentials_body::Mode::Read,
-            ),
-        )
-        .await
-        .map_err(|err| err.to_string())?;
+    let mut spinner = out.spinner("Listing tables...");
+
+    let response = match api::vend_catalog_credentials(
+        config,
+        name,
+        env,
+        vend_catalog_credentials_body::Mode::Read,
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(err) => {
+            spinner.failure(out);
+            return Err(err.to_string());
+        }
+    };
 
     let setup_sql = attach_statements(name, &response.credentials);
     let sql = format!(
@@ -328,7 +332,6 @@ async fn fetch_catalog_tables(
         sql_string(name),
     );
 
-    let mut spinner = out.spinner("Listing tables...");
     let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
     match result {
         Ok(Ok(query_result)) => {
@@ -387,20 +390,24 @@ async fn execute_catalog_query(
     env: &str,
     sql: String,
 ) -> QueryResult {
-    let response = out
-        .with_spinner(
-            "Vending catalog credentials",
-            api::vend_catalog_credentials(
-                config,
-                name,
-                env,
-                vend_catalog_credentials_body::Mode::Read,
-            ),
-        )
-        .await;
+    let mut spinner = out.spinner("Running query...");
+
+    let response = match api::vend_catalog_credentials(
+        config,
+        name,
+        env,
+        vend_catalog_credentials_body::Mode::Read,
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(err) => {
+            spinner.failure(out);
+            out.tower_error_and_die(err, "Running query failed");
+        }
+    };
 
     let setup_sql = attach_statements(name, &response.credentials);
-    let mut spinner = out.spinner("Running query...");
     let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
 
     match result {
@@ -448,7 +455,7 @@ fn attach_statements(name: &str, credentials: &CatalogCredentials) -> String {
          LOAD iceberg;\n\
          SET s3_region='eu-central-1';\n\
          CREATE OR REPLACE SECRET tower_cat (TYPE iceberg, TOKEN {token});\n\
-         ATTACH {warehouse} AS {name} (TYPE iceberg, SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1');\n",
+         ATTACH {warehouse} AS {name} (TYPE iceberg, READ_ONLY, SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1');\n",
         token = sql_string(&credentials.oauth_token),
         warehouse = sql_string(&credentials.warehouse),
         name = sql_ident(name),
@@ -1095,7 +1102,9 @@ mod tests {
         let sql = attach_statements("my\"catalog", &credentials);
 
         assert!(sql.contains("TOKEN 'secret''token'"));
-        assert!(sql.contains("ATTACH 'warehouse-id' AS \"my\"\"catalog\""));
+        assert!(
+            sql.contains("ATTACH 'warehouse-id' AS \"my\"\"catalog\" (TYPE iceberg, READ_ONLY,")
+        );
         assert!(sql.contains("ENDPOINT 'https://catalog.example.com'"));
         assert!(!sql.contains("USE "));
     }
