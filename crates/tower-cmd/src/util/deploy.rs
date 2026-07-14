@@ -19,6 +19,7 @@ pub async fn upload_file_with_progress(
     endpoint_url: String,
     file_path: PathBuf,
     content_type: &str,
+    idempotency_key: Option<&str>,
     progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let package_hash = match compute_sha256_file(&file_path).await {
@@ -56,6 +57,13 @@ pub async fn upload_file_with_progress(
         .header("Content-Type", content_type)
         .header("Content-Encoding", "gzip")
         .body(Body::wrap_stream(progress_stream));
+
+    // When supplied, ask the server to reuse an existing AppVersion that was
+    // deployed with the same key (e.g. a git commit SHA) instead of creating a
+    // new one.
+    if let Some(key) = idempotency_key {
+        req = req.header("X-Tower-Idempotency-Key", key);
+    }
 
     // Add authorization if available. Mirrors the generated tower-api client: prefer a
     // bearer token (interactive session), otherwise fall back to the API key header set
@@ -107,6 +115,7 @@ pub async fn deploy_app_package(
     package: Package,
     environment: Option<&str>,
     all_environments: bool,
+    idempotency_key: Option<&str>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
@@ -150,6 +159,7 @@ pub async fn deploy_app_package(
         url,
         package_path,
         "application/tar",
+        idempotency_key,
         progress_callback,
     )
     .await?;

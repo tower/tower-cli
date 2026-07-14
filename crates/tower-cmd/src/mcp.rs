@@ -812,7 +812,20 @@ impl TowerService {
         let env = request.environment.unwrap_or_else(|| "default".to_string());
         let deploy_target = deploy::DeployTarget::Environment(env);
 
-        match deploy::deploy_from_dir(self.config.clone(), working_dir, true, deploy_target).await {
+        // Auto-detect the idempotency key from git (clean tree HEAD) just like
+        // the CLI deploy command does, so repeated deploys of unchanged source
+        // collapse to a single AppVersion server-side.
+        let idempotency_key = crate::util::git::clean_head_sha(&working_dir);
+
+        match deploy::deploy_from_dir(
+            self.config.clone(),
+            working_dir,
+            true,
+            deploy_target,
+            idempotency_key,
+        )
+        .await
+        {
             Ok(_) => Self::text_success("Deploy completed successfully".to_string()),
             Err(e) => Self::error_result("Deploy failed", e),
         }

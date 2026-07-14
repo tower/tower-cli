@@ -115,6 +115,19 @@ pub fn success(msg: &str) {
     success_with_data(msg, None::<serde_json::Value>);
 }
 
+pub fn muted(msg: &str) {
+    if get_output_mode().is_json() {
+        let response = serde_json::json!({
+            "result": "muted",
+            "message": msg
+        });
+        json(&response);
+    } else {
+        let line = msg.dimmed();
+        write(&line);
+    }
+}
+
 pub fn success_with_data<T: Serialize>(msg: &str, data: Option<T>) {
     let mut response = serde_json::json!({
         "result": "success",
