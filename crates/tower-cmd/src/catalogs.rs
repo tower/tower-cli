@@ -143,6 +143,13 @@ pub fn catalogs_cmd() -> Command {
                         .help("Environment the catalog belongs to")
                         .action(ArgAction::Set),
                 )
+                .arg(
+                    Arg::new("write")
+                        .short('w')
+                        .long("write")
+                        .help("Allow write statements by vending read-write credentials; queries are read-only by default")
+                        .action(ArgAction::SetTrue),
+                )
                 .about(beta::STORAGE.short_about("Run a SQL query against a catalog using DuckDB"))
                 .after_help(
                     "Reference tables as <catalog>.<namespace>.<table>, e.g.:\n  tower catalogs query default --sql 'SELECT * FROM \"default\".my_namespace.my_table LIMIT 10'",
@@ -326,7 +333,7 @@ async fn fetch_catalog_tables(
         }
     };
 
-    let setup_sql = attach_statements(name, &response.credentials);
+    let setup_sql = attach_statements(name, &response.credentials, true);
     let sql = format!(
         "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = {} ORDER BY \"schema\", name",
         sql_string(name),
@@ -377,29 +384,32 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
         ));
     }
 
-    let query_result = execute_catalog_query(out, &config, name, &env, sql).await;
+    let write = cmd::get_bool_flag(args, "write");
+    let query_result = execute_catalog_query(out, &config, name, &env, sql, write).await;
     output_query_result(out, &query_result);
 }
 
-/// Vends read-only credentials for the catalog, attaches it in an in-memory
-/// DuckDB, and runs `sql` against it. Dies with a user-facing error on failure.
+/// Vends credentials for the catalog, attaches it in an in-memory DuckDB, and
+/// runs `sql` against it. Read-only unless `write` is set, in which case
+/// read-write credentials are vended and the attach allows writes. Dies with a
+/// user-facing error on failure.
 async fn execute_catalog_query(
     out: &output::Out,
     config: &Config,
     name: &str,
     env: &str,
     sql: String,
+    write: bool,
 ) -> QueryResult {
+    let mode = if write {
+        vend_catalog_credentials_body::Mode::ReadWrite
+    } else {
+        vend_catalog_credentials_body::Mode::Read
+    };
+
     let mut spinner = out.spinner("Running query...");
 
-    let response = match api::vend_catalog_credentials(
-        config,
-        name,
-        env,
-        vend_catalog_credentials_body::Mode::Read,
-    )
-    .await
-    {
+    let response = match api::vend_catalog_credentials(config, name, env, mode).await {
         Ok(response) => response,
         Err(err) => {
             spinner.failure(out);
@@ -407,7 +417,7 @@ async fn execute_catalog_query(
         }
     };
 
-    let setup_sql = attach_statements(name, &response.credentials);
+    let setup_sql = attach_statements(name, &response.credentials, !write);
     let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
 
     match result {
@@ -447,7 +457,7 @@ struct QueryResult {
 /// Tower name — mirrors `templates/duckdb.sql.tmpl`. No `USE`: DuckDB's `USE`
 /// needs a `main` schema, which Iceberg catalogs don't have, so queries must
 /// qualify tables as <catalog>.<namespace>.<table>.
-fn attach_statements(name: &str, credentials: &CatalogCredentials) -> String {
+fn attach_statements(name: &str, credentials: &CatalogCredentials, read_only: bool) -> String {
     format!(
         "INSTALL httpfs;\n\
          LOAD httpfs;\n\
@@ -455,7 +465,8 @@ fn attach_statements(name: &str, credentials: &CatalogCredentials) -> String {
          LOAD iceberg;\n\
          SET s3_region='eu-central-1';\n\
          CREATE OR REPLACE SECRET tower_cat (TYPE iceberg, TOKEN {token});\n\
-         ATTACH {warehouse} AS {name} (TYPE iceberg, READ_ONLY, SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1');\n",
+         ATTACH {warehouse} AS {name} (TYPE iceberg, {read_only}SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1');\n",
+        read_only = if read_only { "READ_ONLY, " } else { "" },
         token = sql_string(&credentials.oauth_token),
         warehouse = sql_string(&credentials.warehouse),
         name = sql_ident(name),
@@ -1099,7 +1110,7 @@ mod tests {
             "warehouse-id".to_string(),
         );
 
-        let sql = attach_statements("my\"catalog", &credentials);
+        let sql = attach_statements("my\"catalog", &credentials, true);
 
         assert!(sql.contains("TOKEN 'secret''token'"));
         assert!(
@@ -1107,6 +1118,34 @@ mod tests {
         );
         assert!(sql.contains("ENDPOINT 'https://catalog.example.com'"));
         assert!(!sql.contains("USE "));
+
+        let write_sql = attach_statements("my\"catalog", &credentials, false);
+        assert!(!write_sql.contains("READ_ONLY"));
+        assert!(write_sql.contains(
+            "ATTACH 'warehouse-id' AS \"my\"\"catalog\" (TYPE iceberg, SECRET tower_cat,"
+        ));
+    }
+
+    #[test]
+    fn query_write_flag_defaults_to_false() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "query", "my-catalog", "--sql", "SELECT 1"])
+            .expect("query should parse");
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+        assert_eq!(query_args.get_one::<bool>("write").copied(), Some(false));
+
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "query",
+                "my-catalog",
+                "--sql",
+                "DELETE FROM t",
+                "--write",
+            ])
+            .expect("query --write should parse");
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+        assert_eq!(query_args.get_one::<bool>("write").copied(), Some(true));
     }
 
     #[test]
