@@ -3,6 +3,7 @@ use config::{Config, Session};
 
 pub mod api;
 mod apps;
+mod beta;
 mod catalogs;
 mod deploy;
 mod environments;
@@ -303,4 +304,19 @@ fn root_cmd() -> Command {
         .subcommand(teams::teams_cmd())
         .subcommand(mcp::mcp_cmd())
         .subcommand(skill::skill_cmd())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::root_cmd;
+
+    #[test]
+    fn root_help_scopes_beta_label_to_storage() {
+        let help = root_cmd().render_help().to_string();
+
+        assert!(help.contains(
+            "Interact with the catalogs in your Tower account (includes Storage [beta])"
+        ));
+        assert!(!help.contains("catalogs [beta]"));
+    }
 }
