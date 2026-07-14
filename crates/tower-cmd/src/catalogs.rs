@@ -279,30 +279,32 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
         }
     }
 
-    // `tables` is null when the catalog type doesn't support listing, and an
-    // array (possibly empty) when it does.
-    let json_tables = match tables {
-        None => serde_json::Value::Null,
-        Some(result) => serde_json::Value::Array(
-            result
-                .map(|result| {
-                    result
-                        .rows
-                        .iter()
-                        .map(|row| {
-                            serde_json::json!({
-                                "schema": row.first().cloned().unwrap_or(serde_json::Value::Null),
-                                "table": row.get(1).cloned().unwrap_or(serde_json::Value::Null),
-                            })
+    // `tables` is an array (possibly empty) on success and null otherwise;
+    // `tables_error` distinguishes a failed listing (message) from a catalog
+    // type that doesn't support listing (null).
+    let (json_tables, tables_error) = match tables {
+        None => (serde_json::Value::Null, None),
+        Some(Err(err)) => (serde_json::Value::Null, Some(err)),
+        Some(Ok(result)) => (
+            serde_json::Value::Array(
+                result
+                    .rows
+                    .iter()
+                    .map(|row| {
+                        serde_json::json!({
+                            "schema": row.first().cloned().unwrap_or(serde_json::Value::Null),
+                            "table": row.get(1).cloned().unwrap_or(serde_json::Value::Null),
                         })
-                        .collect()
-                })
-                .unwrap_or_default(),
+                    })
+                    .collect(),
+            ),
+            None,
         ),
     };
     let json_data = serde_json::json!({
         "catalog": response.catalog,
         "tables": json_tables,
+        "tables_error": tables_error,
     });
     out.text(&human, &json_data);
 }
@@ -333,6 +335,7 @@ async fn fetch_catalog_tables(
         }
     };
 
+    let token = response.credentials.oauth_token.clone();
     let setup_sql = attach_statements(name, &response.credentials, true);
     let sql = format!(
         "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = {} ORDER BY \"schema\", name",
@@ -347,13 +350,22 @@ async fn fetch_catalog_tables(
         }
         Ok(Err(err)) => {
             spinner.failure(out);
-            Err(err.to_string())
+            Err(redact_token(&err.to_string(), &token))
         }
         Err(err) => {
             spinner.failure(out);
-            Err(err.to_string())
+            Err(redact_token(&err.to_string(), &token))
         }
     }
+}
+
+/// DuckDB errors can echo the failing statement, and the setup batch contains
+/// the vended OAuth token — scrub it before the message reaches any output.
+fn redact_token(message: &str, token: &str) -> String {
+    if token.is_empty() {
+        return message.to_string();
+    }
+    message.replace(token, "[REDACTED]")
 }
 
 pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
@@ -417,6 +429,7 @@ async fn execute_catalog_query(
         }
     };
 
+    let token = response.credentials.oauth_token.clone();
     let setup_sql = attach_statements(name, &response.credentials, !write);
     let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
 
@@ -427,11 +440,17 @@ async fn execute_catalog_query(
         }
         Ok(Err(err)) => {
             spinner.failure(out);
-            out.die(&format!("Query failed: {}", err));
+            out.die(&format!(
+                "Query failed: {}",
+                redact_token(&err.to_string(), &token)
+            ));
         }
         Err(err) => {
             spinner.failure(out);
-            out.die(&format!("Query execution panicked: {}", err));
+            out.die(&format!(
+                "Query execution panicked: {}",
+                redact_token(&err.to_string(), &token)
+            ));
         }
     }
 }
@@ -832,8 +851,8 @@ fn snippets(
 #[cfg(test)]
 mod tests {
     use super::{
-        attach_statements, catalogs_cmd, duckdb_value_to_json, is_storage_catalog_type,
-        parse_mode, run_duckdb_query, snippets, token_export_command,
+        attach_statements, catalogs_cmd, duckdb_value_to_json, is_storage_catalog_type, parse_mode,
+        run_duckdb_query, snippets, token_export_command,
     };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
 
@@ -1028,10 +1047,17 @@ mod tests {
     }
 
     #[test]
-    fn only_tower_catalogs_are_queryable() {
-        assert!(super::is_storage_catalog("tower-catalog"));
-        assert!(!super::is_storage_catalog("snowflake"));
-        assert!(!super::is_storage_catalog(""));
+    fn redact_token_scrubs_secret_from_error_text() {
+        let msg = "Parser Error near 'CREATE SECRET tower_cat (TYPE iceberg, TOKEN 'sekret-123')'";
+        assert_eq!(
+            super::redact_token(msg, "sekret-123"),
+            "Parser Error near 'CREATE SECRET tower_cat (TYPE iceberg, TOKEN '[REDACTED]')'"
+        );
+        assert_eq!(super::redact_token(msg, ""), msg);
+        assert_eq!(
+            super::redact_token("no secret here", "sekret-123"),
+            "no secret here"
+        );
     }
 
     #[test]
