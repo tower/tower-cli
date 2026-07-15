@@ -13,12 +13,18 @@ use tower_telemetry::debug;
 /// This is used to auto-populate the `X-Tower-Idempotency-Key` header on deploy.
 pub fn clean_head_sha(dir: &Path) -> Option<String> {
     if !is_inside_work_tree(dir) {
-        debug!("{:?} is not inside a git worktree; skipping idempotency key", dir);
+        debug!(
+            "{:?} is not inside a git worktree; skipping idempotency key",
+            dir
+        );
         return None;
     }
 
     if is_dirty(dir) {
-        debug!("git worktree at {:?} is dirty; omitting idempotency key", dir);
+        debug!(
+            "git worktree at {:?} is dirty; omitting idempotency key",
+            dir
+        );
         return None;
     }
 
@@ -43,8 +49,7 @@ fn is_inside_work_tree(dir: &Path) -> bool {
         None => return false,
     };
 
-    output.status.success()
-        && String::from_utf8_lossy(&output.stdout).trim() == "true"
+    output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "true"
 }
 
 /// Returns `true` when there are staged, unstaged, or untracked changes in the
