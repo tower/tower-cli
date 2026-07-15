@@ -83,9 +83,11 @@ impl App {
             config.clone()
         };
 
-        if config.json {
-            output::set_output_mode(output::OutputMode::Json);
-        }
+        let out = if config.json {
+            output::Out::json_stdout()
+        } else {
+            output::Out::human()
+        };
 
         if config.debug {
             // Set log level to "DEBUG"
@@ -120,18 +122,20 @@ impl App {
         }
 
         match matches.subcommand() {
-            Some(("login", args)) => session::do_login(config, args).await,
-            Some(("version", _)) => version::do_version().await,
+            Some(("login", args)) => session::do_login(&out, config, args).await,
+            Some(("version", _)) => version::do_version(&out).await,
             Some(("apps", sub_matches)) => {
                 let apps_command = sub_matches.subcommand();
 
                 match apps_command {
-                    Some(("list", args)) => apps::do_list_apps(sessionized_config, args).await,
-                    Some(("create", args)) => apps::do_create(sessionized_config, args).await,
-                    Some(("show", args)) => apps::do_show(sessionized_config, args).await,
-                    Some(("logs", args)) => apps::do_logs(sessionized_config, args).await,
-                    Some(("delete", args)) => apps::do_delete(sessionized_config, args).await,
-                    Some(("cancel", args)) => apps::do_cancel(sessionized_config, args).await,
+                    Some(("list", args)) => {
+                        apps::do_list_apps(&out, sessionized_config, args).await
+                    }
+                    Some(("create", args)) => apps::do_create(&out, sessionized_config, args).await,
+                    Some(("show", args)) => apps::do_show(&out, sessionized_config, args).await,
+                    Some(("logs", args)) => apps::do_logs(&out, sessionized_config, args).await,
+                    Some(("delete", args)) => apps::do_delete(&out, sessionized_config, args).await,
+                    Some(("cancel", args)) => apps::do_cancel(&out, sessionized_config, args).await,
                     _ => {
                         apps::apps_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -142,10 +146,10 @@ impl App {
                 let catalogs_command = sub_matches.subcommand();
 
                 match catalogs_command {
-                    Some(("list", args)) => catalogs::do_list(sessionized_config, args).await,
-                    Some(("show", args)) => catalogs::do_show(sessionized_config, args).await,
+                    Some(("list", args)) => catalogs::do_list(&out, sessionized_config, args).await,
+                    Some(("show", args)) => catalogs::do_show(&out, sessionized_config, args).await,
                     Some(("credentials", args)) => {
-                        catalogs::do_credentials(sessionized_config, args).await
+                        catalogs::do_credentials(&out, sessionized_config, args).await
                     }
                     _ => {
                         catalogs::catalogs_cmd().print_help().unwrap();
@@ -157,9 +161,13 @@ impl App {
                 let secrets_command = sub_matches.subcommand();
 
                 match secrets_command {
-                    Some(("list", args)) => secrets::do_list(sessionized_config, args).await,
-                    Some(("create", args)) => secrets::do_create(sessionized_config, args).await,
-                    Some(("delete", args)) => secrets::do_delete(sessionized_config, args).await,
+                    Some(("list", args)) => secrets::do_list(&out, sessionized_config, args).await,
+                    Some(("create", args)) => {
+                        secrets::do_create(&out, sessionized_config, args).await
+                    }
+                    Some(("delete", args)) => {
+                        secrets::do_delete(&out, sessionized_config, args).await
+                    }
                     _ => {
                         secrets::secrets_cmd().print_help().unwrap();
                         std::process::exit(2);
@@ -170,12 +178,12 @@ impl App {
                 let environments_command = sub_matches.subcommand();
 
                 match environments_command {
-                    Some(("list", _)) => environments::do_list(sessionized_config).await,
+                    Some(("list", _)) => environments::do_list(&out, sessionized_config).await,
                     Some(("create", args)) => {
-                        environments::do_create(sessionized_config, args).await
+                        environments::do_create(&out, sessionized_config, args).await
                     }
                     Some(("delete", args)) => {
-                        environments::do_delete(sessionized_config, args).await
+                        environments::do_delete(&out, sessionized_config, args).await
                     }
                     _ => {
                         environments::environments_cmd().print_help().unwrap();
@@ -186,25 +194,35 @@ impl App {
                 let schedules_command = sub_matches.subcommand();
 
                 match schedules_command {
-                    Some(("list", args)) => schedules::do_list(sessionized_config, args).await,
-                    Some(("create", args)) => schedules::do_create(sessionized_config, args).await,
-                    Some(("update", args)) => schedules::do_update(sessionized_config, args).await,
-                    Some(("delete", args)) => schedules::do_delete(sessionized_config, args).await,
+                    Some(("list", args)) => {
+                        schedules::do_list(&out, sessionized_config, args).await
+                    }
+                    Some(("create", args)) => {
+                        schedules::do_create(&out, sessionized_config, args).await
+                    }
+                    Some(("update", args)) => {
+                        schedules::do_update(&out, sessionized_config, args).await
+                    }
+                    Some(("delete", args)) => {
+                        schedules::do_delete(&out, sessionized_config, args).await
+                    }
                     _ => {
                         schedules::schedules_cmd().print_help().unwrap();
                         std::process::exit(2);
                     }
                 }
             }
-            Some(("deploy", args)) => deploy::do_deploy(sessionized_config, args).await,
-            Some(("package", args)) => package::do_package(sessionized_config, args).await,
-            Some(("run", args)) => run::do_run(sessionized_config, args).await,
+            Some(("deploy", args)) => deploy::do_deploy(&out, sessionized_config, args).await,
+            Some(("package", args)) => package::do_package(&out, sessionized_config, args).await,
+            Some(("run", args)) => run::do_run(&out, sessionized_config, args).await,
             Some(("teams", sub_matches)) => {
                 let teams_command = sub_matches.subcommand();
 
                 match teams_command {
-                    Some(("list", _)) => teams::do_list(sessionized_config).await,
-                    Some(("switch", args)) => teams::do_switch(sessionized_config, args).await,
+                    Some(("list", _)) => teams::do_list(&out, sessionized_config).await,
+                    Some(("switch", args)) => {
+                        teams::do_switch(&out, sessionized_config, args).await
+                    }
                     _ => {
                         teams::teams_cmd().print_help().unwrap();
                         std::process::exit(2);

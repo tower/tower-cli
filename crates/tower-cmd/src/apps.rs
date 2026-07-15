@@ -1,4 +1,5 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
+use colored::Colorize;
 use config::Config;
 use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration, Instant};
@@ -116,123 +117,118 @@ pub fn apps_cmd() -> Command {
         )
 }
 
-pub async fn do_logs(config: Config, cmd: &ArgMatches) {
+pub async fn do_logs(out: &output::Out, config: Config, cmd: &ArgMatches) {
     let app_name_raw = cmd
         .get_one::<String>("app_name")
         .expect("app_name is required");
     let (name, seq) = if let Some((name, num_str)) = app_name_raw.split_once('#') {
         let num = num_str
             .parse::<i64>()
-            .unwrap_or_else(|_| output::die("Run number must be a number"));
+            .unwrap_or_else(|_| out.die("Run number must be a number"));
         (name.to_string(), num)
     } else {
         let num = match cmd.get_one::<i64>("run_number").copied() {
             Some(n) => n,
-            None => latest_run_number(&config, app_name_raw).await,
+            None => latest_run_number(out, &config, app_name_raw).await,
         };
         (app_name_raw.clone(), num)
     };
     let follow = cmd.get_one::<bool>("follow").copied().unwrap_or(false);
 
     if follow {
-        follow_logs(config, name, seq).await;
+        follow_logs(out, config, name, seq).await;
         return;
     }
 
     if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
         for line in resp.log_lines {
-            output::remote_log_event(&line);
+            out.remote_log_event(&line);
         }
     }
 }
 
-pub async fn do_show(config: Config, cmd: &ArgMatches) {
+pub async fn do_show(out: &output::Out, config: Config, cmd: &ArgMatches) {
     let name = cmd
         .get_one::<String>("app_name")
         .expect("app_name is required");
     let env = cmd::get_string_flag(cmd, "environment");
 
     match api::describe_app(&config, &name, Some(&env)).await {
-        Ok(app_response) => {
-            if output::get_output_mode().is_json() {
-                output::json(&app_response);
-                return;
-            }
-
-            let app = &app_response.app;
-            let runs = &app_response.runs;
-
-            output::detail("Name", &app.name);
-            output::header("Description");
-            let line = output::paragraph(&app.short_description);
-            output::write(&line);
-            output::newline();
-            output::newline();
-            output::header("Recent runs");
-
-            let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
-                .into_iter()
-                .map(str::to_string)
-                .collect();
-
-            let rows = runs
-                .iter()
-                .map(|run: &Run| {
-                    let status = &run.status;
-                    let status_str = format!("{:?}", status);
-
-                    // Format start time
-                    let start_time = if let Some(started_at) = &run.started_at {
-                        if !started_at.is_empty() {
-                            started_at.to_string()
-                        } else {
-                            format!("Scheduled at {}", &run.scheduled_at)
-                        }
-                    } else {
-                        format!("Scheduled at {}", &run.scheduled_at)
-                    };
-
-                    // Calculate elapsed time
-                    let elapsed_time = if let Some(ended_at) = &run.ended_at {
-                        if !ended_at.is_empty() {
-                            if let (Some(started_at), Some(ended_at)) =
-                                (&run.started_at, &run.ended_at)
-                            {
-                                let start =
-                                    started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                let end = ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
-                                if let (Some(start), Some(end)) = (start, end) {
-                                    format!("{:.1}s", (end - start).num_seconds())
-                                } else {
-                                    "Invalid time".into()
-                                }
-                            } else {
-                                "Invalid time".into()
-                            }
-                        } else if run.started_at.is_some() {
-                            "Running".into()
-                        } else {
-                            "Pending".into()
-                        }
-                    } else if run.started_at.is_some() {
-                        "Running".into()
-                    } else {
-                        "Pending".into()
-                    };
-
-                    vec![run.number.to_string(), status_str, start_time, elapsed_time]
-                })
-                .collect();
-
-            output::table(headers, rows, Some(&app_response));
-        }
-        Err(err) => output::tower_error_and_die(err, "Fetching app details failed"),
+        Ok(app_response) => out.text(&app_details_text(&app_response), &app_response),
+        Err(err) => out.tower_error_and_die(err, "Fetching app details failed"),
     }
 }
 
-pub async fn do_list_apps(config: Config, args: &ArgMatches) {
+fn app_details_text(response: &tower_api::models::DescribeAppResponse) -> String {
+    let app = &response.app;
+    let mut text = String::new();
+
+    text.push_str(&format!("{} {}\n", "Name:".bold().green(), app.name));
+    text.push_str(&format!("{}\n", "Description".bold().green()));
+    text.push_str(&output::paragraph(&app.short_description));
+    text.push_str("\n\n");
+    text.push_str(&format!("{}\n", "Recent runs".bold().green()));
+
+    let headers = vec!["#", "Status", "Start Time", "Elapsed Time"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+    let rows = response
+        .runs
+        .iter()
+        .map(|run: &Run| {
+            let status_str = format!("{:?}", &run.status);
+
+            // Format start time
+            let start_time = if let Some(started_at) = &run.started_at {
+                if !started_at.is_empty() {
+                    started_at.to_string()
+                } else {
+                    format!("Scheduled at {}", &run.scheduled_at)
+                }
+            } else {
+                format!("Scheduled at {}", &run.scheduled_at)
+            };
+
+            // Calculate elapsed time
+            let elapsed_time = if let Some(ended_at) = &run.ended_at {
+                if !ended_at.is_empty() {
+                    if let (Some(started_at), Some(ended_at)) = (&run.started_at, &run.ended_at) {
+                        let start = started_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                        let end = ended_at.parse::<chrono::DateTime<chrono::Utc>>().ok();
+                        if let (Some(start), Some(end)) = (start, end) {
+                            format!("{:.1}s", (end - start).num_seconds())
+                        } else {
+                            "Invalid time".into()
+                        }
+                    } else {
+                        "Invalid time".into()
+                    }
+                } else if run.started_at.is_some() {
+                    "Running".into()
+                } else {
+                    "Pending".into()
+                }
+            } else if run.started_at.is_some() {
+                "Running".into()
+            } else {
+                "Pending".into()
+            };
+
+            vec![run.number.to_string(), status_str, start_time, elapsed_time]
+        })
+        .collect();
+
+    text.push_str(&format!("{}\n", output::table_text(headers, rows)));
+    text
+}
+
+pub async fn do_list_apps(out: &output::Out, config: Config, args: &ArgMatches) {
     let env = args.get_one::<String>("environment").map(|s| s.as_str());
-    let apps = output::with_spinner("Listing apps", api::list_apps(&config, env)).await;
+    let apps = out
+        .with_spinner("Listing apps", api::list_apps(&config, env))
+        .await;
 
     let items = apps
         .iter()
@@ -246,31 +242,33 @@ pub async fn do_list_apps(config: Config, args: &ArgMatches) {
             format!("{}\n{}", output::title(&app.name), desc)
         })
         .collect();
-    output::list(items, Some(&apps));
+    out.list(items, Some(&apps));
 }
 
-pub async fn do_create(config: Config, args: &ArgMatches) {
+pub async fn do_create(out: &output::Out, config: Config, args: &ArgMatches) {
     let name = args.get_one::<String>("name").unwrap_or_else(|| {
-        output::die("App name (--name) is required");
+        out.die("App name (--name) is required");
     });
 
     let description = args.get_one::<String>("description").unwrap();
 
-    let app =
-        output::with_spinner("Creating app", api::create_app(&config, name, description)).await;
+    let app = out
+        .with_spinner("Creating app", api::create_app(&config, name, description))
+        .await;
 
-    output::success_with_data(&format!("App '{}' created", name), Some(app));
+    out.success_with_data(&format!("App '{}' created", name), Some(app));
 }
 
-pub async fn do_delete(config: Config, cmd: &ArgMatches) {
+pub async fn do_delete(out: &output::Out, config: Config, cmd: &ArgMatches) {
     let name = cmd
         .get_one::<String>("app_name")
         .expect("app_name is required");
 
-    output::with_spinner("Deleting app", api::delete_app(&config, name)).await;
+    out.with_spinner("Deleting app", api::delete_app(&config, name))
+        .await;
 }
 
-pub async fn do_cancel(config: Config, cmd: &ArgMatches) {
+pub async fn do_cancel(out: &output::Out, config: Config, cmd: &ArgMatches) {
     let name = cmd
         .get_one::<String>("app_name")
         .expect("app_name should be required");
@@ -279,26 +277,27 @@ pub async fn do_cancel(config: Config, cmd: &ArgMatches) {
         .copied()
         .expect("run_number should be required");
 
-    let response =
-        output::with_spinner("Cancelling run", api::cancel_run(&config, name, seq)).await;
+    let response = out
+        .with_spinner("Cancelling run", api::cancel_run(&config, name, seq))
+        .await;
 
     let run = &response.run;
     let status = format!("{:?}", run.status);
-    output::success_with_data(
+    out.success_with_data(
         &format!("Run #{} for '{}' cancelled (status: {})", seq, name, status),
         Some(response),
     );
 }
 
-async fn latest_run_number(config: &Config, name: &str) -> i64 {
+async fn latest_run_number(out: &output::Out, config: &Config, name: &str) -> i64 {
     match api::describe_app(config, name, None).await {
         Ok(resp) => resp
             .runs
             .iter()
             .map(|r| r.number)
             .max()
-            .unwrap_or_else(|| output::die(&format!("No runs found for app '{}'", name))),
-        Err(err) => output::tower_error_and_die(err, "Fetching app details failed"),
+            .unwrap_or_else(|| out.die(&format!("No runs found for app '{}'", name))),
+        Err(err) => out.tower_error_and_die(err, "Fetching app details failed"),
     }
 }
 
@@ -309,8 +308,7 @@ const RUN_START_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const RUN_START_MESSAGE_DELAY: Duration = Duration::from_secs(3);
 const RUN_START_TIMEOUT: Duration = Duration::from_secs(30);
 
-async fn follow_logs(config: Config, name: String, seq: i64) {
-    let enable_ctrl_c = !output::get_output_mode().is_mcp();
+async fn follow_logs(out: &output::Out, config: Config, name: String, seq: i64) {
     let mut backoff = FOLLOW_BACKOFF_INITIAL;
     let mut cancel_monitor: Option<oneshot::Sender<()>> = None;
     let mut last_line_num: Option<i64> = None;
@@ -318,13 +316,13 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
     loop {
         let mut run = match api::describe_run(&config, &name, seq).await {
             Ok(res) => res.run,
-            Err(err) => output::tower_error_and_die(err, "Fetching run details failed"),
+            Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
         };
 
         if is_run_finished(&run) {
             if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
                 for line in resp.log_lines {
-                    emit_log_if_new(&line, &mut last_line_num);
+                    emit_log_if_new(out, &line, &mut last_line_num);
                 }
             }
             return;
@@ -337,25 +335,23 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 sleep(RUN_START_POLL_INTERVAL).await;
 
                 if wait_started.elapsed() > RUN_START_TIMEOUT {
-                    output::error(
-                        "Timed out waiting for run to start. The runner may be unavailable.",
-                    );
+                    out.error("Timed out waiting for run to start. The runner may be unavailable.");
                     return;
                 }
 
                 // Avoid blank output on slow starts while keeping fast starts quiet.
                 if should_notify_run_wait(notified, wait_started.elapsed()) {
-                    output::write("Waiting for run to start...\n");
+                    out.write("Waiting for run to start...\n");
                     notified = true;
                 }
                 run = match api::describe_run(&config, &name, seq).await {
                     Ok(res) => res.run,
-                    Err(err) => output::tower_error_and_die(err, "Fetching run details failed"),
+                    Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
                 };
                 if is_run_finished(&run) {
                     if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
                         for line in resp.log_lines {
-                            emit_log_if_new(&line, &mut last_line_num);
+                            emit_log_if_new(out, &line, &mut last_line_num);
                         }
                     }
                     return;
@@ -378,9 +374,10 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
                 // Reset after a successful connection so transient drops recover quickly.
                 backoff = FOLLOW_BACKOFF_INITIAL;
                 match stream_logs_until_complete(
+                    out,
                     log_stream,
                     run_complete,
-                    enable_ctrl_c,
+                    out.foreground(),
                     &run.dollar_link,
                     &mut last_line_num,
                 )
@@ -409,10 +406,10 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
             }
             Err(err) => {
                 if is_fatal_stream_error(&err) {
-                    output::error(&format!("Failed to stream run logs: {}", err));
+                    out.error(&format!("Failed to stream run logs: {}", err));
                     return;
                 }
-                output::error(&format!("Failed to stream run logs: {}", err));
+                out.error(&format!("Failed to stream run logs: {}", err));
                 sleep(backoff).await;
                 backoff = next_backoff(backoff);
                 continue;
@@ -421,7 +418,7 @@ async fn follow_logs(config: Config, name: String, seq: i64) {
 
         let latest = match api::describe_run(&config, &name, seq).await {
             Ok(res) => res.run,
-            Err(err) => output::tower_error_and_die(err, "Fetching run details failed"),
+            Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
         };
         if is_run_finished(&latest) {
             return;
@@ -448,6 +445,7 @@ enum LogFollowOutcome {
 }
 
 async fn stream_logs_until_complete(
+    out: &output::Out,
     mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
     mut run_complete: oneshot::Receiver<Run>,
     enable_ctrl_c: bool,
@@ -458,17 +456,17 @@ async fn stream_logs_until_complete(
         tokio::select! {
             event = log_stream.recv() => match event {
                 Some(api::LogStreamEvent::EventLog(log)) => {
-                    emit_log_if_new(&log, last_line_num);
+                    emit_log_if_new(out, &log, last_line_num);
                 },
                 Some(api::LogStreamEvent::EventWarning(warning)) => {
-                    output::write(&format!("Warning: {}\n", warning.data.content));
+                    out.write(&format!("Warning: {}\n", warning.data.content));
                 }
                 None => return Ok(LogFollowOutcome::Disconnected),
             },
             res = &mut run_complete => {
                 match res {
                     Ok(_) => {
-                        drain_remaining_logs(log_stream, last_line_num).await;
+                        drain_remaining_logs(out, log_stream, last_line_num).await;
                         return Ok(LogFollowOutcome::Completed);
                     }
                     // If monitoring failed, keep following and let the caller retry.
@@ -476,9 +474,9 @@ async fn stream_logs_until_complete(
                 }
             },
             _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                output::write("Received Ctrl+C, stopping log streaming...\n");
-                output::write("Note: The run will continue in Tower cloud\n");
-                output::write(&format!("  See more: {}\n", run_link));
+                out.write("Received Ctrl+C, stopping log streaming...\n");
+                out.write("Note: The run will continue in Tower cloud\n");
+                out.write(&format!("  See more: {}\n", run_link));
                 return Ok(LogFollowOutcome::Interrupted);
             },
         }
@@ -486,6 +484,7 @@ async fn stream_logs_until_complete(
 }
 
 async fn drain_remaining_logs(
+    out: &output::Out,
     mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
     last_line_num: &mut Option<i64>,
 ) {
@@ -493,10 +492,10 @@ async fn drain_remaining_logs(
         while let Some(event) = log_stream.recv().await {
             match event {
                 api::LogStreamEvent::EventLog(log) => {
-                    emit_log_if_new(&log, last_line_num);
+                    emit_log_if_new(out, &log, last_line_num);
                 }
                 api::LogStreamEvent::EventWarning(warning) => {
-                    output::write(&format!("Warning: {}\n", warning.data.content));
+                    out.write(&format!("Warning: {}\n", warning.data.content));
                 }
             }
         }
@@ -504,9 +503,9 @@ async fn drain_remaining_logs(
     .await;
 }
 
-fn emit_log_if_new(log: &RunLogLine, last_line_num: &mut Option<i64>) {
+fn emit_log_if_new(out: &output::Out, log: &RunLogLine, last_line_num: &mut Option<i64>) {
     if should_emit_line(last_line_num, log.line_num) {
-        output::remote_log_event(log);
+        out.remote_log_event(log);
     }
 }
 
@@ -555,7 +554,7 @@ fn monitor_run_completion(
                     Err(_) => {
                         failures += 1;
                         if failures >= 5 {
-                            output::error(
+                            output::background_error(
                                 "Failed to monitor run completion after repeated errors",
                             );
                             return;
@@ -744,7 +743,9 @@ mod tests {
             drop(tx);
         });
 
-        let res = stream_logs_until_complete(rx, done_rx, false, "link", &mut last_line_num).await;
+        let out = crate::output::Out::sink();
+        let res =
+            stream_logs_until_complete(&out, rx, done_rx, false, "link", &mut last_line_num).await;
         done_task.await.unwrap();
 
         assert!(matches!(res, Ok(LogFollowOutcome::Completed)));
@@ -757,7 +758,9 @@ mod tests {
         let (_done_tx, done_rx) = oneshot::channel::<Run>();
         let mut last_line_num = None;
 
-        let res = stream_logs_until_complete(rx, done_rx, false, "link", &mut last_line_num).await;
+        let out = crate::output::Out::sink();
+        let res =
+            stream_logs_until_complete(&out, rx, done_rx, false, "link", &mut last_line_num).await;
 
         assert!(matches!(res, Ok(LogFollowOutcome::Disconnected)));
     }

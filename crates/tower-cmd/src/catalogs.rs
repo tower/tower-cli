@@ -118,7 +118,7 @@ pub fn catalogs_cmd() -> Command {
         )
 }
 
-pub async fn do_list(config: Config, args: &ArgMatches) {
+pub async fn do_list(out: &output::Out, config: Config, args: &ArgMatches) {
     let all = cmd::get_bool_flag(args, "all");
     let env = cmd::get_string_flag(args, "environment");
     let catalog_type = if cmd::get_bool_flag(args, "storage") {
@@ -128,14 +128,15 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     };
 
     if is_storage_catalog_type(catalog_type) {
-        beta::notify_once(&beta::STORAGE);
+        beta::notify_once(out, &beta::STORAGE);
     }
 
-    let catalogs = output::with_spinner(
-        "Listing catalogs",
-        api::list_catalogs(&config, &env, all, catalog_type),
-    )
-    .await;
+    let catalogs = out
+        .with_spinner(
+            "Listing catalogs",
+            api::list_catalogs(&config, &env, all, catalog_type),
+        )
+        .await;
 
     let headers = vec!["Name", "Type", "Environment"]
         .into_iter()
@@ -151,11 +152,11 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
             ]
         })
         .collect();
-    output::table(headers, data, Some(&catalogs));
+    out.table(headers, data, Some(&catalogs));
 }
 
-pub async fn do_credentials(config: Config, args: &ArgMatches) {
-    beta::notify_once(&beta::STORAGE);
+pub async fn do_credentials(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
 
     let name = args
         .get_one::<String>("catalog_name")
@@ -171,11 +172,12 @@ pub async fn do_credentials(config: Config, args: &ArgMatches) {
         .unwrap_or("all");
     let show_token = cmd::get_bool_flag(args, "show_token");
 
-    let response = output::with_spinner(
-        "Vending catalog credentials",
-        api::vend_catalog_credentials(&config, name, &env, parse_mode(mode)),
-    )
-    .await;
+    let response = out
+        .with_spinner(
+            "Vending catalog credentials",
+            api::vend_catalog_credentials(&config, name, &env, parse_mode(mode)),
+        )
+        .await;
 
     let human = credentials_text(
         name,
@@ -186,10 +188,10 @@ pub async fn do_credentials(config: Config, args: &ArgMatches) {
         format,
         show_token,
     );
-    output::text(&human, &response);
+    out.text(&human, &response);
 }
 
-pub async fn do_show(config: Config, args: &ArgMatches) {
+pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
     let name = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
@@ -198,12 +200,12 @@ pub async fn do_show(config: Config, args: &ArgMatches) {
     match api::describe_catalog(&config, name, &env).await {
         Ok(response) => {
             if is_storage_catalog_type(Some(&response.catalog.r#type)) {
-                beta::notify_once(&beta::STORAGE);
+                beta::notify_once(out, &beta::STORAGE);
             }
             let human = catalog_details_text(&response);
-            output::text(&human, &response);
+            out.text(&human, &response);
         }
-        Err(err) => output::tower_error_and_die(err, "Fetching catalog details failed"),
+        Err(err) => out.tower_error_and_die(err, "Fetching catalog details failed"),
     }
 }
 

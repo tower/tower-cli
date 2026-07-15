@@ -236,11 +236,10 @@ pub async fn do_mcp_server(config: Config, args: &clap::ArgMatches) -> Result<()
 }
 
 async fn run_stdio_server(config: Config) -> Result<(), Error> {
-    // Set stdio MCP mode to prevent any non-JSON-RPC output from corrupting the protocol
-    crate::output::set_output_mode(crate::output::OutputMode::McpStdio);
-
+    // stdio transport only collects tool output (no notifications) so nothing pollutes
+    // the JSON-RPC stream on stdout.
     let (stdin, stdout) = stdio();
-    let service = TowerService::new(config);
+    let service = TowerService::new(config, false);
     let server = service.serve((stdin, stdout)).await.map_err(|e| {
         Error::from(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -253,14 +252,11 @@ async fn run_stdio_server(config: Config) -> Result<(), Error> {
 
 async fn run_sse_server(config: Config, port: u16) -> Result<(), Error> {
     let bind_addr = format!("127.0.0.1:{}", port);
-    crate::output::write(&format!("SSE MCP server running on http://{}\n", bind_addr));
-
-    // Set streaming MCP mode to enable logging notifications
-    crate::output::set_output_mode(crate::output::OutputMode::McpStreaming);
+    println!("SSE MCP server running on http://{}", bind_addr);
 
     let ct = SseServer::serve(bind_addr.parse()?)
         .await?
-        .with_service_directly(move || TowerService::new(config.clone()));
+        .with_service_directly(move || TowerService::new(config.clone(), true));
 
     tokio::signal::ctrl_c().await?;
     ct.cancel();
@@ -269,16 +265,10 @@ async fn run_sse_server(config: Config, port: u16) -> Result<(), Error> {
 
 async fn run_http_server(config: Config, port: u16) -> Result<(), Error> {
     let bind_addr = format!("127.0.0.1:{}", port);
-    crate::output::write(&format!(
-        "Streamable HTTP MCP server running on http://{}\n",
-        bind_addr
-    ));
-
-    // Set streaming MCP mode to enable logging notifications
-    crate::output::set_output_mode(crate::output::OutputMode::McpStreaming);
+    println!("Streamable HTTP MCP server running on http://{}", bind_addr);
 
     let service = StreamableHttpService::new(
-        move || Ok(TowerService::new(config.clone())),
+        move || Ok(TowerService::new(config.clone(), true)),
         LocalSessionManager::default().into(),
         StreamableHttpServerConfig::default(),
     );
@@ -296,18 +286,24 @@ async fn run_http_server(config: Config, port: u16) -> Result<(), Error> {
 #[derive(Clone)]
 pub struct TowerService {
     config: Config,
+    /// Whether tool output should be streamed to the peer as logging notifications.
+    /// True for SSE/HTTP transports, false for stdio (which only collects output).
+    send_notifications: bool,
     tool_router: ToolRouter<Self>,
 }
 
 #[tool_router]
 impl TowerService {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, send_notifications: bool) -> Self {
+        // MCP output is captured as plain text, so disable ANSI colours globally.
+        colored::control::set_override(false);
         Self {
             config: std::env::var("TOWER_JWT")
                 .ok()
                 .and_then(|token| Session::from_jwt(&token).ok())
                 .map(|session| config.clone().with_session(session))
                 .unwrap_or(config),
+            send_notifications,
             tool_router: Self::tool_router(),
         }
     }
@@ -466,25 +462,23 @@ impl TowerService {
     }
 
     async fn execute_with_streaming<F, Fut, T>(
+        &self,
         ctx: &RequestContext<RoleServer>,
         operation: F,
     ) -> (Result<T, crate::Error>, String)
     where
-        F: FnOnce() -> Fut,
+        F: FnOnce(crate::output::Out) -> Fut,
         Fut: std::future::Future<Output = Result<T, crate::Error>>,
     {
-        // Check if we're in streaming mode (SSE/HTTP) where we send notifications
-        // vs stdio mode where we don't
-        let mode = crate::output::get_output_mode();
-        let send_notifications = mode == crate::output::OutputMode::McpStreaming;
-        let streaming = Self::setup_output_capture(ctx, send_notifications);
+        let streaming = Self::setup_output_capture(ctx, self.send_notifications);
 
-        crate::output::set_current_sender(streaming.sender.clone());
+        // The command writes through this `Out`; each line it produces is forwarded to
+        // the capture channel (and, in streaming mode, to the peer as a notification).
+        // The operation owns the `Out` and drops it when finished, which closes the
+        // channel so the drain task below can complete.
+        let out = crate::output::Out::mcp(streaming.sender);
+        let result = operation(out).await;
 
-        let result = operation().await;
-
-        crate::output::clear_current_sender();
-        drop(streaming.sender);
         streaming.task.await.ok();
 
         let output = streaming
@@ -817,7 +811,10 @@ impl TowerService {
         // collapse to a single AppVersion server-side.
         let idempotency_key = crate::util::git::clean_head_sha(&working_dir);
 
+        // The tool builds its own result message, so the deploy's own progress is discarded.
+        let out = crate::output::Out::sink();
         match deploy::deploy_from_dir(
+            &out,
             self.config.clone(),
             working_dir,
             true,
@@ -842,15 +839,17 @@ impl TowerService {
         let working_dir = Self::resolve_working_directory(&request.common);
         let config = self.config.clone();
 
-        let (result, output) = Self::execute_with_streaming(&ctx, || {
-            run::do_run_local(
-                config,
-                working_dir,
-                "default",
-                std::collections::HashMap::new(),
-            )
-        })
-        .await;
+        let (result, output) = self
+            .execute_with_streaming(&ctx, |out| {
+                run::do_run_local(
+                    out,
+                    config,
+                    working_dir,
+                    "default",
+                    std::collections::HashMap::new(),
+                )
+            })
+            .await;
         match result {
             Ok(_) => {
                 if output.trim().is_empty() {
@@ -894,10 +893,11 @@ impl TowerService {
 
         let app_name = towerfile.app.name.clone();
 
-        let (result, output) = Self::execute_with_streaming(&ctx, || {
-            run::do_run_remote(config, path, &env, params, None, true)
-        })
-        .await;
+        let (result, output) = self
+            .execute_with_streaming(&ctx, |out| {
+                run::do_run_remote(out, config, path, &env, params, None, true)
+            })
+            .await;
         match result {
             Ok(_) => {
                 if output.trim().is_empty() {
