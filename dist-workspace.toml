@@ -42,3 +42,15 @@ runner = "macos-15"
 
 [dist.github-custom-runners.aarch64-apple-darwin]
 runner = "macos-15"
+
+# The bundled DuckDB build (libduckdb-sys) needs a musl C++ toolchain, which the
+# stock Ubuntu runners don't have. Build the musl targets inside musllinux
+# containers (same images the maturin wheel builds use), where gcc/g++ target
+# musl natively.
+[dist.github-custom-runners.x86_64-unknown-linux-musl]
+runner = "ubuntu-latest"
+container = { image = "quay.io/pypa/musllinux_1_2_x86_64", host = "x86_64-unknown-linux-musl" }
+
+[dist.github-custom-runners.aarch64-unknown-linux-musl]
+runner = "ubuntu-22.04-arm"
+container = { image = "quay.io/pypa/musllinux_1_2_aarch64", host = "aarch64-unknown-linux-musl" }
