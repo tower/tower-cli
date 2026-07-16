@@ -610,6 +610,28 @@ fn duckdb_value_to_json(value: duckdb::types::Value) -> serde_json::Value {
                 None => json!(format!("{:?}", Value::Time64(unit, v))),
             }
         }
+        Value::Enum(v) => json!(v),
+        Value::List(items) | Value::Array(items) => {
+            serde_json::Value::Array(items.into_iter().map(duckdb_value_to_json).collect())
+        }
+        Value::Struct(fields) => serde_json::Value::Object(
+            fields
+                .iter()
+                .map(|(name, value)| (name.clone(), duckdb_value_to_json(value.clone())))
+                .collect(),
+        ),
+        Value::Map(entries) => serde_json::Value::Object(
+            entries
+                .iter()
+                .map(|(key, value)| {
+                    (
+                        json_value_to_cell(&duckdb_value_to_json(key.clone())),
+                        duckdb_value_to_json(value.clone()),
+                    )
+                })
+                .collect(),
+        ),
+        Value::Union(inner) => duckdb_value_to_json(*inner),
         other => json!(format!("{:?}", other)),
     }
 }
@@ -1277,6 +1299,26 @@ mod tests {
         assert_eq!(
             result.rows[1],
             vec![serde_json::json!(2), serde_json::Value::Null]
+        );
+    }
+
+    #[test]
+    fn nested_duckdb_values_convert_to_json_structures() {
+        let result = run_duckdb_query(
+            &[],
+            "SELECT [1, 2] AS l, {'a': 1, 'b': 'x'} AS s, MAP {'k': 2} AS m",
+            [],
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.columns, vec!["l", "s", "m"]);
+        assert_eq!(
+            result.rows[0],
+            vec![
+                serde_json::json!([1, 2]),
+                serde_json::json!({"a": 1, "b": "x"}),
+                serde_json::json!({"k": 2}),
+            ]
         );
     }
 
