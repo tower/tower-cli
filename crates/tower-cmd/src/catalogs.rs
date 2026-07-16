@@ -336,13 +336,21 @@ async fn fetch_catalog_tables(
     };
 
     let token = response.credentials.oauth_token.clone();
-    let setup_sql = attach_statements(name, &response.credentials, true);
-    let sql = format!(
-        "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = {} ORDER BY \"schema\", name",
-        sql_string(name),
+    let setup = attach_statements(
+        name,
+        &response.credentials,
+        vend_catalog_credentials_body::Mode::Read,
     );
+    let db_name = name.to_string();
 
-    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
+    let result = tokio::task::spawn_blocking(move || {
+        run_duckdb_query(
+            &setup,
+            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
+            duckdb::params![db_name],
+        )
+    })
+    .await;
     match result {
         Ok(Ok(query_result)) => {
             spinner.success(out);
@@ -430,8 +438,8 @@ async fn execute_catalog_query(
     };
 
     let token = response.credentials.oauth_token.clone();
-    let setup_sql = attach_statements(name, &response.credentials, !write);
-    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup_sql, &sql)).await;
+    let setup = attach_statements(name, &response.credentials, mode);
+    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup, &sql, [])).await;
 
     match result {
         Ok(Ok(query_result)) => {
@@ -472,37 +480,58 @@ struct QueryResult {
     rows: Vec<Vec<serde_json::Value>>,
 }
 
-/// SQL that installs the Iceberg support and attaches the catalog under its
-/// Tower name — mirrors `templates/duckdb.sql.tmpl`. No `USE`: DuckDB's `USE`
-/// needs a `main` schema, which Iceberg catalogs don't have, so queries must
-/// qualify tables as <catalog>.<namespace>.<table>.
-fn attach_statements(name: &str, credentials: &CatalogCredentials, read_only: bool) -> String {
-    format!(
-        "INSTALL httpfs;\n\
-         LOAD httpfs;\n\
-         INSTALL iceberg;\n\
-         LOAD iceberg;\n\
-         SET s3_region='eu-central-1';\n\
-         CREATE OR REPLACE SECRET tower_cat (TYPE iceberg, TOKEN {token});\n\
-         ATTACH {warehouse} AS {name} (TYPE iceberg, {read_only}SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1');\n",
-        read_only = if read_only { "READ_ONLY, " } else { "" },
-        token = sql_string(&credentials.oauth_token),
-        warehouse = sql_string(&credentials.warehouse),
-        name = sql_ident(name),
-        uri = sql_string(&credentials.catalog_uri),
-    )
+/// Statements that install the Iceberg support and attach the catalog under
+/// its Tower name — mirrors `templates/duckdb.sql.tmpl`. The attach is
+/// READ_ONLY unless read-write credentials were vended. No `USE`: DuckDB's
+/// `USE` needs a `main` schema, which Iceberg catalogs don't have, so queries
+/// must qualify tables as <catalog>.<namespace>.<table>.
+fn attach_statements(
+    name: &str,
+    credentials: &CatalogCredentials,
+    mode: vend_catalog_credentials_body::Mode,
+) -> Vec<String> {
+    let read_only = match mode {
+        vend_catalog_credentials_body::Mode::Read => "READ_ONLY, ",
+        vend_catalog_credentials_body::Mode::ReadWrite => "",
+    };
+    vec![
+        "INSTALL httpfs".to_string(),
+        "LOAD httpfs".to_string(),
+        "INSTALL iceberg".to_string(),
+        "LOAD iceberg".to_string(),
+        "SET s3_region='eu-central-1'".to_string(),
+        format!(
+            "CREATE OR REPLACE SECRET tower_cat (TYPE iceberg, TOKEN {})",
+            SqlLiteral(&credentials.oauth_token),
+        ),
+        format!(
+            "ATTACH {warehouse} AS {name} (TYPE iceberg, {read_only}SECRET tower_cat, ENDPOINT {uri}, DEFAULT_REGION 'eu-central-1')",
+            warehouse = SqlLiteral(&credentials.warehouse),
+            name = SqlIdent(name),
+            uri = SqlLiteral(&credentials.catalog_uri),
+        ),
+    ]
 }
 
-fn run_duckdb_query(setup_sql: &str, query: &str) -> Result<QueryResult, duckdb::Error> {
+/// Runs `setup` statements one at a time, then `query` as a prepared statement
+/// with `params` bound. Values that fit a bind position should go through
+/// `params` rather than into the query text.
+fn run_duckdb_query<P: duckdb::Params>(
+    setup: &[String],
+    query: &str,
+    params: P,
+) -> Result<QueryResult, duckdb::Error> {
     let conn = duckdb::Connection::open_in_memory()?;
-    conn.execute_batch(setup_sql)?;
+    for statement in setup {
+        conn.execute_batch(statement)?;
+    }
 
     let mut stmt = conn.prepare(query)?;
     let mut columns: Vec<String> = Vec::new();
     let mut rows = Vec::new();
 
     {
-        let mut result_rows = stmt.query([])?;
+        let mut result_rows = stmt.query(params)?;
         while let Some(row) = result_rows.next()? {
             if columns.is_empty() {
                 columns = row.as_ref().column_names();
@@ -636,12 +665,24 @@ fn quote(value: &str) -> String {
     serde_json::to_string(value).expect("serializing a string should not fail")
 }
 
-fn sql_string(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
+/// A value embedded in generated SQL as a single-quoted string literal.
+/// Escaping lives in the `Display` impl, so a value can only appear in the
+/// generated text in its escaped form.
+struct SqlLiteral<'a>(&'a str);
+
+impl std::fmt::Display for SqlLiteral<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "'{}'", self.0.replace('\'', "''"))
+    }
 }
 
-fn sql_ident(value: &str) -> String {
-    format!("\"{}\"", value.replace('"', "\"\""))
+/// A value embedded in generated SQL as a double-quoted identifier.
+struct SqlIdent<'a>(&'a str);
+
+impl std::fmt::Display for SqlIdent<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\"{}\"", self.0.replace('"', "\"\""))
+    }
 }
 
 fn token_export_command(name: &str, environment: &str, mode: &str, tower_url: &str) -> String {
@@ -777,7 +818,7 @@ fn snippets(
         "os.environ[\"TOWER_CATALOG_TOKEN\"]".to_string()
     };
     let sql_token = if show_token {
-        sql_string(&credentials.oauth_token)
+        SqlLiteral(&credentials.oauth_token).to_string()
     } else {
         "'${TOWER_CATALOG_TOKEN}'".to_string()
     };
@@ -822,9 +863,15 @@ fn snippets(
             body: render(
                 DUCKDB_TMPL,
                 &[
-                    ("__TOWER_NAME__", sql_ident(name)),
-                    ("__TOWER_URI__", sql_string(&credentials.catalog_uri)),
-                    ("__TOWER_WAREHOUSE__", sql_string(&credentials.warehouse)),
+                    ("__TOWER_NAME__", SqlIdent(name).to_string()),
+                    (
+                        "__TOWER_URI__",
+                        SqlLiteral(&credentials.catalog_uri).to_string(),
+                    ),
+                    (
+                        "__TOWER_WAREHOUSE__",
+                        SqlLiteral(&credentials.warehouse).to_string(),
+                    ),
                     ("__TOWER_TOKEN__", sql_token.clone()),
                 ],
             ),
@@ -1062,9 +1109,14 @@ mod tests {
 
     #[test]
     fn show_all_tables_query_lists_tables() {
+        let setup = vec![
+            "CREATE SCHEMA s; CREATE TABLE s.t1 (i INTEGER); CREATE TABLE s.t2 (i INTEGER);"
+                .to_string(),
+        ];
         let result = run_duckdb_query(
-            "CREATE SCHEMA s; CREATE TABLE s.t1 (i INTEGER); CREATE TABLE s.t2 (i INTEGER);",
-            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = 'memory' ORDER BY \"schema\", name",
+            &setup,
+            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
+            duckdb::params!["memory"],
         )
         .expect("query should succeed");
 
@@ -1136,7 +1188,12 @@ mod tests {
             "warehouse-id".to_string(),
         );
 
-        let sql = attach_statements("my\"catalog", &credentials, true);
+        let sql = attach_statements(
+            "my\"catalog",
+            &credentials,
+            vend_catalog_credentials_body::Mode::Read,
+        )
+        .join("\n");
 
         assert!(sql.contains("TOKEN 'secret''token'"));
         assert!(
@@ -1145,7 +1202,12 @@ mod tests {
         assert!(sql.contains("ENDPOINT 'https://catalog.example.com'"));
         assert!(!sql.contains("USE "));
 
-        let write_sql = attach_statements("my\"catalog", &credentials, false);
+        let write_sql = attach_statements(
+            "my\"catalog",
+            &credentials,
+            vend_catalog_credentials_body::Mode::ReadWrite,
+        )
+        .join("\n");
         assert!(!write_sql.contains("READ_ONLY"));
         assert!(write_sql.contains(
             "ATTACH 'warehouse-id' AS \"my\"\"catalog\" (TYPE iceberg, SECRET tower_cat,"
@@ -1199,11 +1261,12 @@ mod tests {
 
     #[test]
     fn run_duckdb_query_returns_columns_and_rows() {
-        let result = run_duckdb_query(
-            "CREATE TABLE t (id INTEGER, name VARCHAR); INSERT INTO t VALUES (1, 'a'), (2, NULL);",
-            "SELECT id, name FROM t ORDER BY id",
-        )
-        .expect("query should succeed");
+        let setup = vec![
+            "CREATE TABLE t (id INTEGER, name VARCHAR); INSERT INTO t VALUES (1, 'a'), (2, NULL);"
+                .to_string(),
+        ];
+        let result = run_duckdb_query(&setup, "SELECT id, name FROM t ORDER BY id", [])
+            .expect("query should succeed");
 
         assert_eq!(result.columns, vec!["id", "name"]);
         assert_eq!(result.rows.len(), 2);
@@ -1220,7 +1283,7 @@ mod tests {
     #[test]
     fn run_duckdb_query_reports_columns_for_empty_results() {
         let result =
-            run_duckdb_query("", "SELECT 1 AS x WHERE 1 = 0").expect("query should succeed");
+            run_duckdb_query(&[], "SELECT 1 AS x WHERE 1 = 0", []).expect("query should succeed");
 
         assert_eq!(result.columns, vec!["x"]);
         assert!(result.rows.is_empty());
