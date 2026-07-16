@@ -28,6 +28,7 @@ config = { path = "crates/config" }
 crypto = { path = "crates/crypto" }
 ctrlc = "3"
 dirs = "5"
+duckdb = { version = "~1.10504.0", features = ["bundled"] }
 flate2 = "1"
 fs2 = "0.4"
 futures = "0.3"
