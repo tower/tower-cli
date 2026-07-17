@@ -35,4 +35,12 @@ jobs:
         run: npm install -g npm@latest
       - name: Publish to npm
         working-directory: pkg
-        run: npm publish --access public --provenance
+        # npm refuses to publish a prerelease version without an explicit
+        # dist-tag; publish those under `next` so they never become `latest`.
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$VERSION" == *-* ]]; then
+            npm publish --access public --provenance --tag next
+          else
+            npm publish --access public --provenance
+          fi
