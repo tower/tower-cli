@@ -85,6 +85,10 @@ pub async fn ensure_app_exists(
                 slug: None,
                 is_externally_accessible: None,
                 subdomain: None,
+                pending_timeout: None,
+                retry_policy: None,
+                running_timeout: None,
+                tags: None,
             },
         },
     )
