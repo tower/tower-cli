@@ -70,6 +70,12 @@ pub fn catalogs_cmd() -> Command {
                         .help("Environment the catalog belongs to")
                         .action(ArgAction::Set),
                 )
+                .arg(
+                    Arg::new("full")
+                        .long("full")
+                        .help("List each table's columns and their types")
+                        .action(ArgAction::SetTrue),
+                )
                 .about("Show the details of a catalog, including its properties and tables"),
         )
         .subcommand(
@@ -235,6 +241,7 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
     let env = cmd::get_string_flag(args, "environment");
+    let full = cmd::get_bool_flag(args, "full");
 
     let response = match api::describe_catalog(&config, name, &env).await {
         Ok(response) => response,
@@ -247,7 +254,7 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
     }
 
     let tables = if is_storage {
-        Some(fetch_catalog_tables(out, &config, name, &env).await)
+        Some(fetch_catalog_tables(out, &config, name, &env, full).await)
     } else {
         None
     };
@@ -265,8 +272,30 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
         Some(Ok(result)) if result.rows.is_empty() => {
             human.push_str("  No tables found.\n");
         }
+        Some(Ok(result)) if full => {
+            for row in &result.rows {
+                let namespace = json_value_to_cell(row.first().unwrap_or(&serde_json::Value::Null));
+                let table = json_value_to_cell(row.get(1).unwrap_or(&serde_json::Value::Null));
+                human.push_str(&header_line(&format!("{}.{}", namespace, table)));
+
+                let names = json_array_to_strings(row.get(2));
+                let types = json_array_to_strings(row.get(3));
+                if names.is_empty() {
+                    human.push_str("  No columns found.\n");
+                } else {
+                    let headers = vec!["Column".to_string(), "Type".to_string()];
+                    let data = names
+                        .iter()
+                        .enumerate()
+                        .map(|(i, n)| vec![n.clone(), types.get(i).cloned().unwrap_or_default()])
+                        .collect();
+                    human.push_str(&output::table_text(headers, data));
+                }
+                human.push('\n');
+            }
+        }
         Some(Ok(result)) => {
-            let headers = vec!["Schema".to_string(), "Table".to_string()];
+            let headers = vec!["Namespace".to_string(), "Table".to_string()];
             let data = result
                 .rows
                 .iter()
@@ -291,10 +320,26 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
                     .rows
                     .iter()
                     .map(|row| {
-                        serde_json::json!({
-                            "schema": row.first().cloned().unwrap_or(serde_json::Value::Null),
+                        let mut entry = serde_json::json!({
+                            "namespace": row.first().cloned().unwrap_or(serde_json::Value::Null),
                             "table": row.get(1).cloned().unwrap_or(serde_json::Value::Null),
-                        })
+                        });
+                        if full {
+                            let names = json_array_to_strings(row.get(2));
+                            let types = json_array_to_strings(row.get(3));
+                            let columns = names
+                                .iter()
+                                .enumerate()
+                                .map(|(i, n)| {
+                                    serde_json::json!({
+                                        "name": n,
+                                        "type": types.get(i).cloned().unwrap_or_default(),
+                                    })
+                                })
+                                .collect();
+                            entry["columns"] = serde_json::Value::Array(columns);
+                        }
+                        entry
                     })
                     .collect(),
             ),
@@ -317,6 +362,7 @@ async fn fetch_catalog_tables(
     config: &Config,
     name: &str,
     env: &str,
+    full: bool,
 ) -> Result<QueryResult, String> {
     let mut spinner = out.spinner("Listing tables...");
 
@@ -343,12 +389,16 @@ async fn fetch_catalog_tables(
     );
     let db_name = name.to_string();
 
+    // `SHOW ALL TABLES` already carries each table's `column_names`/`column_types`
+    // as list columns, so `--full` needs no extra per-table introspection.
+    let query = if full {
+        "SELECT \"schema\", name, column_names, column_types FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name"
+    } else {
+        "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name"
+    };
+
     let result = tokio::task::spawn_blocking(move || {
-        run_duckdb_query(
-            &setup,
-            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-            duckdb::params![db_name],
-        )
+        run_duckdb_query(&setup, query, duckdb::params![db_name])
     })
     .await;
     match result {
@@ -665,6 +715,15 @@ fn json_value_to_cell(value: &serde_json::Value) -> String {
         serde_json::Value::Null => String::new(),
         serde_json::Value::String(s) => s.clone(),
         other => other.to_string(),
+    }
+}
+
+/// Flattens a DuckDB list column (surfaced as a JSON array) into display strings.
+/// Anything that isn't an array — a null or missing cell — becomes an empty list.
+fn json_array_to_strings(value: Option<&serde_json::Value>) -> Vec<String> {
+    match value {
+        Some(serde_json::Value::Array(items)) => items.iter().map(json_value_to_cell).collect(),
+        _ => Vec::new(),
     }
 }
 
