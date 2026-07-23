@@ -165,26 +165,26 @@ pub fn catalogs_cmd() -> Command {
                     "Reference tables as <catalog>.<namespace>.<table>, e.g.:\n  tower catalogs query default --sql 'SELECT * FROM \"default\".my_namespace.my_table LIMIT 10'",
                 ),
         )
-        .subcommand(facts_cmd())
+        .subcommand(knowledge_cmd())
 }
 
 /// The values `--scope` accepts, mirroring `catalog_fact::Scope`.
-const FACT_SCOPES: [&str; 5] = ["catalog", "namespace", "table", "column", "metric"];
+const KNOWLEDGE_SCOPES: [&str; 5] = ["catalog", "namespace", "table", "column", "metric"];
 
 /// The values `--confidence` accepts, mirroring `catalog_fact::Confidence`.
-const FACT_CONFIDENCES: [&str; 3] = ["confirmed", "heuristic", "inferred"];
+const KNOWLEDGE_CONFIDENCES: [&str; 3] = ["confirmed", "heuristic", "inferred"];
 
-fn facts_cmd() -> Command {
+fn knowledge_cmd() -> Command {
     let catalog_arg = Arg::new("catalog_name")
         .value_parser(value_parser!(String))
         .index(1)
         .required(true)
         .help("Name of the catalog");
-    let fact_name_arg = Arg::new("fact_name")
+    let name_arg = Arg::new("name")
         .value_parser(value_parser!(String))
         .index(2)
         .required(true)
-        .help("Name of the fact");
+        .help("Name of the knowledge entry");
     let environment_arg = Arg::new("environment")
         .short('e')
         .long("environment")
@@ -193,12 +193,12 @@ fn facts_cmd() -> Command {
         .help("Environment the catalog belongs to")
         .action(ArgAction::Set);
 
-    Command::new("facts")
+    Command::new("knowledge")
         .about(beta::STORAGE.short_about(
-            "Store and retrieve facts about the semantics of the data in a catalog",
+            "Store and retrieve knowledge about the semantics of the data in a catalog",
         ))
         .after_help(
-            "Facts let agents (and people) record context about a catalog's data — \
+            "Knowledge lets agents (and people) record context about a catalog's data — \
              semantics, ontology, conventions — scoped to the catalog itself or to a \
              namespace, table, column, or metric within it.",
         )
@@ -210,67 +210,67 @@ fn facts_cmd() -> Command {
                 .arg(
                     Arg::new("scope")
                         .long("scope")
-                        .value_parser(FACT_SCOPES)
-                        .help("Only list facts with this scope")
+                        .value_parser(KNOWLEDGE_SCOPES)
+                        .help("Only list knowledge with this scope")
                         .action(ArgAction::Set),
                 )
                 .arg(
                     Arg::new("object")
                         .long("object")
                         .value_parser(value_parser!(String))
-                        .help("Only list facts about this object path, e.g. bronze.runs.deleted_at")
+                        .help("Only list knowledge about this object path, e.g. bronze.runs.deleted_at")
                         .action(ArgAction::Set),
                 )
-                .about("List the facts recorded for a catalog"),
+                .about("List the knowledge recorded for a catalog"),
         )
         .subcommand(
             Command::new("show")
                 .arg(catalog_arg.clone())
-                .arg(fact_name_arg.clone())
+                .arg(name_arg.clone())
                 .arg(environment_arg.clone())
-                .about("Show the full details of a fact, including its body"),
+                .about("Show the full details of a knowledge entry, including its body"),
         )
         .subcommand(
             Command::new("set")
                 .arg(catalog_arg.clone())
-                .arg(fact_name_arg.clone())
+                .arg(name_arg.clone())
                 .arg(environment_arg.clone())
                 .arg(
                     Arg::new("statement")
                         .long("statement")
                         .value_parser(value_parser!(String))
                         .required(true)
-                        .help("The human-readable meaning of the fact")
+                        .help("The human-readable meaning of the entry")
                         .action(ArgAction::Set),
                 )
                 .arg(
                     Arg::new("scope")
                         .long("scope")
                         .default_value("catalog")
-                        .value_parser(FACT_SCOPES)
-                        .help("What kind of object the fact is about")
+                        .value_parser(KNOWLEDGE_SCOPES)
+                        .help("What kind of object the entry is about")
                         .action(ArgAction::Set),
                 )
                 .arg(
                     Arg::new("object")
                         .long("object")
                         .value_parser(value_parser!(String))
-                        .help("Path to what the fact is about, e.g. bronze.runs.deleted_at; omit for catalog-scoped facts")
+                        .help("Path to what the entry is about, e.g. bronze.runs.deleted_at; omit for catalog-scoped knowledge")
                         .action(ArgAction::Set),
                 )
                 .arg(
                     Arg::new("confidence")
                         .long("confidence")
                         .default_value("confirmed")
-                        .value_parser(FACT_CONFIDENCES)
-                        .help("How trustworthy the fact is")
+                        .value_parser(KNOWLEDGE_CONFIDENCES)
+                        .help("How trustworthy the entry is")
                         .action(ArgAction::Set),
                 )
                 .arg(
                     Arg::new("source")
                         .long("source")
                         .value_parser(value_parser!(String))
-                        .help("Where the fact came from (agent id, user, ...)")
+                        .help("Where the knowledge came from (agent id, user, ...)")
                         .action(ArgAction::Set),
                 )
                 .arg(
@@ -280,14 +280,14 @@ fn facts_cmd() -> Command {
                         .help("Optional structured payload (SQL, unit, enum values) as a JSON string")
                         .action(ArgAction::Set),
                 )
-                .about("Create a fact, or replace it if one with the same name exists"),
+                .about("Create a knowledge entry, or replace it if one with the same name exists"),
         )
         .subcommand(
             Command::new("delete")
                 .arg(catalog_arg)
-                .arg(fact_name_arg)
+                .arg(name_arg)
                 .arg(environment_arg)
-                .about("Delete a fact from a catalog"),
+                .about("Delete a knowledge entry from a catalog"),
         )
 }
 
@@ -646,7 +646,7 @@ async fn execute_catalog_query(
     }
 }
 
-pub async fn do_facts_list(out: &output::Out, config: Config, args: &ArgMatches) {
+pub async fn do_knowledge_list(out: &output::Out, config: Config, args: &ArgMatches) {
     beta::notify_once(out, &beta::STORAGE);
 
     let catalog = args
@@ -658,8 +658,8 @@ pub async fn do_facts_list(out: &output::Out, config: Config, args: &ArgMatches)
 
     let response = out
         .with_spinner(
-            "Listing facts",
-            api::list_catalog_facts(&config, catalog, &env, scope, object),
+            "Listing knowledge",
+            api::list_catalog_knowledge(&config, catalog, &env, scope, object),
         )
         .await;
 
@@ -670,50 +670,50 @@ pub async fn do_facts_list(out: &output::Out, config: Config, args: &ArgMatches)
     let data = response
         .facts
         .iter()
-        .map(|fact| {
+        .map(|entry| {
             vec![
-                fact.name.clone(),
-                fact_scope_str(fact.scope).to_string(),
-                fact.object.clone(),
-                fact_confidence_str(fact.confidence).to_string(),
-                truncate_statement(&fact.statement, 80),
+                entry.name.clone(),
+                knowledge_scope_str(entry.scope).to_string(),
+                entry.object.clone(),
+                knowledge_confidence_str(entry.confidence).to_string(),
+                truncate_statement(&entry.statement, 80),
             ]
         })
         .collect();
     out.table(headers, data, Some(&response.facts));
 }
 
-pub async fn do_facts_show(out: &output::Out, config: Config, args: &ArgMatches) {
+pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatches) {
     beta::notify_once(out, &beta::STORAGE);
 
     let catalog = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
     let name = args
-        .get_one::<String>("fact_name")
-        .expect("fact_name is required");
+        .get_one::<String>("name")
+        .expect("name is required");
     let env = cmd::get_string_flag(args, "environment");
 
     let response = out
         .with_spinner(
-            "Fetching fact",
-            api::describe_catalog_fact(&config, catalog, name, &env),
+            "Fetching knowledge",
+            api::describe_catalog_knowledge(&config, catalog, name, &env),
         )
         .await;
 
-    let human = fact_details_text(catalog, &env, &response.fact);
+    let human = knowledge_details_text(catalog, &env, &response.fact);
     out.text(&human, &response);
 }
 
-pub async fn do_facts_set(out: &output::Out, config: Config, args: &ArgMatches) {
+pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatches) {
     beta::notify_once(out, &beta::STORAGE);
 
     let catalog = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
     let name = args
-        .get_one::<String>("fact_name")
-        .expect("fact_name is required");
+        .get_one::<String>("name")
+        .expect("name is required");
     let env = cmd::get_string_flag(args, "environment");
     let statement = cmd::get_string_flag(args, "statement");
     let scope = cmd::get_string_flag(args, "scope");
@@ -730,53 +730,53 @@ pub async fn do_facts_set(out: &output::Out, config: Config, args: &ArgMatches) 
         }
     }
 
-    let fact_body = UpdateCatalogFactBody {
+    let knowledge_body = UpdateCatalogFactBody {
         schema: None,
         body,
-        confidence: parse_fact_confidence(&confidence),
+        confidence: parse_knowledge_confidence(&confidence),
         object,
-        scope: parse_fact_scope(&scope),
+        scope: parse_knowledge_scope(&scope),
         source,
         statement,
     };
 
     let response = out
         .with_spinner(
-            "Saving fact",
-            api::update_catalog_fact(&config, catalog, name, &env, fact_body),
+            "Saving knowledge",
+            api::update_catalog_knowledge(&config, catalog, name, &env, knowledge_body),
         )
         .await;
 
     out.success_with_data(
-        &format!("Fact '{}' saved in catalog '{}'", name, catalog),
+        &format!("Knowledge '{}' saved in catalog '{}'", name, catalog),
         Some(&response),
     );
 }
 
-pub async fn do_facts_delete(out: &output::Out, config: Config, args: &ArgMatches) {
+pub async fn do_knowledge_delete(out: &output::Out, config: Config, args: &ArgMatches) {
     beta::notify_once(out, &beta::STORAGE);
 
     let catalog = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
     let name = args
-        .get_one::<String>("fact_name")
-        .expect("fact_name is required");
+        .get_one::<String>("name")
+        .expect("name is required");
     let env = cmd::get_string_flag(args, "environment");
 
     out.with_spinner(
-        "Deleting fact",
-        api::delete_catalog_fact(&config, catalog, name, &env),
+        "Deleting knowledge",
+        api::delete_catalog_knowledge(&config, catalog, name, &env),
     )
     .await;
 
     out.success(&format!(
-        "Fact '{}' deleted from catalog '{}'",
+        "Knowledge '{}' deleted from catalog '{}'",
         name, catalog
     ));
 }
 
-fn fact_scope_str(scope: catalog_fact::Scope) -> &'static str {
+fn knowledge_scope_str(scope: catalog_fact::Scope) -> &'static str {
     match scope {
         catalog_fact::Scope::Catalog => "catalog",
         catalog_fact::Scope::Namespace => "namespace",
@@ -786,7 +786,7 @@ fn fact_scope_str(scope: catalog_fact::Scope) -> &'static str {
     }
 }
 
-fn fact_confidence_str(confidence: catalog_fact::Confidence) -> &'static str {
+fn knowledge_confidence_str(confidence: catalog_fact::Confidence) -> &'static str {
     match confidence {
         catalog_fact::Confidence::Confirmed => "confirmed",
         catalog_fact::Confidence::Heuristic => "heuristic",
@@ -794,7 +794,7 @@ fn fact_confidence_str(confidence: catalog_fact::Confidence) -> &'static str {
     }
 }
 
-fn parse_fact_scope(scope: &str) -> update_catalog_fact_body::Scope {
+fn parse_knowledge_scope(scope: &str) -> update_catalog_fact_body::Scope {
     match scope {
         "namespace" => update_catalog_fact_body::Scope::Namespace,
         "table" => update_catalog_fact_body::Scope::Table,
@@ -804,7 +804,7 @@ fn parse_fact_scope(scope: &str) -> update_catalog_fact_body::Scope {
     }
 }
 
-fn parse_fact_confidence(confidence: &str) -> update_catalog_fact_body::Confidence {
+fn parse_knowledge_confidence(confidence: &str) -> update_catalog_fact_body::Confidence {
     match confidence {
         "heuristic" => update_catalog_fact_body::Confidence::Heuristic,
         "inferred" => update_catalog_fact_body::Confidence::Inferred,
@@ -826,32 +826,32 @@ fn truncate_statement(statement: &str, max_chars: usize) -> String {
     }
 }
 
-fn fact_details_text(catalog: &str, env: &str, fact: &CatalogFact) -> String {
+fn knowledge_details_text(catalog: &str, env: &str, entry: &CatalogFact) -> String {
     let mut out = String::new();
 
-    out.push_str(&detail_line("Fact", &fact.name));
+    out.push_str(&detail_line("Name", &entry.name));
     out.push_str(&detail_line("Catalog", catalog));
     out.push_str(&detail_line("Environment", env));
-    out.push_str(&detail_line("Scope", fact_scope_str(fact.scope)));
-    if !fact.object.is_empty() {
-        out.push_str(&detail_line("Object", &fact.object));
+    out.push_str(&detail_line("Scope", knowledge_scope_str(entry.scope)));
+    if !entry.object.is_empty() {
+        out.push_str(&detail_line("Object", &entry.object));
     }
     out.push_str(&detail_line(
         "Confidence",
-        fact_confidence_str(fact.confidence),
+        knowledge_confidence_str(entry.confidence),
     ));
-    if let Some(source) = fact.source.as_deref().filter(|s| !s.is_empty()) {
+    if let Some(source) = entry.source.as_deref().filter(|s| !s.is_empty()) {
         out.push_str(&detail_line("Source", source));
     }
-    out.push_str(&detail_line("Created", &fact.created_at));
-    out.push_str(&detail_line("Updated", &fact.updated_at));
+    out.push_str(&detail_line("Created", &entry.created_at));
+    out.push_str(&detail_line("Updated", &entry.updated_at));
 
     out.push('\n');
     out.push_str(&header_line("Statement"));
-    out.push_str(&fact.statement);
+    out.push_str(&entry.statement);
     out.push('\n');
 
-    if let Some(body) = fact.body.as_ref().and_then(|b| b.as_ref()) {
+    if let Some(body) = entry.body.as_ref().and_then(|b| b.as_ref()) {
         out.push('\n');
         out.push_str(&header_line("Body"));
         out.push_str(&serde_json::to_string_pretty(body).unwrap_or_else(|_| body.to_string()));
@@ -2199,11 +2199,11 @@ mod tests {
     }
 
     #[test]
-    fn facts_list_accepts_filters() {
+    fn knowledge_list_accepts_filters() {
         let matches = catalogs_cmd()
             .try_get_matches_from([
                 "catalogs",
-                "facts",
+                "knowledge",
                 "list",
                 "my-catalog",
                 "--scope",
@@ -2213,10 +2213,10 @@ mod tests {
                 "-e",
                 "production",
             ])
-            .expect("facts list should parse");
+            .expect("knowledge list should parse");
 
-        let (_, facts_args) = matches.subcommand().expect("expected facts subcommand");
-        let (_, list_args) = facts_args.subcommand().expect("expected list subcommand");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, list_args) = knowledge_args.subcommand().expect("expected list subcommand");
 
         assert_eq!(
             list_args.get_one::<String>("catalog_name").unwrap(),
@@ -2234,10 +2234,10 @@ mod tests {
     }
 
     #[test]
-    fn facts_list_rejects_invalid_scope() {
+    fn knowledge_list_rejects_invalid_scope() {
         let result = catalogs_cmd().try_get_matches_from([
             "catalogs",
-            "facts",
+            "knowledge",
             "list",
             "my-catalog",
             "--scope",
@@ -2247,17 +2247,17 @@ mod tests {
     }
 
     #[test]
-    fn facts_show_requires_catalog_and_fact_name() {
+    fn knowledge_show_requires_catalog_and_name() {
         let result =
-            catalogs_cmd().try_get_matches_from(["catalogs", "facts", "show", "my-catalog"]);
+            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog"]);
         assert!(result.is_err());
 
         let matches = catalogs_cmd()
-            .try_get_matches_from(["catalogs", "facts", "show", "my-catalog", "my-fact"])
-            .expect("facts show should parse");
-        let (_, facts_args) = matches.subcommand().expect("expected facts subcommand");
-        let (_, show_args) = facts_args.subcommand().expect("expected show subcommand");
-        assert_eq!(show_args.get_one::<String>("fact_name").unwrap(), "my-fact");
+            .try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog", "my-entry"])
+            .expect("knowledge show should parse");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, show_args) = knowledge_args.subcommand().expect("expected show subcommand");
+        assert_eq!(show_args.get_one::<String>("name").unwrap(), "my-entry");
         assert_eq!(
             show_args.get_one::<String>("environment").unwrap(),
             "default"
@@ -2265,28 +2265,28 @@ mod tests {
     }
 
     #[test]
-    fn facts_set_requires_statement() {
+    fn knowledge_set_requires_statement() {
         let result =
-            catalogs_cmd().try_get_matches_from(["catalogs", "facts", "set", "my-catalog", "f"]);
+            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "set", "my-catalog", "f"]);
         assert!(result.is_err());
     }
 
     #[test]
-    fn facts_set_defaults_scope_and_confidence() {
+    fn knowledge_set_defaults_scope_and_confidence() {
         let matches = catalogs_cmd()
             .try_get_matches_from([
                 "catalogs",
-                "facts",
+                "knowledge",
                 "set",
                 "my-catalog",
-                "my-fact",
+                "my-entry",
                 "--statement",
                 "deleted_at is a soft-delete marker",
             ])
-            .expect("facts set should parse");
+            .expect("knowledge set should parse");
 
-        let (_, facts_args) = matches.subcommand().expect("expected facts subcommand");
-        let (_, set_args) = facts_args.subcommand().expect("expected set subcommand");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
 
         assert_eq!(set_args.get_one::<String>("scope").unwrap(), "catalog");
         assert_eq!(
@@ -2299,14 +2299,14 @@ mod tests {
     }
 
     #[test]
-    fn facts_set_accepts_all_fields() {
+    fn knowledge_set_accepts_all_fields() {
         let matches = catalogs_cmd()
             .try_get_matches_from([
                 "catalogs",
-                "facts",
+                "knowledge",
                 "set",
                 "my-catalog",
-                "my-fact",
+                "my-entry",
                 "--statement",
                 "deleted_at marks soft-deleted rows",
                 "--scope",
@@ -2320,10 +2320,10 @@ mod tests {
                 "--body",
                 "{\"sql\": \"deleted_at IS NULL\"}",
             ])
-            .expect("facts set with all flags should parse");
+            .expect("knowledge set with all flags should parse");
 
-        let (_, facts_args) = matches.subcommand().expect("expected facts subcommand");
-        let (_, set_args) = facts_args.subcommand().expect("expected set subcommand");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
 
         assert_eq!(set_args.get_one::<String>("scope").unwrap(), "column");
         assert_eq!(
@@ -2342,29 +2342,29 @@ mod tests {
     }
 
     #[test]
-    fn facts_delete_accepts_catalog_and_fact_name() {
+    fn knowledge_delete_accepts_catalog_and_name() {
         let matches = catalogs_cmd()
-            .try_get_matches_from(["catalogs", "facts", "delete", "my-catalog", "my-fact"])
-            .expect("facts delete should parse");
+            .try_get_matches_from(["catalogs", "knowledge", "delete", "my-catalog", "my-entry"])
+            .expect("knowledge delete should parse");
 
-        let (_, facts_args) = matches.subcommand().expect("expected facts subcommand");
-        let (_, delete_args) = facts_args.subcommand().expect("expected delete subcommand");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, delete_args) = knowledge_args.subcommand().expect("expected delete subcommand");
         assert_eq!(
             delete_args.get_one::<String>("catalog_name").unwrap(),
             "my-catalog"
         );
         assert_eq!(
-            delete_args.get_one::<String>("fact_name").unwrap(),
-            "my-fact"
+            delete_args.get_one::<String>("name").unwrap(),
+            "my-entry"
         );
     }
 
     #[test]
-    fn fact_scope_and_confidence_round_trip() {
+    fn knowledge_scope_and_confidence_round_trip() {
         use tower_api::models::{catalog_fact, update_catalog_fact_body};
 
-        for scope in super::FACT_SCOPES {
-            let parsed = super::parse_fact_scope(scope);
+        for scope in super::KNOWLEDGE_SCOPES {
+            let parsed = super::parse_knowledge_scope(scope);
             let rendered = match parsed {
                 update_catalog_fact_body::Scope::Catalog => catalog_fact::Scope::Catalog,
                 update_catalog_fact_body::Scope::Namespace => catalog_fact::Scope::Namespace,
@@ -2372,11 +2372,11 @@ mod tests {
                 update_catalog_fact_body::Scope::Column => catalog_fact::Scope::Column,
                 update_catalog_fact_body::Scope::Metric => catalog_fact::Scope::Metric,
             };
-            assert_eq!(super::fact_scope_str(rendered), scope);
+            assert_eq!(super::knowledge_scope_str(rendered), scope);
         }
 
-        for confidence in super::FACT_CONFIDENCES {
-            let parsed = super::parse_fact_confidence(confidence);
+        for confidence in super::KNOWLEDGE_CONFIDENCES {
+            let parsed = super::parse_knowledge_confidence(confidence);
             let rendered = match parsed {
                 update_catalog_fact_body::Confidence::Confirmed => {
                     catalog_fact::Confidence::Confirmed
@@ -2388,7 +2388,7 @@ mod tests {
                     catalog_fact::Confidence::Inferred
                 }
             };
-            assert_eq!(super::fact_confidence_str(rendered), confidence);
+            assert_eq!(super::knowledge_confidence_str(rendered), confidence);
         }
     }
 
@@ -2402,10 +2402,10 @@ mod tests {
     }
 
     #[test]
-    fn fact_details_text_includes_body_and_optional_fields() {
+    fn knowledge_details_text_includes_body_and_optional_fields() {
         use tower_api::models::{catalog_fact, CatalogFact};
 
-        let mut fact = CatalogFact::new(
+        let mut entry = CatalogFact::new(
             catalog_fact::Confidence::Inferred,
             "2026-07-22T00:00:00Z".to_string(),
             "soft-deletes".to_string(),
@@ -2414,10 +2414,10 @@ mod tests {
             "deleted_at marks soft-deleted rows".to_string(),
             "2026-07-22T01:00:00Z".to_string(),
         );
-        fact.source = Some("agent-42".to_string());
-        fact.body = Some(Some(serde_json::json!({"sql": "deleted_at IS NULL"})));
+        entry.source = Some("agent-42".to_string());
+        entry.body = Some(Some(serde_json::json!({"sql": "deleted_at IS NULL"})));
 
-        let text = super::fact_details_text("my-catalog", "production", &fact);
+        let text = super::knowledge_details_text("my-catalog", "production", &entry);
 
         assert!(text.contains("soft-deletes"));
         assert!(text.contains("my-catalog"));
@@ -2430,24 +2430,24 @@ mod tests {
         assert!(text.contains("deleted_at IS NULL"));
 
         // Optional fields drop out when absent.
-        fact.source = None;
-        fact.body = None;
-        fact.object = String::new();
-        let text = super::fact_details_text("my-catalog", "production", &fact);
+        entry.source = None;
+        entry.body = None;
+        entry.object = String::new();
+        let text = super::knowledge_details_text("my-catalog", "production", &entry);
         assert!(!text.contains("Source"));
         assert!(!text.contains("Body"));
         assert!(!text.contains("Object"));
     }
 
     #[test]
-    fn facts_command_is_marked_beta() {
+    fn knowledge_command_is_marked_beta() {
         let mut command = catalogs_cmd();
-        let facts_help = command
-            .find_subcommand_mut("facts")
-            .expect("facts command should exist")
+        let knowledge_help = command
+            .find_subcommand_mut("knowledge")
+            .expect("knowledge command should exist")
             .render_help()
             .to_string();
-        assert!(facts_help.contains("[beta]"));
+        assert!(knowledge_help.contains("[beta]"));
     }
 
     #[test]

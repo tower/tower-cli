@@ -433,7 +433,10 @@ pub async fn describe_catalog(
     .await
 }
 
-pub async fn list_catalog_facts(
+/// The CLI surface calls these "knowledge", but the backend and its generated
+/// client still call them catalog "facts" — hence the `..._fact`/`CatalogFact`
+/// names threaded through these wrappers.
+pub async fn list_catalog_knowledge(
     config: &Config,
     catalog: &str,
     env: &str,
@@ -458,7 +461,7 @@ pub async fn list_catalog_facts(
     .await
 }
 
-pub async fn describe_catalog_fact(
+pub async fn describe_catalog_knowledge(
     config: &Config,
     catalog: &str,
     name: &str,
@@ -481,9 +484,9 @@ pub async fn describe_catalog_fact(
     .await
 }
 
-/// Upserts a catalog fact: the server creates the fact under `name` when it
-/// doesn't exist yet and replaces it otherwise.
-pub async fn update_catalog_fact(
+/// Upserts a piece of catalog knowledge: the server creates it under `name`
+/// when it doesn't exist yet and replaces it otherwise.
+pub async fn update_catalog_knowledge(
     config: &Config,
     catalog: &str,
     name: &str,
@@ -508,10 +511,10 @@ pub async fn update_catalog_fact(
     .await
 }
 
-/// Deletes a catalog fact. The endpoint responds 204 with no body, which
-/// `unwrap_api_response` would treat as an error, so success maps to `()`
-/// directly; the generated client already surfaces 4xx/5xx as `Err`.
-pub async fn delete_catalog_fact(
+/// Deletes a piece of catalog knowledge. The endpoint responds 204 with no
+/// body, which `unwrap_api_response` would treat as an error, so success maps
+/// to `()` directly; the generated client already surfaces 4xx/5xx as `Err`.
+pub async fn delete_catalog_knowledge(
     config: &Config,
     catalog: &str,
     name: &str,
