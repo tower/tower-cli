@@ -1,0 +1,18 @@
+[package]
+name = "duckdb-wasm-spike"
+version = "0.0.0"
+edition = "2021"
+
+[[bin]]
+name = "spike"
+path = "src/main.rs"
+
+[dependencies]
+arrow = { version = "59.1.0", default-features = false, features = ["ipc"] }
+deno_core = "=0.330.0"
+deno_error = "0.5.7"
+duckdb = { version = "1.10505.0", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["rt", "macros"] }
+ureq = "2"
