@@ -1,10 +1,13 @@
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
+use futures_util::StreamExt;
 use std::io::{IsTerminal, Read};
+use std::time::{Duration, Instant};
 use tower_api::models::{
     vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
 };
+use tower_telemetry::debug;
 
 use crate::{api, beta, output, util::cmd};
 
@@ -69,6 +72,12 @@ pub fn catalogs_cmd() -> Command {
                         .value_parser(value_parser!(String))
                         .help("Environment the catalog belongs to")
                         .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("full")
+                        .long("full")
+                        .help("List each table's columns and their types")
+                        .action(ArgAction::SetTrue),
                 )
                 .about("Show the details of a catalog, including its properties and tables"),
         )
@@ -235,6 +244,7 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
     let env = cmd::get_string_flag(args, "environment");
+    let full = cmd::get_bool_flag(args, "full");
 
     let response = match api::describe_catalog(&config, name, &env).await {
         Ok(response) => response,
@@ -247,7 +257,7 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
     }
 
     let tables = if is_storage {
-        Some(fetch_catalog_tables(out, &config, name, &env).await)
+        Some(fetch_catalog_tables(out, &config, name, &env, full).await)
     } else {
         None
     };
@@ -265,8 +275,30 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
         Some(Ok(result)) if result.rows.is_empty() => {
             human.push_str("  No tables found.\n");
         }
+        Some(Ok(result)) if full => {
+            for row in &result.rows {
+                let namespace = json_value_to_cell(row.first().unwrap_or(&serde_json::Value::Null));
+                let table = json_value_to_cell(row.get(1).unwrap_or(&serde_json::Value::Null));
+                human.push_str(&header_line(&format!("{}.{}", namespace, table)));
+
+                let names = json_array_to_strings(row.get(2));
+                let types = json_array_to_strings(row.get(3));
+                if names.is_empty() {
+                    human.push_str("  No columns found.\n");
+                } else {
+                    let headers = vec!["Column".to_string(), "Type".to_string()];
+                    let data = names
+                        .iter()
+                        .enumerate()
+                        .map(|(i, n)| vec![n.clone(), types.get(i).cloned().unwrap_or_default()])
+                        .collect();
+                    human.push_str(&output::table_text(headers, data));
+                }
+                human.push('\n');
+            }
+        }
         Some(Ok(result)) => {
-            let headers = vec!["Schema".to_string(), "Table".to_string()];
+            let headers = vec!["Namespace".to_string(), "Table".to_string()];
             let data = result
                 .rows
                 .iter()
@@ -291,10 +323,26 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
                     .rows
                     .iter()
                     .map(|row| {
-                        serde_json::json!({
-                            "schema": row.first().cloned().unwrap_or(serde_json::Value::Null),
+                        let mut entry = serde_json::json!({
+                            "namespace": row.first().cloned().unwrap_or(serde_json::Value::Null),
                             "table": row.get(1).cloned().unwrap_or(serde_json::Value::Null),
-                        })
+                        });
+                        if full {
+                            let names = json_array_to_strings(row.get(2));
+                            let types = json_array_to_strings(row.get(3));
+                            let columns = names
+                                .iter()
+                                .enumerate()
+                                .map(|(i, n)| {
+                                    serde_json::json!({
+                                        "name": n,
+                                        "type": types.get(i).cloned().unwrap_or_default(),
+                                    })
+                                })
+                                .collect();
+                            entry["columns"] = serde_json::Value::Array(columns);
+                        }
+                        entry
                     })
                     .collect(),
             ),
@@ -317,6 +365,7 @@ async fn fetch_catalog_tables(
     config: &Config,
     name: &str,
     env: &str,
+    full: bool,
 ) -> Result<QueryResult, String> {
     let mut spinner = out.spinner("Listing tables...");
 
@@ -336,33 +385,42 @@ async fn fetch_catalog_tables(
     };
 
     let token = response.credentials.oauth_token.clone();
-    let setup = attach_statements(
-        name,
-        &response.credentials,
-        vend_catalog_credentials_body::Mode::Read,
-    );
-    let db_name = name.to_string();
 
-    let result = tokio::task::spawn_blocking(move || {
-        run_duckdb_query(
-            &setup,
-            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-            duckdb::params![db_name],
-        )
-    })
-    .await;
+    // `--full` needs every table's column schema. Going through DuckDB means a
+    // `DESCRIBE` per table, each of which fully opens the Iceberg table (reading
+    // manifests from object storage) — slow, and unbounded for tables with heavy
+    // metadata. The Iceberg REST catalog's `loadTable` returns the schema
+    // straight from table metadata with no manifest I/O, so `--full` talks to
+    // the catalog directly. The plain listing stays on DuckDB.
+    let result = if full {
+        fetch_catalog_columns_via_rest(&response.credentials).await
+    } else {
+        let setup = attach_statements(
+            name,
+            &response.credentials,
+            vend_catalog_credentials_body::Mode::Read,
+        );
+        let db_name = name.to_string();
+        tokio::task::spawn_blocking(move || {
+            run_duckdb_query(
+                &setup,
+                "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
+                duckdb::params![db_name],
+            )
+        })
+        .await
+        .map_err(|err| err.to_string())
+        .and_then(|inner| inner.map_err(|err| err.to_string()))
+    };
+
     match result {
-        Ok(Ok(query_result)) => {
+        Ok(query_result) => {
             spinner.success(out);
             Ok(query_result)
         }
-        Ok(Err(err)) => {
-            spinner.failure(out);
-            Err(redact_token(&err.to_string(), &token))
-        }
         Err(err) => {
             spinner.failure(out);
-            Err(redact_token(&err.to_string(), &token))
+            Err(redact_token(&err, &token))
         }
     }
 }
@@ -522,10 +580,19 @@ fn run_duckdb_query<P: duckdb::Params>(
     params: P,
 ) -> Result<QueryResult, duckdb::Error> {
     let conn = duckdb::Connection::open_in_memory()?;
+    // Setup statements embed the vended OAuth token, so time them without logging
+    // their text.
+    let setup_start = Instant::now();
     for statement in setup {
         conn.execute_batch(statement)?;
     }
+    debug!(
+        "duckdb: setup ({} statements) took {:?}",
+        setup.len(),
+        setup_start.elapsed()
+    );
 
+    let query_start = Instant::now();
     let mut stmt = conn.prepare(query)?;
     let mut columns: Vec<String> = Vec::new();
     let mut rows = Vec::new();
@@ -550,7 +617,386 @@ fn run_duckdb_query<P: duckdb::Params>(
         columns = stmt.column_names();
     }
 
+    debug!(
+        "duckdb: query took {:?} ({} rows): {}",
+        query_start.elapsed(),
+        rows.len(),
+        query
+    );
+
     Ok(QueryResult { columns, rows })
+}
+
+/// How many `loadTable` requests `--full` runs against the Iceberg REST catalog
+/// at once. Each is a single metadata fetch; kept modest because Polaris rate
+/// limits (HTTP 429) aggressive fan-out. Throttled requests are retried, so this
+/// only tunes throughput, not correctness.
+const CATALOG_LOADTABLE_CONCURRENCY: usize = 4;
+
+/// How many times to retry a throttled or transient catalog request before
+/// giving up on it.
+const CATALOG_HTTP_MAX_RETRIES: usize = 4;
+
+/// Fetches every table's column schema directly from the Iceberg REST catalog.
+/// Discovers namespaces and tables through the catalog's list endpoints, then
+/// `loadTable`s each table concurrently and reads its current schema — no DuckDB
+/// attach and no manifest I/O, which is what makes `DESCRIBE` slow. Returns rows
+/// shaped like the plain listing (`[namespace, table, [column names],
+/// [column types]]`) so `do_show` renders both modes the same way. A table whose
+/// `loadTable` fails is reported with no columns rather than failing the listing.
+async fn fetch_catalog_columns_via_rest(
+    credentials: &CatalogCredentials,
+) -> Result<QueryResult, String> {
+    let client = reqwest::Client::new();
+    let base = credentials.catalog_uri.trim_end_matches('/');
+    // The vended warehouse is the Polaris REST prefix (see `CatalogCredentials`).
+    let prefix = credentials.warehouse.as_str();
+    let token = credentials.oauth_token.as_str();
+
+    let list_start = Instant::now();
+    let namespaces = list_all_namespaces(&client, base, prefix, token).await?;
+    let mut tables: Vec<(Vec<String>, String)> = Vec::new();
+    for namespace in &namespaces {
+        for table in list_tables(&client, base, prefix, token, namespace).await? {
+            tables.push((namespace.clone(), table));
+        }
+    }
+    debug!(
+        "catalog rest: discovered {} tables across {} namespaces in {:?}",
+        tables.len(),
+        namespaces.len(),
+        list_start.elapsed()
+    );
+
+    let load_start = Instant::now();
+    let client = &client;
+    let mut rows: Vec<Vec<serde_json::Value>> = futures_util::stream::iter(tables)
+        .map(|(namespace, table)| async move {
+            let display_ns = namespace.join(".");
+            let started = Instant::now();
+            let (names, types) =
+                match load_table_columns(client, base, prefix, token, &namespace, &table).await {
+                    Ok(columns) => {
+                        debug!(
+                            "catalog rest: loadTable {}.{} took {:?} ({} columns)",
+                            display_ns,
+                            table,
+                            started.elapsed(),
+                            columns.0.len()
+                        );
+                        columns
+                    }
+                    Err(err) => {
+                        debug!(
+                            "catalog rest: loadTable {}.{} failed after {:?}: {}",
+                            display_ns,
+                            table,
+                            started.elapsed(),
+                            err
+                        );
+                        (Vec::new(), Vec::new())
+                    }
+                };
+            vec![
+                serde_json::Value::String(display_ns),
+                serde_json::Value::String(table),
+                serde_json::Value::Array(names),
+                serde_json::Value::Array(types),
+            ]
+        })
+        .buffer_unordered(CATALOG_LOADTABLE_CONCURRENCY)
+        .collect()
+        .await;
+    debug!(
+        "catalog rest: loaded {} table schemas in {:?}",
+        rows.len(),
+        load_start.elapsed()
+    );
+
+    // `buffer_unordered` yields as each request finishes, so restore the
+    // namespace/table ordering the plain listing produces.
+    rows.sort_by(|a, b| {
+        let key = |row: &[serde_json::Value]| {
+            (
+                row.first().and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+                row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            )
+        };
+        key(a).cmp(&key(b))
+    });
+
+    Ok(QueryResult {
+        columns: vec![
+            "schema".to_string(),
+            "name".to_string(),
+            "column_names".to_string(),
+            "column_types".to_string(),
+        ],
+        rows,
+    })
+}
+
+/// Appends `segments` to the catalog base URL, percent-encoding each segment
+/// (so a multi-level namespace joined by the Iceberg `\u{1f}` separator is
+/// encoded as one path component). Preserves any path already on the base.
+fn build_catalog_url(base: &str, segments: &[&str]) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(base).map_err(|err| err.to_string())?;
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| format!("catalog uri is not a valid base: {}", base))?;
+        for segment in segments {
+            path.push(segment);
+        }
+    }
+    Ok(url)
+}
+
+/// Issues an authenticated GET and parses the JSON body, retrying on throttling
+/// (HTTP 429) and transient 5xx responses with backoff — Polaris rate limits
+/// concurrent `loadTable`s, and an un-retried 429 would drop that table's
+/// schema. The bearer token rides in the header, never the URL, so the URL is
+/// safe to include in errors.
+async fn catalog_get_json(
+    client: &reqwest::Client,
+    url: reqwest::Url,
+    token: &str,
+) -> Result<serde_json::Value, String> {
+    let url_display = url.as_str().to_owned();
+    let mut attempt = 0;
+    loop {
+        let response = client
+            .get(url.clone())
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
+        let status = response.status();
+        if status.is_success() {
+            return response
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|err| format!("GET {} -> {}", url_display, err));
+        }
+
+        let retryable =
+            status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
+        if retryable && attempt < CATALOG_HTTP_MAX_RETRIES {
+            // Honour Retry-After when present; otherwise exponential backoff.
+            let backoff = retry_after(&response)
+                .unwrap_or_else(|| Duration::from_millis(200 * (1 << attempt)));
+            debug!(
+                "catalog rest: {} returned HTTP {} (attempt {}), retrying in {:?}",
+                url_display,
+                status,
+                attempt + 1,
+                backoff
+            );
+            attempt += 1;
+            tokio::time::sleep(backoff).await;
+            continue;
+        }
+
+        let body: String = response
+            .text()
+            .await
+            .unwrap_or_default()
+            .chars()
+            .take(200)
+            .collect();
+        return Err(format!("GET {} -> HTTP {}: {}", url_display, status, body));
+    }
+}
+
+/// Parses a `Retry-After` header expressed in whole seconds, if present.
+fn retry_after(response: &reqwest::Response) -> Option<Duration> {
+    response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(Duration::from_secs)
+}
+
+/// Walks the catalog's namespace tree breadth-first so nested namespaces are
+/// included, not just the top level. Deduped in case a catalog also returns
+/// descendants from the root listing.
+async fn list_all_namespaces(
+    client: &reqwest::Client,
+    base: &str,
+    prefix: &str,
+    token: &str,
+) -> Result<Vec<Vec<String>>, String> {
+    let mut all: Vec<Vec<String>> = Vec::new();
+    let mut frontier: Vec<Vec<String>> = vec![Vec::new()];
+    while let Some(parent) = frontier.pop() {
+        for child in list_namespaces(client, base, prefix, token, &parent).await? {
+            if !all.contains(&child) {
+                all.push(child.clone());
+                frontier.push(child);
+            }
+        }
+    }
+    Ok(all)
+}
+
+/// Lists the immediate child namespaces of `parent` (the root when empty).
+async fn list_namespaces(
+    client: &reqwest::Client,
+    base: &str,
+    prefix: &str,
+    token: &str,
+    parent: &[String],
+) -> Result<Vec<Vec<String>>, String> {
+    let mut url = build_catalog_url(base, &["v1", prefix, "namespaces"])?;
+    if !parent.is_empty() {
+        url.query_pairs_mut()
+            .append_pair("parent", &parent.join("\u{1f}"));
+    }
+    let json = catalog_get_json(client, url, token).await?;
+    Ok(json
+        .get("namespaces")
+        .and_then(|v| v.as_array())
+        .map(|list| {
+            list.iter()
+                .filter_map(|ns| ns.as_array())
+                .map(|levels| {
+                    levels
+                        .iter()
+                        .filter_map(|level| level.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// Lists the table names in a single namespace.
+async fn list_tables(
+    client: &reqwest::Client,
+    base: &str,
+    prefix: &str,
+    token: &str,
+    namespace: &[String],
+) -> Result<Vec<String>, String> {
+    let ns = namespace.join("\u{1f}");
+    let url = build_catalog_url(base, &["v1", prefix, "namespaces", &ns, "tables"])?;
+    let json = catalog_get_json(client, url, token).await?;
+    Ok(json
+        .get("identifiers")
+        .and_then(|v| v.as_array())
+        .map(|list| {
+            list.iter()
+                .filter_map(|ident| ident.get("name").and_then(|n| n.as_str()))
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// `loadTable`s one table and extracts its current schema as parallel
+/// `(column names, column types)` vectors. Falls back to the first schema, and
+/// to legacy single-`schema` metadata, when `current-schema-id` isn't matched.
+async fn load_table_columns(
+    client: &reqwest::Client,
+    base: &str,
+    prefix: &str,
+    token: &str,
+    namespace: &[String],
+    table: &str,
+) -> Result<(Vec<serde_json::Value>, Vec<serde_json::Value>), String> {
+    let ns = namespace.join("\u{1f}");
+    let url = build_catalog_url(base, &["v1", prefix, "namespaces", &ns, "tables", table])?;
+    let json = catalog_get_json(client, url, token).await?;
+
+    let metadata = json
+        .get("metadata")
+        .ok_or_else(|| "loadTable response missing `metadata`".to_string())?;
+    let current = metadata.get("current-schema-id").and_then(|v| v.as_i64());
+    let schema = match (metadata.get("schemas").and_then(|v| v.as_array()), current) {
+        (Some(schemas), Some(id)) => schemas
+            .iter()
+            .find(|s| s.get("schema-id").and_then(|v| v.as_i64()) == Some(id))
+            .or_else(|| schemas.first()),
+        (Some(schemas), None) => schemas.first(),
+        (None, _) => metadata.get("schema"),
+    };
+
+    let fields = schema
+        .and_then(|s| s.get("fields"))
+        .and_then(|v| v.as_array());
+    let mut names = Vec::new();
+    let mut types = Vec::new();
+    if let Some(fields) = fields {
+        for field in fields {
+            let name = field
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            let ty = iceberg_type_to_display(field.get("type").unwrap_or(&serde_json::Value::Null));
+            names.push(serde_json::Value::String(name));
+            types.push(serde_json::Value::String(ty));
+        }
+    }
+    Ok((names, types))
+}
+
+/// Renders an Iceberg field type (from `loadTable` metadata) as a display
+/// string, mapping primitives to the DuckDB-style names the plain listing shows
+/// and summarising nested types.
+fn iceberg_type_to_display(ty: &serde_json::Value) -> String {
+    match ty {
+        serde_json::Value::String(name) => iceberg_primitive_to_display(name),
+        serde_json::Value::Object(obj) => match obj.get("type").and_then(|v| v.as_str()) {
+            Some("struct") => "STRUCT".to_string(),
+            Some("list") => {
+                let element = obj
+                    .get("element")
+                    .map(iceberg_type_to_display)
+                    .unwrap_or_default();
+                format!("LIST({})", element)
+            }
+            Some("map") => {
+                let key = obj.get("key").map(iceberg_type_to_display).unwrap_or_default();
+                let value = obj
+                    .get("value")
+                    .map(iceberg_type_to_display)
+                    .unwrap_or_default();
+                format!("MAP({}, {})", key, value)
+            }
+            Some(other) => other.to_uppercase(),
+            None => "UNKNOWN".to_string(),
+        },
+        _ => "UNKNOWN".to_string(),
+    }
+}
+
+/// Maps an Iceberg primitive type name to its DuckDB-style display name so the
+/// `--full` output matches the types the plain listing used to show.
+fn iceberg_primitive_to_display(name: &str) -> String {
+    match name {
+        "boolean" => "BOOLEAN".to_string(),
+        "int" => "INTEGER".to_string(),
+        "long" => "BIGINT".to_string(),
+        "float" => "FLOAT".to_string(),
+        "double" => "DOUBLE".to_string(),
+        "date" => "DATE".to_string(),
+        "time" => "TIME".to_string(),
+        "timestamp" => "TIMESTAMP".to_string(),
+        "timestamp_ns" => "TIMESTAMP_NS".to_string(),
+        "timestamptz" | "timestamptz_ns" => "TIMESTAMP WITH TIME ZONE".to_string(),
+        "string" => "VARCHAR".to_string(),
+        "uuid" => "UUID".to_string(),
+        "binary" => "BLOB".to_string(),
+        // decimal(P, S) is already descriptive; fixed[L] has no tidy SQL name.
+        other if other.starts_with("decimal") => other.to_uppercase(),
+        other if other.starts_with("fixed") => "BLOB".to_string(),
+        other => other.to_uppercase(),
+    }
 }
 
 fn duckdb_value_to_json(value: duckdb::types::Value) -> serde_json::Value {
@@ -665,6 +1111,15 @@ fn json_value_to_cell(value: &serde_json::Value) -> String {
         serde_json::Value::Null => String::new(),
         serde_json::Value::String(s) => s.clone(),
         other => other.to_string(),
+    }
+}
+
+/// Flattens a DuckDB list column (surfaced as a JSON array) into display strings.
+/// Anything that isn't an array — a null or missing cell — becomes an empty list.
+fn json_array_to_strings(value: Option<&serde_json::Value>) -> Vec<String> {
+    match value {
+        Some(serde_json::Value::Array(items)) => items.iter().map(json_value_to_cell).collect(),
+        _ => Vec::new(),
     }
 }
 
