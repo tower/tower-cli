@@ -465,16 +465,28 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
     }
 
     let write = cmd::get_bool_flag(args, "write");
-    // Read mode runs untrusted SQL, so gate it before it reaches DuckDB: a
-    // smuggled second statement would otherwise execute as a side effect of
-    // `prepare`, and a write in read mode should fail with a clear message rather
-    // than a raw engine error. Write mode is the trusted power-user path.
+    // Read mode runs untrusted SQL, so gate it through DuckDB's parser before it
+    // reaches the query path: it must be exactly one SELECT. A smuggled second
+    // statement would otherwise execute as a side effect of `prepare`, and a
+    // write should fail with a clear message rather than a raw engine error.
+    // Write mode is the trusted power-user path and skips the gate.
     if !write {
-        if guard::is_multi_statement(&sql) {
-            out.die("Only a single SQL statement can be run at a time. Remove the extra statement(s).");
-        }
-        if guard::is_write_statement(&sql) {
-            out.die("This command runs read-only queries. The statement looks like it writes or changes data; re-run with --write to modify the catalog.");
+        let sql_to_check = sql.clone();
+        let verdict =
+            tokio::task::spawn_blocking(move || guard::classify_read_only(&sql_to_check)).await;
+        match verdict {
+            Ok(Ok(guard::ReadOnlyCheck::Allowed)) => {}
+            Ok(Ok(guard::ReadOnlyCheck::Empty)) => {
+                out.die("No SQL statement provided. Pass one with --sql or pipe it via stdin.")
+            }
+            Ok(Ok(guard::ReadOnlyCheck::Multiple)) => {
+                out.die("Only a single SQL statement can be run at a time. Remove the extra statement(s).")
+            }
+            Ok(Ok(guard::ReadOnlyCheck::NotReadOnly)) => out.die(
+                "This command runs read-only queries. Only a single SELECT statement is allowed; re-run with --write to modify the catalog.",
+            ),
+            Ok(Err(err)) => out.die(&format!("Could not validate the query: {err}")),
+            Err(err) => out.die(&format!("Could not validate the query: {err}")),
         }
     }
     let query_result = execute_catalog_query(out, &config, name, &env, sql, write).await;

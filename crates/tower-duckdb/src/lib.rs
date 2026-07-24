@@ -259,7 +259,7 @@ fn stringify_key(value: &serde_json::Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::guard::{first_keyword, is_multi_statement, is_write_statement};
+    use super::guard::{classify_read_only, ReadOnlyCheck};
     use super::{hardening_statements, run_query, value_to_json, QueryResult};
 
     #[test]
@@ -352,35 +352,60 @@ mod tests {
         assert!(!exact.truncated);
     }
 
-    // --- Guard gates -----------------------------------------------------
+    // --- Read-only gate --------------------------------------------------
 
-    #[test]
-    fn multi_statement_ignores_separators_in_strings_and_comments() {
-        assert!(!is_multi_statement("SELECT 1"));
-        assert!(!is_multi_statement("SELECT 1;"));
-        assert!(!is_multi_statement("  SELECT 1 ;  "));
-        assert!(!is_multi_statement("SELECT 'a;b'"));
-        assert!(!is_multi_statement("SELECT 1 -- ; not a statement"));
-        assert!(!is_multi_statement("SELECT 1; -- trailing comment"));
-        assert!(!is_multi_statement("SELECT /* ; */ 1"));
-
-        assert!(is_multi_statement("SELECT 1; SELECT 2"));
-        assert!(is_multi_statement("SELECT 1; DROP TABLE t"));
-        assert!(is_multi_statement("SELECT 'a;b'; SELECT 2"));
+    fn check(sql: &str) -> ReadOnlyCheck {
+        classify_read_only(sql).expect("parser should run")
     }
 
     #[test]
-    fn write_statements_are_detected_through_case_and_comments() {
-        assert_eq!(first_keyword("  SELECT 1"), "select");
-        assert_eq!(first_keyword("/* c */ INSERT INTO t VALUES (1)"), "insert");
-        assert_eq!(first_keyword("-- lead\nDELETE FROM t"), "delete");
+    fn read_only_gate_allows_only_single_selects() {
+        for sql in [
+            "SELECT 1",
+            "SELECT 1;",
+            "  SELECT 1 ;  ",
+            "SELECT 'a;b'",
+            "SELECT 1 -- ; not a statement",
+            "SELECT /* ; */ 1",
+            "WITH x AS (SELECT 1) SELECT * FROM x",
+            "select COUNT(*) from runs",
+        ] {
+            assert_eq!(check(sql), ReadOnlyCheck::Allowed, "should allow: {sql}");
+        }
+    }
 
-        assert!(!is_write_statement("SELECT * FROM t"));
-        assert!(!is_write_statement("WITH x AS (SELECT 1) SELECT * FROM x"));
-        assert!(is_write_statement("insert into t values (1)"));
-        assert!(is_write_statement("  DROP TABLE t"));
-        assert!(is_write_statement("COPY t TO 'out.csv'"));
-        assert!(is_write_statement("ATTACH 'x' AS y"));
+    #[test]
+    fn read_only_gate_rejects_writes_and_ddl_whatever_the_leading_keyword() {
+        for sql in [
+            "insert into t values (1)",
+            "  DROP TABLE t",
+            "COPY t TO 'out.csv'",
+            "ATTACH 'x' AS y",
+            "SET memory_limit = '1GB'",
+            "PRAGMA version",
+            // Starts with an allowed keyword but still mutates: the parser sees
+            // the DELETE a first-keyword denylist would miss.
+            "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x",
+        ] {
+            assert_eq!(check(sql), ReadOnlyCheck::NotReadOnly, "should reject: {sql}");
+        }
+    }
+
+    #[test]
+    fn read_only_gate_rejects_comment_terminator_smuggling() {
+        // A `--` comment ends at a carriage return in DuckDB, so this parses as a
+        // DROP even though it opens with what looks like a full-line comment. A
+        // text scanner that only breaks comments on `\n` would see it as empty.
+        assert_eq!(check("-- harmless\rDROP TABLE runs"), ReadOnlyCheck::NotReadOnly);
+        assert_eq!(check("-- harmless\r\nSELECT 1"), ReadOnlyCheck::Allowed);
+    }
+
+    #[test]
+    fn read_only_gate_classifies_empty_and_multiple() {
+        assert_eq!(check(""), ReadOnlyCheck::Empty);
+        assert_eq!(check("   -- just a comment"), ReadOnlyCheck::Empty);
+        assert_eq!(check("SELECT 1; SELECT 2"), ReadOnlyCheck::Multiple);
+        assert_eq!(check("SELECT 'a;b'; SELECT 2"), ReadOnlyCheck::Multiple);
     }
 
     #[test]
@@ -492,28 +517,34 @@ mod tests {
             "  drop   TABLE runs",
             "/* sneaky */ DELETE FROM runs",
         ] {
-            assert!(is_write_statement(sql), "not rejected as write/DDL: {sql}");
+            assert_eq!(check(sql), ReadOnlyCheck::NotReadOnly, "not rejected: {sql}");
         }
         for sql in [
             "SELECT * FROM runs",
             "WITH t AS (SELECT 1) SELECT * FROM t",
             "SELECT count(*) FROM runs",
         ] {
-            assert!(!is_write_statement(sql), "legit read wrongly flagged: {sql}");
+            assert_eq!(check(sql), ReadOnlyCheck::Allowed, "legit read rejected: {sql}");
         }
     }
 
     #[test]
     fn sandbox_gate_rejects_statement_smuggling() {
+        // A trailing statement of any kind is refused: an all-SELECT pair counts
+        // as Multiple, a mixed one trips the SELECT-only parser first.
         for sql in [
             "SELECT 1; DROP TABLE runs",
             "SELECT 1; DELETE FROM runs",
             "SELECT 'a;b'; DROP TABLE runs",
             "SELECT 1;\n-- c\nUPDATE runs SET id = 0",
+            "SELECT 1; SELECT 2",
         ] {
-            assert!(is_multi_statement(sql), "smuggled statement not caught: {sql}");
+            assert_ne!(check(sql), ReadOnlyCheck::Allowed, "smuggled statement allowed: {sql}");
         }
-        assert!(!is_multi_statement("SELECT * FROM runs -- a trailing ; comment"));
+        assert_eq!(
+            check("SELECT * FROM runs -- a trailing ; comment"),
+            ReadOnlyCheck::Allowed
+        );
     }
 
     #[test]
