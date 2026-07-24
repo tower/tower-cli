@@ -4817,7 +4817,6 @@ dependencies = [
  "crypto",
  "ctrlc",
  "cucumber",
- "duckdb",
  "futures",
  "futures-util",
  "http",
@@ -4836,7 +4835,6 @@ dependencies = [
  "snafu",
  "spinners",
  "tempfile",
- "testcontainers",
  "testutils",
  "tokio",
  "tokio-test",
@@ -4844,6 +4842,7 @@ dependencies = [
  "toml",
  "toml_edit 0.22.27",
  "tower-api",
+ "tower-duckdb",
  "tower-package",
  "tower-runtime",
  "tower-telemetry",
@@ -4851,6 +4850,17 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "webbrowser",
+]
+
+[[package]]
+name = "tower-duckdb"
+version = "0.3.70-rc.1"
+dependencies = [
+ "chrono",
+ "duckdb",
+ "serde_json",
+ "testcontainers",
+ "tower-telemetry",
 ]
 
 [[package]]

@@ -7,168 +7,12 @@ use std::time::{Duration, Instant};
 use tower_api::models::{
     vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
 };
+use tower_duckdb::{guard, params, run_query, QueryResult, Session};
 use tower_telemetry::debug;
 
 use crate::{api, beta, output, util::cmd};
 
 const STORAGE_CATALOG_TYPE: &str = "tower-catalog";
-
-/// Query-sandbox primitives for untrusted (agent) callers. These are the gates
-/// and the DuckDB session lockdown a future MCP `tower_catalogs_query` tool will
-/// apply to agent-issued SQL: reject write/DDL and multi-statement input, cap
-/// the row count, and lock the session down so a query cannot read the local
-/// filesystem, load community extensions, or unwind the settings. Nothing wires
-/// these into the query path yet, so `dead_code` is allowed here; the
-/// adversarial test suite exercises them directly.
-#[allow(dead_code)]
-mod sandbox {
-    /// Row cap for agent-issued queries. Rows past this are dropped and the
-    /// caller is told the set was truncated, so a model cannot pull an unbounded
-    /// table into memory or its context.
-    pub(super) const AGENT_MAX_ROWS: usize = 1_000;
-
-    /// Leading keywords that write data or schema, or repoint the session. An
-    /// agent query starting with one of these is refused, as defence in depth on
-    /// top of the read-only credentials it is given.
-    const WRITE_LEADING_KEYWORDS: &[&str] = &[
-        "insert", "update", "delete", "merge", "create", "drop", "alter", "truncate", "replace",
-        "copy", "attach", "detach",
-    ];
-
-    /// Statements that lock an attached DuckDB session down before an untrusted
-    /// query runs: no local-filesystem access (so `read_csv('/etc/passwd')` and
-    /// friends fail), no community extensions, and a configuration lock so the
-    /// query cannot unwind any of it. These run after the catalog is attached,
-    /// which is what installs extensions and reaches the network. Network access
-    /// stays on because httpfs is how the attached Iceberg catalog reads its
-    /// data, so this narrows but does not eliminate the query surface.
-    pub(super) fn agent_hardening_statements() -> Vec<String> {
-        vec![
-            "SET disabled_filesystems = 'LocalFileSystem'".to_string(),
-            "SET allow_community_extensions = false".to_string(),
-            "SET lock_configuration = true".to_string(),
-        ]
-    }
-
-    /// The leading SQL keyword, lowercased, after skipping leading whitespace and
-    /// `--` / `/* */` comments.
-    pub(super) fn first_sql_keyword(sql: &str) -> String {
-        let mut s = sql.trim_start();
-        loop {
-            if let Some(rest) = s.strip_prefix("--") {
-                match rest.find('\n') {
-                    Some(nl) => s = rest[nl + 1..].trim_start(),
-                    None => return String::new(),
-                }
-            } else if let Some(rest) = s.strip_prefix("/*") {
-                match rest.find("*/") {
-                    Some(end) => s = rest[end + 2..].trim_start(),
-                    None => return String::new(),
-                }
-            } else {
-                break;
-            }
-        }
-        s.chars()
-            .take_while(|c| c.is_ascii_alphabetic())
-            .collect::<String>()
-            .to_lowercase()
-    }
-
-    /// True when `sql` starts with a write/DDL keyword.
-    pub(super) fn is_write_statement(sql: &str) -> bool {
-        WRITE_LEADING_KEYWORDS.contains(&first_sql_keyword(sql).as_str())
-    }
-
-    /// True when `sql` holds more than one statement. A `;` inside a string
-    /// literal or comment is data, not a separator, so those spans are skipped.
-    /// This gate matters because duckdb-rs `prepare` runs every statement but the
-    /// last as a side effect, so unguarded multi-statement SQL would execute its
-    /// leading statements even though only the final one is returned.
-    pub(super) fn contains_multiple_statements(sql: &str) -> bool {
-        #[derive(PartialEq)]
-        enum State {
-            Normal,
-            Single,
-            Double,
-            Line,
-            Block,
-        }
-
-        let mut state = State::Normal;
-        let mut statements = 0usize;
-        let mut current_has_content = false;
-        let mut chars = sql.chars().peekable();
-
-        while let Some(c) = chars.next() {
-            match state {
-                State::Normal => match c {
-                    '\'' => {
-                        state = State::Single;
-                        current_has_content = true;
-                    }
-                    '"' => {
-                        state = State::Double;
-                        current_has_content = true;
-                    }
-                    '-' if chars.peek() == Some(&'-') => {
-                        chars.next();
-                        state = State::Line;
-                    }
-                    '/' if chars.peek() == Some(&'*') => {
-                        chars.next();
-                        state = State::Block;
-                    }
-                    ';' => {
-                        if current_has_content {
-                            statements += 1;
-                            if statements > 1 {
-                                return true;
-                            }
-                        }
-                        current_has_content = false;
-                    }
-                    c if c.is_whitespace() => {}
-                    _ => current_has_content = true,
-                },
-                State::Single => {
-                    if c == '\'' {
-                        if chars.peek() == Some(&'\'') {
-                            chars.next();
-                        } else {
-                            state = State::Normal;
-                        }
-                    }
-                }
-                State::Double => {
-                    if c == '"' {
-                        if chars.peek() == Some(&'"') {
-                            chars.next();
-                        } else {
-                            state = State::Normal;
-                        }
-                    }
-                }
-                State::Line => {
-                    if c == '\n' {
-                        state = State::Normal;
-                    }
-                }
-                State::Block => {
-                    if c == '*' && chars.peek() == Some(&'/') {
-                        chars.next();
-                        state = State::Normal;
-                    }
-                }
-            }
-        }
-
-        if current_has_content {
-            statements += 1;
-        }
-        statements > 1
-    }
-}
 
 pub fn catalogs_cmd() -> Command {
     Command::new("catalogs")
@@ -559,10 +403,10 @@ async fn fetch_catalog_tables(
         );
         let db_name = name.to_string();
         tokio::task::spawn_blocking(move || {
-            run_duckdb_query(
+            run_query(
                 &setup,
                 "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-                duckdb::params![db_name],
+                params![db_name],
                 None,
             )
         })
@@ -621,13 +465,27 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
     }
 
     let write = cmd::get_bool_flag(args, "write");
+    // Read mode runs untrusted SQL, so gate it before it reaches DuckDB: a
+    // smuggled second statement would otherwise execute as a side effect of
+    // `prepare`, and a write in read mode should fail with a clear message rather
+    // than a raw engine error. Write mode is the trusted power-user path.
+    if !write {
+        if guard::is_multi_statement(&sql) {
+            out.die("Only a single SQL statement can be run at a time. Remove the extra statement(s).");
+        }
+        if guard::is_write_statement(&sql) {
+            out.die("This command runs read-only queries. The statement looks like it writes or changes data; re-run with --write to modify the catalog.");
+        }
+    }
     let query_result = execute_catalog_query(out, &config, name, &env, sql, write).await;
     output_query_result(out, &query_result);
 }
 
 /// Vends credentials for the catalog, attaches it in an in-memory DuckDB, and
-/// runs `sql` against it. Read-only unless `write` is set, in which case
-/// read-write credentials are vended and the attach allows writes. Dies with a
+/// runs `sql` against it. In read mode (the default) the session is hardened
+/// after attach and the result row count is capped, so an untrusted query cannot
+/// read the host or pull an unbounded table back. `write` vends read-write
+/// credentials, lets the attach write, and runs the query trusted. Dies with a
 /// user-facing error on failure.
 async fn execute_catalog_query(
     out: &output::Out,
@@ -655,7 +513,20 @@ async fn execute_catalog_query(
 
     let token = response.credentials.oauth_token.clone();
     let setup = attach_statements(name, &response.credentials, mode);
-    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup, &sql, [], None)).await;
+    // Read mode is the sandboxed path: lock the session down after attach and cap
+    // the rows, so the query cannot read the host, escape the config, or pull an
+    // unbounded table back. Write mode is trusted and runs the setup as-is.
+    let harden = !write;
+    let max_rows = (!write).then_some(guard::AGENT_MAX_ROWS);
+    let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
+        let session = Session::open()?;
+        session.run_setup(&setup)?;
+        if harden {
+            session.harden()?;
+        }
+        session.query(&sql, [], max_rows)
+    })
+    .await;
 
     match result {
         Ok(Ok(query_result)) => {
@@ -691,17 +562,6 @@ fn read_sql_from_stdin(out: &output::Out) -> String {
     sql
 }
 
-#[derive(Debug)]
-struct QueryResult {
-    columns: Vec<String>,
-    rows: Vec<Vec<serde_json::Value>>,
-    /// Rows were dropped to honour a caller-supplied row cap. Populated by
-    /// `run_duckdb_query`; the reader lands with the agent query path, so it is
-    /// exercised only by the sandbox tests today.
-    #[allow(dead_code)]
-    truncated: bool,
-}
-
 /// Statements that install the Iceberg support and attach the catalog under
 /// its Tower name — mirrors `templates/duckdb.sql.tmpl`. The attach is
 /// READ_ONLY unless read-write credentials were vended. No `USE`: DuckDB's
@@ -733,74 +593,6 @@ fn attach_statements(
             uri = SqlLiteral(&credentials.catalog_uri),
         ),
     ]
-}
-
-/// Runs `setup` statements one at a time, then `query` as a prepared statement
-/// with `params` bound. Values that fit a bind position should go through
-/// `params` rather than into the query text. When `max_rows` is set, rows past
-/// it are dropped and the result is flagged truncated, so an untrusted caller
-/// cannot pull an unbounded table into memory.
-fn run_duckdb_query<P: duckdb::Params>(
-    setup: &[String],
-    query: &str,
-    params: P,
-    max_rows: Option<usize>,
-) -> Result<QueryResult, duckdb::Error> {
-    let conn = duckdb::Connection::open_in_memory()?;
-    // Setup statements embed the vended OAuth token, so time them without logging
-    // their text.
-    let setup_start = Instant::now();
-    for statement in setup {
-        conn.execute_batch(statement)?;
-    }
-    debug!(
-        "duckdb: setup ({} statements) took {:?}",
-        setup.len(),
-        setup_start.elapsed()
-    );
-
-    let query_start = Instant::now();
-    let mut stmt = conn.prepare(query)?;
-    let mut columns: Vec<String> = Vec::new();
-    let mut rows = Vec::new();
-    let mut truncated = false;
-
-    {
-        let mut result_rows = stmt.query(params)?;
-        while let Some(row) = result_rows.next()? {
-            if columns.is_empty() {
-                columns = row.as_ref().column_names();
-            }
-            if max_rows.is_some_and(|max| rows.len() >= max) {
-                truncated = true;
-                break;
-            }
-            let mut record = Vec::with_capacity(columns.len());
-            for idx in 0..columns.len() {
-                let value: duckdb::types::Value = row.get(idx)?;
-                record.push(duckdb_value_to_json(value));
-            }
-            rows.push(record);
-        }
-    }
-
-    // A query with no result rows never populates columns above.
-    if columns.is_empty() {
-        columns = stmt.column_names();
-    }
-
-    debug!(
-        "duckdb: query took {:?} ({} rows): {}",
-        query_start.elapsed(),
-        rows.len(),
-        query
-    );
-
-    Ok(QueryResult {
-        columns,
-        rows,
-        truncated,
-    })
 }
 
 /// How many `loadTable` requests `--full` runs against the Iceberg REST catalog
@@ -1176,89 +968,6 @@ fn iceberg_primitive_to_display(name: &str) -> String {
     }
 }
 
-fn duckdb_value_to_json(value: duckdb::types::Value) -> serde_json::Value {
-    use duckdb::types::{TimeUnit, Value};
-    use serde_json::json;
-
-    match value {
-        Value::Null => serde_json::Value::Null,
-        Value::Boolean(v) => json!(v),
-        Value::TinyInt(v) => json!(v),
-        Value::SmallInt(v) => json!(v),
-        Value::Int(v) => json!(v),
-        Value::BigInt(v) => json!(v),
-        Value::HugeInt(v) => json!(v.to_string()),
-        Value::UTinyInt(v) => json!(v),
-        Value::USmallInt(v) => json!(v),
-        Value::UInt(v) => json!(v),
-        Value::UBigInt(v) => json!(v),
-        Value::Float(v) => json!(v),
-        Value::Double(v) => json!(v),
-        Value::Decimal(v) => json!(v.to_string()),
-        Value::Text(v) => json!(v),
-        Value::Timestamp(unit, v) => {
-            let micros = match unit {
-                TimeUnit::Second => v.checked_mul(1_000_000),
-                TimeUnit::Millisecond => v.checked_mul(1_000),
-                TimeUnit::Microsecond => Some(v),
-                TimeUnit::Nanosecond => Some(v / 1_000),
-            };
-            match micros.and_then(chrono::DateTime::from_timestamp_micros) {
-                Some(ts) => json!(ts.naive_utc().to_string()),
-                None => json!(format!("{:?}", Value::Timestamp(unit, v))),
-            }
-        }
-        Value::Date32(days) => {
-            let date = chrono::DateTime::from_timestamp(i64::from(days) * 86_400, 0);
-            match date {
-                Some(d) => json!(d.date_naive().to_string()),
-                None => json!(format!("{:?}", Value::Date32(days))),
-            }
-        }
-        Value::Time64(unit, v) => {
-            let micros = match unit {
-                TimeUnit::Second => v.checked_mul(1_000_000),
-                TimeUnit::Millisecond => v.checked_mul(1_000),
-                TimeUnit::Microsecond => Some(v),
-                TimeUnit::Nanosecond => Some(v / 1_000),
-            };
-            let time = micros.and_then(|m| {
-                chrono::NaiveTime::from_num_seconds_from_midnight_opt(
-                    (m / 1_000_000) as u32,
-                    ((m % 1_000_000) * 1_000) as u32,
-                )
-            });
-            match time {
-                Some(t) => json!(t.to_string()),
-                None => json!(format!("{:?}", Value::Time64(unit, v))),
-            }
-        }
-        Value::Enum(v) => json!(v),
-        Value::List(items) | Value::Array(items) => {
-            serde_json::Value::Array(items.into_iter().map(duckdb_value_to_json).collect())
-        }
-        Value::Struct(fields) => serde_json::Value::Object(
-            fields
-                .iter()
-                .map(|(name, value)| (name.clone(), duckdb_value_to_json(value.clone())))
-                .collect(),
-        ),
-        Value::Map(entries) => serde_json::Value::Object(
-            entries
-                .iter()
-                .map(|(key, value)| {
-                    (
-                        json_value_to_cell(&duckdb_value_to_json(key.clone())),
-                        duckdb_value_to_json(value.clone()),
-                    )
-                })
-                .collect(),
-        ),
-        Value::Union(inner) => duckdb_value_to_json(*inner),
-        other => json!(format!("{:?}", other)),
-    }
-}
-
 fn output_query_result(out: &output::Out, result: &QueryResult) {
     let json_rows: Vec<serde_json::Map<String, serde_json::Value>> = result
         .rows
@@ -1280,7 +989,14 @@ fn output_query_result(out: &output::Out, result: &QueryResult) {
         .collect();
 
     out.table(result.columns.clone(), data, Some(&json_rows));
-    out.note(&format!("\n{} row(s)\n", result.rows.len()));
+    if result.truncated {
+        out.note(&format!(
+            "\nShowing the first {} row(s); result truncated. Add a LIMIT or filter to narrow it.\n",
+            result.rows.len()
+        ));
+    } else {
+        out.note(&format!("\n{} row(s)\n", result.rows.len()));
+    }
 }
 
 fn json_value_to_cell(value: &serde_json::Value) -> String {
@@ -1551,15 +1267,12 @@ fn snippets(
 
 #[cfg(test)]
 mod tests {
-    use super::sandbox::{
-        agent_hardening_statements, contains_multiple_statements, first_sql_keyword,
-        is_write_statement,
-    };
     use super::{
-        attach_statements, catalogs_cmd, duckdb_value_to_json, is_storage_catalog_type, parse_mode,
-        run_duckdb_query, snippets, token_export_command,
+        attach_statements, catalogs_cmd, is_storage_catalog_type, parse_mode, snippets,
+        token_export_command,
     };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
+    use tower_duckdb::{params, run_query};
 
     #[test]
     fn list_defaults_to_default_environment() {
@@ -1771,10 +1484,10 @@ mod tests {
             "CREATE SCHEMA s; CREATE TABLE s.t1 (i INTEGER); CREATE TABLE s.t2 (i INTEGER);"
                 .to_string(),
         ];
-        let result = run_duckdb_query(
+        let result = run_query(
             &setup,
             "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-            duckdb::params!["memory"],
+            params!["memory"],
             None,
         )
         .expect("query should succeed");
@@ -1893,442 +1606,6 @@ mod tests {
             .expect("query --write should parse");
         let (_, query_args) = matches.subcommand().expect("expected query subcommand");
         assert_eq!(query_args.get_one::<bool>("write").copied(), Some(true));
-    }
-
-    #[test]
-    fn duckdb_values_convert_to_json() {
-        use duckdb::types::{TimeUnit, Value};
-
-        assert_eq!(duckdb_value_to_json(Value::Null), serde_json::Value::Null);
-        assert_eq!(
-            duckdb_value_to_json(Value::BigInt(42)),
-            serde_json::json!(42)
-        );
-        assert_eq!(
-            duckdb_value_to_json(Value::Text("hi".to_string())),
-            serde_json::json!("hi")
-        );
-        assert_eq!(
-            duckdb_value_to_json(Value::Timestamp(TimeUnit::Microsecond, 0)),
-            serde_json::json!("1970-01-01 00:00:00")
-        );
-        assert_eq!(
-            duckdb_value_to_json(Value::Date32(1)),
-            serde_json::json!("1970-01-02")
-        );
-    }
-
-    #[test]
-    fn run_duckdb_query_returns_columns_and_rows() {
-        let setup = vec![
-            "CREATE TABLE t (id INTEGER, name VARCHAR); INSERT INTO t VALUES (1, 'a'), (2, NULL);"
-                .to_string(),
-        ];
-        let result = run_duckdb_query(&setup, "SELECT id, name FROM t ORDER BY id", [], None)
-            .expect("query should succeed");
-
-        assert_eq!(result.columns, vec!["id", "name"]);
-        assert_eq!(result.rows.len(), 2);
-        assert_eq!(
-            result.rows[0],
-            vec![serde_json::json!(1), serde_json::json!("a")]
-        );
-        assert_eq!(
-            result.rows[1],
-            vec![serde_json::json!(2), serde_json::Value::Null]
-        );
-    }
-
-    #[test]
-    fn nested_duckdb_values_convert_to_json_structures() {
-        let result = run_duckdb_query(
-            &[],
-            "SELECT [1, 2] AS l, {'a': 1, 'b': 'x'} AS s, MAP {'k': 2} AS m",
-            [],
-            None,
-        )
-        .expect("query should succeed");
-
-        assert_eq!(result.columns, vec!["l", "s", "m"]);
-        assert_eq!(
-            result.rows[0],
-            vec![
-                serde_json::json!([1, 2]),
-                serde_json::json!({"a": 1, "b": "x"}),
-                serde_json::json!({"k": 2}),
-            ]
-        );
-    }
-
-    #[test]
-    fn run_duckdb_query_reports_columns_for_empty_results() {
-        let result = run_duckdb_query(&[], "SELECT 1 AS x WHERE 1 = 0", [], None)
-            .expect("query should succeed");
-
-        assert_eq!(result.columns, vec!["x"]);
-        assert!(result.rows.is_empty());
-    }
-
-    #[test]
-    fn run_duckdb_query_caps_rows_and_flags_truncation() {
-        let capped = run_duckdb_query(&[], "SELECT * FROM range(5) AS t(i)", [], Some(3))
-            .expect("query should succeed");
-        assert_eq!(capped.rows.len(), 3);
-        assert!(capped.truncated);
-
-        let exact = run_duckdb_query(&[], "SELECT * FROM range(3) AS t(i)", [], Some(3))
-            .expect("query should succeed");
-        assert_eq!(exact.rows.len(), 3);
-        assert!(!exact.truncated);
-    }
-
-    // --- Sandbox primitive gates -----------------------------------------
-
-    #[test]
-    fn contains_multiple_statements_ignores_separators_in_strings_and_comments() {
-        assert!(!contains_multiple_statements("SELECT 1"));
-        assert!(!contains_multiple_statements("SELECT 1;"));
-        assert!(!contains_multiple_statements("  SELECT 1 ;  "));
-        assert!(!contains_multiple_statements("SELECT 'a;b'"));
-        assert!(!contains_multiple_statements("SELECT 1 -- ; not a statement"));
-        assert!(!contains_multiple_statements("SELECT 1; -- trailing comment"));
-        assert!(!contains_multiple_statements("SELECT /* ; */ 1"));
-
-        assert!(contains_multiple_statements("SELECT 1; SELECT 2"));
-        assert!(contains_multiple_statements("SELECT 1; DROP TABLE t"));
-        assert!(contains_multiple_statements("SELECT 'a;b'; SELECT 2"));
-    }
-
-    #[test]
-    fn write_statements_are_detected_through_case_and_comments() {
-        assert_eq!(first_sql_keyword("  SELECT 1"), "select");
-        assert_eq!(first_sql_keyword("/* c */ INSERT INTO t VALUES (1)"), "insert");
-        assert_eq!(first_sql_keyword("-- lead\nDELETE FROM t"), "delete");
-
-        assert!(!is_write_statement("SELECT * FROM t"));
-        assert!(!is_write_statement("WITH x AS (SELECT 1) SELECT * FROM x"));
-        assert!(is_write_statement("insert into t values (1)"));
-        assert!(is_write_statement("  DROP TABLE t"));
-        assert!(is_write_statement("COPY t TO 'out.csv'"));
-        assert!(is_write_statement("ATTACH 'x' AS y"));
-    }
-
-    #[test]
-    fn agent_hardening_allows_selects_but_blocks_local_files_and_config_changes() {
-        let setup = agent_hardening_statements();
-
-        let ok = run_duckdb_query(&setup, "SELECT 1 AS x", [], None)
-            .expect("a plain select should still run under the hardened session");
-        assert_eq!(ok.columns, vec!["x"]);
-        assert_eq!(ok.rows, vec![vec![serde_json::json!(1)]]);
-
-        let fs_err = run_duckdb_query(&setup, "SELECT * FROM read_csv('Cargo.toml')", [], None)
-            .expect_err("local filesystem access should be blocked");
-        assert!(
-            fs_err.to_string().to_lowercase().contains("disabled"),
-            "unexpected error: {fs_err}"
-        );
-
-        let cfg_err = run_duckdb_query(&setup, "SET memory_limit = '1GB'", [], None)
-            .expect_err("configuration should be locked");
-        let cfg_msg = cfg_err.to_string().to_lowercase();
-        assert!(
-            cfg_msg.contains("lock") || cfg_msg.contains("configuration"),
-            "unexpected error: {cfg_err}"
-        );
-    }
-
-    /// Regression check against real Iceberg data. The other `run_duckdb_query`
-    /// tests use plain in-memory tables; this one writes a small Iceberg table
-    /// with DuckDB's `COPY … (FORMAT iceberg)` (real metadata + manifests +
-    /// parquet) and reads it back, so the iceberg reader and our column/row
-    /// extraction are exercised end to end, NULLs and the row cap included.
-    /// Needs the `iceberg` extension, fetched on first run and then cached.
-    #[test]
-    fn iceberg_scan_reads_written_table_through_run_duckdb_query() {
-        let dir = std::env::temp_dir().join(format!("tower_iceberg_test_{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).expect("create temp dir");
-        let table = dir.join("events").to_string_lossy().replace('\'', "''");
-
-        let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
-        conn.execute_batch("INSTALL iceberg").expect("install iceberg");
-        conn.execute_batch("LOAD iceberg").expect("load iceberg");
-        conn.execute_batch(&format!(
-            "COPY (SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, NULL)) AS t(id, name)) \
-             TO '{table}' (FORMAT iceberg)"
-        ))
-        .expect("write iceberg table");
-
-        let setup = vec!["INSTALL iceberg".to_string(), "LOAD iceberg".to_string()];
-
-        let result = run_duckdb_query(
-            &setup,
-            &format!("SELECT id, name FROM iceberg_scan('{table}') ORDER BY id"),
-            [],
-            None,
-        )
-        .expect("iceberg_scan should read the table");
-        assert_eq!(result.columns, vec!["id", "name"]);
-        assert_eq!(
-            result.rows,
-            vec![
-                vec![serde_json::json!(1), serde_json::json!("a")],
-                vec![serde_json::json!(2), serde_json::json!("b")],
-                vec![serde_json::json!(3), serde_json::Value::Null],
-            ]
-        );
-        assert!(!result.truncated);
-
-        let capped = run_duckdb_query(
-            &setup,
-            &format!("SELECT id FROM iceberg_scan('{table}') ORDER BY id"),
-            [],
-            Some(2),
-        )
-        .expect("iceberg_scan should read the table");
-        assert_eq!(capped.rows.len(), 2);
-        assert!(capped.truncated);
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    // --- Adversarial regression suite ------------------------------------
-    //
-    // Each test encodes an attack an agent-issued query might attempt and
-    // asserts the sandbox refuses it. These are the security invariants: if a
-    // future change weakens the gates or the hardening, one of these fails.
-
-    /// A statement run under the full agent hardening. Extensions are not
-    /// loaded, so the attacks below must be blocked by the session lockdown
-    /// alone.
-    fn run_hardened(sql: &str) -> Result<super::QueryResult, duckdb::Error> {
-        run_duckdb_query(&agent_hardening_statements(), sql, [], None)
-    }
-
-    #[test]
-    fn sandbox_gate_rejects_data_tampering() {
-        for sql in [
-            "DROP TABLE runs",
-            "DELETE FROM runs",
-            "UPDATE runs SET id = 0",
-            "INSERT INTO runs VALUES (1)",
-            "CREATE TABLE evil AS SELECT 1",
-            "ALTER TABLE runs ADD COLUMN x INTEGER",
-            "TRUNCATE runs",
-            "MERGE INTO runs USING x ON true WHEN MATCHED THEN DELETE",
-            "COPY runs TO '/tmp/exfil.csv'",
-            "ATTACH '/tmp/evil.db' AS e",
-            "DETACH runs",
-            "  drop   TABLE runs",
-            "/* sneaky */ DELETE FROM runs",
-        ] {
-            assert!(is_write_statement(sql), "not rejected as write/DDL: {sql}");
-        }
-        for sql in [
-            "SELECT * FROM runs",
-            "WITH t AS (SELECT 1) SELECT * FROM t",
-            "SELECT count(*) FROM runs",
-        ] {
-            assert!(!is_write_statement(sql), "legit read wrongly flagged: {sql}");
-        }
-    }
-
-    #[test]
-    fn sandbox_gate_rejects_statement_smuggling() {
-        for sql in [
-            "SELECT 1; DROP TABLE runs",
-            "SELECT 1; DELETE FROM runs",
-            "SELECT 'a;b'; DROP TABLE runs",
-            "SELECT 1;\n-- c\nUPDATE runs SET id = 0",
-        ] {
-            assert!(contains_multiple_statements(sql), "smuggled statement not caught: {sql}");
-        }
-        assert!(!contains_multiple_statements(
-            "SELECT * FROM runs -- a trailing ; comment"
-        ));
-    }
-
-    #[test]
-    fn sandbox_blocks_host_filesystem_reads() {
-        for sql in [
-            "SELECT * FROM read_csv('/etc/passwd')",
-            "SELECT * FROM read_text('/etc/hostname')",
-            "SELECT * FROM read_json('/etc/passwd')",
-            "SELECT * FROM read_parquet('/tmp/x.parquet')",
-            "SELECT * FROM read_csv('/etc/*')",
-            "SELECT * FROM '/etc/passwd'",
-        ] {
-            assert!(run_hardened(sql).is_err(), "host file read NOT blocked: {sql}");
-        }
-        let err = run_hardened("SELECT * FROM read_csv('/etc/passwd')").unwrap_err();
-        assert!(err.to_string().to_lowercase().contains("disabled"), "{err}");
-    }
-
-    #[test]
-    fn sandbox_blocks_host_filesystem_writes() {
-        for sql in [
-            "COPY (SELECT 1) TO '/tmp/pwned.csv'",
-            "COPY (SELECT 1) TO '/tmp/pwned.parquet' (FORMAT parquet)",
-        ] {
-            assert!(run_hardened(sql).is_err(), "host file write NOT blocked: {sql}");
-        }
-    }
-
-    #[test]
-    fn sandbox_blocks_configuration_escape() {
-        for sql in [
-            "SET disabled_filesystems = ''",
-            "RESET disabled_filesystems",
-            "SET enable_external_access = true",
-            "SET allow_community_extensions = true",
-            "SET lock_configuration = false",
-            "PRAGMA disabled_filesystems=''",
-        ] {
-            assert!(run_hardened(sql).is_err(), "configuration escape NOT blocked: {sql}");
-        }
-    }
-
-    #[test]
-    fn sandbox_blocks_arbitrary_extension_loading() {
-        for sql in [
-            "LOAD '/tmp/evil.duckdb_extension'",
-            "INSTALL some_untrusted_extension_xyz",
-        ] {
-            assert!(run_hardened(sql).is_err(), "extension load NOT blocked: {sql}");
-        }
-    }
-
-    #[test]
-    fn sandbox_blocks_network_ssrf_via_table_functions() {
-        for sql in [
-            "SELECT * FROM read_csv('http://169.254.169.254/latest/meta-data/')",
-            "SELECT * FROM read_parquet('https://attacker.example/x.parquet')",
-            "SELECT * FROM read_csv('http://localhost:8080/internal')",
-        ] {
-            assert!(run_hardened(sql).is_err(), "SSRF NOT blocked: {sql}");
-        }
-    }
-
-    /// Polls MinIO's health endpoint over a raw socket until it answers 200.
-    fn wait_for_minio(port: u16) -> bool {
-        use std::io::{Read, Write};
-        for _ in 0..60 {
-            if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) {
-                let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
-                let request =
-                    "GET /minio/health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
-                let mut response = String::new();
-                if stream.write_all(request.as_bytes()).is_ok()
-                    && stream.read_to_string(&mut response).is_ok()
-                    && response.contains(" 200 ")
-                {
-                    return true;
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-        false
-    }
-
-    /// The coverage the local-only tests can't give: it proves the hardening
-    /// does NOT break a real object-store Iceberg read (the reader uses
-    /// S3FileSystem, which the hardening leaves enabled) while local-filesystem
-    /// access and configuration changes stay blocked in the same session. Starts
-    /// a MinIO container via testcontainers and self-skips when no Docker daemon
-    /// is available, so a plain `cargo test` still passes without Docker.
-    #[test]
-    fn sandbox_holds_over_object_store_iceberg() {
-        use testcontainers::core::{IntoContainerPort, WaitFor};
-        use testcontainers::runners::SyncRunner;
-        use testcontainers::{GenericImage, ImageExt};
-
-        let bucket = "warehouse";
-        let image = GenericImage::new("minio/minio", "latest")
-            .with_wait_for(WaitFor::seconds(1))
-            .with_exposed_port(9000.tcp())
-            .with_entrypoint("sh")
-            .with_env_var("MINIO_ROOT_USER", "minioadmin")
-            .with_env_var("MINIO_ROOT_PASSWORD", "minioadmin")
-            .with_cmd([
-                "-c".to_string(),
-                format!("mkdir -p /data/{bucket} && exec minio server /data"),
-            ]);
-
-        let container = match image.start() {
-            Ok(container) => container,
-            Err(err) => {
-                eprintln!(
-                    "skipping sandbox_holds_over_object_store_iceberg (no Docker daemon?): {err}"
-                );
-                return;
-            }
-        };
-        let port = container
-            .get_host_port_ipv4(9000.tcp())
-            .expect("mapped MinIO port");
-        assert!(wait_for_minio(port), "MinIO did not become healthy");
-
-        let secret = format!(
-            "CREATE SECRET s3sec (TYPE s3, KEY_ID 'minioadmin', SECRET 'minioadmin', \
-             ENDPOINT '127.0.0.1:{port}', URL_STYLE 'path', USE_SSL false, REGION 'us-east-1')"
-        );
-        let table = format!("s3://{bucket}/tbl");
-        let extensions = || {
-            vec![
-                "INSTALL httpfs".to_string(),
-                "LOAD httpfs".to_string(),
-                "INSTALL iceberg".to_string(),
-                "LOAD iceberg".to_string(),
-            ]
-        };
-
-        let seed = duckdb::Connection::open_in_memory().expect("open duckdb");
-        for stmt in extensions() {
-            seed.execute_batch(&stmt).expect("load extension");
-        }
-        seed.execute_batch(&secret).expect("create s3 secret");
-        seed.execute_batch(&format!(
-            "COPY (SELECT * FROM (VALUES (1,'a'),(2,'b'),(3,NULL)) t(id,name)) \
-             TO '{table}' (FORMAT iceberg)"
-        ))
-        .expect("seed iceberg table on object storage");
-
-        let mut setup = extensions();
-        setup.push(secret);
-        setup.extend(agent_hardening_statements());
-
-        let read = run_duckdb_query(
-            &setup,
-            &format!("SELECT id, name FROM iceberg_scan('{table}') ORDER BY id"),
-            [],
-            None,
-        )
-        .expect("hardening must not break object-store Iceberg reads");
-        assert_eq!(read.columns, vec!["id", "name"]);
-        assert_eq!(
-            read.rows,
-            vec![
-                vec![serde_json::json!(1), serde_json::json!("a")],
-                vec![serde_json::json!(2), serde_json::json!("b")],
-                vec![serde_json::json!(3), serde_json::Value::Null],
-            ]
-        );
-
-        let local = run_duckdb_query(&setup, "SELECT * FROM read_csv('/etc/hostname')", [], None)
-            .expect_err("local filesystem reads must stay blocked");
-        assert!(
-            local.to_string().to_lowercase().contains("disabled"),
-            "unexpected error: {local}"
-        );
-
-        let cfg = run_duckdb_query(&setup, "SET memory_limit = '1GB'", [], None)
-            .expect_err("configuration must stay locked");
-        let cfg = cfg.to_string().to_lowercase();
-        assert!(
-            cfg.contains("lock") || cfg.contains("configuration"),
-            "unexpected error: {cfg}"
-        );
     }
 
     #[test]
