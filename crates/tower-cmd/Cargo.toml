@@ -49,3 +49,4 @@ uuid = { version = "1.0", features = ["v4"] }
 futures = { workspace = true }
 cucumber = { version = "0.21", features = ["macros"] }
 tokio-test = "0.4"
+testcontainers = { version = "0.24", features = ["blocking"] }
