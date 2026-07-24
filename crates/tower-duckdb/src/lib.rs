@@ -4,11 +4,12 @@
 //!
 //! The point of the crate is the hardened query path. Agent-issued SQL runs on
 //! a customer's machine with their catalog credentials, so before it runs we
-//! reject write/DDL and multi-statement input (the [`guard`] module), lock the
-//! session down so a query cannot read the local filesystem, load community
-//! extensions, or unwind the settings ([`Session::harden`]), and cap the rows a
-//! result can carry back ([`Session::query`]). The adversarial tests exercise
-//! each of these invariants directly.
+//! reject anything that is not a single read-only SELECT, using DuckDB's own
+//! parser (the [`guard`] module), lock the session down so a query cannot read
+//! the local filesystem, load community extensions, or unwind the settings
+//! ([`Session::harden`]), and cap the rows a result can carry back
+//! ([`Session::query`]). The adversarial tests exercise each of these invariants
+//! directly.
 
 use std::time::Instant;
 
@@ -437,18 +438,24 @@ mod tests {
     /// plain in-memory tables; this one writes a small Iceberg table with
     /// DuckDB's `COPY … (FORMAT iceberg)` (real metadata + manifests + parquet)
     /// and reads it back, so the iceberg reader and our column/row extraction are
-    /// exercised end to end, NULLs and the row cap included. Needs the `iceberg`
-    /// extension, fetched on first run and then cached.
+    /// exercised end to end, NULLs and the row cap included. The `iceberg`
+    /// extension is not bundled, so it is fetched on first run and cached; the
+    /// test self-skips where that install cannot happen (some CI has no writable
+    /// extension directory), the same way the object-store test skips without
+    /// Docker.
     #[test]
     fn iceberg_scan_reads_written_table_through_run_query() {
+        let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
+        if conn.execute_batch("INSTALL iceberg; LOAD iceberg;").is_err() {
+            eprintln!("skipping iceberg_scan test (iceberg extension unavailable)");
+            return;
+        }
+
         let dir = std::env::temp_dir().join(format!("tower_iceberg_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let table = dir.join("events").to_string_lossy().replace('\'', "''");
 
-        let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
-        conn.execute_batch("INSTALL iceberg").expect("install iceberg");
-        conn.execute_batch("LOAD iceberg").expect("load iceberg");
         conn.execute_batch(&format!(
             "COPY (SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, NULL)) AS t(id, name)) \
              TO '{table}' (FORMAT iceberg)"
@@ -729,3 +736,4 @@ mod tests {
         );
     }
 }
+
