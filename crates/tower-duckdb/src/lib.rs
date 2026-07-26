@@ -353,60 +353,10 @@ mod tests {
         assert!(!exact.truncated);
     }
 
-    // --- Read-only gate --------------------------------------------------
-
+    // The read-only gate is unit-tested in `guard.rs`. This helper backs the
+    // adversarial suite below, which exercises the gate alongside the hardening.
     fn check(sql: &str) -> ReadOnlyCheck {
         classify_read_only(sql).expect("parser should run")
-    }
-
-    #[test]
-    fn read_only_gate_allows_only_single_selects() {
-        for sql in [
-            "SELECT 1",
-            "SELECT 1;",
-            "  SELECT 1 ;  ",
-            "SELECT 'a;b'",
-            "SELECT 1 -- ; not a statement",
-            "SELECT /* ; */ 1",
-            "WITH x AS (SELECT 1) SELECT * FROM x",
-            "select COUNT(*) from runs",
-        ] {
-            assert_eq!(check(sql), ReadOnlyCheck::Allowed, "should allow: {sql}");
-        }
-    }
-
-    #[test]
-    fn read_only_gate_rejects_writes_and_ddl_whatever_the_leading_keyword() {
-        for sql in [
-            "insert into t values (1)",
-            "  DROP TABLE t",
-            "COPY t TO 'out.csv'",
-            "ATTACH 'x' AS y",
-            "SET memory_limit = '1GB'",
-            "PRAGMA version",
-            // Starts with an allowed keyword but still mutates: the parser sees
-            // the DELETE a first-keyword denylist would miss.
-            "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x",
-        ] {
-            assert_eq!(check(sql), ReadOnlyCheck::NotReadOnly, "should reject: {sql}");
-        }
-    }
-
-    #[test]
-    fn read_only_gate_rejects_comment_terminator_smuggling() {
-        // A `--` comment ends at a carriage return in DuckDB, so this parses as a
-        // DROP even though it opens with what looks like a full-line comment. A
-        // text scanner that only breaks comments on `\n` would see it as empty.
-        assert_eq!(check("-- harmless\rDROP TABLE runs"), ReadOnlyCheck::NotReadOnly);
-        assert_eq!(check("-- harmless\r\nSELECT 1"), ReadOnlyCheck::Allowed);
-    }
-
-    #[test]
-    fn read_only_gate_classifies_empty_and_multiple() {
-        assert_eq!(check(""), ReadOnlyCheck::Empty);
-        assert_eq!(check("   -- just a comment"), ReadOnlyCheck::Empty);
-        assert_eq!(check("SELECT 1; SELECT 2"), ReadOnlyCheck::Multiple);
-        assert_eq!(check("SELECT 'a;b'; SELECT 2"), ReadOnlyCheck::Multiple);
     }
 
     #[test]
