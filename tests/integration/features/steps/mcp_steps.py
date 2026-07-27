@@ -996,8 +996,8 @@ def step_receive_query_results(context):
 @then('the query result columns should include "{column}"')
 def step_query_columns_include(context, column):
     data = _parse_json_content(context.mcp_response)
-    assert (
-        data is not None and column in data.get("columns", [])
+    assert data is not None and column in data.get(
+        "columns", []
     ), f"Expected column '{column}', got: {data}"
 
 
