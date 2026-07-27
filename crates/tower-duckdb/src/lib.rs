@@ -126,6 +126,21 @@ pub struct Hardening {
 }
 
 impl Hardening {
+    /// The lockdown for untrusted (agent-issued) SQL.
+    ///
+    /// Adds an engine memory ceiling on top of the default lockdown. [`Limits`]
+    /// bounds what a result hands back, but a query can spend far more than that
+    /// inside DuckDB before the first row appears (a large `ORDER BY`, or a
+    /// `string_agg` over a whole column). Only the engine can bound that, so an
+    /// untrusted caller should set it.
+    pub fn agent() -> Self {
+        Self {
+            deny_external_access: false,
+            memory_limit: Some("1GB".to_string()),
+            max_temp_directory_size: Some("2GB".to_string()),
+        }
+    }
+
     /// The lockdown statements, in the order they must run.
     ///
     /// `lock_configuration` is last because it freezes every later `SET`. The
@@ -262,14 +277,25 @@ impl Session {
                     let value: duckdb::types::Value = row.get(idx)?;
                     record.push(value_to_json(value));
                 }
-                total_bytes += record.iter().map(json_size) .sum::<usize>();
-                rows.push(record);
-                // Checked after pushing, so a single oversized row is returned
-                // rather than silently yielding an empty result.
-                if limits.max_total_bytes.is_some_and(|max| total_bytes >= max) {
+                // Measured before the row is kept, so a row that would blow the
+                // budget is discarded rather than returned and merely labelled
+                // truncated. A single `string_agg` can carry an entire table in
+                // one row, so admitting it and flagging it would leave the
+                // ceiling doing nothing at all. A first row that is already over
+                // budget yields an empty, truncated result, which is the honest
+                // answer. Note this bounds what the caller is handed, not what
+                // the engine allocated to produce it; that needs
+                // `Hardening::memory_limit`.
+                let record_bytes = record.iter().map(json_size).sum::<usize>();
+                if limits
+                    .max_total_bytes
+                    .is_some_and(|max| total_bytes + record_bytes > max)
+                {
                     truncated = Some(Truncation::Bytes);
                     break;
                 }
+                total_bytes += record_bytes;
+                rows.push(record);
             }
         }
 
@@ -602,6 +628,48 @@ mod tests {
             Some(Truncation::Bytes),
             "the byte ceiling should have cut this short"
         );
+        // The ceiling has to *withhold* the oversized row, not hand it over with a
+        // label on it. Returning it and calling it truncated would leave the bound
+        // doing nothing.
+        let returned: usize = byte_capped
+            .rows
+            .iter()
+            .flat_map(|row| row.iter())
+            .map(|value| value.as_str().map_or(0, str::len))
+            .sum();
+        assert!(
+            returned <= 4096,
+            "budget was 4096 bytes but {returned} bytes came back"
+        );
+    }
+
+    /// A single row larger than the whole budget is refused outright, leaving an
+    /// empty truncated result. That is deliberately blunt: the alternative is
+    /// admitting an arbitrarily large row, which is what the ceiling exists to
+    /// prevent.
+    #[test]
+    fn one_row_bigger_than_the_whole_budget_is_withheld() {
+        let result = run_query(
+            &[],
+            "SELECT repeat('x', 5000000) AS pad",
+            [],
+            &Limits {
+                max_rows: None,
+                max_total_bytes: Some(1024 * 1024),
+                timeout: None,
+            },
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.truncated, Some(Truncation::Bytes));
+        assert!(
+            result.rows.is_empty(),
+            "a row over the whole budget must not be returned, got {} row(s)",
+            result.rows.len()
+        );
+        // Columns are still reported so the caller can see the shape of what it
+        // asked for.
+        assert_eq!(result.columns, vec!["pad"]);
     }
 
     /// Many small rows trip the byte ceiling too, so the bound holds however the
@@ -779,8 +847,22 @@ mod tests {
     #[test]
     fn iceberg_scan_reads_written_table_through_run_query() {
         let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
-        if conn.execute_batch("INSTALL iceberg; LOAD iceberg;").is_err() {
-            eprintln!("skipping iceberg_scan test (iceberg extension unavailable)");
+        // The iceberg extension is fetched at runtime, so a machine that cannot
+        // install it (no writable extension directory, no network) is a legitimate
+        // skip. Anything else is a real failure: matching on the install error
+        // keeps a broken build from turning this into a silent pass.
+        if let Err(err) = conn.execute_batch("INSTALL iceberg; LOAD iceberg;") {
+            let message = err.to_string().to_lowercase();
+            let unavailable = message.contains("install")
+                || message.contains("download")
+                || message.contains("network")
+                || message.contains("access is denied")
+                || message.contains("no such file");
+            assert!(
+                unavailable,
+                "iceberg failed for a reason other than being unavailable: {err}"
+            );
+            eprintln!("skipping iceberg_scan test (iceberg extension unavailable): {err}");
             return;
         }
 
@@ -937,15 +1019,90 @@ mod tests {
         }
     }
 
+    /// Proves no request leaves the process, by counting connections to a listener
+    /// we control rather than trusting an error message.
+    ///
+    /// The earlier version of this test ran through a helper that never loaded
+    /// `httpfs`, so it passed for a reason production does not share: with no HTTP
+    /// filesystem registered there was nothing to block. This one loads the same
+    /// extensions `attach_statements` does before hardening, so it fails if the
+    /// sandbox ever stops covering the real configuration.
     #[test]
-    fn sandbox_blocks_network_ssrf_via_table_functions() {
-        for sql in [
-            "SELECT * FROM read_csv('http://169.254.169.254/latest/meta-data/')",
-            "SELECT * FROM read_parquet('https://attacker.example/x.parquet')",
-            "SELECT * FROM read_csv('http://localhost:8080/internal')",
-        ] {
-            assert!(run_hardened(sql).is_err(), "SSRF NOT blocked: {sql}");
+    fn no_query_can_reach_the_network_under_production_hardening() {
+        use std::io::{Read, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let connections = Arc::new(AtomicUsize::new(0));
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind probe listener");
+        let port = listener.local_addr().expect("listener addr").port();
+        let counter = connections.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                counter.fetch_add(1, Ordering::SeqCst);
+                if let Ok(mut stream) = stream {
+                    let mut buf = [0u8; 1024];
+                    let _ = stream.read(&mut buf);
+                    let body = "col\nreached\n";
+                    let _ = stream.write_all(
+                        format!(
+                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        )
+                        .as_bytes(),
+                    );
+                }
+            }
+        });
+
+        // A control run proves the listener and the URL are reachable at all, so a
+        // later "no connections" result means the sandbox stopped it rather than
+        // the probe being broken.
+        let control = duckdb::Connection::open_in_memory().expect("open duckdb");
+        let extensions_available = control.execute_batch("INSTALL httpfs; LOAD httpfs;").is_ok();
+        if !extensions_available {
+            eprintln!("skipping SSRF test: httpfs extension unavailable");
+            return;
         }
+        let url = format!("http://127.0.0.1:{port}/probe.csv");
+        let reached_without_hardening = control
+            .query_row(
+                &format!("SELECT count(*) FROM read_csv('{url}')"),
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .is_ok();
+        assert!(
+            reached_without_hardening && connections.load(Ordering::SeqCst) > 0,
+            "control failed: the probe listener was never reached even unhardened, so this test would pass vacuously"
+        );
+
+        let baseline = connections.load(Ordering::SeqCst);
+        for sql in [
+            "SELECT count(*) FROM read_csv('URL')",
+            "SELECT count(*) FROM read_text('URL')",
+            "SELECT count(*) FROM read_blob('URL')",
+            "SELECT count(*) FROM read_json_auto('URL')",
+            "SELECT count(*) FROM 'URL'",
+            "SELECT count(*) FROM read_csv('http://169.254.169.254/latest/meta-data/')",
+        ] {
+            let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
+            // Mirror production: extensions loaded first, then the lockdown.
+            conn.execute_batch("INSTALL httpfs; LOAD httpfs;")
+                .expect("load httpfs");
+            let _ = conn.execute_batch("INSTALL iceberg; LOAD iceberg;");
+            for statement in hardening_statements() {
+                conn.execute_batch(&statement).expect("harden session");
+            }
+            let _ = conn.query_row(&sql.replace("URL", &url), [], |row| row.get::<_, i64>(0));
+        }
+
+        assert_eq!(
+            connections.load(Ordering::SeqCst),
+            baseline,
+            "a hardened query reached the network"
+        );
     }
 
     /// Polls MinIO's health endpoint over a raw socket until it answers 200.
@@ -969,20 +1126,49 @@ mod tests {
         false
     }
 
+    /// MinIO pinned to an immutable release tag rather than `latest`.
+    ///
+    /// A floating tag lets a new upstream image change this test's behaviour, or
+    /// break it into a skip, without anyone choosing that. A security regression
+    /// test should only change when someone means it. Bump deliberately and re-run.
+    const MINIO_IMAGE_TAG: &str = "RELEASE.2025-09-07T16-13-09Z";
+
+    /// Whether a container runtime is actually reachable.
+    ///
+    /// Used to tell "no Docker on this machine", which is a legitimate skip, from
+    /// "the container failed to start", which is a failure worth surfacing.
+    /// Treating both as a skip is how a security test quietly becomes a no-op.
+    fn docker_is_available() -> bool {
+        std::process::Command::new("docker")
+            .args(["info", "--format", "{{.ServerVersion}}"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+
     /// The coverage the local-only tests can't give: it proves the hardening does
     /// NOT break a real object-store Iceberg read (the reader uses S3FileSystem,
     /// which the hardening leaves enabled) while local-filesystem access and
-    /// configuration changes stay blocked in the same session. Starts a MinIO
-    /// container via testcontainers and self-skips when no Docker daemon is
-    /// available, so a plain `cargo test` still passes without Docker.
+    /// configuration changes stay blocked in the same session.
+    ///
+    /// Skips only when no container runtime is reachable. If Docker is present and
+    /// the container will not start, that is a failure, not a skip, so a broken
+    /// image or a registry problem cannot turn this into a silent pass.
     #[test]
     fn sandbox_holds_over_object_store_iceberg() {
         use testcontainers::core::{IntoContainerPort, WaitFor};
         use testcontainers::runners::SyncRunner;
         use testcontainers::{GenericImage, ImageExt};
 
+        if !docker_is_available() {
+            eprintln!("skipping sandbox_holds_over_object_store_iceberg: no container runtime");
+            return;
+        }
+
         let bucket = "warehouse";
-        let image = GenericImage::new("minio/minio", "latest")
+        let image = GenericImage::new("minio/minio", MINIO_IMAGE_TAG)
             .with_wait_for(WaitFor::seconds(1))
             .with_exposed_port(9000.tcp())
             .with_entrypoint("sh")
@@ -993,15 +1179,12 @@ mod tests {
                 format!("mkdir -p /data/{bucket} && exec minio server /data"),
             ]);
 
-        let container = match image.start() {
-            Ok(container) => container,
-            Err(err) => {
-                eprintln!(
-                    "skipping sandbox_holds_over_object_store_iceberg (no Docker daemon?): {err}"
-                );
-                return;
-            }
-        };
+        // Docker answered `info` above, so a failure here is a real problem (a bad
+        // image, a registry outage, a broken container config) and must fail the
+        // test rather than quietly skip it.
+        let container = image
+            .start()
+            .expect("MinIO container failed to start despite a reachable Docker daemon");
         let port = container
             .get_host_port_ipv4(9000.tcp())
             .expect("mapped MinIO port");

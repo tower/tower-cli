@@ -572,7 +572,10 @@ async fn execute_catalog_query(
         let session = Session::open()?;
         session.run_setup(&setup)?;
         if harden {
-            session.harden(&Hardening::default())?;
+            // `Hardening::agent()` adds an engine memory ceiling on top of the
+            // lockdown. The result `limits` bound what comes back; only the engine
+            // can bound what a query spends producing it.
+            session.harden(&Hardening::agent())?;
         }
         session.query(&sql, [], &limits)
     })
