@@ -379,49 +379,10 @@ async fn fetch_catalog_tables(
 ) -> Result<QueryResult, String> {
     let mut spinner = out.spinner("Listing tables...");
 
-    let response = match api::vend_catalog_credentials(
-        config,
-        name,
-        env,
-        vend_catalog_credentials_body::Mode::Read,
-    )
-    .await
-    {
-        Ok(response) => response,
-        Err(err) => {
-            spinner.failure(out);
-            return Err(err.to_string());
-        }
-    };
-
-    let token = response.credentials.oauth_token.clone();
-
-    // `--full` needs every table's column schema. Going through DuckDB means a
-    // `DESCRIBE` per table, each of which fully opens the Iceberg table (reading
-    // manifests from object storage) — slow, and unbounded for tables with heavy
-    // metadata. The Iceberg REST catalog's `loadTable` returns the schema
-    // straight from table metadata with no manifest I/O, so `--full` talks to
-    // the catalog directly. The plain listing stays on DuckDB.
     let result = if full {
-        fetch_catalog_columns_via_rest(&response.credentials).await
+        list_catalog_columns(config, name, env).await
     } else {
-        let setup = attach_statements(
-            name,
-            &response.credentials,
-            vend_catalog_credentials_body::Mode::Read,
-        );
-        let db_name = name.to_string();
-        tokio::task::spawn_blocking(move || {
-            run_query(
-                &setup,
-                "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-                params![db_name],
-                &Limits::none(),
-            )
-        })
-        .await
-        .map_err(|err| err.to_string())
-        .and_then(|inner| inner.map_err(|err| err.to_string()))
+        list_catalog_tables(config, name, env).await
     };
 
     match result {
@@ -431,9 +392,66 @@ async fn fetch_catalog_tables(
         }
         Err(err) => {
             spinner.failure(out);
-            Err(redact_token(&err, &token))
+            Err(err)
         }
     }
+}
+
+/// Attaches a storage catalog read-only and returns its (namespace, table)
+/// rows via `SHOW ALL TABLES`. Shared by the CLI `show` and the MCP server.
+/// Errors are returned with the OAuth token redacted.
+pub(crate) async fn list_catalog_tables(
+    config: &Config,
+    name: &str,
+    env: &str,
+) -> Result<QueryResult, String> {
+    let response =
+        api::vend_catalog_credentials(config, name, env, vend_catalog_credentials_body::Mode::Read)
+            .await
+            .map_err(|err| err.to_string())?;
+
+    let token = response.credentials.oauth_token.clone();
+    let setup = attach_statements(
+        name,
+        &response.credentials,
+        vend_catalog_credentials_body::Mode::Read,
+    );
+    let db_name = name.to_string();
+
+    tokio::task::spawn_blocking(move || {
+        run_query(
+            &setup,
+            "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
+            params![db_name],
+            &Limits::none(),
+        )
+    })
+    .await
+    .map_err(|err| err.to_string())
+    .and_then(|inner| inner.map_err(|err| err.to_string()))
+    .map_err(|err| redact_token(&err, &token))
+}
+
+/// The `--full` listing: every table's column schema. Going through DuckDB
+/// means a `DESCRIBE` per table, each of which fully opens the Iceberg table
+/// (reading manifests from object storage) — slow, and unbounded for tables
+/// with heavy metadata. The Iceberg REST catalog's `loadTable` returns the
+/// schema straight from table metadata with no manifest I/O, so this talks to
+/// the catalog directly. The plain listing stays on DuckDB.
+async fn list_catalog_columns(
+    config: &Config,
+    name: &str,
+    env: &str,
+) -> Result<QueryResult, String> {
+    let response =
+        api::vend_catalog_credentials(config, name, env, vend_catalog_credentials_body::Mode::Read)
+            .await
+            .map_err(|err| err.to_string())?;
+
+    let token = response.credentials.oauth_token.clone();
+    fetch_catalog_columns_via_rest(&response.credentials)
+        .await
+        .map_err(|err| redact_token(&err, &token))
 }
 
 /// DuckDB errors can echo the failing statement, and the setup batch contains
@@ -605,6 +623,88 @@ async fn execute_catalog_query(
                 redact_token(&err.to_string(), &token)
             ));
         }
+    }
+}
+
+/// Agent-facing counterpart of `do_query`, used by the MCP server: the same
+/// read-only gate, storage-type check, sandbox, and ceilings, but errors are
+/// returned rather than printed, and the caps are non-negotiable — an agent
+/// has no `--write` or `--max-rows` escape hatch.
+pub(crate) async fn query_catalog_for_agent(
+    config: &Config,
+    name: &str,
+    env: &str,
+    sql: String,
+) -> Result<QueryResult, String> {
+    let sql_to_check = sql.clone();
+    let verdict = tokio::task::spawn_blocking(move || guard::classify_read_only(&sql_to_check))
+        .await
+        .map_err(|err| format!("Could not validate the query: {err}"))?
+        .map_err(|err| format!("Could not validate the query: {err}"))?;
+    match verdict {
+        guard::ReadOnlyCheck::Allowed => {}
+        guard::ReadOnlyCheck::Empty => {
+            return Err("No SQL statement provided.".to_string());
+        }
+        guard::ReadOnlyCheck::Multiple => {
+            return Err("Only a single SQL statement can be run per query.".to_string());
+        }
+        guard::ReadOnlyCheck::NotReadOnly => {
+            return Err(
+                "This query is read-only; only a single SELECT statement is allowed.".to_string(),
+            );
+        }
+        guard::ReadOnlyCheck::DeniedFunction(function) => {
+            return Err(format!(
+                "'{function}' is not allowed in a read-only query: it changes engine state, runs SQL built at runtime, or reads outside the catalog."
+            ));
+        }
+        guard::ReadOnlyCheck::DeniedTableReference(reference) => {
+            return Err(format!(
+                "'{reference}' is a file or URL, not a table in this catalog. Read-only queries can only read the catalog's own tables."
+            ));
+        }
+    }
+
+    let response = api::describe_catalog(config, name, env)
+        .await
+        .map_err(|err| format!("Fetching catalog details failed: {err}"))?;
+    if !is_storage_catalog_type(Some(&response.catalog.r#type)) {
+        return Err(format!(
+            "Querying is only supported for {} catalogs; '{}' has type '{}'.",
+            STORAGE_CATALOG_TYPE, name, response.catalog.r#type
+        ));
+    }
+
+    let response =
+        api::vend_catalog_credentials(config, name, env, vend_catalog_credentials_body::Mode::Read)
+            .await
+            .map_err(|err| format!("Running query failed: {err}"))?;
+
+    let token = response.credentials.oauth_token.clone();
+    let setup = attach_statements(
+        name,
+        &response.credentials,
+        vend_catalog_credentials_body::Mode::Read,
+    );
+    let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
+        let session = Session::open()?;
+        session.run_setup(&setup)?;
+        session.harden(&Hardening::agent())?;
+        session.query(&sql, [], &Limits::agent())
+    })
+    .await;
+
+    match result {
+        Ok(Ok(query_result)) => Ok(query_result),
+        Ok(Err(err)) => Err(format!(
+            "Query failed: {}",
+            redact_token(&err.to_string(), &token)
+        )),
+        Err(err) => Err(format!(
+            "Query execution panicked: {}",
+            redact_token(&err.to_string(), &token)
+        )),
     }
 }
 
@@ -1077,7 +1177,7 @@ fn json_array_to_strings(value: Option<&serde_json::Value>) -> Vec<String> {
     }
 }
 
-fn is_storage_catalog_type(catalog_type: Option<&str>) -> bool {
+pub(crate) fn is_storage_catalog_type(catalog_type: Option<&str>) -> bool {
     catalog_type == Some(STORAGE_CATALOG_TYPE)
 }
 
