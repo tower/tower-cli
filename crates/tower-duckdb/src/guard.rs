@@ -75,18 +75,17 @@ pub const ALWAYS_DENIED_FUNCTIONS: &[&str] = &[
 /// This is the fail-closed half of the gate and the reason it does not rely on
 /// naming every dangerous function. A catalog query reads base tables in the
 /// attached catalog, which are not functions at all, so the legitimate
-/// table-function surface is tiny. The `read_*`/`glob`/`*_scan` family is
-/// deliberately absent: those are the file-read and network-egress vectors, and
-/// they are not needed to query an attached catalog. A caller that genuinely
-/// needs them can widen the set through [`classify_read_only_with`].
-pub const ALLOWED_TABLE_FUNCTIONS: &[&str] = &[
-    "range",
-    "generate_series",
-    "unnest",
-    "iceberg_scan",
-    "iceberg_metadata",
-    "iceberg_snapshots",
-];
+/// table-function surface is tiny.
+///
+/// Every entry here is a pure generator that takes no path and no URL. That is
+/// the property worth preserving: the session hardening does not close network
+/// egress, and on Linux it does not incidentally block it either, so any table
+/// function that accepts a location is a way to reach internal services. That is
+/// why the `read_*`/`glob` family is absent, and why `iceberg_scan` is too even
+/// though it reads the same data an attached catalog does. **Adding anything here
+/// that accepts a path or URL reopens SSRF.** A caller that needs one can widen
+/// the set through [`classify_read_only_with`] and take that on knowingly.
+pub const ALLOWED_TABLE_FUNCTIONS: &[&str] = &["range", "generate_series", "unnest"];
 
 /// What a caller will and will not allow in untrusted SQL.
 #[derive(Debug, Clone)]
@@ -129,6 +128,11 @@ pub enum ReadOnlyCheck {
     /// Parses as a `SELECT` but calls a function that mutates state or executes
     /// dynamically-built SQL. Carries the offending name for the error message.
     DeniedFunction(String),
+    /// Names a file or URL where a table belongs, which DuckDB resolves through a
+    /// replacement scan. `SELECT * FROM 'http://…'` reads as an ordinary base
+    /// table in the parse tree, so nothing about the function allowlist catches
+    /// it. Carries the offending reference.
+    DeniedTableReference(String),
 }
 
 /// Classify untrusted `sql` for the read-only path using DuckDB's parser. Opens a
@@ -198,6 +202,18 @@ pub fn classify_read_only_with(
 
     let calls = collect_function_calls(&parsed);
 
+    // 0. A table reference that names a file or a URL. DuckDB turns these into a
+    //    replacement scan, so `SELECT * FROM 'http://internal/x.csv'` reaches the
+    //    network while parsing as a plain base table. The function allowlist never
+    //    sees it, which is why this is checked separately.
+    if let Some(reference) = calls
+        .table_references
+        .iter()
+        .find(|name| looks_like_a_location(name))
+    {
+        return Ok(ReadOnlyCheck::DeniedTableReference(reference.clone()));
+    }
+
     // 1. Names refused wherever they appear.
     if let Some(name) = calls
         .all
@@ -239,6 +255,29 @@ struct FunctionCalls {
     all: std::collections::BTreeSet<String>,
     /// Just the ones in `FROM` position.
     table_functions: std::collections::BTreeSet<String>,
+    /// Base-table names, which is where a replacement scan hides a file or URL.
+    /// Kept with original case, since these are paths rather than identifiers.
+    table_references: std::collections::BTreeSet<String>,
+}
+
+/// Whether a table reference is really a file or URL, and so a replacement scan
+/// rather than a table.
+///
+/// A DuckDB identifier does not contain a path separator or a scheme, so those
+/// are decisive. The extension check catches a bare relative name like
+/// `data.csv`. Erring toward refusal is right here: the cost of rejecting an
+/// oddly-named table is a clear error, and the cost of missing one is egress.
+fn looks_like_a_location(reference: &str) -> bool {
+    let lowered = reference.to_lowercase();
+    if lowered.contains("://") || lowered.contains('/') || lowered.contains('\\') {
+        return true;
+    }
+    [
+        ".csv", ".tsv", ".parquet", ".json", ".ndjson", ".jsonl", ".avro", ".arrow", ".xlsx",
+        ".gz", ".zst",
+    ]
+    .iter()
+    .any(|extension| lowered.ends_with(extension))
 }
 
 /// Walks the serialized parse tree collecting function names, noting which sit in
@@ -267,6 +306,14 @@ fn walk_function_calls(node: &serde_json::Value, calls: &mut FunctionCalls) {
                     .and_then(serde_json::Value::as_str)
                 {
                     calls.table_functions.insert(name.to_lowercase());
+                }
+            }
+            if fields.get("type").and_then(serde_json::Value::as_str) == Some("BASE_TABLE") {
+                if let Some(name) = fields
+                    .get("table_name")
+                    .and_then(serde_json::Value::as_str)
+                {
+                    calls.table_references.insert(name.to_string());
                 }
             }
             if let Some(name) = fields.get("function_name").and_then(serde_json::Value::as_str) {
@@ -605,6 +652,45 @@ mod tests {
             "SELECT count(*) FROM range(10)",
             "SELECT * FROM generate_series(1, 5)",
             "WITH x AS (SELECT * FROM runs) SELECT count(*) FROM x",
+        ] {
+            assert_eq!(check(sql), ReadOnlyCheck::Allowed, "should allow: {sql}");
+        }
+    }
+
+    #[test]
+    fn a_replacement_scan_naming_a_file_or_url_is_refused() {
+        // `FROM '<location>'` parses as an ordinary base table, so the function
+        // allowlist never sees it. Missing this was a live SSRF path: it reached
+        // the network on Linux, where disabling LocalFileSystem does not
+        // incidentally block HTTP the way it does on macOS.
+        for reference in [
+            "http://169.254.169.254/latest/meta-data/",
+            "https://attacker.example/x.parquet",
+            "s3://bucket/object.parquet",
+            "/etc/passwd",
+            "./local.csv",
+            "data.parquet",
+            "C:\\Windows\\System32\\drivers\\etc\\hosts",
+        ] {
+            let sql = format!("SELECT * FROM '{reference}'");
+            assert_eq!(
+                check(&sql),
+                ReadOnlyCheck::DeniedTableReference(reference.to_string()),
+                "replacement scan not refused: {sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_table_names_are_not_mistaken_for_locations() {
+        // The location check must not get in the way of real tables, including
+        // qualified ones, where the catalog and schema are separate fields.
+        for sql in [
+            "SELECT * FROM runs",
+            "SELECT * FROM \"default\".bronze.runs",
+            "SELECT * FROM my_schema.events_2026",
+            "SELECT * FROM \"weird name\"",
+            "WITH staging AS (SELECT 1) SELECT * FROM staging",
         ] {
             assert_eq!(check(sql), ReadOnlyCheck::Allowed, "should allow: {sql}");
         }

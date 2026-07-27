@@ -1085,23 +1085,85 @@ mod tests {
             "SELECT count(*) FROM read_blob('URL')",
             "SELECT count(*) FROM read_json_auto('URL')",
             "SELECT count(*) FROM 'URL'",
+            "SELECT count(*) FROM iceberg_scan('URL')",
             "SELECT count(*) FROM read_csv('http://169.254.169.254/latest/meta-data/')",
         ] {
+            let sql = sql.replace("URL", &url);
+
+            // Production runs the gate first and never executes what it refuses,
+            // so the test has to as well. Executing regardless would measure the
+            // hardening alone, which is not a layer that closes egress: see
+            // `hardening_alone_does_not_close_network_egress`.
+            let verdict = classify_read_only(&sql).expect("gate should run");
+            assert_ne!(
+                verdict,
+                ReadOnlyCheck::Allowed,
+                "the gate must refuse a query that can reach a URL: {sql}"
+            );
+
             let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
-            // Mirror production: extensions loaded first, then the lockdown.
             conn.execute_batch("INSTALL httpfs; LOAD httpfs;")
                 .expect("load httpfs");
             let _ = conn.execute_batch("INSTALL iceberg; LOAD iceberg;");
             for statement in hardening_statements() {
                 conn.execute_batch(&statement).expect("harden session");
             }
-            let _ = conn.query_row(&sql.replace("URL", &url), [], |row| row.get::<_, i64>(0));
+            if verdict == ReadOnlyCheck::Allowed {
+                let _ = conn.query_row(&sql, [], |row| row.get::<_, i64>(0));
+            }
         }
 
         assert_eq!(
             connections.load(Ordering::SeqCst),
             baseline,
-            "a hardened query reached the network"
+            "a query that survived the gate reached the network"
+        );
+    }
+
+    /// The layer that is *not* load-bearing here, recorded so nobody assumes it is.
+    ///
+    /// The session hardening does not close network egress: it cannot, because an
+    /// attached Iceberg catalog is made of S3 reads, so `enable_external_access`
+    /// has to stay on. On macOS it happens to block HTTP reads anyway, because
+    /// disabling LocalFileSystem breaks path resolution before the HTTP filesystem
+    /// is consulted. On Linux it does not, and the request goes out. Relying on
+    /// that accident is exactly the mistake this test exists to prevent: the
+    /// read-only gate's table-function allowlist is what actually stops these.
+    #[test]
+    fn hardening_alone_does_not_close_network_egress() {
+        let conn = duckdb::Connection::open_in_memory().expect("open duckdb");
+        if conn.execute_batch("INSTALL httpfs; LOAD httpfs;").is_err() {
+            eprintln!("skipping: httpfs extension unavailable");
+            return;
+        }
+        for statement in hardening_statements() {
+            conn.execute_batch(&statement).expect("harden session");
+        }
+
+        // Whether this reaches the network is platform-dependent, so assert only
+        // the part that holds everywhere: hardening does not *refuse* the
+        // statement the way the gate does. The error, if any, comes from the read
+        // failing, not from the sandbox declining to try.
+        let hardened_error = conn
+            .query_row(
+                "SELECT count(*) FROM read_csv('http://127.0.0.1:9/nothing')",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .err()
+            .map(|err| err.to_string().to_lowercase());
+        if let Some(message) = &hardened_error {
+            assert!(
+                !message.contains("not allowed") && !message.contains("denied function"),
+                "hardening is not the layer that refuses this; the gate is: {message}"
+            );
+        }
+
+        // The gate is. That is the invariant worth depending on.
+        assert_ne!(
+            classify_read_only("SELECT count(*) FROM read_csv('http://127.0.0.1:9/nothing')")
+                .expect("gate should run"),
+            ReadOnlyCheck::Allowed
         );
     }
 
@@ -1133,18 +1195,27 @@ mod tests {
     /// test should only change when someone means it. Bump deliberately and re-run.
     const MINIO_IMAGE_TAG: &str = "RELEASE.2025-09-07T16-13-09Z";
 
-    /// Whether a container runtime is actually reachable.
+    /// Whether a container runtime that can run this image is reachable.
     ///
-    /// Used to tell "no Docker on this machine", which is a legitimate skip, from
-    /// "the container failed to start", which is a failure worth surfacing.
-    /// Treating both as a skip is how a security test quietly becomes a no-op.
-    fn docker_is_available() -> bool {
+    /// Used to tell an environment that cannot run the test, which is a legitimate
+    /// skip, from a container that failed to start, which is a failure worth
+    /// surfacing. Treating both as a skip is how a security test quietly becomes a
+    /// no-op.
+    ///
+    /// Windows is excluded outright: MinIO publishes Linux images only, and
+    /// Windows CI runs Windows containers, so the pull can never succeed there.
+    /// That is a property of the image, not a transient problem, so it is decided
+    /// here rather than inferred from a pull error.
+    fn can_run_linux_containers() -> bool {
+        if cfg!(windows) {
+            return false;
+        }
         std::process::Command::new("docker")
-            .args(["info", "--format", "{{.ServerVersion}}"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .map(|status| status.success())
+            .args(["info", "--format", "{{.OSType}}"])
+            .output()
+            .map(|out| {
+                out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "linux"
+            })
             .unwrap_or(false)
     }
 
@@ -1162,8 +1233,10 @@ mod tests {
         use testcontainers::runners::SyncRunner;
         use testcontainers::{GenericImage, ImageExt};
 
-        if !docker_is_available() {
-            eprintln!("skipping sandbox_holds_over_object_store_iceberg: no container runtime");
+        if !can_run_linux_containers() {
+            eprintln!(
+                "skipping sandbox_holds_over_object_store_iceberg: no Linux container runtime"
+            );
             return;
         }
 

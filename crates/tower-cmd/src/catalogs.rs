@@ -493,7 +493,10 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
                 "This command runs read-only queries. Only a single SELECT statement is allowed; re-run with --write to modify the catalog.",
             ),
             Ok(Ok(guard::ReadOnlyCheck::DeniedFunction(name))) => out.die(&format!(
-                "'{name}' is not allowed in a read-only query: it changes engine state or runs SQL built at runtime. Remove it, or re-run with --write."
+                "'{name}' is not allowed in a read-only query: it changes engine state, runs SQL built at runtime, or reads outside the catalog. Remove it, or re-run with --write."
+            )),
+            Ok(Ok(guard::ReadOnlyCheck::DeniedTableReference(reference))) => out.die(&format!(
+                "'{reference}' is a file or URL, not a table in this catalog. Read-only queries can only read the catalog's own tables; re-run with --write to read elsewhere."
             )),
             Ok(Err(err)) => out.die(&format!("Could not validate the query: {err}")),
             Err(err) => out.die(&format!("Could not validate the query: {err}")),
