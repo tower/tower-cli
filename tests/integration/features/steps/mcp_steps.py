@@ -904,3 +904,120 @@ def step_then_receive_workflow_help_stdio(context):
 @given('I have a simple hello world application named "{app_name}"')
 def step_create_hello_world_app_named(context, app_name):
     create_towerfile(context, app_name=app_name)
+
+
+# --- Catalog querying (gated on TOWER_TEST_CATALOG; see environment.py) -------
+
+
+def _first_text_content(response):
+    """Return the first text block of an MCP response, or ''."""
+    for item in response.get("content", []):
+        if isinstance(item, dict):
+            if item.get("type") == "text":
+                return item.get("text", "")
+        elif getattr(item, "type", None) == "text":
+            return getattr(item, "text", "")
+    return ""
+
+
+def _parse_json_content(response):
+    """Parse the response's text block as JSON, or None if it isn't JSON."""
+    try:
+        return json.loads(_first_text_content(response))
+    except (ValueError, TypeError):
+        return None
+
+
+@when("I show the test catalog via MCP")
+@async_run_until_complete
+async def step_show_test_catalog(context):
+    await call_mcp_tool(
+        context,
+        "tower_catalogs_show",
+        {"name": context.test_catalog, "environment": context.test_catalog_env},
+    )
+
+
+@when('I query the test catalog with SQL "{sql}" via MCP')
+@async_run_until_complete
+async def step_query_test_catalog(context, sql):
+    await call_mcp_tool(
+        context,
+        "tower_catalogs_query",
+        {
+            "name": context.test_catalog,
+            "environment": context.test_catalog_env,
+            "sql": sql,
+        },
+    )
+
+
+@when("I query the configured catalog table via MCP")
+@async_run_until_complete
+async def step_query_configured_table(context):
+    await call_mcp_tool(
+        context,
+        "tower_catalogs_query",
+        {
+            "name": context.test_catalog,
+            "environment": context.test_catalog_env,
+            "sql": f"SELECT * FROM {context.test_catalog_table} LIMIT 5",
+        },
+    )
+
+
+@then("the catalog response should list tables")
+def step_catalog_lists_tables(context):
+    data = _parse_json_content(context.mcp_response)
+    assert (
+        data is not None
+    ), f"Expected JSON content, got: {context.mcp_response.get('content')}"
+    assert "tables" in data, f"Response should include a 'tables' field, got: {data}"
+
+
+@then("I should receive query results")
+def step_receive_query_results(context):
+    assert context.mcp_response.get(
+        "success", False
+    ), f"Expected a successful query, got: {context.mcp_response}"
+    data = _parse_json_content(context.mcp_response)
+    assert (
+        data is not None
+    ), f"Expected JSON content, got: {context.mcp_response.get('content')}"
+    assert isinstance(
+        data.get("columns"), list
+    ), f"Expected a 'columns' list, got: {data}"
+    assert isinstance(data.get("rows"), list), f"Expected a 'rows' list, got: {data}"
+    # Rows are positional arrays (one value per column), not objects keyed by name.
+    for row in data["rows"]:
+        assert isinstance(row, list), f"Expected positional row arrays, got: {row}"
+
+
+@then('the query result columns should include "{column}"')
+def step_query_columns_include(context, column):
+    data = _parse_json_content(context.mcp_response)
+    assert (
+        data is not None and column in data.get("columns", [])
+    ), f"Expected column '{column}', got: {data}"
+
+
+@then("I should receive an error response about a read-only query")
+def step_error_read_only(context):
+    assert is_error_response(
+        context.mcp_response
+    ), f"Expected an error response, got: {context.mcp_response}"
+    text = str(context.mcp_response).lower()
+    assert (
+        "read-only" in text or "not allowed" in text
+    ), f"Error should mention the read-only restriction, got: {context.mcp_response}"
+
+
+@then("I should receive an error response about a single statement")
+def step_error_single_statement(context):
+    assert is_error_response(
+        context.mcp_response
+    ), f"Expected an error response, got: {context.mcp_response}"
+    text = str(context.mcp_response).lower()
+    assert (
+        "single" in text and "statement" in text
+    ), f"Error should mention the single-statement rule, got: {context.mcp_response}"
