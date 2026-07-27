@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use tower_api::models::{
     vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
 };
-use tower_duckdb::{guard, params, run_query, QueryResult, Session};
+use tower_duckdb::{guard, params, run_query, Hardening, Limits, QueryResult, Session};
 use tower_telemetry::debug;
 
 use crate::{api, beta, output, util::cmd};
@@ -407,7 +407,7 @@ async fn fetch_catalog_tables(
                 &setup,
                 "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
                 params![db_name],
-                None,
+                &Limits::none(),
             )
         })
         .await
@@ -485,6 +485,9 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
             Ok(Ok(guard::ReadOnlyCheck::NotReadOnly)) => out.die(
                 "This command runs read-only queries. Only a single SELECT statement is allowed; re-run with --write to modify the catalog.",
             ),
+            Ok(Ok(guard::ReadOnlyCheck::DeniedFunction(name))) => out.die(&format!(
+                "'{name}' is not allowed in a read-only query: it changes engine state or runs SQL built at runtime. Remove it, or re-run with --write."
+            )),
             Ok(Err(err)) => out.die(&format!("Could not validate the query: {err}")),
             Err(err) => out.die(&format!("Could not validate the query: {err}")),
         }
@@ -525,18 +528,29 @@ async fn execute_catalog_query(
 
     let token = response.credentials.oauth_token.clone();
     let setup = attach_statements(name, &response.credentials, mode);
-    // Read mode is the sandboxed path: lock the session down after attach and cap
-    // the rows, so the query cannot read the host, escape the config, or pull an
-    // unbounded table back. Write mode is trusted and runs the setup as-is.
+    // Read mode is the sandboxed path: lock the session down after attach so the
+    // query cannot read the host or unwind the config, and bound the result so a
+    // terminal isn't flooded. No wall-clock ceiling here, because a legitimate
+    // analytical scan over a large catalog can take minutes and a person is
+    // driving; the agent path uses `Limits::agent()`, which adds one. Write mode
+    // is the trusted opt-in and runs unbounded.
     let harden = !write;
-    let max_rows = (!write).then_some(guard::AGENT_MAX_ROWS);
+    let limits = if write {
+        Limits::none()
+    } else {
+        Limits {
+            max_rows: Some(guard::AGENT_MAX_ROWS),
+            max_total_bytes: Some(guard::AGENT_MAX_RESULT_BYTES),
+            timeout: None,
+        }
+    };
     let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
         let session = Session::open()?;
         session.run_setup(&setup)?;
         if harden {
-            session.harden()?;
+            session.harden(&Hardening::default())?;
         }
-        session.query(&sql, [], max_rows)
+        session.query(&sql, [], &limits)
     })
     .await;
 
@@ -713,7 +727,7 @@ async fn fetch_catalog_columns_via_rest(
             "column_types".to_string(),
         ],
         rows,
-        truncated: false,
+        truncated: None,
     })
 }
 
@@ -1001,13 +1015,16 @@ fn output_query_result(out: &output::Out, result: &QueryResult) {
         .collect();
 
     out.table(result.columns.clone(), data, Some(&json_rows));
-    if result.truncated {
-        out.note(&format!(
-            "\nShowing the first {} row(s); result truncated. Add a LIMIT or filter to narrow it.\n",
+    match result.truncated {
+        Some(tower_duckdb::Truncation::Rows) => out.note(&format!(
+            "\nShowing the first {} row(s); result truncated at the row limit. Add a LIMIT or filter to narrow it.\n",
             result.rows.len()
-        ));
-    } else {
-        out.note(&format!("\n{} row(s)\n", result.rows.len()));
+        )),
+        Some(tower_duckdb::Truncation::Bytes) => out.note(&format!(
+            "\nShowing {} row(s); result truncated at the size limit. Select fewer columns, or filter to narrow it.\n",
+            result.rows.len()
+        )),
+        None => out.note(&format!("\n{} row(s)\n", result.rows.len())),
     }
 }
 
@@ -1284,7 +1301,7 @@ mod tests {
         token_export_command,
     };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
-    use tower_duckdb::{params, run_query};
+    use tower_duckdb::{params, run_query, Limits};
 
     #[test]
     fn list_defaults_to_default_environment() {
@@ -1500,7 +1517,7 @@ mod tests {
             &setup,
             "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
             params!["memory"],
-            None,
+            &Limits::none(),
         )
         .expect("query should succeed");
 

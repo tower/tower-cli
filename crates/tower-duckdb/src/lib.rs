@@ -2,14 +2,28 @@
 //! setup, locking the session down for untrusted SQL, and executing a query
 //! into JSON rows with an optional row cap.
 //!
-//! The point of the crate is the hardened query path. Agent-issued SQL runs on
-//! a customer's machine with their catalog credentials, so before it runs we
-//! reject anything that is not a single read-only SELECT, using DuckDB's own
-//! parser (the [`guard`] module), lock the session down so a query cannot read
-//! the local filesystem, load community extensions, or unwind the settings
-//! ([`Session::harden`]), and cap the rows a result can carry back
-//! ([`Session::query`]). The adversarial tests exercise each of these invariants
+//! The point of the crate is the hardened query path. Agent-issued SQL runs on a
+//! customer's machine with their catalog credentials, so it gets layered
+//! treatment: reject anything that is not a single read-only SELECT using
+//! DuckDB's own parser (the [`guard`] module), lock the session down so a query
+//! cannot read the local filesystem, pull in extensions, or unwind the settings
+//! ([`Hardening`]), and bound what a result may carry back in rows, bytes, and
+//! wall-clock time ([`Limits`]). The adversarial tests exercise each of these
 //! directly.
+//!
+//! None of that is the security boundary. The boundary is the engine-enforced
+//! privilege: the caller vends read-only credentials and attaches the catalog
+//! `READ_ONLY`, so a write is refused by the catalog no matter what this crate
+//! concludes. Everything here is defence in depth in front of that, worth having
+//! because it turns a confusing engine error into a clear refusal and closes
+//! SELECT-shaped holes the credential alone would not.
+//!
+//! Two gaps are deliberate and worth knowing. Network egress is open: an attached
+//! Iceberg catalog is made of S3 reads, so `enable_external_access` cannot be
+//! turned off on that path, and a query can still reach a URL through a table
+//! function. And the ceilings bound what this process holds, not what DuckDB
+//! spends internally on a materializing plan. Closing either one needs controls
+//! outside this crate: a network boundary, and [`Hardening::memory_limit`].
 
 use std::time::Instant;
 
@@ -19,29 +33,141 @@ pub use duckdb::{params, Error, Params};
 
 pub mod guard;
 
-/// A tabular query result: column names, rows as positional JSON values, and a
-/// flag set when rows were dropped to honour a caller-supplied cap.
+/// Why a result stopped short of everything the query would have returned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Truncation {
+    /// Hit the row ceiling.
+    Rows,
+    /// Hit the byte ceiling. This is the one that catches a query which packs a
+    /// whole table into a handful of rows.
+    Bytes,
+}
+
+/// A tabular query result: column names, rows as positional JSON values, and why
+/// it stopped early if it did.
 #[derive(Debug, Clone)]
 pub struct QueryResult {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<serde_json::Value>>,
-    /// Rows were dropped to honour the `max_rows` passed to [`Session::query`].
-    pub truncated: bool,
+    /// Set when a [`Limits`] ceiling cut the result short.
+    pub truncated: Option<Truncation>,
 }
 
-/// The statements that lock a session down before untrusted SQL runs: no
-/// local-filesystem access (so `read_csv('/etc/passwd')` and friends fail), no
-/// community extensions, and a configuration lock so the query cannot unwind any
-/// of it. These run after setup, because attaching a catalog is what installs
-/// extensions and reaches the network. Only `LocalFileSystem` is disabled, so
-/// httpfs and the object-store reads an attached Iceberg catalog depends on keep
-/// working; this narrows the query surface without breaking those reads.
+impl QueryResult {
+    /// Whether a ceiling cut this result short.
+    pub fn is_truncated(&self) -> bool {
+        self.truncated.is_some()
+    }
+}
+
+/// Ceilings applied while a result is read back.
+///
+/// Rows alone are a weak bound, because a query can compact a whole column into
+/// one row (`string_agg`, `list`, `to_json`). `max_total_bytes` is what actually
+/// limits how much data a single query carries back, so set both for untrusted
+/// callers. `timeout` bounds how long the query may run: DuckDB has no statement
+/// timeout of its own, so it is enforced by interrupting the connection.
+#[derive(Debug, Clone, Default)]
+pub struct Limits {
+    pub max_rows: Option<usize>,
+    pub max_total_bytes: Option<usize>,
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Limits {
+    /// No ceilings. For trusted, caller-authored SQL.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// The ceilings for untrusted (agent-issued) SQL.
+    pub fn agent() -> Self {
+        Self {
+            max_rows: Some(guard::AGENT_MAX_ROWS),
+            max_total_bytes: Some(guard::AGENT_MAX_RESULT_BYTES),
+            timeout: Some(guard::AGENT_QUERY_TIMEOUT),
+        }
+    }
+
+    /// Only a row ceiling, for a caller that wants a readable result without a
+    /// security budget.
+    pub fn rows(max_rows: usize) -> Self {
+        Self {
+            max_rows: Some(max_rows),
+            ..Self::default()
+        }
+    }
+}
+
+/// How to lock a session down before untrusted SQL runs.
+///
+/// The defaults are what a catalog query needs: local-filesystem access off (so
+/// `read_csv('/etc/passwd')` and friends fail), no implicit extension
+/// install/load, no community or unsigned extensions, secrets kept redacted, and
+/// the configuration frozen so the query cannot unwind any of it.
+///
+/// Note what is deliberately *not* set: `enable_external_access = false`. It is
+/// DuckDB's master switch and would be the stronger control, but it also blocks
+/// the S3 reads an attached Iceberg catalog is made of, so a catalog query cannot
+/// use it. Network egress is therefore not closed by this lockdown; a query can
+/// still reach a URL through a table function. The read-only credential is what
+/// bounds what that query can *read*, and closing egress needs a network boundary
+/// outside this process. Callers that do not need object storage should set
+/// `deny_external_access` and get the stronger guarantee.
+#[derive(Debug, Clone, Default)]
+pub struct Hardening {
+    /// Refuse all external access, network and local files alike. Breaks attached
+    /// object-store catalogs, so it is off by default.
+    pub deny_external_access: bool,
+    /// Engine memory ceiling, e.g. `"2GB"`. `None` keeps DuckDB's default.
+    pub memory_limit: Option<String>,
+    /// Ceiling on spill-to-disk, e.g. `"4GB"`. `None` keeps DuckDB's default.
+    pub max_temp_directory_size: Option<String>,
+}
+
+impl Hardening {
+    /// The lockdown statements, in the order they must run.
+    ///
+    /// `lock_configuration` is last because it freezes every later `SET`. The
+    /// whole sequence runs after setup, because attaching a catalog is what
+    /// installs the extensions and reaches the network that this then takes away.
+    pub fn statements(&self) -> Vec<String> {
+        let mut statements = Vec::new();
+        if self.deny_external_access {
+            statements.push("SET enable_external_access = false".to_string());
+        }
+        statements.extend(
+            [
+                "SET disabled_filesystems = 'LocalFileSystem'",
+                // Stop DuckDB reaching out for an extension mid-query. The ones a
+                // catalog needs are already loaded by setup.
+                "SET autoinstall_known_extensions = false",
+                "SET autoload_known_extensions = false",
+                "SET allow_community_extensions = false",
+                "SET allow_unsigned_extensions = false",
+                // Keep vended tokens redacted in duckdb_secrets().
+                "SET allow_unredacted_secrets = false",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+        if let Some(limit) = &self.memory_limit {
+            statements.push(format!("SET memory_limit = '{}'", limit.replace('\'', "''")));
+        }
+        if let Some(limit) = &self.max_temp_directory_size {
+            statements.push(format!(
+                "SET max_temp_directory_size = '{}'",
+                limit.replace('\'', "''")
+            ));
+        }
+        statements.push("SET lock_configuration = true".to_string());
+        statements
+    }
+}
+
+/// The default lockdown statements, for callers that do not need to tune it.
 pub fn hardening_statements() -> Vec<String> {
-    vec![
-        "SET disabled_filesystems = 'LocalFileSystem'".to_string(),
-        "SET allow_community_extensions = false".to_string(),
-        "SET lock_configuration = true".to_string(),
-    ]
+    Hardening::default().statements()
 }
 
 /// An in-memory DuckDB connection Tower runs queries through.
@@ -84,8 +210,8 @@ impl Session {
     /// attaching a catalog needs the access this removes.
     ///
     /// [`run_setup`]: Session::run_setup
-    pub fn harden(&self) -> Result<(), Error> {
-        for statement in hardening_statements() {
+    pub fn harden(&self, hardening: &Hardening) -> Result<(), Error> {
+        for statement in hardening.statements() {
             self.conn.execute_batch(&statement)?;
         }
         Ok(())
@@ -93,20 +219,33 @@ impl Session {
 
     /// Execute a single query as a prepared statement with `params` bound. Values
     /// that fit a bind position should go through `params` rather than the query
-    /// text. When `max_rows` is set, rows past it are dropped and the result is
-    /// flagged truncated, so an untrusted caller cannot pull an unbounded table
-    /// into memory or a model's context.
+    /// text.
+    ///
+    /// `limits` bound the result as it is read: rows and total bytes are counted
+    /// as values come back and the read stops at either ceiling, so an untrusted
+    /// caller cannot pull an unbounded table into memory or a model's context. A
+    /// `timeout` interrupts the connection when the query outruns it.
+    ///
+    /// The ceilings bound what this process *holds*, which is not the same as
+    /// what the engine does: a query whose plan materializes (a large `ORDER BY`
+    /// or aggregate) spends that memory inside DuckDB before the first row is
+    /// handed over. Use [`Hardening::memory_limit`] for that.
     pub fn query<P: Params>(
         &self,
         sql: &str,
         params: P,
-        max_rows: Option<usize>,
+        limits: &Limits,
     ) -> Result<QueryResult, Error> {
         let query_start = Instant::now();
+        // Armed before prepare so a statement that hangs while binding (a remote
+        // catalog read, say) is still interrupted. Disarms on drop.
+        let _deadline = limits.timeout.map(|timeout| Deadline::arm(&self.conn, timeout));
+
         let mut stmt = self.conn.prepare(sql)?;
         let mut columns: Vec<String> = Vec::new();
         let mut rows = Vec::new();
-        let mut truncated = false;
+        let mut truncated = None;
+        let mut total_bytes = 0usize;
 
         {
             let mut result_rows = stmt.query(params)?;
@@ -114,8 +253,8 @@ impl Session {
                 if columns.is_empty() {
                     columns = row.as_ref().column_names();
                 }
-                if max_rows.is_some_and(|max| rows.len() >= max) {
-                    truncated = true;
+                if limits.max_rows.is_some_and(|max| rows.len() >= max) {
+                    truncated = Some(Truncation::Rows);
                     break;
                 }
                 let mut record = Vec::with_capacity(columns.len());
@@ -123,7 +262,14 @@ impl Session {
                     let value: duckdb::types::Value = row.get(idx)?;
                     record.push(value_to_json(value));
                 }
+                total_bytes += record.iter().map(json_size) .sum::<usize>();
                 rows.push(record);
+                // Checked after pushing, so a single oversized row is returned
+                // rather than silently yielding an empty result.
+                if limits.max_total_bytes.is_some_and(|max| total_bytes >= max) {
+                    truncated = Some(Truncation::Bytes);
+                    break;
+                }
             }
         }
 
@@ -133,9 +279,10 @@ impl Session {
         }
 
         debug!(
-            "tower-duckdb: query took {:?} ({} rows): {}",
+            "tower-duckdb: query took {:?} ({} rows, {} bytes): {}",
             query_start.elapsed(),
             rows.len(),
+            total_bytes,
             sql
         );
 
@@ -147,6 +294,70 @@ impl Session {
     }
 }
 
+/// Interrupts a connection if it is still working when the deadline passes.
+///
+/// DuckDB has no statement timeout, so a wall-clock bound has to come from the
+/// host. Interrupts are honoured at chunk boundaries, so this bounds a runaway
+/// query rather than guaranteeing an exact deadline; a hard kill would need a
+/// process boundary.
+struct Deadline {
+    expired: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    watcher: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Deadline {
+    fn arm(conn: &duckdb::Connection, timeout: std::time::Duration) -> Self {
+        let handle = conn.interrupt_handle();
+        let expired = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let done = expired.clone();
+        let watcher = std::thread::spawn(move || {
+            let deadline = Instant::now() + timeout;
+            // Woken in slices so a finished query disarms promptly instead of
+            // holding the thread for the whole timeout.
+            while Instant::now() < deadline {
+                if done.load(std::sync::atomic::Ordering::Relaxed) {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            if !done.load(std::sync::atomic::Ordering::Relaxed) {
+                handle.interrupt();
+            }
+        });
+        Self {
+            expired,
+            watcher: Some(watcher),
+        }
+    }
+}
+
+impl Drop for Deadline {
+    fn drop(&mut self) {
+        self.expired
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(watcher) = self.watcher.take() {
+            let _ = watcher.join();
+        }
+    }
+}
+
+/// Rough serialized size of a value, used only to bound how much a result may
+/// carry back. Strings dominate real results, so they are measured exactly and
+/// everything else is approximated.
+fn json_size(value: &serde_json::Value) -> usize {
+    match value {
+        serde_json::Value::Null => 4,
+        serde_json::Value::Bool(_) => 5,
+        serde_json::Value::Number(n) => n.to_string().len(),
+        serde_json::Value::String(s) => s.len(),
+        serde_json::Value::Array(items) => items.iter().map(json_size).sum::<usize>() + 2,
+        serde_json::Value::Object(fields) => fields
+            .iter()
+            .map(|(key, value)| key.len() + json_size(value))
+            .sum::<usize>(),
+    }
+}
+
 /// Open a session, run `setup`, and execute `query`. Convenience for one-shot
 /// callers that do not need to hold the session. Callers running untrusted SQL
 /// should build a [`Session`] and call [`Session::harden`] between setup and
@@ -155,11 +366,11 @@ pub fn run_query<P: Params>(
     setup: &[String],
     query: &str,
     params: P,
-    max_rows: Option<usize>,
+    limits: &Limits,
 ) -> Result<QueryResult, Error> {
     let session = Session::open()?;
     session.run_setup(setup)?;
-    session.query(query, params, max_rows)
+    session.query(query, params, limits)
 }
 
 /// Converts a DuckDB value into a `serde_json::Value`. Integers that overflow an
@@ -261,7 +472,10 @@ fn stringify_key(value: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::guard::{classify_read_only, ReadOnlyCheck};
-    use super::{hardening_statements, run_query, value_to_json, QueryResult};
+    use super::{
+        hardening_statements, run_query, value_to_json, Hardening, Limits, QueryResult, Session,
+        Truncation,
+    };
 
     #[test]
     fn duckdb_values_convert_to_json() {
@@ -296,7 +510,7 @@ mod tests {
             &[],
             "SELECT [1, 2] AS l, {'a': 1, 'b': 'x'} AS s, MAP {'k': 2} AS m",
             [],
-            None,
+            &Limits::none(),
         )
         .expect("query should succeed");
 
@@ -317,7 +531,7 @@ mod tests {
             "CREATE TABLE t (id INTEGER, name TEXT)".to_string(),
             "INSERT INTO t VALUES (1, 'a'), (2, 'b')".to_string(),
         ];
-        let result = run_query(&setup, "SELECT id, name FROM t ORDER BY id", [], None)
+        let result = run_query(&setup, "SELECT id, name FROM t ORDER BY id", [], &Limits::none())
             .expect("query should succeed");
 
         assert_eq!(result.columns, vec!["id", "name"]);
@@ -328,13 +542,13 @@ mod tests {
                 vec![serde_json::json!(2), serde_json::json!("b")],
             ]
         );
-        assert!(!result.truncated);
+        assert!(!result.is_truncated());
     }
 
     #[test]
     fn run_query_reports_columns_for_empty_results() {
         let result =
-            run_query(&[], "SELECT 1 AS x WHERE 1 = 0", [], None).expect("query should succeed");
+            run_query(&[], "SELECT 1 AS x WHERE 1 = 0", [], &Limits::none()).expect("query should succeed");
 
         assert_eq!(result.columns, vec!["x"]);
         assert!(result.rows.is_empty());
@@ -342,15 +556,184 @@ mod tests {
 
     #[test]
     fn run_query_caps_rows_and_flags_truncation() {
-        let capped = run_query(&[], "SELECT * FROM range(5) AS t(i)", [], Some(3))
+        let capped = run_query(&[], "SELECT * FROM range(5) AS t(i)", [], &Limits::rows(3))
             .expect("query should succeed");
         assert_eq!(capped.rows.len(), 3);
-        assert!(capped.truncated);
+        assert_eq!(capped.truncated, Some(Truncation::Rows));
 
-        let exact = run_query(&[], "SELECT * FROM range(3) AS t(i)", [], Some(3))
+        let exact = run_query(&[], "SELECT * FROM range(3) AS t(i)", [], &Limits::rows(3))
             .expect("query should succeed");
         assert_eq!(exact.rows.len(), 3);
-        assert!(!exact.truncated);
+        assert!(!exact.is_truncated());
+    }
+
+    /// The reason a row cap is not enough on its own: one row can carry a whole
+    /// column. A row-only ceiling lets this through; the byte ceiling catches it.
+    #[test]
+    fn a_byte_ceiling_catches_what_a_row_ceiling_misses() {
+        let packed = "SELECT string_agg(i::VARCHAR, ',') AS all_rows FROM range(20000) AS t(i)";
+
+        let row_capped = run_query(&[], packed, [], &Limits::rows(1000))
+            .expect("query should succeed");
+        assert_eq!(row_capped.rows.len(), 1);
+        assert!(
+            !row_capped.is_truncated(),
+            "a row ceiling cannot see a single oversized row"
+        );
+        let packed_bytes = row_capped.rows[0][0].as_str().map_or(0, str::len);
+        assert!(
+            packed_bytes > 64 * 1024,
+            "expected a large packed value, got {packed_bytes} bytes"
+        );
+
+        let byte_capped = run_query(
+            &[],
+            packed,
+            [],
+            &Limits {
+                max_rows: Some(1000),
+                max_total_bytes: Some(4096),
+                timeout: None,
+            },
+        )
+        .expect("query should succeed");
+        assert_eq!(
+            byte_capped.truncated,
+            Some(Truncation::Bytes),
+            "the byte ceiling should have cut this short"
+        );
+    }
+
+    /// Many small rows trip the byte ceiling too, so the bound holds however the
+    /// result is shaped.
+    #[test]
+    fn the_byte_ceiling_also_bounds_many_small_rows() {
+        let result = run_query(
+            &[],
+            "SELECT repeat('x', 512) AS pad FROM range(10000)",
+            [],
+            &Limits {
+                max_rows: None,
+                max_total_bytes: Some(16 * 1024),
+                timeout: None,
+            },
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.truncated, Some(Truncation::Bytes));
+        assert!(
+            result.rows.len() < 10_000,
+            "should have stopped early, got {} rows",
+            result.rows.len()
+        );
+    }
+
+    /// DuckDB has no statement timeout, so a runaway query is bounded by
+    /// interrupting the connection from the host. `range(1e12)` would run
+    /// effectively forever; it must come back as an error, not hang the test.
+    #[test]
+    fn a_runaway_query_is_interrupted_by_the_timeout() {
+        let started = std::time::Instant::now();
+        let result = run_query(
+            &[],
+            "SELECT count(*) FROM range(1000000000000) AS t(i) WHERE i % 7 = 0",
+            [],
+            &Limits {
+                max_rows: None,
+                max_total_bytes: None,
+                timeout: Some(std::time::Duration::from_secs(2)),
+            },
+        );
+
+        assert!(result.is_err(), "runaway query should have been interrupted");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "interrupt took too long: {:?}",
+            started.elapsed()
+        );
+    }
+
+    /// The timeout must not fire on a query that finishes inside it, and the
+    /// watcher must not outlive the call.
+    #[test]
+    fn a_fast_query_is_unaffected_by_an_armed_timeout() {
+        let result = run_query(
+            &[],
+            "SELECT 1 AS x",
+            [],
+            &Limits {
+                max_rows: None,
+                max_total_bytes: None,
+                timeout: Some(std::time::Duration::from_secs(30)),
+            },
+        )
+        .expect("a fast query should not be interrupted");
+        assert_eq!(result.rows, vec![vec![serde_json::json!(1)]]);
+    }
+
+    /// `lock_configuration` freezes every later `SET`, so it has to be issued
+    /// last or the rest of the lockdown silently fails to apply.
+    #[test]
+    fn lock_configuration_is_always_the_last_hardening_statement() {
+        for hardening in [
+            Hardening::default(),
+            Hardening {
+                deny_external_access: true,
+                memory_limit: Some("2GB".to_string()),
+                max_temp_directory_size: Some("4GB".to_string()),
+            },
+        ] {
+            let statements = hardening.statements();
+            let last = statements.last().expect("hardening should not be empty");
+            assert!(
+                last.contains("lock_configuration"),
+                "lock_configuration must be last, got: {last}"
+            );
+            assert_eq!(
+                statements
+                    .iter()
+                    .filter(|s| s.contains("lock_configuration"))
+                    .count(),
+                1
+            );
+        }
+    }
+
+    /// The stricter lockdown a caller with no object-store catalog can take. It
+    /// closes network egress, which the default cannot, because an attached
+    /// Iceberg catalog is made of S3 reads.
+    #[test]
+    fn deny_external_access_closes_the_network_the_default_leaves_open() {
+        let strict = Hardening {
+            deny_external_access: true,
+            ..Hardening::default()
+        };
+        assert!(strict
+            .statements()
+            .iter()
+            .any(|s| s.contains("enable_external_access")));
+        assert!(
+            !Hardening::default()
+                .statements()
+                .iter()
+                .any(|s| s.contains("enable_external_access")),
+            "the default must leave object-store reads working"
+        );
+
+        let session = Session::open().expect("open session");
+        session.harden(&strict).expect("harden");
+        let err = session
+            .query(
+                "SELECT * FROM read_csv('https://example.com/x.csv')",
+                [],
+                &Limits::none(),
+            )
+            .expect_err("external access should be refused");
+        let message = err.to_string().to_lowercase();
+        assert!(
+            message.contains("disabled") || message.contains("permission"),
+            "unexpected error: {err}"
+        );
     }
 
     // The read-only gate is unit-tested in `guard.rs`. This helper backs the
@@ -363,19 +746,19 @@ mod tests {
     fn harden_allows_selects_but_blocks_local_files_and_config_changes() {
         let setup = hardening_statements();
 
-        let ok = run_query(&setup, "SELECT 1 AS x", [], None)
+        let ok = run_query(&setup, "SELECT 1 AS x", [], &Limits::none())
             .expect("a plain select should still run under the hardened session");
         assert_eq!(ok.columns, vec!["x"]);
         assert_eq!(ok.rows, vec![vec![serde_json::json!(1)]]);
 
-        let fs_err = run_query(&setup, "SELECT * FROM read_csv('Cargo.toml')", [], None)
+        let fs_err = run_query(&setup, "SELECT * FROM read_csv('Cargo.toml')", [], &Limits::none())
             .expect_err("local filesystem access should be blocked");
         assert!(
             fs_err.to_string().to_lowercase().contains("disabled"),
             "unexpected error: {fs_err}"
         );
 
-        let cfg_err = run_query(&setup, "SET memory_limit = '1GB'", [], None)
+        let cfg_err = run_query(&setup, "SET memory_limit = '1GB'", [], &Limits::none())
             .expect_err("configuration should be locked");
         let cfg_msg = cfg_err.to_string().to_lowercase();
         assert!(
@@ -418,7 +801,7 @@ mod tests {
             &setup,
             &format!("SELECT id, name FROM iceberg_scan('{table}') ORDER BY id"),
             [],
-            None,
+            &Limits::none(),
         )
         .expect("iceberg_scan should read the table");
         assert_eq!(result.columns, vec!["id", "name"]);
@@ -430,17 +813,17 @@ mod tests {
                 vec![serde_json::json!(3), serde_json::Value::Null],
             ]
         );
-        assert!(!result.truncated);
+        assert!(!result.is_truncated());
 
         let capped = run_query(
             &setup,
             &format!("SELECT id FROM iceberg_scan('{table}') ORDER BY id"),
             [],
-            Some(2),
+            &Limits::rows(2),
         )
         .expect("iceberg_scan should read the table");
         assert_eq!(capped.rows.len(), 2);
-        assert!(capped.truncated);
+        assert_eq!(capped.truncated, Some(Truncation::Rows));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -454,7 +837,7 @@ mod tests {
     /// A statement run under the session hardening. Extensions are not loaded, so
     /// the attacks below must be blocked by the session lockdown alone.
     fn run_hardened(sql: &str) -> Result<QueryResult, duckdb::Error> {
-        run_query(&hardening_statements(), sql, [], None)
+        run_query(&hardening_statements(), sql, [], &Limits::none())
     }
 
     #[test]
@@ -657,7 +1040,7 @@ mod tests {
             &setup,
             &format!("SELECT id, name FROM iceberg_scan('{table}') ORDER BY id"),
             [],
-            None,
+            &Limits::none(),
         )
         .expect("hardening must not break object-store Iceberg reads");
         assert_eq!(read.columns, vec!["id", "name"]);
@@ -670,14 +1053,14 @@ mod tests {
             ]
         );
 
-        let local = run_query(&setup, "SELECT * FROM read_csv('/etc/hostname')", [], None)
+        let local = run_query(&setup, "SELECT * FROM read_csv('/etc/hostname')", [], &Limits::none())
             .expect_err("local filesystem reads must stay blocked");
         assert!(
             local.to_string().to_lowercase().contains("disabled"),
             "unexpected error: {local}"
         );
 
-        let cfg = run_query(&setup, "SET memory_limit = '1GB'", [], None)
+        let cfg = run_query(&setup, "SET memory_limit = '1GB'", [], &Limits::none())
             .expect_err("configuration must stay locked");
         let cfg = cfg.to_string().to_lowercase();
         assert!(
