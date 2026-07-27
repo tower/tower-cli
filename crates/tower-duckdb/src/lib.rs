@@ -272,25 +272,38 @@ impl Session {
                     truncated = Some(Truncation::Rows);
                     break;
                 }
-                let mut record = Vec::with_capacity(columns.len());
-                for idx in 0..columns.len() {
-                    let value: duckdb::types::Value = row.get(idx)?;
-                    record.push(value_to_json(value));
-                }
                 // Measured before the row is kept, so a row that would blow the
                 // budget is discarded rather than returned and merely labelled
                 // truncated. A single `string_agg` can carry an entire table in
                 // one row, so admitting it and flagging it would leave the
                 // ceiling doing nothing at all. A first row that is already over
                 // budget yields an empty, truncated result, which is the honest
-                // answer. Note this bounds what the caller is handed, not what
-                // the engine allocated to produce it; that needs
-                // `Hardening::memory_limit`.
-                let record_bytes = record.iter().map(json_size).sum::<usize>();
-                if limits
-                    .max_total_bytes
-                    .is_some_and(|max| total_bytes + record_bytes > max)
-                {
+                // answer. The check runs per value, not per row, so conversion
+                // stops at the first column that exceeds the budget instead of
+                // materializing the rest of an oversized row. (The offending
+                // value itself is still built once before it is measured — the
+                // driver hands values over whole — so the engine's
+                // `Hardening::memory_limit` is what bounds a query's spend,
+                // while this bounds what the caller is handed.)
+                let mut record = Vec::with_capacity(columns.len());
+                // Counted as the row serializes: `[`…`]` plus a comma per
+                // separator, and a comma joining it to the previous row.
+                let mut record_bytes = 2 + usize::from(!rows.is_empty());
+                let mut over_budget = false;
+                for idx in 0..columns.len() {
+                    let value: duckdb::types::Value = row.get(idx)?;
+                    let value = value_to_json(value);
+                    record_bytes += json_size(&value) + usize::from(idx > 0);
+                    if limits
+                        .max_total_bytes
+                        .is_some_and(|max| total_bytes + record_bytes > max)
+                    {
+                        over_budget = true;
+                        break;
+                    }
+                    record.push(value);
+                }
+                if over_budget {
                     truncated = Some(Truncation::Bytes);
                     break;
                 }
@@ -367,21 +380,109 @@ impl Drop for Deadline {
     }
 }
 
-/// Rough serialized size of a value, used only to bound how much a result may
-/// carry back. Strings dominate real results, so they are measured exactly and
-/// everything else is approximated.
+/// A shareable handle that stops a session's running query from another thread.
+///
+/// A session runs its query on a blocking thread, and the async caller that
+/// spawned it can go away — an MCP request gets cancelled, its future dropped —
+/// with no way to reach the connection. This is that way: create the handle
+/// first, hand a clone to the blocking thread to [`attach`] to its session, and
+/// [`cancel`] from anywhere. Cancelling before the attach is remembered
+/// (`attach` reports it), so work queued behind a concurrency limit can be
+/// abandoned before its query ever starts. Cancelling after the session
+/// finished or closed is a documented no-op in the driver, so an unconditional
+/// cancel-on-drop guard is safe.
+///
+/// Like [`Deadline`], this rides on `duckdb_interrupt`, which is honoured at
+/// chunk boundaries: it stops a runaway query promptly rather than instantly.
+///
+/// [`attach`]: CancelHandle::attach
+/// [`cancel`]: CancelHandle::cancel
+#[derive(Clone, Default)]
+pub struct CancelHandle {
+    state: std::sync::Arc<std::sync::Mutex<CancelState>>,
+}
+
+#[derive(Default)]
+struct CancelState {
+    cancelled: bool,
+    target: Option<std::sync::Arc<duckdb::InterruptHandle>>,
+}
+
+impl CancelHandle {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Interrupt the attached session's query, if one is running, and remember
+    /// the cancellation so a later [`attach`](CancelHandle::attach) sees it.
+    pub fn cancel(&self) {
+        let target = {
+            let mut state = self.state.lock().expect("cancel state poisoned");
+            state.cancelled = true;
+            state.target.clone()
+        };
+        if let Some(handle) = target {
+            handle.interrupt();
+        }
+    }
+
+    /// Bind this handle to `session`'s connection. Returns whether the handle
+    /// was already cancelled; a caller seeing `true` should drop the session
+    /// without running its query.
+    #[must_use]
+    pub fn attach(&self, session: &Session) -> bool {
+        let mut state = self.state.lock().expect("cancel state poisoned");
+        state.target = Some(session.conn.interrupt_handle());
+        state.cancelled
+    }
+}
+
+/// The exact number of bytes `value` occupies when serialized as compact JSON.
+///
+/// This is what the byte ceiling counts, so it must not undercount: an earlier
+/// approximation ignored quotes, escapes, and separators, and a query shaped as
+/// one deeply nested value (`list_transform(range(10000000), x -> '')`) slipped
+/// a 100 MB serialized response under a 1 MiB ceiling. Exactness is asserted
+/// against `serde_json::to_string` in the tests. Callers that serialize
+/// pretty-printed pay whitespace on top of this, so they should serialize
+/// bounded results compactly.
 fn json_size(value: &serde_json::Value) -> usize {
     match value {
         serde_json::Value::Null => 4,
-        serde_json::Value::Bool(_) => 5,
+        serde_json::Value::Bool(b) => {
+            if *b {
+                4
+            } else {
+                5
+            }
+        }
         serde_json::Value::Number(n) => n.to_string().len(),
-        serde_json::Value::String(s) => s.len(),
-        serde_json::Value::Array(items) => items.iter().map(json_size).sum::<usize>() + 2,
-        serde_json::Value::Object(fields) => fields
-            .iter()
-            .map(|(key, value)| key.len() + json_size(value))
-            .sum::<usize>(),
+        serde_json::Value::String(s) => json_string_size(s),
+        serde_json::Value::Array(items) => {
+            2 + items.len().saturating_sub(1) + items.iter().map(json_size).sum::<usize>()
+        }
+        serde_json::Value::Object(fields) => {
+            2 + fields.len().saturating_sub(1)
+                + fields
+                    .iter()
+                    .map(|(key, value)| json_string_size(key) + 1 + json_size(value))
+                    .sum::<usize>()
+        }
     }
+}
+
+/// Serialized size of a JSON string: surrounding quotes plus per-byte escape
+/// cost, mirroring serde_json's escaping (short escapes for the common control
+/// characters, `\u00XX` for the rest, multi-byte UTF-8 passed through).
+fn json_string_size(s: &str) -> usize {
+    2 + s
+        .bytes()
+        .map(|b| match b {
+            b'"' | b'\\' | 0x08 | 0x0c | b'\n' | b'\r' | b'\t' => 2,
+            0x00..=0x1f => 6,
+            _ => 1,
+        })
+        .sum::<usize>()
 }
 
 /// Open a session, run `setup`, and execute `query`. Convenience for one-shot
@@ -694,6 +795,136 @@ mod tests {
             "should have stopped early, got {} rows",
             result.rows.len()
         );
+    }
+
+    /// The byte counter must be exact for the serialized form, or a value shaped
+    /// to exploit the gap walks under the ceiling: an array of empty strings used
+    /// to count ~0 bytes while serializing to 3 bytes per element, letting a
+    /// 100 MB response through a 1 MiB ceiling.
+    #[test]
+    fn json_size_matches_serialized_length_exactly() {
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!(true),
+            serde_json::json!(false),
+            serde_json::json!(0),
+            serde_json::json!(-12345.678),
+            serde_json::json!(""),
+            serde_json::json!("plain"),
+            serde_json::json!("quote\" backslash\\ newline\n tab\t nul\u{0} unicode\u{1F600}é"),
+            serde_json::json!([]),
+            serde_json::json!(["", "", ""]),
+            serde_json::json!([1, [2, [3, "x\ny"]], {"k": null}]),
+            serde_json::json!({}),
+            serde_json::json!({"a": 1, "b\"": ["c", {"d": false}]}),
+        ] {
+            let serialized = serde_json::to_string(&value).expect("serialize");
+            assert_eq!(
+                super::json_size(&value),
+                serialized.len(),
+                "json_size disagrees with serde_json for {serialized}"
+            );
+        }
+    }
+
+    /// The nested-value bypass, end to end: one row holding a large list of
+    /// empty strings must be withheld by the byte ceiling, not returned with
+    /// `truncated: false`.
+    #[test]
+    fn a_nested_value_cannot_walk_under_the_byte_ceiling() {
+        let result = run_query(
+            &[],
+            "SELECT list_transform(range(1000000), x -> '') AS xs",
+            [],
+            &Limits {
+                max_rows: Some(1000),
+                max_total_bytes: Some(1024 * 1024),
+                timeout: None,
+            },
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.truncated, Some(Truncation::Bytes));
+        assert!(
+            result.rows.is_empty(),
+            "an oversized nested row must be withheld, got {} row(s)",
+            result.rows.len()
+        );
+    }
+
+    /// Whatever comes back under a byte ceiling must actually serialize inside
+    /// it — the counted size is the serialized size, so this holds for any
+    /// result shape, nested or flat.
+    #[test]
+    fn returned_rows_serialize_within_the_byte_ceiling() {
+        let budget = 64 * 1024;
+        let result = run_query(
+            &[],
+            "SELECT list_transform(range(200), x -> 'padding \"quoted\"') AS xs, \
+             repeat('y', 500) AS pad FROM range(1000)",
+            [],
+            &Limits {
+                max_rows: None,
+                max_total_bytes: Some(budget),
+                timeout: None,
+            },
+        )
+        .expect("query should succeed");
+
+        assert_eq!(result.truncated, Some(Truncation::Bytes));
+        let serialized = serde_json::to_string(&result.rows).expect("serialize rows");
+        assert!(
+            serialized.len() <= budget,
+            "budget was {budget} bytes but rows serialize to {} bytes",
+            serialized.len()
+        );
+    }
+
+    /// A cancel handle stops a running query from another thread — the path an
+    /// MCP cancellation takes when the request future is dropped mid-query.
+    #[test]
+    fn a_cancel_handle_interrupts_a_running_query() {
+        let cancel = super::CancelHandle::new();
+        let worker_cancel = cancel.clone();
+        let started = std::time::Instant::now();
+        let worker = std::thread::spawn(move || {
+            let session = Session::open().expect("open session");
+            if worker_cancel.attach(&session) {
+                panic!("handle cancelled before the query started");
+            }
+            session.query(
+                "SELECT count(*) FROM range(1000000000000) AS t(i) WHERE i % 7 = 0",
+                [],
+                &Limits::none(),
+            )
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        cancel.cancel();
+        let result = worker.join().expect("worker should not panic");
+        assert!(result.is_err(), "cancelled query should return an error");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "cancel took too long: {:?}",
+            started.elapsed()
+        );
+    }
+
+    /// Cancelling before the session exists must be remembered: `attach` reports
+    /// it so a caller queued behind the concurrency limit never starts work for
+    /// a request that already went away.
+    #[test]
+    fn a_cancel_before_attach_is_remembered() {
+        let cancel = super::CancelHandle::new();
+        cancel.cancel();
+        let session = Session::open().expect("open session");
+        assert!(
+            cancel.attach(&session),
+            "attach must report a cancellation that happened first"
+        );
+        // And cancelling after a session is gone is a safe no-op.
+        drop(session);
+        cancel.cancel();
     }
 
     /// DuckDB has no statement timeout, so a runaway query is bounded by
