@@ -154,6 +154,24 @@ impl App {
                     Some(("query", args)) => {
                         catalogs::do_query(&out, sessionized_config, args).await
                     }
+                    Some(("knowledge", knowledge_matches)) => match knowledge_matches.subcommand() {
+                        Some(("list", args)) => {
+                            catalogs::do_knowledge_list(&out, sessionized_config, args).await
+                        }
+                        Some(("show", args)) => {
+                            catalogs::do_knowledge_show(&out, sessionized_config, args).await
+                        }
+                        Some(("set", args)) => {
+                            catalogs::do_knowledge_set(&out, sessionized_config, args).await
+                        }
+                        Some(("delete", args)) => {
+                            catalogs::do_knowledge_delete(&out, sessionized_config, args).await
+                        }
+                        _ => {
+                            catalogs::catalogs_cmd().print_help().unwrap();
+                            std::process::exit(2);
+                        }
+                    },
                     _ => {
                         catalogs::catalogs_cmd().print_help().unwrap();
                         std::process::exit(2);

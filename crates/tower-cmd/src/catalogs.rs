@@ -5,7 +5,8 @@ use futures_util::StreamExt;
 use std::io::{IsTerminal, Read};
 use std::time::{Duration, Instant};
 use tower_api::models::{
-    vend_catalog_credentials_body, CatalogCredentials, DescribeCatalogResponse,
+    catalog_fact, update_catalog_fact_body, vend_catalog_credentials_body, CatalogCredentials,
+    CatalogFact, DescribeCatalogResponse, UpdateCatalogFactBody,
 };
 use tower_duckdb::{guard, params, run_query, Hardening, Limits, QueryResult, Session};
 use tower_telemetry::debug;
@@ -127,6 +128,7 @@ pub fn catalogs_cmd() -> Command {
                         .short_about("Vend short-lived catalog credentials for external tools"),
                 ),
         )
+        .subcommand(knowledge_cmd())
         .subcommand(
             Command::new("query")
                 .arg(
@@ -1324,6 +1326,344 @@ fn snippets(
     snippets
 }
 
+/// The values `--scope` accepts, mirroring `catalog_fact::Scope`.
+const KNOWLEDGE_SCOPES: [&str; 5] = ["catalog", "namespace", "table", "column", "metric"];
+
+/// The values `--confidence` accepts, mirroring `catalog_fact::Confidence`.
+const KNOWLEDGE_CONFIDENCES: [&str; 3] = ["confirmed", "heuristic", "inferred"];
+
+fn knowledge_cmd() -> Command {
+    let catalog_arg = Arg::new("catalog_name")
+        .value_parser(value_parser!(String))
+        .index(1)
+        .required(true)
+        .help("Name of the catalog");
+    let name_arg = Arg::new("name")
+        .value_parser(value_parser!(String))
+        .index(2)
+        .required(true)
+        .help("Name of the knowledge entry");
+    let environment_arg = Arg::new("environment")
+        .short('e')
+        .long("environment")
+        .default_value("default")
+        .value_parser(value_parser!(String))
+        .help("Environment the catalog belongs to")
+        .action(ArgAction::Set);
+
+    Command::new("knowledge")
+        .about(beta::STORAGE.short_about(
+            "Store and retrieve knowledge about the semantics of the data in a catalog",
+        ))
+        .after_help(
+            "Knowledge lets agents (and people) record context about a catalog's data — \
+             semantics, ontology, conventions — scoped to the catalog itself or to a \
+             namespace, table, column, or metric within it.",
+        )
+        .arg_required_else_help(true)
+        .subcommand(
+            Command::new("list")
+                .arg(catalog_arg.clone())
+                .arg(environment_arg.clone())
+                .arg(
+                    Arg::new("scope")
+                        .long("scope")
+                        .value_parser(KNOWLEDGE_SCOPES)
+                        .help("Only list knowledge with this scope")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("object")
+                        .long("object")
+                        .value_parser(value_parser!(String))
+                        .help("Only list knowledge about this object path, e.g. bronze.runs.deleted_at")
+                        .action(ArgAction::Set),
+                )
+                .about("List the knowledge recorded for a catalog"),
+        )
+        .subcommand(
+            Command::new("show")
+                .arg(catalog_arg.clone())
+                .arg(name_arg.clone())
+                .arg(environment_arg.clone())
+                .about("Show the full details of a knowledge entry, including its body"),
+        )
+        .subcommand(
+            Command::new("set")
+                .arg(catalog_arg.clone())
+                .arg(name_arg.clone())
+                .arg(environment_arg.clone())
+                .arg(
+                    Arg::new("statement")
+                        .long("statement")
+                        .value_parser(value_parser!(String))
+                        .required(true)
+                        .help("The human-readable meaning of the entry")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("scope")
+                        .long("scope")
+                        .default_value("catalog")
+                        .value_parser(KNOWLEDGE_SCOPES)
+                        .help("What kind of object the entry is about")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("object")
+                        .long("object")
+                        .value_parser(value_parser!(String))
+                        .help("Path to what the entry is about, e.g. bronze.runs.deleted_at; omit for catalog-scoped knowledge")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("confidence")
+                        .long("confidence")
+                        .default_value("confirmed")
+                        .value_parser(KNOWLEDGE_CONFIDENCES)
+                        .help("How trustworthy the entry is")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("source")
+                        .long("source")
+                        .value_parser(value_parser!(String))
+                        .help("Where the knowledge came from (agent id, user, ...)")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("body")
+                        .long("body")
+                        .value_parser(value_parser!(String))
+                        .help("Optional structured payload (SQL, unit, enum values) as a JSON string")
+                        .action(ArgAction::Set),
+                )
+                .about("Create a knowledge entry, or replace it if one with the same name exists"),
+        )
+        .subcommand(
+            Command::new("delete")
+                .arg(catalog_arg)
+                .arg(name_arg)
+                .arg(environment_arg)
+                .about("Delete a knowledge entry from a catalog"),
+        )
+}
+
+pub async fn do_knowledge_list(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let env = cmd::get_string_flag(args, "environment");
+    let scope = args.get_one::<String>("scope").map(String::as_str);
+    let object = args.get_one::<String>("object").map(String::as_str);
+
+    let response = out
+        .with_spinner(
+            "Listing knowledge",
+            api::list_catalog_knowledge(&config, catalog, &env, scope, object),
+        )
+        .await;
+
+    let headers = vec!["Name", "Scope", "Object", "Confidence", "Statement"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let data = response
+        .facts
+        .iter()
+        .map(|entry| {
+            vec![
+                entry.name.clone(),
+                knowledge_scope_str(entry.scope).to_string(),
+                entry.object.clone(),
+                knowledge_confidence_str(entry.confidence).to_string(),
+                truncate_statement(&entry.statement, 80),
+            ]
+        })
+        .collect();
+    out.table(headers, data, Some(&response.facts));
+}
+
+pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let name = args
+        .get_one::<String>("name")
+        .expect("name is required");
+    let env = cmd::get_string_flag(args, "environment");
+
+    let response = out
+        .with_spinner(
+            "Fetching knowledge",
+            api::describe_catalog_knowledge(&config, catalog, name, &env),
+        )
+        .await;
+
+    let human = knowledge_details_text(catalog, &env, &response.fact);
+    out.text(&human, &response);
+}
+
+pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let name = args
+        .get_one::<String>("name")
+        .expect("name is required");
+    let env = cmd::get_string_flag(args, "environment");
+    let statement = cmd::get_string_flag(args, "statement");
+    let scope = cmd::get_string_flag(args, "scope");
+    let confidence = cmd::get_string_flag(args, "confidence");
+    let object = args.get_one::<String>("object").cloned();
+    let source = args.get_one::<String>("source").cloned();
+    let body = args.get_one::<String>("body").cloned();
+
+    // The API carries the body as a JSON string; catch malformed JSON here so
+    // the error names the flag instead of surfacing as a server-side 400.
+    if let Some(body) = &body {
+        if let Err(err) = serde_json::from_str::<serde_json::Value>(body) {
+            out.die(&format!("--body is not valid JSON: {}", err));
+        }
+    }
+
+    let knowledge_body = UpdateCatalogFactBody {
+        schema: None,
+        body,
+        confidence: parse_knowledge_confidence(&confidence),
+        object,
+        scope: parse_knowledge_scope(&scope),
+        source,
+        statement,
+    };
+
+    let response = out
+        .with_spinner(
+            "Saving knowledge",
+            api::update_catalog_knowledge(&config, catalog, name, &env, knowledge_body),
+        )
+        .await;
+
+    out.success_with_data(
+        &format!("Knowledge '{}' saved in catalog '{}'", name, catalog),
+        Some(&response),
+    );
+}
+
+pub async fn do_knowledge_delete(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let name = args
+        .get_one::<String>("name")
+        .expect("name is required");
+    let env = cmd::get_string_flag(args, "environment");
+
+    out.with_spinner(
+        "Deleting knowledge",
+        api::delete_catalog_knowledge(&config, catalog, name, &env),
+    )
+    .await;
+
+    out.success(&format!(
+        "Knowledge '{}' deleted from catalog '{}'",
+        name, catalog
+    ));
+}
+
+fn knowledge_scope_str(scope: catalog_fact::Scope) -> &'static str {
+    match scope {
+        catalog_fact::Scope::Catalog => "catalog",
+        catalog_fact::Scope::Namespace => "namespace",
+        catalog_fact::Scope::Table => "table",
+        catalog_fact::Scope::Column => "column",
+        catalog_fact::Scope::Metric => "metric",
+    }
+}
+
+fn knowledge_confidence_str(confidence: catalog_fact::Confidence) -> &'static str {
+    match confidence {
+        catalog_fact::Confidence::Confirmed => "confirmed",
+        catalog_fact::Confidence::Heuristic => "heuristic",
+        catalog_fact::Confidence::Inferred => "inferred",
+    }
+}
+
+fn parse_knowledge_scope(scope: &str) -> update_catalog_fact_body::Scope {
+    match scope {
+        "namespace" => update_catalog_fact_body::Scope::Namespace,
+        "table" => update_catalog_fact_body::Scope::Table,
+        "column" => update_catalog_fact_body::Scope::Column,
+        "metric" => update_catalog_fact_body::Scope::Metric,
+        _ => update_catalog_fact_body::Scope::Catalog,
+    }
+}
+
+fn parse_knowledge_confidence(confidence: &str) -> update_catalog_fact_body::Confidence {
+    match confidence {
+        "heuristic" => update_catalog_fact_body::Confidence::Heuristic,
+        "inferred" => update_catalog_fact_body::Confidence::Inferred,
+        _ => update_catalog_fact_body::Confidence::Confirmed,
+    }
+}
+
+/// Trims a statement to fit a table cell, on a char boundary, marking the cut
+/// with an ellipsis. The full statement is always in the JSON output.
+fn truncate_statement(statement: &str, max_chars: usize) -> String {
+    if statement.chars().count() <= max_chars {
+        statement.to_string()
+    } else {
+        let truncated: String = statement
+            .chars()
+            .take(max_chars.saturating_sub(1))
+            .collect();
+        format!("{}…", truncated)
+    }
+}
+
+fn knowledge_details_text(catalog: &str, env: &str, entry: &CatalogFact) -> String {
+    let mut out = String::new();
+
+    out.push_str(&detail_line("Name", &entry.name));
+    out.push_str(&detail_line("Catalog", catalog));
+    out.push_str(&detail_line("Environment", env));
+    out.push_str(&detail_line("Scope", knowledge_scope_str(entry.scope)));
+    if !entry.object.is_empty() {
+        out.push_str(&detail_line("Object", &entry.object));
+    }
+    out.push_str(&detail_line(
+        "Confidence",
+        knowledge_confidence_str(entry.confidence),
+    ));
+    if let Some(source) = entry.source.as_deref().filter(|s| !s.is_empty()) {
+        out.push_str(&detail_line("Source", source));
+    }
+    out.push_str(&detail_line("Created", &entry.created_at));
+    out.push_str(&detail_line("Updated", &entry.updated_at));
+
+    out.push('\n');
+    out.push_str(&header_line("Statement"));
+    out.push_str(&entry.statement);
+    out.push('\n');
+
+    if let Some(body) = entry.body.as_ref().and_then(|b| b.as_ref()) {
+        out.push('\n');
+        out.push_str(&header_line("Body"));
+        out.push_str(&serde_json::to_string_pretty(body).unwrap_or_else(|_| body.to_string()));
+        out.push('\n');
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1837,4 +2177,257 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn knowledge_command_is_marked_beta() {
+        let mut command = catalogs_cmd();
+        let knowledge_help = command
+            .find_subcommand_mut("knowledge")
+            .expect("knowledge command should exist")
+            .render_help()
+            .to_string();
+        assert!(knowledge_help.contains("[beta]"));
+    }
+
+    #[test]
+    fn knowledge_delete_accepts_catalog_and_name() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "knowledge", "delete", "my-catalog", "my-entry"])
+            .expect("knowledge delete should parse");
+
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, delete_args) = knowledge_args.subcommand().expect("expected delete subcommand");
+        assert_eq!(
+            delete_args.get_one::<String>("catalog_name").unwrap(),
+            "my-catalog"
+        );
+        assert_eq!(
+            delete_args.get_one::<String>("name").unwrap(),
+            "my-entry"
+        );
+    }
+
+    #[test]
+    fn knowledge_details_text_includes_body_and_optional_fields() {
+        use tower_api::models::{catalog_fact, CatalogFact};
+
+        let mut entry = CatalogFact::new(
+            catalog_fact::Confidence::Inferred,
+            "2026-07-22T00:00:00Z".to_string(),
+            "soft-deletes".to_string(),
+            "bronze.runs.deleted_at".to_string(),
+            catalog_fact::Scope::Column,
+            "deleted_at marks soft-deleted rows".to_string(),
+            "2026-07-22T01:00:00Z".to_string(),
+        );
+        entry.source = Some("agent-42".to_string());
+        entry.body = Some(Some(serde_json::json!({"sql": "deleted_at IS NULL"})));
+
+        let text = super::knowledge_details_text("my-catalog", "production", &entry);
+
+        assert!(text.contains("soft-deletes"));
+        assert!(text.contains("my-catalog"));
+        assert!(text.contains("production"));
+        assert!(text.contains("column"));
+        assert!(text.contains("bronze.runs.deleted_at"));
+        assert!(text.contains("inferred"));
+        assert!(text.contains("agent-42"));
+        assert!(text.contains("deleted_at marks soft-deleted rows"));
+        assert!(text.contains("deleted_at IS NULL"));
+
+        // Optional fields drop out when absent.
+        entry.source = None;
+        entry.body = None;
+        entry.object = String::new();
+        let text = super::knowledge_details_text("my-catalog", "production", &entry);
+        assert!(!text.contains("Source"));
+        assert!(!text.contains("Body"));
+        assert!(!text.contains("Object"));
+    }
+
+    #[test]
+    fn knowledge_list_accepts_filters() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "knowledge",
+                "list",
+                "my-catalog",
+                "--scope",
+                "table",
+                "--object",
+                "bronze.runs",
+                "-e",
+                "production",
+            ])
+            .expect("knowledge list should parse");
+
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, list_args) = knowledge_args.subcommand().expect("expected list subcommand");
+
+        assert_eq!(
+            list_args.get_one::<String>("catalog_name").unwrap(),
+            "my-catalog"
+        );
+        assert_eq!(list_args.get_one::<String>("scope").unwrap(), "table");
+        assert_eq!(
+            list_args.get_one::<String>("object").unwrap(),
+            "bronze.runs"
+        );
+        assert_eq!(
+            list_args.get_one::<String>("environment").unwrap(),
+            "production"
+        );
+    }
+
+    #[test]
+    fn knowledge_list_rejects_invalid_scope() {
+        let result = catalogs_cmd().try_get_matches_from([
+            "catalogs",
+            "knowledge",
+            "list",
+            "my-catalog",
+            "--scope",
+            "bogus",
+        ]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn knowledge_scope_and_confidence_round_trip() {
+        use tower_api::models::{catalog_fact, update_catalog_fact_body};
+
+        for scope in super::KNOWLEDGE_SCOPES {
+            let parsed = super::parse_knowledge_scope(scope);
+            let rendered = match parsed {
+                update_catalog_fact_body::Scope::Catalog => catalog_fact::Scope::Catalog,
+                update_catalog_fact_body::Scope::Namespace => catalog_fact::Scope::Namespace,
+                update_catalog_fact_body::Scope::Table => catalog_fact::Scope::Table,
+                update_catalog_fact_body::Scope::Column => catalog_fact::Scope::Column,
+                update_catalog_fact_body::Scope::Metric => catalog_fact::Scope::Metric,
+            };
+            assert_eq!(super::knowledge_scope_str(rendered), scope);
+        }
+
+        for confidence in super::KNOWLEDGE_CONFIDENCES {
+            let parsed = super::parse_knowledge_confidence(confidence);
+            let rendered = match parsed {
+                update_catalog_fact_body::Confidence::Confirmed => {
+                    catalog_fact::Confidence::Confirmed
+                }
+                update_catalog_fact_body::Confidence::Heuristic => {
+                    catalog_fact::Confidence::Heuristic
+                }
+                update_catalog_fact_body::Confidence::Inferred => {
+                    catalog_fact::Confidence::Inferred
+                }
+            };
+            assert_eq!(super::knowledge_confidence_str(rendered), confidence);
+        }
+    }
+
+    #[test]
+    fn knowledge_set_accepts_all_fields() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "knowledge",
+                "set",
+                "my-catalog",
+                "my-entry",
+                "--statement",
+                "deleted_at marks soft-deleted rows",
+                "--scope",
+                "column",
+                "--object",
+                "bronze.runs.deleted_at",
+                "--confidence",
+                "inferred",
+                "--source",
+                "agent-42",
+                "--body",
+                "{\"sql\": \"deleted_at IS NULL\"}",
+            ])
+            .expect("knowledge set with all flags should parse");
+
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
+
+        assert_eq!(set_args.get_one::<String>("scope").unwrap(), "column");
+        assert_eq!(
+            set_args.get_one::<String>("object").unwrap(),
+            "bronze.runs.deleted_at"
+        );
+        assert_eq!(
+            set_args.get_one::<String>("confidence").unwrap(),
+            "inferred"
+        );
+        assert_eq!(set_args.get_one::<String>("source").unwrap(), "agent-42");
+        assert_eq!(
+            set_args.get_one::<String>("body").unwrap(),
+            "{\"sql\": \"deleted_at IS NULL\"}"
+        );
+    }
+
+    #[test]
+    fn knowledge_set_defaults_scope_and_confidence() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "knowledge",
+                "set",
+                "my-catalog",
+                "my-entry",
+                "--statement",
+                "deleted_at is a soft-delete marker",
+            ])
+            .expect("knowledge set should parse");
+
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
+
+        assert_eq!(set_args.get_one::<String>("scope").unwrap(), "catalog");
+        assert_eq!(
+            set_args.get_one::<String>("confidence").unwrap(),
+            "confirmed"
+        );
+        assert!(set_args.get_one::<String>("object").is_none());
+        assert!(set_args.get_one::<String>("source").is_none());
+        assert!(set_args.get_one::<String>("body").is_none());
+    }
+
+    #[test]
+    fn knowledge_set_requires_statement() {
+        let result =
+            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "set", "my-catalog", "f"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn knowledge_show_requires_catalog_and_name() {
+        let result =
+            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog"]);
+        assert!(result.is_err());
+
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog", "my-entry"])
+            .expect("knowledge show should parse");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, show_args) = knowledge_args.subcommand().expect("expected show subcommand");
+        assert_eq!(show_args.get_one::<String>("name").unwrap(), "my-entry");
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn truncate_statement_preserves_short_and_marks_long() {
+        assert_eq!(super::truncate_statement("short", 80), "short");
+        let long = "x".repeat(100);
+        let truncated = super::truncate_statement(&long, 80);
+        assert_eq!(truncated.chars().count(), 80);
+        assert!(truncated.ends_with('…'));
+    }
+
 }

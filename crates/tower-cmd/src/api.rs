@@ -179,6 +179,7 @@ pub async fn list_apps(
                 num_runs: Some(0),
                 sort: None,
                 filter: None,
+                tag_filter: None,
                 environment: environment.clone(),
             };
             unwrap_api_response(tower_api::apis::default_api::list_apps(api_config, params)).await
@@ -204,6 +205,10 @@ pub async fn create_app(
             slug: None,
             is_externally_accessible: None,
             subdomain: None,
+            pending_timeout: None,
+            retry_policy: None,
+            running_timeout: None,
+            tags: None,
         },
     };
 
@@ -259,6 +264,8 @@ pub async fn describe_run_logs(
         name: name.to_string(),
         seq,
         start_at: None,
+        head: None,
+        tail: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::describe_run_logs(
@@ -424,6 +431,106 @@ pub async fn describe_catalog(
         api_config, params,
     ))
     .await
+}
+
+/// The CLI surface calls these "knowledge", but the backend and its generated
+/// client still call them catalog "facts" — hence the `..._fact`/`CatalogFact`
+/// names threaded through these wrappers.
+pub async fn list_catalog_knowledge(
+    config: &Config,
+    catalog: &str,
+    env: &str,
+    scope: Option<&str>,
+    object: Option<&str>,
+) -> Result<
+    tower_api::models::ListCatalogFactsResponse,
+    Error<tower_api::apis::default_api::ListCatalogFactsError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::ListCatalogFactsParams {
+        catalog: catalog.to_string(),
+        environment: Some(env.to_string()),
+        scope: scope.map(str::to_string),
+        object: object.map(str::to_string),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::list_catalog_facts(
+        api_config, params,
+    ))
+    .await
+}
+
+pub async fn describe_catalog_knowledge(
+    config: &Config,
+    catalog: &str,
+    name: &str,
+    env: &str,
+) -> Result<
+    tower_api::models::DescribeCatalogFactResponse,
+    Error<tower_api::apis::default_api::DescribeCatalogFactError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DescribeCatalogFactParams {
+        catalog: catalog.to_string(),
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::describe_catalog_fact(
+        api_config, params,
+    ))
+    .await
+}
+
+/// Upserts a piece of catalog knowledge: the server creates it under `name`
+/// when it doesn't exist yet and replaces it otherwise.
+pub async fn update_catalog_knowledge(
+    config: &Config,
+    catalog: &str,
+    name: &str,
+    env: &str,
+    body: tower_api::models::UpdateCatalogFactBody,
+) -> Result<
+    tower_api::models::UpdateCatalogFactResponse,
+    Error<tower_api::apis::default_api::UpdateCatalogFactError>,
+> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::UpdateCatalogFactParams {
+        catalog: catalog.to_string(),
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+        update_catalog_fact_body: body,
+    };
+
+    unwrap_api_response(tower_api::apis::default_api::update_catalog_fact(
+        api_config, params,
+    ))
+    .await
+}
+
+/// Deletes a piece of catalog knowledge. The endpoint responds 204 with no
+/// body, which `unwrap_api_response` would treat as an error, so success maps
+/// to `()` directly; the generated client already surfaces 4xx/5xx as `Err`.
+pub async fn delete_catalog_knowledge(
+    config: &Config,
+    catalog: &str,
+    name: &str,
+    env: &str,
+) -> Result<(), Error<tower_api::apis::default_api::DeleteCatalogFactError>> {
+    let api_config = &config.into();
+
+    let params = tower_api::apis::default_api::DeleteCatalogFactParams {
+        catalog: catalog.to_string(),
+        name: name.to_string(),
+        environment: Some(env.to_string()),
+    };
+
+    tower_api::apis::default_api::delete_catalog_fact(api_config, params)
+        .await
+        .map(|_| ())
 }
 
 pub async fn list_secrets(
@@ -891,6 +998,39 @@ impl ResponseEntity for tower_api::apis::default_api::ListCatalogsSuccess {
 
 impl ResponseEntity for tower_api::apis::default_api::DescribeCatalogSuccess {
     type Data = tower_api::models::DescribeCatalogResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::ListCatalogFactsSuccess {
+    type Data = tower_api::models::ListCatalogFactsResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::DescribeCatalogFactSuccess {
+    type Data = tower_api::models::DescribeCatalogFactResponse;
+
+    fn extract_data(self) -> Option<Self::Data> {
+        match self {
+            Self::Status200(data) => Some(data),
+            Self::UnknownValue(_) => None,
+        }
+    }
+}
+
+impl ResponseEntity for tower_api::apis::default_api::UpdateCatalogFactSuccess {
+    type Data = tower_api::models::UpdateCatalogFactResponse;
 
     fn extract_data(self) -> Option<Self::Data> {
         match self {
