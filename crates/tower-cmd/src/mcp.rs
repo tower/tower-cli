@@ -199,6 +199,18 @@ struct ShowCatalogRequest {
     environment: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+struct QueryCatalogRequest {
+    /// Name of the Tower-managed storage catalog to query
+    name: String,
+    /// A single read-only SQL statement. Tables must be fully qualified as
+    /// <catalog>.<namespace>.<table> (there is no default schema). Writes, DDL,
+    /// and multiple statements are rejected.
+    sql: String,
+    /// The environment the catalog belongs to (defaults to "default")
+    environment: Option<String>,
+}
+
 pub fn mcp_cmd() -> Command {
     Command::new("mcp-server")
         .about("Runs an MCP server for LLM interaction")
@@ -719,7 +731,9 @@ impl TowerService {
         }
     }
 
-    #[tool(description = "Show details for a catalog, including its property names")]
+    #[tool(
+        description = "Show a catalog's details: its property names and, for Tower-managed storage catalogs, the namespaces and tables you can query."
+    )]
     async fn tower_catalogs_show(
         &self,
         Parameters(request): Parameters<ShowCatalogRequest>,
@@ -739,14 +753,85 @@ impl TowerService {
                         })
                     })
                     .collect();
+
+                // Only Tower-managed storage catalogs expose queryable tables;
+                // for anything else `tables` stays null. A listing failure is
+                // surfaced in `tables_error` without failing the whole call.
+                let (tables, tables_error) = if crate::catalogs::is_storage_catalog_type(Some(
+                    &catalog.r#type,
+                )) {
+                    match crate::catalogs::list_catalog_tables(
+                            &self.config,
+                            &request.name,
+                            environment,
+                        )
+                        .await
+                        {
+                            Ok(result) => (
+                                Value::Array(
+                                    result
+                                        .rows
+                                        .iter()
+                                        .map(|row| {
+                                            json!({
+                                                "namespace": row.first().cloned().unwrap_or(Value::Null),
+                                                "table": row.get(1).cloned().unwrap_or(Value::Null),
+                                            })
+                                        })
+                                        .collect(),
+                                ),
+                                Value::Null,
+                            ),
+                            Err(e) => (Value::Null, Value::String(e)),
+                        }
+                } else {
+                    (Value::Null, Value::Null)
+                };
+
                 Self::json_success(json!({
                     "name": catalog.name,
                     "type": catalog.r#type,
                     "environment": catalog.environment,
                     "properties": properties,
+                    "tables": tables,
+                    "tables_error": tables_error,
                 }))
             }
             Err(e) => Self::error_result("Failed to show catalog", e),
+        }
+    }
+
+    #[tool(
+        description = "Run one read-only SQL statement against a Tower-managed storage (Iceberg) catalog and return the columns plus rows as positional arrays (one value per column, in column order). Fully qualify tables as \"<catalog>\".\"<namespace>\".\"<table>\"; call tower_catalogs_show first to list a catalog's namespaces and tables. Only a single statement runs per call, and writes/DDL are rejected. Results are capped (1000 rows, 1 MiB, 60s) — when a cap was hit, the response sets \"truncated\": true, so narrow with WHERE/LIMIT or aggregate."
+    )]
+    async fn tower_catalogs_query(
+        &self,
+        Parameters(request): Parameters<QueryCatalogRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let environment = request.environment.as_deref().unwrap_or("default");
+        let sql = request.sql.trim().to_string();
+        if sql.is_empty() {
+            return Self::text_error("No SQL statement provided.".to_string());
+        }
+
+        // Agents get read-only, sandboxed, result-capped access; positional rows
+        // preserve duplicate column names (e.g. from joins) that an object keyed
+        // by name would silently collapse.
+        match crate::catalogs::query_catalog_for_agent(
+            &self.config,
+            &request.name,
+            environment,
+            sql,
+        )
+        .await
+        {
+            Ok(result) => Self::json_success(json!({
+                "columns": result.columns,
+                "rows": result.rows,
+                "row_count": result.rows.len(),
+                "truncated": result.is_truncated(),
+            })),
+            Err(e) => Self::text_error(e),
         }
     }
 
