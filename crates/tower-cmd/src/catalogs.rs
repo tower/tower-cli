@@ -160,6 +160,13 @@ pub fn catalogs_cmd() -> Command {
                         .help("Allow write statements by vending read-write credentials; queries are read-only by default")
                         .action(ArgAction::SetTrue),
                 )
+                .arg(
+                    Arg::new("max_rows")
+                        .long("max-rows")
+                        .value_parser(value_parser!(usize))
+                        .help("Maximum rows to return; 0 for no limit. Also lifts the result size limit, so a large result can exhaust memory")
+                        .action(ArgAction::Set),
+                )
                 .about(beta::STORAGE.short_about("Run a SQL query against a catalog using DuckDB"))
                 .after_help(
                     "Reference tables as <catalog>.<namespace>.<table>, e.g.:\n  tower catalogs query default --sql 'SELECT * FROM \"default\".my_namespace.my_table LIMIT 10'",
@@ -492,14 +499,40 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
             Err(err) => out.die(&format!("Could not validate the query: {err}")),
         }
     }
-    let query_result = execute_catalog_query(out, &config, name, &env, sql, write).await;
+    let limits = query_limits(write, args.get_one::<usize>("max_rows").copied());
+    let query_result = execute_catalog_query(out, &config, name, &env, sql, write, limits).await;
     output_query_result(out, &query_result);
+}
+
+/// The result ceilings for a query.
+///
+/// Read mode defaults to bounded, so a runaway query cannot flood a terminal or a
+/// model's context. `--max-rows` is the escape hatch for a caller that knowingly
+/// wants more: it sets the row ceiling and lifts the size ceiling, because a
+/// caller who asked for a million rows should not then be cut off by a byte
+/// budget they never saw. `--max-rows 0` removes the ceilings entirely. Write
+/// mode is the trusted path and is unbounded unless a row count is asked for.
+fn query_limits(write: bool, max_rows: Option<usize>) -> Limits {
+    match max_rows {
+        Some(0) => Limits::none(),
+        Some(rows) => Limits {
+            max_rows: Some(rows),
+            max_total_bytes: None,
+            timeout: None,
+        },
+        None if write => Limits::none(),
+        None => Limits {
+            max_rows: Some(guard::AGENT_MAX_ROWS),
+            max_total_bytes: Some(guard::AGENT_MAX_RESULT_BYTES),
+            timeout: None,
+        },
+    }
 }
 
 /// Vends credentials for the catalog, attaches it in an in-memory DuckDB, and
 /// runs `sql` against it. In read mode (the default) the session is hardened
-/// after attach and the result row count is capped, so an untrusted query cannot
-/// read the host or pull an unbounded table back. `write` vends read-write
+/// after attach and the result is bounded by `limits`, so an untrusted query
+/// cannot read the host or pull an unbounded table back. `write` vends read-write
 /// credentials, lets the attach write, and runs the query trusted. Dies with a
 /// user-facing error on failure.
 async fn execute_catalog_query(
@@ -509,6 +542,7 @@ async fn execute_catalog_query(
     env: &str,
     sql: String,
     write: bool,
+    limits: Limits,
 ) -> QueryResult {
     let mode = if write {
         vend_catalog_credentials_body::Mode::ReadWrite
@@ -529,21 +563,11 @@ async fn execute_catalog_query(
     let token = response.credentials.oauth_token.clone();
     let setup = attach_statements(name, &response.credentials, mode);
     // Read mode is the sandboxed path: lock the session down after attach so the
-    // query cannot read the host or unwind the config, and bound the result so a
-    // terminal isn't flooded. No wall-clock ceiling here, because a legitimate
-    // analytical scan over a large catalog can take minutes and a person is
-    // driving; the agent path uses `Limits::agent()`, which adds one. Write mode
-    // is the trusted opt-in and runs unbounded.
+    // query cannot read the host or unwind the config. `limits` bounds the result
+    // (see `query_limits`). No wall-clock ceiling on this path, because a
+    // legitimate analytical scan over a large catalog can take minutes and a
+    // person is driving; the agent path uses `Limits::agent()`, which adds one.
     let harden = !write;
-    let limits = if write {
-        Limits::none()
-    } else {
-        Limits {
-            max_rows: Some(guard::AGENT_MAX_ROWS),
-            max_total_bytes: Some(guard::AGENT_MAX_RESULT_BYTES),
-            timeout: None,
-        }
-    };
     let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
         let session = Session::open()?;
         session.run_setup(&setup)?;
@@ -1297,8 +1321,8 @@ fn snippets(
 #[cfg(test)]
 mod tests {
     use super::{
-        attach_statements, catalogs_cmd, is_storage_catalog_type, parse_mode, snippets,
-        token_export_command,
+        attach_statements, catalogs_cmd, is_storage_catalog_type, parse_mode, query_limits,
+        snippets, token_export_command,
     };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
     use tower_duckdb::{params, run_query, Limits};
@@ -1635,6 +1659,87 @@ mod tests {
             .expect("query --write should parse");
         let (_, query_args) = matches.subcommand().expect("expected query subcommand");
         assert_eq!(query_args.get_one::<bool>("write").copied(), Some(true));
+    }
+
+    #[test]
+    fn query_accepts_a_max_rows_override() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "query", "my-catalog", "--sql", "SELECT 1"])
+            .expect("query should parse");
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+        assert_eq!(query_args.get_one::<usize>("max_rows").copied(), None);
+
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "query",
+                "my-catalog",
+                "--sql",
+                "SELECT 1",
+                "--max-rows",
+                "50000",
+            ])
+            .expect("query --max-rows should parse");
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+        assert_eq!(query_args.get_one::<usize>("max_rows").copied(), Some(50_000));
+
+        assert!(
+            catalogs_cmd()
+                .try_get_matches_from([
+                    "catalogs",
+                    "query",
+                    "my-catalog",
+                    "--sql",
+                    "SELECT 1",
+                    "--max-rows",
+                    "not-a-number",
+                ])
+                .is_err(),
+            "a non-numeric --max-rows should be rejected"
+        );
+    }
+
+    #[test]
+    fn read_queries_are_bounded_unless_the_caller_asks_otherwise() {
+        // The default: bounded by rows and by size, so a runaway read cannot
+        // flood a terminal or a model's context.
+        let default = query_limits(false, None);
+        assert_eq!(default.max_rows, Some(tower_duckdb::guard::AGENT_MAX_ROWS));
+        assert_eq!(
+            default.max_total_bytes,
+            Some(tower_duckdb::guard::AGENT_MAX_RESULT_BYTES)
+        );
+    }
+
+    #[test]
+    fn max_rows_override_raises_the_row_ceiling_and_lifts_the_size_ceiling() {
+        // A caller who asks for a million rows should not then be cut short by a
+        // byte budget they never set, so the size ceiling comes off with it.
+        let raised = query_limits(false, Some(1_000_000));
+        assert_eq!(raised.max_rows, Some(1_000_000));
+        assert_eq!(
+            raised.max_total_bytes, None,
+            "an explicit row count should not be second-guessed by the size cap"
+        );
+
+        // Lowering it is just as valid as raising it.
+        assert_eq!(query_limits(false, Some(10)).max_rows, Some(10));
+    }
+
+    #[test]
+    fn max_rows_zero_removes_every_result_ceiling() {
+        let unbounded = query_limits(false, Some(0));
+        assert_eq!(unbounded.max_rows, None);
+        assert_eq!(unbounded.max_total_bytes, None);
+    }
+
+    #[test]
+    fn write_mode_is_unbounded_but_still_honours_an_explicit_row_count() {
+        let write_default = query_limits(true, None);
+        assert_eq!(write_default.max_rows, None);
+        assert_eq!(write_default.max_total_bytes, None);
+
+        assert_eq!(query_limits(true, Some(25)).max_rows, Some(25));
     }
 
     #[test]
