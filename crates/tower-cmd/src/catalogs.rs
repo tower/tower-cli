@@ -8,6 +8,7 @@ use tower_api::models::{
     catalog_fact, update_catalog_fact_body, vend_catalog_credentials_body, CatalogCredentials,
     CatalogFact, DescribeCatalogResponse, UpdateCatalogFactBody,
 };
+use tower_duckdb::{guard, params, run_query, Hardening, Limits, QueryResult, Session};
 use tower_telemetry::debug;
 
 use crate::{api, beta, output, util::cmd};
@@ -127,6 +128,7 @@ pub fn catalogs_cmd() -> Command {
                         .short_about("Vend short-lived catalog credentials for external tools"),
                 ),
         )
+        .subcommand(knowledge_cmd())
         .subcommand(
             Command::new("query")
                 .arg(
@@ -160,134 +162,17 @@ pub fn catalogs_cmd() -> Command {
                         .help("Allow write statements by vending read-write credentials; queries are read-only by default")
                         .action(ArgAction::SetTrue),
                 )
+                .arg(
+                    Arg::new("max_rows")
+                        .long("max-rows")
+                        .value_parser(value_parser!(usize))
+                        .help("Maximum rows to return; 0 for no limit. Also lifts the result size limit, so a large result can exhaust memory")
+                        .action(ArgAction::Set),
+                )
                 .about(beta::STORAGE.short_about("Run a SQL query against a catalog using DuckDB"))
                 .after_help(
                     "Reference tables as <catalog>.<namespace>.<table>, e.g.:\n  tower catalogs query default --sql 'SELECT * FROM \"default\".my_namespace.my_table LIMIT 10'",
                 ),
-        )
-        .subcommand(knowledge_cmd())
-}
-
-/// The values `--scope` accepts, mirroring `catalog_fact::Scope`.
-const KNOWLEDGE_SCOPES: [&str; 5] = ["catalog", "namespace", "table", "column", "metric"];
-
-/// The values `--confidence` accepts, mirroring `catalog_fact::Confidence`.
-const KNOWLEDGE_CONFIDENCES: [&str; 3] = ["confirmed", "heuristic", "inferred"];
-
-fn knowledge_cmd() -> Command {
-    let catalog_arg = Arg::new("catalog_name")
-        .value_parser(value_parser!(String))
-        .index(1)
-        .required(true)
-        .help("Name of the catalog");
-    let name_arg = Arg::new("name")
-        .value_parser(value_parser!(String))
-        .index(2)
-        .required(true)
-        .help("Name of the knowledge entry");
-    let environment_arg = Arg::new("environment")
-        .short('e')
-        .long("environment")
-        .default_value("default")
-        .value_parser(value_parser!(String))
-        .help("Environment the catalog belongs to")
-        .action(ArgAction::Set);
-
-    Command::new("knowledge")
-        .about(beta::STORAGE.short_about(
-            "Store and retrieve knowledge about the semantics of the data in a catalog",
-        ))
-        .after_help(
-            "Knowledge lets agents (and people) record context about a catalog's data — \
-             semantics, ontology, conventions — scoped to the catalog itself or to a \
-             namespace, table, column, or metric within it.",
-        )
-        .arg_required_else_help(true)
-        .subcommand(
-            Command::new("list")
-                .arg(catalog_arg.clone())
-                .arg(environment_arg.clone())
-                .arg(
-                    Arg::new("scope")
-                        .long("scope")
-                        .value_parser(KNOWLEDGE_SCOPES)
-                        .help("Only list knowledge with this scope")
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("object")
-                        .long("object")
-                        .value_parser(value_parser!(String))
-                        .help("Only list knowledge about this object path, e.g. bronze.runs.deleted_at")
-                        .action(ArgAction::Set),
-                )
-                .about("List the knowledge recorded for a catalog"),
-        )
-        .subcommand(
-            Command::new("show")
-                .arg(catalog_arg.clone())
-                .arg(name_arg.clone())
-                .arg(environment_arg.clone())
-                .about("Show the full details of a knowledge entry, including its body"),
-        )
-        .subcommand(
-            Command::new("set")
-                .arg(catalog_arg.clone())
-                .arg(name_arg.clone())
-                .arg(environment_arg.clone())
-                .arg(
-                    Arg::new("statement")
-                        .long("statement")
-                        .value_parser(value_parser!(String))
-                        .required(true)
-                        .help("The human-readable meaning of the entry")
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("scope")
-                        .long("scope")
-                        .default_value("catalog")
-                        .value_parser(KNOWLEDGE_SCOPES)
-                        .help("What kind of object the entry is about")
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("object")
-                        .long("object")
-                        .value_parser(value_parser!(String))
-                        .help("Path to what the entry is about, e.g. bronze.runs.deleted_at; omit for catalog-scoped knowledge")
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("confidence")
-                        .long("confidence")
-                        .default_value("confirmed")
-                        .value_parser(KNOWLEDGE_CONFIDENCES)
-                        .help("How trustworthy the entry is")
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("source")
-                        .long("source")
-                        .value_parser(value_parser!(String))
-                        .help("Where the knowledge came from (agent id, user, ...)")
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("body")
-                        .long("body")
-                        .value_parser(value_parser!(String))
-                        .help("Optional structured payload (SQL, unit, enum values) as a JSON string")
-                        .action(ArgAction::Set),
-                )
-                .about("Create a knowledge entry, or replace it if one with the same name exists"),
-        )
-        .subcommand(
-            Command::new("delete")
-                .arg(catalog_arg)
-                .arg(name_arg)
-                .arg(environment_arg)
-                .about("Delete a knowledge entry from a catalog"),
         )
 }
 
@@ -527,10 +412,11 @@ async fn fetch_catalog_tables(
         );
         let db_name = name.to_string();
         tokio::task::spawn_blocking(move || {
-            run_duckdb_query(
+            run_query(
                 &setup,
                 "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-                duckdb::params![db_name],
+                params![db_name],
+                &Limits::none(),
             )
         })
         .await
@@ -588,13 +474,71 @@ pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
     }
 
     let write = cmd::get_bool_flag(args, "write");
-    let query_result = execute_catalog_query(out, &config, name, &env, sql, write).await;
+    // Read mode runs untrusted SQL, so gate it through DuckDB's parser before it
+    // reaches the query path: it must be exactly one SELECT. A smuggled second
+    // statement would otherwise execute as a side effect of `prepare`, and a
+    // write should fail with a clear message rather than a raw engine error.
+    // Write mode is the trusted power-user path and skips the gate.
+    if !write {
+        let sql_to_check = sql.clone();
+        let verdict =
+            tokio::task::spawn_blocking(move || guard::classify_read_only(&sql_to_check)).await;
+        match verdict {
+            Ok(Ok(guard::ReadOnlyCheck::Allowed)) => {}
+            Ok(Ok(guard::ReadOnlyCheck::Empty)) => {
+                out.die("No SQL statement provided. Pass one with --sql or pipe it via stdin.")
+            }
+            Ok(Ok(guard::ReadOnlyCheck::Multiple)) => {
+                out.die("Only a single SQL statement can be run at a time. Remove the extra statement(s).")
+            }
+            Ok(Ok(guard::ReadOnlyCheck::NotReadOnly)) => out.die(
+                "This command runs read-only queries. Only a single SELECT statement is allowed; re-run with --write to modify the catalog.",
+            ),
+            Ok(Ok(guard::ReadOnlyCheck::DeniedFunction(name))) => out.die(&format!(
+                "'{name}' is not allowed in a read-only query: it changes engine state, runs SQL built at runtime, or reads outside the catalog. Remove it, or re-run with --write."
+            )),
+            Ok(Ok(guard::ReadOnlyCheck::DeniedTableReference(reference))) => out.die(&format!(
+                "'{reference}' is a file or URL, not a table in this catalog. Read-only queries can only read the catalog's own tables; re-run with --write to read elsewhere."
+            )),
+            Ok(Err(err)) => out.die(&format!("Could not validate the query: {err}")),
+            Err(err) => out.die(&format!("Could not validate the query: {err}")),
+        }
+    }
+    let limits = query_limits(write, args.get_one::<usize>("max_rows").copied());
+    let query_result = execute_catalog_query(out, &config, name, &env, sql, write, limits).await;
     output_query_result(out, &query_result);
 }
 
+/// The result ceilings for a query.
+///
+/// Read mode defaults to bounded, so a runaway query cannot flood a terminal or a
+/// model's context. `--max-rows` is the escape hatch for a caller that knowingly
+/// wants more: it sets the row ceiling and lifts the size ceiling, because a
+/// caller who asked for a million rows should not then be cut off by a byte
+/// budget they never saw. `--max-rows 0` removes the ceilings entirely. Write
+/// mode is the trusted path and is unbounded unless a row count is asked for.
+fn query_limits(write: bool, max_rows: Option<usize>) -> Limits {
+    match max_rows {
+        Some(0) => Limits::none(),
+        Some(rows) => Limits {
+            max_rows: Some(rows),
+            max_total_bytes: None,
+            timeout: None,
+        },
+        None if write => Limits::none(),
+        None => Limits {
+            max_rows: Some(guard::AGENT_MAX_ROWS),
+            max_total_bytes: Some(guard::AGENT_MAX_RESULT_BYTES),
+            timeout: None,
+        },
+    }
+}
+
 /// Vends credentials for the catalog, attaches it in an in-memory DuckDB, and
-/// runs `sql` against it. Read-only unless `write` is set, in which case
-/// read-write credentials are vended and the attach allows writes. Dies with a
+/// runs `sql` against it. In read mode (the default) the session is hardened
+/// after attach and the result is bounded by `limits`, so an untrusted query
+/// cannot read the host or pull an unbounded table back. `write` vends read-write
+/// credentials, lets the attach write, and runs the query trusted. Dies with a
 /// user-facing error on failure.
 async fn execute_catalog_query(
     out: &output::Out,
@@ -603,6 +547,7 @@ async fn execute_catalog_query(
     env: &str,
     sql: String,
     write: bool,
+    limits: Limits,
 ) -> QueryResult {
     let mode = if write {
         vend_catalog_credentials_body::Mode::ReadWrite
@@ -622,7 +567,24 @@ async fn execute_catalog_query(
 
     let token = response.credentials.oauth_token.clone();
     let setup = attach_statements(name, &response.credentials, mode);
-    let result = tokio::task::spawn_blocking(move || run_duckdb_query(&setup, &sql, [])).await;
+    // Read mode is the sandboxed path: lock the session down after attach so the
+    // query cannot read the host or unwind the config. `limits` bounds the result
+    // (see `query_limits`). No wall-clock ceiling on this path, because a
+    // legitimate analytical scan over a large catalog can take minutes and a
+    // person is driving; the agent path uses `Limits::agent()`, which adds one.
+    let harden = !write;
+    let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
+        let session = Session::open()?;
+        session.run_setup(&setup)?;
+        if harden {
+            // `Hardening::agent()` adds an engine memory ceiling on top of the
+            // lockdown. The result `limits` bound what comes back; only the engine
+            // can bound what a query spends producing it.
+            session.harden(&Hardening::agent())?;
+        }
+        session.query(&sql, [], &limits)
+    })
+    .await;
 
     match result {
         Ok(Ok(query_result)) => {
@@ -646,221 +608,6 @@ async fn execute_catalog_query(
     }
 }
 
-pub async fn do_knowledge_list(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
-
-    let catalog = args
-        .get_one::<String>("catalog_name")
-        .expect("catalog_name is required");
-    let env = cmd::get_string_flag(args, "environment");
-    let scope = args.get_one::<String>("scope").map(String::as_str);
-    let object = args.get_one::<String>("object").map(String::as_str);
-
-    let response = out
-        .with_spinner(
-            "Listing knowledge",
-            api::list_catalog_knowledge(&config, catalog, &env, scope, object),
-        )
-        .await;
-
-    let headers = vec!["Name", "Scope", "Object", "Confidence", "Statement"]
-        .into_iter()
-        .map(str::to_string)
-        .collect();
-    let data = response
-        .facts
-        .iter()
-        .map(|entry| {
-            vec![
-                entry.name.clone(),
-                knowledge_scope_str(entry.scope).to_string(),
-                entry.object.clone(),
-                knowledge_confidence_str(entry.confidence).to_string(),
-                truncate_statement(&entry.statement, 80),
-            ]
-        })
-        .collect();
-    out.table(headers, data, Some(&response.facts));
-}
-
-pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
-
-    let catalog = args
-        .get_one::<String>("catalog_name")
-        .expect("catalog_name is required");
-    let name = args
-        .get_one::<String>("name")
-        .expect("name is required");
-    let env = cmd::get_string_flag(args, "environment");
-
-    let response = out
-        .with_spinner(
-            "Fetching knowledge",
-            api::describe_catalog_knowledge(&config, catalog, name, &env),
-        )
-        .await;
-
-    let human = knowledge_details_text(catalog, &env, &response.fact);
-    out.text(&human, &response);
-}
-
-pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
-
-    let catalog = args
-        .get_one::<String>("catalog_name")
-        .expect("catalog_name is required");
-    let name = args
-        .get_one::<String>("name")
-        .expect("name is required");
-    let env = cmd::get_string_flag(args, "environment");
-    let statement = cmd::get_string_flag(args, "statement");
-    let scope = cmd::get_string_flag(args, "scope");
-    let confidence = cmd::get_string_flag(args, "confidence");
-    let object = args.get_one::<String>("object").cloned();
-    let source = args.get_one::<String>("source").cloned();
-    let body = args.get_one::<String>("body").cloned();
-
-    // The API carries the body as a JSON string; catch malformed JSON here so
-    // the error names the flag instead of surfacing as a server-side 400.
-    if let Some(body) = &body {
-        if let Err(err) = serde_json::from_str::<serde_json::Value>(body) {
-            out.die(&format!("--body is not valid JSON: {}", err));
-        }
-    }
-
-    let knowledge_body = UpdateCatalogFactBody {
-        schema: None,
-        body,
-        confidence: parse_knowledge_confidence(&confidence),
-        object,
-        scope: parse_knowledge_scope(&scope),
-        source,
-        statement,
-    };
-
-    let response = out
-        .with_spinner(
-            "Saving knowledge",
-            api::update_catalog_knowledge(&config, catalog, name, &env, knowledge_body),
-        )
-        .await;
-
-    out.success_with_data(
-        &format!("Knowledge '{}' saved in catalog '{}'", name, catalog),
-        Some(&response),
-    );
-}
-
-pub async fn do_knowledge_delete(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
-
-    let catalog = args
-        .get_one::<String>("catalog_name")
-        .expect("catalog_name is required");
-    let name = args
-        .get_one::<String>("name")
-        .expect("name is required");
-    let env = cmd::get_string_flag(args, "environment");
-
-    out.with_spinner(
-        "Deleting knowledge",
-        api::delete_catalog_knowledge(&config, catalog, name, &env),
-    )
-    .await;
-
-    out.success(&format!(
-        "Knowledge '{}' deleted from catalog '{}'",
-        name, catalog
-    ));
-}
-
-fn knowledge_scope_str(scope: catalog_fact::Scope) -> &'static str {
-    match scope {
-        catalog_fact::Scope::Catalog => "catalog",
-        catalog_fact::Scope::Namespace => "namespace",
-        catalog_fact::Scope::Table => "table",
-        catalog_fact::Scope::Column => "column",
-        catalog_fact::Scope::Metric => "metric",
-    }
-}
-
-fn knowledge_confidence_str(confidence: catalog_fact::Confidence) -> &'static str {
-    match confidence {
-        catalog_fact::Confidence::Confirmed => "confirmed",
-        catalog_fact::Confidence::Heuristic => "heuristic",
-        catalog_fact::Confidence::Inferred => "inferred",
-    }
-}
-
-fn parse_knowledge_scope(scope: &str) -> update_catalog_fact_body::Scope {
-    match scope {
-        "namespace" => update_catalog_fact_body::Scope::Namespace,
-        "table" => update_catalog_fact_body::Scope::Table,
-        "column" => update_catalog_fact_body::Scope::Column,
-        "metric" => update_catalog_fact_body::Scope::Metric,
-        _ => update_catalog_fact_body::Scope::Catalog,
-    }
-}
-
-fn parse_knowledge_confidence(confidence: &str) -> update_catalog_fact_body::Confidence {
-    match confidence {
-        "heuristic" => update_catalog_fact_body::Confidence::Heuristic,
-        "inferred" => update_catalog_fact_body::Confidence::Inferred,
-        _ => update_catalog_fact_body::Confidence::Confirmed,
-    }
-}
-
-/// Trims a statement to fit a table cell, on a char boundary, marking the cut
-/// with an ellipsis. The full statement is always in the JSON output.
-fn truncate_statement(statement: &str, max_chars: usize) -> String {
-    if statement.chars().count() <= max_chars {
-        statement.to_string()
-    } else {
-        let truncated: String = statement
-            .chars()
-            .take(max_chars.saturating_sub(1))
-            .collect();
-        format!("{}…", truncated)
-    }
-}
-
-fn knowledge_details_text(catalog: &str, env: &str, entry: &CatalogFact) -> String {
-    let mut out = String::new();
-
-    out.push_str(&detail_line("Name", &entry.name));
-    out.push_str(&detail_line("Catalog", catalog));
-    out.push_str(&detail_line("Environment", env));
-    out.push_str(&detail_line("Scope", knowledge_scope_str(entry.scope)));
-    if !entry.object.is_empty() {
-        out.push_str(&detail_line("Object", &entry.object));
-    }
-    out.push_str(&detail_line(
-        "Confidence",
-        knowledge_confidence_str(entry.confidence),
-    ));
-    if let Some(source) = entry.source.as_deref().filter(|s| !s.is_empty()) {
-        out.push_str(&detail_line("Source", source));
-    }
-    out.push_str(&detail_line("Created", &entry.created_at));
-    out.push_str(&detail_line("Updated", &entry.updated_at));
-
-    out.push('\n');
-    out.push_str(&header_line("Statement"));
-    out.push_str(&entry.statement);
-    out.push('\n');
-
-    if let Some(body) = entry.body.as_ref().and_then(|b| b.as_ref()) {
-        out.push('\n');
-        out.push_str(&header_line("Body"));
-        out.push_str(&serde_json::to_string_pretty(body).unwrap_or_else(|_| body.to_string()));
-        out.push('\n');
-    }
-
-    out
-}
-
 fn read_sql_from_stdin(out: &output::Out) -> String {
     let mut stdin = std::io::stdin();
     if stdin.is_terminal() {
@@ -871,11 +618,6 @@ fn read_sql_from_stdin(out: &output::Out) -> String {
         out.die(&format!("Failed reading SQL from stdin: {}", err));
     }
     sql
-}
-
-struct QueryResult {
-    columns: Vec<String>,
-    rows: Vec<Vec<serde_json::Value>>,
 }
 
 /// Statements that install the Iceberg support and attach the catalog under
@@ -909,62 +651,6 @@ fn attach_statements(
             uri = SqlLiteral(&credentials.catalog_uri),
         ),
     ]
-}
-
-/// Runs `setup` statements one at a time, then `query` as a prepared statement
-/// with `params` bound. Values that fit a bind position should go through
-/// `params` rather than into the query text.
-fn run_duckdb_query<P: duckdb::Params>(
-    setup: &[String],
-    query: &str,
-    params: P,
-) -> Result<QueryResult, duckdb::Error> {
-    let conn = duckdb::Connection::open_in_memory()?;
-    // Setup statements embed the vended OAuth token, so time them without logging
-    // their text.
-    let setup_start = Instant::now();
-    for statement in setup {
-        conn.execute_batch(statement)?;
-    }
-    debug!(
-        "duckdb: setup ({} statements) took {:?}",
-        setup.len(),
-        setup_start.elapsed()
-    );
-
-    let query_start = Instant::now();
-    let mut stmt = conn.prepare(query)?;
-    let mut columns: Vec<String> = Vec::new();
-    let mut rows = Vec::new();
-
-    {
-        let mut result_rows = stmt.query(params)?;
-        while let Some(row) = result_rows.next()? {
-            if columns.is_empty() {
-                columns = row.as_ref().column_names();
-            }
-            let mut record = Vec::with_capacity(columns.len());
-            for idx in 0..columns.len() {
-                let value: duckdb::types::Value = row.get(idx)?;
-                record.push(duckdb_value_to_json(value));
-            }
-            rows.push(record);
-        }
-    }
-
-    // A query with no result rows never populates columns above.
-    if columns.is_empty() {
-        columns = stmt.column_names();
-    }
-
-    debug!(
-        "duckdb: query took {:?} ({} rows): {}",
-        query_start.elapsed(),
-        rows.len(),
-        query
-    );
-
-    Ok(QueryResult { columns, rows })
 }
 
 /// How many `loadTable` requests `--full` runs against the Iceberg REST catalog
@@ -1058,10 +744,7 @@ async fn fetch_catalog_columns_via_rest(
     rows.sort_by(|a, b| {
         let key = |row: &[serde_json::Value]| {
             (
-                row.first()
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_owned(),
+                row.first().and_then(|v| v.as_str()).unwrap_or("").to_owned(),
                 row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_owned(),
             )
         };
@@ -1076,6 +759,7 @@ async fn fetch_catalog_columns_via_rest(
             "column_types".to_string(),
         ],
         rows,
+        truncated: None,
     })
 }
 
@@ -1304,10 +988,7 @@ fn iceberg_type_to_display(ty: &serde_json::Value) -> String {
                 format!("LIST({})", element)
             }
             Some("map") => {
-                let key = obj
-                    .get("key")
-                    .map(iceberg_type_to_display)
-                    .unwrap_or_default();
+                let key = obj.get("key").map(iceberg_type_to_display).unwrap_or_default();
                 let value = obj
                     .get("value")
                     .map(iceberg_type_to_display)
@@ -1345,89 +1026,6 @@ fn iceberg_primitive_to_display(name: &str) -> String {
     }
 }
 
-fn duckdb_value_to_json(value: duckdb::types::Value) -> serde_json::Value {
-    use duckdb::types::{TimeUnit, Value};
-    use serde_json::json;
-
-    match value {
-        Value::Null => serde_json::Value::Null,
-        Value::Boolean(v) => json!(v),
-        Value::TinyInt(v) => json!(v),
-        Value::SmallInt(v) => json!(v),
-        Value::Int(v) => json!(v),
-        Value::BigInt(v) => json!(v),
-        Value::HugeInt(v) => json!(v.to_string()),
-        Value::UTinyInt(v) => json!(v),
-        Value::USmallInt(v) => json!(v),
-        Value::UInt(v) => json!(v),
-        Value::UBigInt(v) => json!(v),
-        Value::Float(v) => json!(v),
-        Value::Double(v) => json!(v),
-        Value::Decimal(v) => json!(v.to_string()),
-        Value::Text(v) => json!(v),
-        Value::Timestamp(unit, v) => {
-            let micros = match unit {
-                TimeUnit::Second => v.checked_mul(1_000_000),
-                TimeUnit::Millisecond => v.checked_mul(1_000),
-                TimeUnit::Microsecond => Some(v),
-                TimeUnit::Nanosecond => Some(v / 1_000),
-            };
-            match micros.and_then(chrono::DateTime::from_timestamp_micros) {
-                Some(ts) => json!(ts.naive_utc().to_string()),
-                None => json!(format!("{:?}", Value::Timestamp(unit, v))),
-            }
-        }
-        Value::Date32(days) => {
-            let date = chrono::DateTime::from_timestamp(i64::from(days) * 86_400, 0);
-            match date {
-                Some(d) => json!(d.date_naive().to_string()),
-                None => json!(format!("{:?}", Value::Date32(days))),
-            }
-        }
-        Value::Time64(unit, v) => {
-            let micros = match unit {
-                TimeUnit::Second => v.checked_mul(1_000_000),
-                TimeUnit::Millisecond => v.checked_mul(1_000),
-                TimeUnit::Microsecond => Some(v),
-                TimeUnit::Nanosecond => Some(v / 1_000),
-            };
-            let time = micros.and_then(|m| {
-                chrono::NaiveTime::from_num_seconds_from_midnight_opt(
-                    (m / 1_000_000) as u32,
-                    ((m % 1_000_000) * 1_000) as u32,
-                )
-            });
-            match time {
-                Some(t) => json!(t.to_string()),
-                None => json!(format!("{:?}", Value::Time64(unit, v))),
-            }
-        }
-        Value::Enum(v) => json!(v),
-        Value::List(items) | Value::Array(items) => {
-            serde_json::Value::Array(items.into_iter().map(duckdb_value_to_json).collect())
-        }
-        Value::Struct(fields) => serde_json::Value::Object(
-            fields
-                .iter()
-                .map(|(name, value)| (name.clone(), duckdb_value_to_json(value.clone())))
-                .collect(),
-        ),
-        Value::Map(entries) => serde_json::Value::Object(
-            entries
-                .iter()
-                .map(|(key, value)| {
-                    (
-                        json_value_to_cell(&duckdb_value_to_json(key.clone())),
-                        duckdb_value_to_json(value.clone()),
-                    )
-                })
-                .collect(),
-        ),
-        Value::Union(inner) => duckdb_value_to_json(*inner),
-        other => json!(format!("{:?}", other)),
-    }
-}
-
 fn output_query_result(out: &output::Out, result: &QueryResult) {
     let json_rows: Vec<serde_json::Map<String, serde_json::Value>> = result
         .rows
@@ -1449,7 +1047,17 @@ fn output_query_result(out: &output::Out, result: &QueryResult) {
         .collect();
 
     out.table(result.columns.clone(), data, Some(&json_rows));
-    out.note(&format!("\n{} row(s)\n", result.rows.len()));
+    match result.truncated {
+        Some(tower_duckdb::Truncation::Rows) => out.note(&format!(
+            "\nShowing the first {} row(s); result truncated at the row limit. Add a LIMIT or filter to narrow it.\n",
+            result.rows.len()
+        )),
+        Some(tower_duckdb::Truncation::Bytes) => out.note(&format!(
+            "\nShowing {} row(s); result truncated at the size limit. Select fewer columns, or filter to narrow it.\n",
+            result.rows.len()
+        )),
+        None => out.note(&format!("\n{} row(s)\n", result.rows.len())),
+    }
 }
 
 fn json_value_to_cell(value: &serde_json::Value) -> String {
@@ -1718,13 +1326,352 @@ fn snippets(
     snippets
 }
 
+/// The values `--scope` accepts, mirroring `catalog_fact::Scope`.
+const KNOWLEDGE_SCOPES: [&str; 5] = ["catalog", "namespace", "table", "column", "metric"];
+
+/// The values `--confidence` accepts, mirroring `catalog_fact::Confidence`.
+const KNOWLEDGE_CONFIDENCES: [&str; 3] = ["confirmed", "heuristic", "inferred"];
+
+fn knowledge_cmd() -> Command {
+    let catalog_arg = Arg::new("catalog_name")
+        .value_parser(value_parser!(String))
+        .index(1)
+        .required(true)
+        .help("Name of the catalog");
+    let name_arg = Arg::new("name")
+        .value_parser(value_parser!(String))
+        .index(2)
+        .required(true)
+        .help("Name of the knowledge entry");
+    let environment_arg = Arg::new("environment")
+        .short('e')
+        .long("environment")
+        .default_value("default")
+        .value_parser(value_parser!(String))
+        .help("Environment the catalog belongs to")
+        .action(ArgAction::Set);
+
+    Command::new("knowledge")
+        .about(beta::STORAGE.short_about(
+            "Store and retrieve knowledge about the semantics of the data in a catalog",
+        ))
+        .after_help(
+            "Knowledge lets agents (and people) record context about a catalog's data — \
+             semantics, ontology, conventions — scoped to the catalog itself or to a \
+             namespace, table, column, or metric within it.",
+        )
+        .arg_required_else_help(true)
+        .subcommand(
+            Command::new("list")
+                .arg(catalog_arg.clone())
+                .arg(environment_arg.clone())
+                .arg(
+                    Arg::new("scope")
+                        .long("scope")
+                        .value_parser(KNOWLEDGE_SCOPES)
+                        .help("Only list knowledge with this scope")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("object")
+                        .long("object")
+                        .value_parser(value_parser!(String))
+                        .help("Only list knowledge about this object path, e.g. bronze.runs.deleted_at")
+                        .action(ArgAction::Set),
+                )
+                .about("List the knowledge recorded for a catalog"),
+        )
+        .subcommand(
+            Command::new("show")
+                .arg(catalog_arg.clone())
+                .arg(name_arg.clone())
+                .arg(environment_arg.clone())
+                .about("Show the full details of a knowledge entry, including its body"),
+        )
+        .subcommand(
+            Command::new("set")
+                .arg(catalog_arg.clone())
+                .arg(name_arg.clone())
+                .arg(environment_arg.clone())
+                .arg(
+                    Arg::new("statement")
+                        .long("statement")
+                        .value_parser(value_parser!(String))
+                        .required(true)
+                        .help("The human-readable meaning of the entry")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("scope")
+                        .long("scope")
+                        .default_value("catalog")
+                        .value_parser(KNOWLEDGE_SCOPES)
+                        .help("What kind of object the entry is about")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("object")
+                        .long("object")
+                        .value_parser(value_parser!(String))
+                        .help("Path to what the entry is about, e.g. bronze.runs.deleted_at; omit for catalog-scoped knowledge")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("confidence")
+                        .long("confidence")
+                        .default_value("confirmed")
+                        .value_parser(KNOWLEDGE_CONFIDENCES)
+                        .help("How trustworthy the entry is")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("source")
+                        .long("source")
+                        .value_parser(value_parser!(String))
+                        .help("Where the knowledge came from (agent id, user, ...)")
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("body")
+                        .long("body")
+                        .value_parser(value_parser!(String))
+                        .help("Optional structured payload (SQL, unit, enum values) as a JSON string")
+                        .action(ArgAction::Set),
+                )
+                .about("Create a knowledge entry, or replace it if one with the same name exists"),
+        )
+        .subcommand(
+            Command::new("delete")
+                .arg(catalog_arg)
+                .arg(name_arg)
+                .arg(environment_arg)
+                .about("Delete a knowledge entry from a catalog"),
+        )
+}
+
+pub async fn do_knowledge_list(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let env = cmd::get_string_flag(args, "environment");
+    let scope = args.get_one::<String>("scope").map(String::as_str);
+    let object = args.get_one::<String>("object").map(String::as_str);
+
+    let response = out
+        .with_spinner(
+            "Listing knowledge",
+            api::list_catalog_knowledge(&config, catalog, &env, scope, object),
+        )
+        .await;
+
+    let headers = vec!["Name", "Scope", "Object", "Confidence", "Statement"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let data = response
+        .facts
+        .iter()
+        .map(|entry| {
+            vec![
+                entry.name.clone(),
+                knowledge_scope_str(entry.scope).to_string(),
+                entry.object.clone(),
+                knowledge_confidence_str(entry.confidence).to_string(),
+                truncate_statement(&entry.statement, 80),
+            ]
+        })
+        .collect();
+    out.table(headers, data, Some(&response.facts));
+}
+
+pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let name = args
+        .get_one::<String>("name")
+        .expect("name is required");
+    let env = cmd::get_string_flag(args, "environment");
+
+    let response = out
+        .with_spinner(
+            "Fetching knowledge",
+            api::describe_catalog_knowledge(&config, catalog, name, &env),
+        )
+        .await;
+
+    let human = knowledge_details_text(catalog, &env, &response.fact);
+    out.text(&human, &response);
+}
+
+pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let name = args
+        .get_one::<String>("name")
+        .expect("name is required");
+    let env = cmd::get_string_flag(args, "environment");
+    let statement = cmd::get_string_flag(args, "statement");
+    let scope = cmd::get_string_flag(args, "scope");
+    let confidence = cmd::get_string_flag(args, "confidence");
+    let object = args.get_one::<String>("object").cloned();
+    let source = args.get_one::<String>("source").cloned();
+    let body = args.get_one::<String>("body").cloned();
+
+    // The API carries the body as a JSON string; catch malformed JSON here so
+    // the error names the flag instead of surfacing as a server-side 400.
+    if let Some(body) = &body {
+        if let Err(err) = serde_json::from_str::<serde_json::Value>(body) {
+            out.die(&format!("--body is not valid JSON: {}", err));
+        }
+    }
+
+    let knowledge_body = UpdateCatalogFactBody {
+        schema: None,
+        body,
+        confidence: parse_knowledge_confidence(&confidence),
+        object,
+        scope: parse_knowledge_scope(&scope),
+        source,
+        statement,
+    };
+
+    let response = out
+        .with_spinner(
+            "Saving knowledge",
+            api::update_catalog_knowledge(&config, catalog, name, &env, knowledge_body),
+        )
+        .await;
+
+    out.success_with_data(
+        &format!("Knowledge '{}' saved in catalog '{}'", name, catalog),
+        Some(&response),
+    );
+}
+
+pub async fn do_knowledge_delete(out: &output::Out, config: Config, args: &ArgMatches) {
+    beta::notify_once(out, &beta::STORAGE);
+
+    let catalog = args
+        .get_one::<String>("catalog_name")
+        .expect("catalog_name is required");
+    let name = args
+        .get_one::<String>("name")
+        .expect("name is required");
+    let env = cmd::get_string_flag(args, "environment");
+
+    out.with_spinner(
+        "Deleting knowledge",
+        api::delete_catalog_knowledge(&config, catalog, name, &env),
+    )
+    .await;
+
+    out.success(&format!(
+        "Knowledge '{}' deleted from catalog '{}'",
+        name, catalog
+    ));
+}
+
+fn knowledge_scope_str(scope: catalog_fact::Scope) -> &'static str {
+    match scope {
+        catalog_fact::Scope::Catalog => "catalog",
+        catalog_fact::Scope::Namespace => "namespace",
+        catalog_fact::Scope::Table => "table",
+        catalog_fact::Scope::Column => "column",
+        catalog_fact::Scope::Metric => "metric",
+    }
+}
+
+fn knowledge_confidence_str(confidence: catalog_fact::Confidence) -> &'static str {
+    match confidence {
+        catalog_fact::Confidence::Confirmed => "confirmed",
+        catalog_fact::Confidence::Heuristic => "heuristic",
+        catalog_fact::Confidence::Inferred => "inferred",
+    }
+}
+
+fn parse_knowledge_scope(scope: &str) -> update_catalog_fact_body::Scope {
+    match scope {
+        "namespace" => update_catalog_fact_body::Scope::Namespace,
+        "table" => update_catalog_fact_body::Scope::Table,
+        "column" => update_catalog_fact_body::Scope::Column,
+        "metric" => update_catalog_fact_body::Scope::Metric,
+        _ => update_catalog_fact_body::Scope::Catalog,
+    }
+}
+
+fn parse_knowledge_confidence(confidence: &str) -> update_catalog_fact_body::Confidence {
+    match confidence {
+        "heuristic" => update_catalog_fact_body::Confidence::Heuristic,
+        "inferred" => update_catalog_fact_body::Confidence::Inferred,
+        _ => update_catalog_fact_body::Confidence::Confirmed,
+    }
+}
+
+/// Trims a statement to fit a table cell, on a char boundary, marking the cut
+/// with an ellipsis. The full statement is always in the JSON output.
+fn truncate_statement(statement: &str, max_chars: usize) -> String {
+    if statement.chars().count() <= max_chars {
+        statement.to_string()
+    } else {
+        let truncated: String = statement
+            .chars()
+            .take(max_chars.saturating_sub(1))
+            .collect();
+        format!("{}…", truncated)
+    }
+}
+
+fn knowledge_details_text(catalog: &str, env: &str, entry: &CatalogFact) -> String {
+    let mut out = String::new();
+
+    out.push_str(&detail_line("Name", &entry.name));
+    out.push_str(&detail_line("Catalog", catalog));
+    out.push_str(&detail_line("Environment", env));
+    out.push_str(&detail_line("Scope", knowledge_scope_str(entry.scope)));
+    if !entry.object.is_empty() {
+        out.push_str(&detail_line("Object", &entry.object));
+    }
+    out.push_str(&detail_line(
+        "Confidence",
+        knowledge_confidence_str(entry.confidence),
+    ));
+    if let Some(source) = entry.source.as_deref().filter(|s| !s.is_empty()) {
+        out.push_str(&detail_line("Source", source));
+    }
+    out.push_str(&detail_line("Created", &entry.created_at));
+    out.push_str(&detail_line("Updated", &entry.updated_at));
+
+    out.push('\n');
+    out.push_str(&header_line("Statement"));
+    out.push_str(&entry.statement);
+    out.push('\n');
+
+    if let Some(body) = entry.body.as_ref().and_then(|b| b.as_ref()) {
+        out.push('\n');
+        out.push_str(&header_line("Body"));
+        out.push_str(&serde_json::to_string_pretty(body).unwrap_or_else(|_| body.to_string()));
+        out.push('\n');
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        attach_statements, catalogs_cmd, duckdb_value_to_json, is_storage_catalog_type, parse_mode,
-        run_duckdb_query, snippets, token_export_command,
+        attach_statements, catalogs_cmd, is_storage_catalog_type, parse_mode, query_limits,
+        snippets, token_export_command,
     };
     use tower_api::models::{vend_catalog_credentials_body, CatalogCredentials};
+    use tower_duckdb::{params, run_query, Limits};
 
     #[test]
     fn list_defaults_to_default_environment() {
@@ -1936,10 +1883,11 @@ mod tests {
             "CREATE SCHEMA s; CREATE TABLE s.t1 (i INTEGER); CREATE TABLE s.t2 (i INTEGER);"
                 .to_string(),
         ];
-        let result = run_duckdb_query(
+        let result = run_query(
             &setup,
             "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
-            duckdb::params!["memory"],
+            params!["memory"],
+            &Limits::none(),
         )
         .expect("query should succeed");
 
@@ -2060,76 +2008,84 @@ mod tests {
     }
 
     #[test]
-    fn duckdb_values_convert_to_json() {
-        use duckdb::types::{TimeUnit, Value};
+    fn query_accepts_a_max_rows_override() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "query", "my-catalog", "--sql", "SELECT 1"])
+            .expect("query should parse");
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+        assert_eq!(query_args.get_one::<usize>("max_rows").copied(), None);
 
-        assert_eq!(duckdb_value_to_json(Value::Null), serde_json::Value::Null);
-        assert_eq!(
-            duckdb_value_to_json(Value::BigInt(42)),
-            serde_json::json!(42)
-        );
-        assert_eq!(
-            duckdb_value_to_json(Value::Text("hi".to_string())),
-            serde_json::json!("hi")
-        );
-        assert_eq!(
-            duckdb_value_to_json(Value::Timestamp(TimeUnit::Microsecond, 0)),
-            serde_json::json!("1970-01-01 00:00:00")
-        );
-        assert_eq!(
-            duckdb_value_to_json(Value::Date32(1)),
-            serde_json::json!("1970-01-02")
-        );
-    }
+        let matches = catalogs_cmd()
+            .try_get_matches_from([
+                "catalogs",
+                "query",
+                "my-catalog",
+                "--sql",
+                "SELECT 1",
+                "--max-rows",
+                "50000",
+            ])
+            .expect("query --max-rows should parse");
+        let (_, query_args) = matches.subcommand().expect("expected query subcommand");
+        assert_eq!(query_args.get_one::<usize>("max_rows").copied(), Some(50_000));
 
-    #[test]
-    fn run_duckdb_query_returns_columns_and_rows() {
-        let setup = vec![
-            "CREATE TABLE t (id INTEGER, name VARCHAR); INSERT INTO t VALUES (1, 'a'), (2, NULL);"
-                .to_string(),
-        ];
-        let result = run_duckdb_query(&setup, "SELECT id, name FROM t ORDER BY id", [])
-            .expect("query should succeed");
-
-        assert_eq!(result.columns, vec!["id", "name"]);
-        assert_eq!(result.rows.len(), 2);
-        assert_eq!(
-            result.rows[0],
-            vec![serde_json::json!(1), serde_json::json!("a")]
-        );
-        assert_eq!(
-            result.rows[1],
-            vec![serde_json::json!(2), serde_json::Value::Null]
+        assert!(
+            catalogs_cmd()
+                .try_get_matches_from([
+                    "catalogs",
+                    "query",
+                    "my-catalog",
+                    "--sql",
+                    "SELECT 1",
+                    "--max-rows",
+                    "not-a-number",
+                ])
+                .is_err(),
+            "a non-numeric --max-rows should be rejected"
         );
     }
 
     #[test]
-    fn nested_duckdb_values_convert_to_json_structures() {
-        let result = run_duckdb_query(
-            &[],
-            "SELECT [1, 2] AS l, {'a': 1, 'b': 'x'} AS s, MAP {'k': 2} AS m",
-            [],
-        )
-        .expect("query should succeed");
-
-        assert_eq!(result.columns, vec!["l", "s", "m"]);
+    fn read_queries_are_bounded_unless_the_caller_asks_otherwise() {
+        // The default: bounded by rows and by size, so a runaway read cannot
+        // flood a terminal or a model's context.
+        let default = query_limits(false, None);
+        assert_eq!(default.max_rows, Some(tower_duckdb::guard::AGENT_MAX_ROWS));
         assert_eq!(
-            result.rows[0],
-            vec![
-                serde_json::json!([1, 2]),
-                serde_json::json!({"a": 1, "b": "x"}),
-                serde_json::json!({"k": 2}),
-            ]
+            default.max_total_bytes,
+            Some(tower_duckdb::guard::AGENT_MAX_RESULT_BYTES)
         );
     }
 
     #[test]
-    fn run_duckdb_query_reports_columns_for_empty_results() {
-        let result =
-            run_duckdb_query(&[], "SELECT 1 AS x WHERE 1 = 0", []).expect("query should succeed");
+    fn max_rows_override_raises_the_row_ceiling_and_lifts_the_size_ceiling() {
+        // A caller who asks for a million rows should not then be cut short by a
+        // byte budget they never set, so the size ceiling comes off with it.
+        let raised = query_limits(false, Some(1_000_000));
+        assert_eq!(raised.max_rows, Some(1_000_000));
+        assert_eq!(
+            raised.max_total_bytes, None,
+            "an explicit row count should not be second-guessed by the size cap"
+        );
 
-        assert_eq!(result.columns, vec!["x"]);
-        assert!(result.rows.is_empty());
+        // Lowering it is just as valid as raising it.
+        assert_eq!(query_limits(false, Some(10)).max_rows, Some(10));
+    }
+
+    #[test]
+    fn max_rows_zero_removes_every_result_ceiling() {
+        let unbounded = query_limits(false, Some(0));
+        assert_eq!(unbounded.max_rows, None);
+        assert_eq!(unbounded.max_total_bytes, None);
+    }
+
+    #[test]
+    fn write_mode_is_unbounded_but_still_honours_an_explicit_row_count() {
+        let write_default = query_limits(true, None);
+        assert_eq!(write_default.max_rows, None);
+        assert_eq!(write_default.max_total_bytes, None);
+
+        assert_eq!(query_limits(true, Some(25)).max_rows, Some(25));
     }
 
     #[test]
@@ -2199,6 +2155,97 @@ mod tests {
     }
 
     #[test]
+    fn all_snippet_templates_fully_render() {
+        let credentials = CatalogCredentials::new(
+            "https://catalog.example.com".to_string(),
+            "2026-06-26T12:00:00Z".to_string(),
+            "read".to_string(),
+            "secret-token".to_string(),
+            "warehouse-id".to_string(),
+        );
+
+        for show_token in [false, true] {
+            let rendered = snippets("default", &credentials, "all", show_token);
+            assert_eq!(rendered.len(), 4);
+            for snippet in &rendered {
+                assert!(
+                    !snippet.body.contains("__TOWER_"),
+                    "unsubstituted marker in {} snippet (show_token={})",
+                    snippet.title,
+                    show_token
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn knowledge_command_is_marked_beta() {
+        let mut command = catalogs_cmd();
+        let knowledge_help = command
+            .find_subcommand_mut("knowledge")
+            .expect("knowledge command should exist")
+            .render_help()
+            .to_string();
+        assert!(knowledge_help.contains("[beta]"));
+    }
+
+    #[test]
+    fn knowledge_delete_accepts_catalog_and_name() {
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "knowledge", "delete", "my-catalog", "my-entry"])
+            .expect("knowledge delete should parse");
+
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, delete_args) = knowledge_args.subcommand().expect("expected delete subcommand");
+        assert_eq!(
+            delete_args.get_one::<String>("catalog_name").unwrap(),
+            "my-catalog"
+        );
+        assert_eq!(
+            delete_args.get_one::<String>("name").unwrap(),
+            "my-entry"
+        );
+    }
+
+    #[test]
+    fn knowledge_details_text_includes_body_and_optional_fields() {
+        use tower_api::models::{catalog_fact, CatalogFact};
+
+        let mut entry = CatalogFact::new(
+            catalog_fact::Confidence::Inferred,
+            "2026-07-22T00:00:00Z".to_string(),
+            "soft-deletes".to_string(),
+            "bronze.runs.deleted_at".to_string(),
+            catalog_fact::Scope::Column,
+            "deleted_at marks soft-deleted rows".to_string(),
+            "2026-07-22T01:00:00Z".to_string(),
+        );
+        entry.source = Some("agent-42".to_string());
+        entry.body = Some(Some(serde_json::json!({"sql": "deleted_at IS NULL"})));
+
+        let text = super::knowledge_details_text("my-catalog", "production", &entry);
+
+        assert!(text.contains("soft-deletes"));
+        assert!(text.contains("my-catalog"));
+        assert!(text.contains("production"));
+        assert!(text.contains("column"));
+        assert!(text.contains("bronze.runs.deleted_at"));
+        assert!(text.contains("inferred"));
+        assert!(text.contains("agent-42"));
+        assert!(text.contains("deleted_at marks soft-deleted rows"));
+        assert!(text.contains("deleted_at IS NULL"));
+
+        // Optional fields drop out when absent.
+        entry.source = None;
+        entry.body = None;
+        entry.object = String::new();
+        let text = super::knowledge_details_text("my-catalog", "production", &entry);
+        assert!(!text.contains("Source"));
+        assert!(!text.contains("Body"));
+        assert!(!text.contains("Object"));
+    }
+
+    #[test]
     fn knowledge_list_accepts_filters() {
         let matches = catalogs_cmd()
             .try_get_matches_from([
@@ -2247,55 +2294,36 @@ mod tests {
     }
 
     #[test]
-    fn knowledge_show_requires_catalog_and_name() {
-        let result =
-            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog"]);
-        assert!(result.is_err());
+    fn knowledge_scope_and_confidence_round_trip() {
+        use tower_api::models::{catalog_fact, update_catalog_fact_body};
 
-        let matches = catalogs_cmd()
-            .try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog", "my-entry"])
-            .expect("knowledge show should parse");
-        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, show_args) = knowledge_args.subcommand().expect("expected show subcommand");
-        assert_eq!(show_args.get_one::<String>("name").unwrap(), "my-entry");
-        assert_eq!(
-            show_args.get_one::<String>("environment").unwrap(),
-            "default"
-        );
-    }
+        for scope in super::KNOWLEDGE_SCOPES {
+            let parsed = super::parse_knowledge_scope(scope);
+            let rendered = match parsed {
+                update_catalog_fact_body::Scope::Catalog => catalog_fact::Scope::Catalog,
+                update_catalog_fact_body::Scope::Namespace => catalog_fact::Scope::Namespace,
+                update_catalog_fact_body::Scope::Table => catalog_fact::Scope::Table,
+                update_catalog_fact_body::Scope::Column => catalog_fact::Scope::Column,
+                update_catalog_fact_body::Scope::Metric => catalog_fact::Scope::Metric,
+            };
+            assert_eq!(super::knowledge_scope_str(rendered), scope);
+        }
 
-    #[test]
-    fn knowledge_set_requires_statement() {
-        let result =
-            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "set", "my-catalog", "f"]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn knowledge_set_defaults_scope_and_confidence() {
-        let matches = catalogs_cmd()
-            .try_get_matches_from([
-                "catalogs",
-                "knowledge",
-                "set",
-                "my-catalog",
-                "my-entry",
-                "--statement",
-                "deleted_at is a soft-delete marker",
-            ])
-            .expect("knowledge set should parse");
-
-        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
-
-        assert_eq!(set_args.get_one::<String>("scope").unwrap(), "catalog");
-        assert_eq!(
-            set_args.get_one::<String>("confidence").unwrap(),
-            "confirmed"
-        );
-        assert!(set_args.get_one::<String>("object").is_none());
-        assert!(set_args.get_one::<String>("source").is_none());
-        assert!(set_args.get_one::<String>("body").is_none());
+        for confidence in super::KNOWLEDGE_CONFIDENCES {
+            let parsed = super::parse_knowledge_confidence(confidence);
+            let rendered = match parsed {
+                update_catalog_fact_body::Confidence::Confirmed => {
+                    catalog_fact::Confidence::Confirmed
+                }
+                update_catalog_fact_body::Confidence::Heuristic => {
+                    catalog_fact::Confidence::Heuristic
+                }
+                update_catalog_fact_body::Confidence::Inferred => {
+                    catalog_fact::Confidence::Inferred
+                }
+            };
+            assert_eq!(super::knowledge_confidence_str(rendered), confidence);
+        }
     }
 
     #[test]
@@ -2342,54 +2370,55 @@ mod tests {
     }
 
     #[test]
-    fn knowledge_delete_accepts_catalog_and_name() {
+    fn knowledge_set_defaults_scope_and_confidence() {
         let matches = catalogs_cmd()
-            .try_get_matches_from(["catalogs", "knowledge", "delete", "my-catalog", "my-entry"])
-            .expect("knowledge delete should parse");
+            .try_get_matches_from([
+                "catalogs",
+                "knowledge",
+                "set",
+                "my-catalog",
+                "my-entry",
+                "--statement",
+                "deleted_at is a soft-delete marker",
+            ])
+            .expect("knowledge set should parse");
 
         let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, delete_args) = knowledge_args.subcommand().expect("expected delete subcommand");
+        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
+
+        assert_eq!(set_args.get_one::<String>("scope").unwrap(), "catalog");
         assert_eq!(
-            delete_args.get_one::<String>("catalog_name").unwrap(),
-            "my-catalog"
+            set_args.get_one::<String>("confidence").unwrap(),
+            "confirmed"
         );
-        assert_eq!(
-            delete_args.get_one::<String>("name").unwrap(),
-            "my-entry"
-        );
+        assert!(set_args.get_one::<String>("object").is_none());
+        assert!(set_args.get_one::<String>("source").is_none());
+        assert!(set_args.get_one::<String>("body").is_none());
     }
 
     #[test]
-    fn knowledge_scope_and_confidence_round_trip() {
-        use tower_api::models::{catalog_fact, update_catalog_fact_body};
+    fn knowledge_set_requires_statement() {
+        let result =
+            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "set", "my-catalog", "f"]);
+        assert!(result.is_err());
+    }
 
-        for scope in super::KNOWLEDGE_SCOPES {
-            let parsed = super::parse_knowledge_scope(scope);
-            let rendered = match parsed {
-                update_catalog_fact_body::Scope::Catalog => catalog_fact::Scope::Catalog,
-                update_catalog_fact_body::Scope::Namespace => catalog_fact::Scope::Namespace,
-                update_catalog_fact_body::Scope::Table => catalog_fact::Scope::Table,
-                update_catalog_fact_body::Scope::Column => catalog_fact::Scope::Column,
-                update_catalog_fact_body::Scope::Metric => catalog_fact::Scope::Metric,
-            };
-            assert_eq!(super::knowledge_scope_str(rendered), scope);
-        }
+    #[test]
+    fn knowledge_show_requires_catalog_and_name() {
+        let result =
+            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog"]);
+        assert!(result.is_err());
 
-        for confidence in super::KNOWLEDGE_CONFIDENCES {
-            let parsed = super::parse_knowledge_confidence(confidence);
-            let rendered = match parsed {
-                update_catalog_fact_body::Confidence::Confirmed => {
-                    catalog_fact::Confidence::Confirmed
-                }
-                update_catalog_fact_body::Confidence::Heuristic => {
-                    catalog_fact::Confidence::Heuristic
-                }
-                update_catalog_fact_body::Confidence::Inferred => {
-                    catalog_fact::Confidence::Inferred
-                }
-            };
-            assert_eq!(super::knowledge_confidence_str(rendered), confidence);
-        }
+        let matches = catalogs_cmd()
+            .try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog", "my-entry"])
+            .expect("knowledge show should parse");
+        let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
+        let (_, show_args) = knowledge_args.subcommand().expect("expected show subcommand");
+        assert_eq!(show_args.get_one::<String>("name").unwrap(), "my-entry");
+        assert_eq!(
+            show_args.get_one::<String>("environment").unwrap(),
+            "default"
+        );
     }
 
     #[test]
@@ -2401,76 +2430,4 @@ mod tests {
         assert!(truncated.ends_with('…'));
     }
 
-    #[test]
-    fn knowledge_details_text_includes_body_and_optional_fields() {
-        use tower_api::models::{catalog_fact, CatalogFact};
-
-        let mut entry = CatalogFact::new(
-            catalog_fact::Confidence::Inferred,
-            "2026-07-22T00:00:00Z".to_string(),
-            "soft-deletes".to_string(),
-            "bronze.runs.deleted_at".to_string(),
-            catalog_fact::Scope::Column,
-            "deleted_at marks soft-deleted rows".to_string(),
-            "2026-07-22T01:00:00Z".to_string(),
-        );
-        entry.source = Some("agent-42".to_string());
-        entry.body = Some(Some(serde_json::json!({"sql": "deleted_at IS NULL"})));
-
-        let text = super::knowledge_details_text("my-catalog", "production", &entry);
-
-        assert!(text.contains("soft-deletes"));
-        assert!(text.contains("my-catalog"));
-        assert!(text.contains("production"));
-        assert!(text.contains("column"));
-        assert!(text.contains("bronze.runs.deleted_at"));
-        assert!(text.contains("inferred"));
-        assert!(text.contains("agent-42"));
-        assert!(text.contains("deleted_at marks soft-deleted rows"));
-        assert!(text.contains("deleted_at IS NULL"));
-
-        // Optional fields drop out when absent.
-        entry.source = None;
-        entry.body = None;
-        entry.object = String::new();
-        let text = super::knowledge_details_text("my-catalog", "production", &entry);
-        assert!(!text.contains("Source"));
-        assert!(!text.contains("Body"));
-        assert!(!text.contains("Object"));
-    }
-
-    #[test]
-    fn knowledge_command_is_marked_beta() {
-        let mut command = catalogs_cmd();
-        let knowledge_help = command
-            .find_subcommand_mut("knowledge")
-            .expect("knowledge command should exist")
-            .render_help()
-            .to_string();
-        assert!(knowledge_help.contains("[beta]"));
-    }
-
-    #[test]
-    fn all_snippet_templates_fully_render() {
-        let credentials = CatalogCredentials::new(
-            "https://catalog.example.com".to_string(),
-            "2026-06-26T12:00:00Z".to_string(),
-            "read".to_string(),
-            "secret-token".to_string(),
-            "warehouse-id".to_string(),
-        );
-
-        for show_token in [false, true] {
-            let rendered = snippets("default", &credentials, "all", show_token);
-            assert_eq!(rendered.len(), 4);
-            for snippet in &rendered {
-                assert!(
-                    !snippet.body.contains("__TOWER_"),
-                    "unsubstituted marker in {} snippet (show_token={})",
-                    snippet.title,
-                    show_token
-                );
-            }
-        }
-    }
 }
