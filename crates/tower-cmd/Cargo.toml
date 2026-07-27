@@ -29,6 +29,7 @@ spinners = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 tower-api = { workspace = true }
+tower-duckdb = { workspace = true }
 tower-package = { workspace = true }
 tower-runtime = { workspace = true }
 tower-telemetry = { workspace = true }

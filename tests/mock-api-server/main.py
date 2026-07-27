@@ -49,6 +49,14 @@ mock_runs_db = {}
 mock_schedules_db = {}
 mock_deployed_apps = set()  # Track which apps have been deployed
 
+# Idempotency support (mirrors the real server's X-Tower-Idempotency-Key behavior).
+# mock_deploy_log records the idempotency key seen on every deploy (None when the
+# header was absent) so tests can assert exactly what the CLI sent.
+mock_deploy_log = []  # list of {"name": str, "idempotency_key": Optional[str]}
+# mock_idempotent_versions maps (app_name, key) -> a stored version dict that is
+# returned verbatim on a repeat deploy with the same key.
+mock_idempotent_versions = {}
+
 # Pre-populate with test-app for CLI validation/spinner tests
 mock_apps_db["predeployed-test-app"] = {
     "name": "predeployed-test-app",
@@ -219,21 +227,60 @@ async def delete_app(name: str):
 
 
 @app.post("/v1/apps/{name}/deploy")
-async def deploy_app(name: str, response: Response):
+async def deploy_app(name: str, request: Request, response: Response):
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    # Capture the idempotency key the CLI sent (None when the header is absent)
+    # so tests can assert provenance behavior.
+    idempotency_key = request.headers.get("x-tower-idempotency-key")
+    mock_deploy_log.append({"name": name, "idempotency_key": idempotency_key})
+
+    # Idempotency hit: a prior deploy supplied the same key for this app. Return
+    # the stored version verbatim, including its original (past) created_at, which
+    # is what lets the CLI recognize the reuse and print its hint.
+    if idempotency_key and (name, idempotency_key) in mock_idempotent_versions:
+        return {"version": mock_idempotent_versions[(name, idempotency_key)]}
+
     # Simulate a successful deployment
     version_num = "1.0.0"  # Simplified versioning
     deployed_version = {
         "version": version_num,
         "parameters": [],
-        "created_at": datetime.datetime.now().isoformat(),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "towerfile": "mock_towerfile_content",
+        "idempotency_key": idempotency_key,
+        "content_checksum": "mock-content-checksum",
     }
     # Update app's version and mark as deployed
     mock_apps_db[name]["version"] = version_num
     mock_deployed_apps.add(name)
+
+    # Remember this version under its key so the next deploy with the same key is
+    # treated as a reuse. The stored created_at is backdated so the reuse is
+    # unambiguously "older than now" regardless of how fast the test runs.
+    if idempotency_key:
+        stored = dict(deployed_version)
+        stored["created_at"] = (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+        ).isoformat()
+        mock_idempotent_versions[(name, idempotency_key)] = stored
+
     return {"version": deployed_version}
+
+
+@app.get("/test/deploy-log")
+async def get_deploy_log():
+    """Test-only: return the idempotency key seen on every deploy so far."""
+    return {"deploys": mock_deploy_log}
+
+
+@app.post("/test/reset-deploy-log")
+async def reset_deploy_log():
+    """Test-only: clear deploy bookkeeping so each scenario starts clean."""
+    mock_deploy_log.clear()
+    mock_idempotent_versions.clear()
+    return {"ok": True}
 
 
 @app.post("/v1/apps/{name}/runs", status_code=201)

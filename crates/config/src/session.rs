@@ -1,9 +1,10 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::future::Future;
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 use crate::error::Error;
@@ -85,6 +86,43 @@ fn find_or_create_config_dir() -> Result<PathBuf, Error> {
     }
 
     Ok(config_dir)
+}
+
+/// Atomically claims a persistent, user-level CLI notice.
+///
+/// Returns `true` only for the first process to claim this notice ID. Notice
+/// IDs are internal constants and may contain ASCII letters, digits, `-`, and
+/// `_` only.
+pub fn claim_notice(id: &str) -> std::io::Result<bool> {
+    let config_dir = find_or_create_config_dir()
+        .map_err(|err| std::io::Error::other(format!("finding Tower config directory: {err}")))?;
+    claim_notice_at(&config_dir, id)
+}
+
+fn claim_notice_at(base_dir: &Path, id: &str) -> std::io::Result<bool> {
+    if id.is_empty()
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(std::io::Error::new(
+            ErrorKind::InvalidInput,
+            "invalid notice ID",
+        ));
+    }
+
+    let notices_dir = base_dir.join("notices");
+    fs::create_dir_all(&notices_dir)?;
+
+    match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(notices_dir.join(id))
+    {
+        Ok(_) => Ok(true),
+        Err(err) if err.kind() == ErrorKind::AlreadyExists => Ok(false),
+        Err(err) => Err(err),
+    }
 }
 
 pub fn get_last_version_check_timestamp() -> DateTime<Utc> {
@@ -345,4 +383,66 @@ where
     F: Future<Output = T>,
 {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, sync::Arc, thread};
+
+    use tempfile::TempDir;
+
+    use super::claim_notice_at;
+
+    #[test]
+    fn notice_can_only_be_claimed_once() {
+        let temp_dir = TempDir::new().expect("temporary directory should be created");
+
+        assert!(claim_notice_at(temp_dir.path(), "storage-beta-v1").unwrap());
+        assert!(!claim_notice_at(temp_dir.path(), "storage-beta-v1").unwrap());
+    }
+
+    #[test]
+    fn notice_generations_are_independent() {
+        let temp_dir = TempDir::new().expect("temporary directory should be created");
+
+        assert!(claim_notice_at(temp_dir.path(), "storage-beta-v1").unwrap());
+        assert!(claim_notice_at(temp_dir.path(), "storage-beta-v2").unwrap());
+    }
+
+    #[test]
+    fn concurrent_notice_claims_have_one_winner() {
+        let temp_dir = TempDir::new().expect("temporary directory should be created");
+        let base_dir = Arc::new(temp_dir.path().to_path_buf());
+        let handles = (0..8)
+            .map(|_| {
+                let base_dir = Arc::clone(&base_dir);
+                thread::spawn(move || claim_notice_at(&base_dir, "storage-beta-v1").unwrap())
+            })
+            .collect::<Vec<_>>();
+
+        let winners = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("claim thread should finish"))
+            .filter(|claimed| *claimed)
+            .count();
+
+        assert_eq!(winners, 1);
+    }
+
+    #[test]
+    fn notice_claim_rejects_invalid_ids() {
+        let temp_dir = TempDir::new().expect("temporary directory should be created");
+
+        assert!(claim_notice_at(temp_dir.path(), "../outside").is_err());
+        assert!(claim_notice_at(temp_dir.path(), "").is_err());
+    }
+
+    #[test]
+    fn notice_claim_reports_unavailable_base_directory() {
+        let temp_dir = TempDir::new().expect("temporary directory should be created");
+        let base_dir = temp_dir.path().join("config-file");
+        fs::write(&base_dir, "not a directory").expect("fixture should be written");
+
+        assert!(claim_notice_at(&base_dir, "storage-beta-v1").is_err());
+    }
 }

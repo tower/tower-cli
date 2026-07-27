@@ -2,7 +2,7 @@ use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::*;
 use config::Config;
 
-use crate::{api, output};
+use crate::api;
 
 pub fn teams_cmd() -> Command {
     Command::new("teams")
@@ -23,53 +23,57 @@ pub fn teams_cmd() -> Command {
 }
 
 /// Refreshes the session with the Tower API and returns the updated session
-async fn refresh_session(config: &Config) -> config::Session {
+async fn refresh_session(out: &crate::output::Out, config: &Config) -> config::Session {
     // First get the current session
     let current_session = match config.get_current_session() {
         Ok(session) => session,
         Err(e) => {
-            output::config_error(e);
+            out.config_error(e);
             std::process::exit(1);
         }
     };
 
-    let resp = output::with_spinner("Refreshing session", api::refresh_session(&config)).await;
+    let resp = out
+        .with_spinner("Refreshing session", api::refresh_session(&config))
+        .await;
 
     // Create a mutable copy of the session to update
     let mut session = current_session;
 
     // Update it with the API response
     if let Err(e) = session.update_from_api_response(&resp) {
-        output::config_error(e);
+        out.config_error(e);
         std::process::exit(1);
     }
 
     session
 }
 
-pub async fn do_list(config: Config) {
+pub async fn do_list(out: &crate::output::Out, config: Config) {
     if config.api_key.is_some() {
-        do_list_via_api(&config).await;
+        do_list_via_api(out, &config).await;
     } else {
-        do_list_via_session(&config).await;
+        do_list_via_session(out, &config).await;
     }
 }
 
-async fn do_list_via_api(config: &Config) {
-    let teams = output::with_spinner("Fetching teams", api::list_teams(config)).await;
+async fn do_list_via_api(out: &crate::output::Out, config: &Config) {
+    let teams = out
+        .with_spinner("Fetching teams", api::list_teams(config))
+        .await;
 
     let headers = vec!["Name".to_string()];
 
     let teams_data: Vec<Vec<String>> = teams.iter().map(|team| vec![team.name.clone()]).collect();
 
-    output::newline();
-    output::table(headers, teams_data, None::<&Vec<config::Team>>);
-    output::newline();
+    out.newline();
+    out.table(headers, teams_data, None::<&Vec<config::Team>>);
+    out.newline();
 }
 
-async fn do_list_via_session(config: &Config) {
+async fn do_list_via_session(out: &crate::output::Out, config: &Config) {
     // Refresh the session and get the updated data
-    let session = refresh_session(config).await;
+    let session = refresh_session(out, config).await;
 
     // Get the current active team from the session
     let active_team = session.active_team.clone();
@@ -94,26 +98,26 @@ async fn do_list_via_session(config: &Config) {
         })
         .collect();
 
-    output::newline();
+    out.newline();
     // Display the table using the existing table function
-    output::table(headers, teams_data, Some(&teams));
-    output::newline();
+    out.table(headers, teams_data, Some(&teams));
+    out.newline();
 
     // Add a legend for the asterisk
-    output::note(&format!(
+    out.note(&format!(
         "{}\n",
         "* indicates currently active team".dimmed()
     ));
-    output::newline();
+    out.newline();
 }
 
-pub async fn do_switch(config: Config, args: &ArgMatches) {
+pub async fn do_switch(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let name = args
         .get_one::<String>("team_name")
         .expect("team_name is required");
 
     // Refresh the session first to ensure we have the latest teams data
-    let session = refresh_session(&config).await;
+    let session = refresh_session(out, &config).await;
 
     // Check if the provided team name exists in the refreshed session
     let team = session.teams.iter().find(|team| team.name == *name);
@@ -123,17 +127,17 @@ pub async fn do_switch(config: Config, args: &ArgMatches) {
             // Team found, set it as active
             match config.set_active_team_by_name(name) {
                 Ok(_) => {
-                    output::success(&format!("Switched to team: {}", team.name));
+                    out.success(&format!("Switched to team: {}", team.name));
                 }
                 Err(e) => {
-                    output::config_error(e);
+                    out.config_error(e);
                     std::process::exit(1);
                 }
             }
         }
         None => {
             // Team not found
-            output::error(&format!(
+            out.error(&format!(
                 "Team '{}' not found. Use 'tower teams list' to see all your teams.",
                 name,
             ));

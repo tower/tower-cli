@@ -10,7 +10,9 @@ pub use error::Error;
 pub use session::{default_tower_url, Session, Team, Token, User};
 pub use tower_package::{Parameter, Towerfile};
 
-pub use session::{get_last_version_check_timestamp, set_last_version_check_timestamp};
+pub use session::{
+    claim_notice, get_last_version_check_timestamp, set_last_version_check_timestamp,
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {

@@ -15,17 +15,19 @@ use tower_api::apis::ResponseContent;
 use tower_api::models::DeployAppResponse;
 
 pub async fn upload_file_with_progress(
+    out: &output::Out,
     api_config: &Configuration,
     endpoint_url: String,
     file_path: PathBuf,
     content_type: &str,
+    idempotency_key: Option<&str>,
     progress_cb: Box<dyn Fn(u64, u64) + Send + Sync>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let package_hash = match compute_sha256_file(&file_path).await {
         Ok(hash) => hash,
         Err(e) => {
             debug!("Failed to compute package hash: {}", e);
-            output::die("Tower CLI failed to properly prepare your package for deployment. Check that you have permissions to read/write to your temporary directory, and if it keeps happening contact Tower support at https://tower.dev");
+            out.die("Tower CLI failed to properly prepare your package for deployment. Check that you have permissions to read/write to your temporary directory, and if it keeps happening contact Tower support at https://tower.dev");
         }
     };
 
@@ -38,7 +40,7 @@ pub async fn upload_file_with_progress(
     if file_size > tower_package::MAX_PACKAGE_SIZE {
         let size_mb = file_size as f64 / (1024.0 * 1024.0);
         let max_mb = tower_package::MAX_PACKAGE_SIZE as f64 / (1024.0 * 1024.0);
-        output::die(&format!(
+        out.die(&format!(
             "Your App is too big! ({:.2} MB) exceeds maximum allowed size ({:.0} MB). Please consider reducing app size by removing unnecessary files or import_paths in the Towerfile.",
             size_mb, max_mb
         ));
@@ -56,6 +58,13 @@ pub async fn upload_file_with_progress(
         .header("Content-Type", content_type)
         .header("Content-Encoding", "gzip")
         .body(Body::wrap_stream(progress_stream));
+
+    // When supplied, ask the server to reuse an existing AppVersion that was
+    // deployed with the same key (e.g. a git commit SHA) instead of creating a
+    // new one.
+    if let Some(key) = idempotency_key {
+        req = req.header("X-Tower-Idempotency-Key", key);
+    }
 
     // Add authorization if available. Mirrors the generated tower-api client: prefer a
     // bearer token (interactive session), otherwise fall back to the API key header set
@@ -102,11 +111,13 @@ pub async fn upload_file_with_progress(
 }
 
 pub async fn deploy_app_package(
+    out: &output::Out,
     api_config: &tower_api::apis::configuration::Configuration,
     app_name: &str,
     package: Package,
     environment: Option<&str>,
     all_environments: bool,
+    idempotency_key: Option<&str>,
 ) -> Result<DeployAppResponse, Error<DeployAppError>> {
     let progress_bar = Arc::new(Mutex::new(output::progress_bar("Deploying to Tower...")));
 
@@ -122,7 +133,7 @@ pub async fn deploy_app_package(
     // Get the package file path
     let package_path = package.package_file_path.unwrap_or_else(|| {
         debug!("No package file path found");
-        output::die("An error happened in Tower CLI that it couldn't recover from.");
+        out.die("An error happened in Tower CLI that it couldn't recover from.");
     });
 
     // Create the URL for the API endpoint
@@ -146,10 +157,12 @@ pub async fn deploy_app_package(
 
     // Upload the package
     let response = upload_file_with_progress(
+        out,
         api_config,
         url,
         package_path,
         "application/tar",
+        idempotency_key,
         progress_callback,
     )
     .await?;
@@ -157,7 +170,7 @@ pub async fn deploy_app_package(
     // Finish the progress bar
     let progress_bar = progress_bar.lock().unwrap();
     progress_bar.finish();
-    output::newline();
+    out.newline();
 
     Ok(response)
 }
