@@ -1854,8 +1854,10 @@ mod tests {
 
     #[test]
     fn catalog_help_marks_storage_beta_in_short_and_long_help() {
-        let short_help = catalogs_cmd().render_help().to_string();
-        let long_help = catalogs_cmd().render_long_help().to_string();
+        // term_width(0) turns off help wrapping, which otherwise follows the
+        // width of the terminal the tests run in.
+        let short_help = catalogs_cmd().term_width(0).render_help().to_string();
+        let long_help = catalogs_cmd().term_width(0).render_long_help().to_string();
 
         for help in [short_help, long_help] {
             assert!(help.contains("includes Storage [beta]"));
@@ -1865,7 +1867,7 @@ mod tests {
 
     #[test]
     fn storage_specific_command_and_flag_are_marked_beta() {
-        let mut command = catalogs_cmd();
+        let mut command = catalogs_cmd().mut_subcommand("credentials", |c| c.term_width(0));
         let credentials_help = command
             .find_subcommand_mut("credentials")
             .expect("credentials command should exist")
@@ -1874,7 +1876,7 @@ mod tests {
         assert!(credentials_help
             .contains("Vend short-lived catalog credentials for external tools [beta]"));
 
-        let mut command = catalogs_cmd();
+        let mut command = catalogs_cmd().mut_subcommand("list", |c| c.term_width(0));
         let list_help = command
             .find_subcommand_mut("list")
             .expect("list command should exist")
