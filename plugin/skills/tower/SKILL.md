@@ -203,7 +203,7 @@ Cancel a running app run
 
 ### `tower catalogs`
 
-Interact with the catalogs in your Tower account
+Interact with the catalogs in your Tower account (includes Storage [beta])
 
 #### `tower catalogs list`
 
@@ -214,20 +214,21 @@ List all of your catalogs
 - `-e`, `--environment` — List catalogs in this environment
 - `-a`, `--all` — List catalogs across all environments
 - `--type` — Filter catalogs by type, e.g. tower-catalog
-- `--storage` — List Tower-managed storage catalogs
+- `--storage` — List Tower-managed storage catalogs [beta]
 
 #### `tower catalogs show`
 
-Show the details of a catalog, including its property names
+Show the details of a catalog, including its properties and tables
 
 **Arguments:**
 
 - `<catalog_name>`  *(required)* — Name of the catalog
 - `-e`, `--environment` — Environment the catalog belongs to
+- `--full` — List each table's columns and their types
 
 #### `tower catalogs credentials`
 
-Vend short-lived catalog credentials for external tools
+Vend short-lived catalog credentials for external tools [beta]
 
 **Arguments:**
 
@@ -236,6 +237,69 @@ Vend short-lived catalog credentials for external tools
 - `--mode` — Credential access mode
 - `--format` — Snippet format to print
 - `--show-token` — Print the vended OAuth token in normal output
+
+#### `tower catalogs knowledge`
+
+Store and retrieve knowledge about the semantics of the data in a catalog [beta]
+
+##### `tower catalogs knowledge list`
+
+List the knowledge recorded for a catalog
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `-e`, `--environment` — Environment the catalog belongs to
+- `--scope` — Only list knowledge with this scope
+- `--object` — Only list knowledge about this object path, e.g. bronze.runs.deleted_at
+
+##### `tower catalogs knowledge show`
+
+Show the full details of a knowledge entry, including its body
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `<name>`  *(required)* — Name of the knowledge entry
+- `-e`, `--environment` — Environment the catalog belongs to
+
+##### `tower catalogs knowledge set`
+
+Create a knowledge entry, or replace it if one with the same name exists
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `<name>`  *(required)* — Name of the knowledge entry
+- `-e`, `--environment` — Environment the catalog belongs to
+- `--statement` *(required)* — The human-readable meaning of the entry
+- `--scope` — What kind of object the entry is about
+- `--object` — Path to what the entry is about, e.g. bronze.runs.deleted_at; omit for catalog-scoped knowledge
+- `--confidence` — How trustworthy the entry is
+- `--source` — Where the knowledge came from (agent id, user, ...)
+- `--body` — Optional structured payload (SQL, unit, enum values) as a JSON string
+
+##### `tower catalogs knowledge delete`
+
+Delete a knowledge entry from a catalog
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog
+- `<name>`  *(required)* — Name of the knowledge entry
+- `-e`, `--environment` — Environment the catalog belongs to
+
+#### `tower catalogs query`
+
+Run a SQL query against a catalog using DuckDB [beta]
+
+**Arguments:**
+
+- `<catalog_name>`  *(required)* — Name of the catalog to query
+- `-s`, `--sql` — SQL statement to execute; read from stdin when omitted
+- `-e`, `--environment` — Environment the catalog belongs to
+- `-w`, `--write` — Allow write statements by vending read-write credentials; queries are read-only by default
+- `--max-rows` — Maximum rows to return; 0 for no limit. Also lifts the result size limit, so a large result can exhaust memory
 
 ### `tower schedules`
 
@@ -346,6 +410,8 @@ Deploy your latest code to Tower
 - `-f`, `--create` — Automatically force creation of the app if it doesn't already exist
 - `-e`, `--environment` — The environment to deploy to
 - `--all` — Deploy to all environments
+- `--idempotency-key` — Reuse the existing version deployed with this key instead of creating a new one. Defaults to the current git commit SHA when the working tree is clean.
+- `--no-idempotency-key` — Never send an idempotency key, even on a clean git tree
 
 ### `tower run`
 

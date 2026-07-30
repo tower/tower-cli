@@ -3,7 +3,6 @@ use config::{Config, Towerfile};
 use std::path::PathBuf;
 use tokio::fs;
 
-use crate::output;
 use tower_package::{Package, PackageSpec};
 use tower_telemetry::debug;
 
@@ -28,7 +27,7 @@ pub fn package_cmd() -> Command {
         .about("Create a package tar.gz file from your app without deploying")
 }
 
-pub async fn do_package(_config: Config, args: &ArgMatches) {
+pub async fn do_package(out: &crate::output::Out, _config: Config, args: &ArgMatches) {
     // Determine the directory to build the package from
     let dir = PathBuf::from(
         args.get_one::<String>("dir")
@@ -41,11 +40,11 @@ pub async fn do_package(_config: Config, args: &ArgMatches) {
     match Towerfile::from_path(path) {
         Ok(towerfile) => {
             let spec = PackageSpec::from_towerfile(&towerfile);
-            let mut spinner = output::spinner("Building package...");
+            let mut spinner = out.spinner("Building package...");
 
             match Package::build(spec).await {
                 Ok(package) => {
-                    spinner.success();
+                    spinner.success(out);
 
                     // Get the output path
                     let output_path = args
@@ -55,24 +54,21 @@ pub async fn do_package(_config: Config, args: &ArgMatches) {
                     // Save the package
                     match save_package(&package, output_path).await {
                         Ok(_) => {
-                            output::success(&format!(
-                                "Package created successfully: {}",
-                                output_path
-                            ));
+                            out.success(&format!("Package created successfully: {}", output_path));
                         }
                         Err(err) => {
-                            output::error(&format!("Failed to save package: {}", err));
+                            out.error(&format!("Failed to save package: {}", err));
                         }
                     }
                 }
                 Err(err) => {
-                    spinner.failure();
-                    output::package_error(err);
+                    spinner.failure(out);
+                    out.package_error(err);
                 }
             }
         }
         Err(err) => {
-            output::package_error(err);
+            out.package_error(err);
         }
     }
 }

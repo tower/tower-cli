@@ -7,7 +7,7 @@ use rsa::pkcs1::DecodeRsaPublicKey;
 use tower_api::models::CreateSecretResponse;
 use tower_telemetry::debug;
 
-use crate::{api, output, util::cmd};
+use crate::{api, util::cmd};
 
 pub fn secrets_cmd() -> Command {
     Command::new("secrets")
@@ -93,7 +93,7 @@ pub fn secrets_cmd() -> Command {
         )
 }
 
-pub async fn do_list(config: Config, args: &ArgMatches) {
+pub async fn do_list(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let all = cmd::get_bool_flag(args, "all");
     let show = cmd::get_bool_flag(args, "show");
     let env = cmd::get_string_flag(args, "environment");
@@ -106,11 +106,12 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
     if show {
         let (private_key, public_key) = crypto::generate_key_pair();
 
-        let list_response = output::with_spinner(
-            "Listing secrets",
-            api::export_secrets(&config, &env, all, public_key),
-        )
-        .await;
+        let list_response = out
+            .with_spinner(
+                "Listing secrets",
+                api::export_secrets(&config, &env, all, public_key),
+            )
+            .await;
 
         let headers = vec!["Secret", "Environment", "Value"]
             .into_iter()
@@ -131,10 +132,11 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                 ]
             })
             .collect();
-        output::table(headers, data, Some(&list_response.secrets));
+        out.table(headers, data, Some(&list_response.secrets));
     } else {
-        let secrets =
-            output::with_spinner("Listing secrets", api::list_secrets(&config, &env, all)).await;
+        let secrets = out
+            .with_spinner("Listing secrets", api::list_secrets(&config, &env, all))
+            .await;
 
         let headers = vec!["Secret", "Environment", "Preview"]
             .into_iter()
@@ -150,40 +152,40 @@ pub async fn do_list(config: Config, args: &ArgMatches) {
                 ]
             })
             .collect();
-        output::table(headers, data, Some(&secrets));
+        out.table(headers, data, Some(&secrets));
     }
 }
 
-pub async fn do_create(config: Config, args: &ArgMatches) {
+pub async fn do_create(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let name = cmd::get_string_flag(args, "name");
     let environment = cmd::get_string_flag(args, "environment");
     let value = cmd::get_string_flag(args, "value");
 
-    let mut spinner = output::spinner("Creating secret...");
+    let mut spinner = out.spinner("Creating secret...");
 
-    match encrypt_and_create_secret(&config, &name, &value, &environment).await {
+    match encrypt_and_create_secret(out, &config, &name, &value, &environment).await {
         Ok(_) => {
-            spinner.success();
+            spinner.success(out);
 
             let line = format!("Secret {} created in environment {}", name, environment,);
 
-            output::success(&line);
+            out.success(&line);
         }
         Err(err) => {
-            spinner.failure();
+            spinner.failure(out);
             match err {
                 SecretCreationError::FetchKeyFailed(e) => {
-                    output::tower_error_and_die(e, "Fetching secrets key failed");
+                    out.tower_error_and_die(e, "Fetching secrets key failed");
                 }
                 SecretCreationError::CreateFailed(e) => {
-                    output::tower_error_and_die(e, "Creating secret failed");
+                    out.tower_error_and_die(e, "Creating secret failed");
                 }
             }
         }
     }
 }
 
-pub async fn do_delete(config: Config, args: &ArgMatches) {
+pub async fn do_delete(out: &crate::output::Out, config: Config, args: &ArgMatches) {
     let secret_name_arg = args
         .get_one::<String>("secret_name")
         .expect("secret_name is required");
@@ -197,7 +199,7 @@ pub async fn do_delete(config: Config, args: &ArgMatches) {
     };
     debug!("deleting secret, environment={} name={}", environment, name);
 
-    output::with_spinner(
+    out.with_spinner(
         "Deleting secret",
         api::delete_secret(&config, &name, &environment),
     )
@@ -223,6 +225,7 @@ enum SecretCreationError {
 }
 
 async fn encrypt_and_create_secret(
+    out: &crate::output::Out,
     config: &Config,
     name: &str,
     value: &str,
@@ -233,7 +236,7 @@ async fn encrypt_and_create_secret(
         .map_err(SecretCreationError::FetchKeyFailed)?;
 
     let public_key = rsa::RsaPublicKey::from_pkcs1_pem(&res.public_key).unwrap_or_else(|_| {
-        output::die("Failed to parse public key");
+        out.die("Failed to parse public key");
     });
 
     let encrypted_value = encrypt(public_key, value.to_string()).unwrap();

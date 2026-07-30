@@ -16,6 +16,25 @@ def before_all(context):
 
 
 def before_scenario(context, scenario):
+    # Catalog scenarios hit the real attach -> Iceberg -> query path, which the
+    # mock server can't stand up. Skip them unless a storage catalog is
+    # configured (and rely on a real TOWER_URL + session being provided too).
+    if "catalogs" in scenario.effective_tags:
+        catalog = os.environ.get("TOWER_TEST_CATALOG")
+        if not catalog:
+            scenario.skip(
+                "set TOWER_TEST_CATALOG (and a real TOWER_URL) to run catalog tests"
+            )
+            return
+        context.test_catalog = catalog
+        context.test_catalog_env = os.environ.get("TOWER_TEST_CATALOG_ENV", "default")
+        context.test_catalog_table = os.environ.get("TOWER_TEST_CATALOG_TABLE")
+        if "catalog-data" in scenario.effective_tags and not context.test_catalog_table:
+            scenario.skip(
+                "set TOWER_TEST_CATALOG_TABLE to run the catalog data query test"
+            )
+            return
+
     # Create a temporary working directory for this scenario
     context.temp_dir = tempfile.mkdtemp(prefix="tower_test_")
     context.original_cwd = os.getcwd()

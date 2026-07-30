@@ -21,3 +21,6 @@ url = { workspace = true }
 tower-api = { workspace = true }
 tower-package = { workspace = true }
 tower-telemetry = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
