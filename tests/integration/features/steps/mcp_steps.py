@@ -35,7 +35,7 @@ async def call_mcp_tool_raw(
             await session.initialize()
             result = await session.call_tool(tool_name, args)
             return {
-                "success": not result.isError,
+                "success": not result.is_error,
                 "content": result.content,
                 "result": result,
                 "captured_logs": captured_logs,
