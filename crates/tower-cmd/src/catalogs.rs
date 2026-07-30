@@ -591,18 +591,19 @@ async fn execute_catalog_query(
     // legitimate analytical scan over a large catalog can take minutes and a
     // person is driving; the agent path uses `Limits::agent()`, which adds one.
     let harden = !write;
-    let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
-        let session = Session::open()?;
-        session.run_setup(&setup)?;
-        if harden {
-            // `Hardening::agent()` adds an engine memory ceiling on top of the
-            // lockdown. The result `limits` bound what comes back; only the engine
-            // can bound what a query spends producing it.
-            session.harden(&Hardening::agent())?;
-        }
-        session.query(&sql, [], &limits)
-    })
-    .await;
+    let result =
+        tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
+            let session = Session::open()?;
+            session.run_setup(&setup)?;
+            if harden {
+                // `Hardening::agent()` adds an engine memory ceiling on top of the
+                // lockdown. The result `limits` bound what comes back; only the engine
+                // can bound what a query spends producing it.
+                session.harden(&Hardening::agent())?;
+            }
+            session.query(&sql, [], &limits)
+        })
+        .await;
 
     match result {
         Ok(Ok(query_result)) => {
@@ -687,13 +688,14 @@ pub(crate) async fn query_catalog_for_agent(
         &response.credentials,
         vend_catalog_credentials_body::Mode::Read,
     );
-    let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
-        let session = Session::open()?;
-        session.run_setup(&setup)?;
-        session.harden(&Hardening::agent())?;
-        session.query(&sql, [], &Limits::agent())
-    })
-    .await;
+    let result =
+        tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
+            let session = Session::open()?;
+            session.run_setup(&setup)?;
+            session.harden(&Hardening::agent())?;
+            session.query(&sql, [], &Limits::agent())
+        })
+        .await;
 
     match result {
         Ok(Ok(query_result)) => Ok(query_result),
@@ -844,7 +846,10 @@ async fn fetch_catalog_columns_via_rest(
     rows.sort_by(|a, b| {
         let key = |row: &[serde_json::Value]| {
             (
-                row.first().and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+                row.first()
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_owned(),
                 row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_owned(),
             )
         };
@@ -1088,7 +1093,10 @@ fn iceberg_type_to_display(ty: &serde_json::Value) -> String {
                 format!("LIST({})", element)
             }
             Some("map") => {
-                let key = obj.get("key").map(iceberg_type_to_display).unwrap_or_default();
+                let key = obj
+                    .get("key")
+                    .map(iceberg_type_to_display)
+                    .unwrap_or_default();
                 let value = obj
                     .get("value")
                     .map(iceberg_type_to_display)
@@ -1592,9 +1600,7 @@ pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatc
     let catalog = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
-    let name = args
-        .get_one::<String>("name")
-        .expect("name is required");
+    let name = args.get_one::<String>("name").expect("name is required");
     let env = cmd::get_string_flag(args, "environment");
 
     let response = out
@@ -1614,9 +1620,7 @@ pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatch
     let catalog = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
-    let name = args
-        .get_one::<String>("name")
-        .expect("name is required");
+    let name = args.get_one::<String>("name").expect("name is required");
     let env = cmd::get_string_flag(args, "environment");
     let statement = cmd::get_string_flag(args, "statement");
     let scope = cmd::get_string_flag(args, "scope");
@@ -1662,9 +1666,7 @@ pub async fn do_knowledge_delete(out: &output::Out, config: Config, args: &ArgMa
     let catalog = args
         .get_one::<String>("catalog_name")
         .expect("catalog_name is required");
-    let name = args
-        .get_one::<String>("name")
-        .expect("name is required");
+    let name = args.get_one::<String>("name").expect("name is required");
     let env = cmd::get_string_flag(args, "environment");
 
     out.with_spinner(
@@ -2127,7 +2129,10 @@ mod tests {
             ])
             .expect("query --max-rows should parse");
         let (_, query_args) = matches.subcommand().expect("expected query subcommand");
-        assert_eq!(query_args.get_one::<usize>("max_rows").copied(), Some(50_000));
+        assert_eq!(
+            query_args.get_one::<usize>("max_rows").copied(),
+            Some(50_000)
+        );
 
         assert!(
             catalogs_cmd()
@@ -2296,15 +2301,14 @@ mod tests {
             .expect("knowledge delete should parse");
 
         let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, delete_args) = knowledge_args.subcommand().expect("expected delete subcommand");
+        let (_, delete_args) = knowledge_args
+            .subcommand()
+            .expect("expected delete subcommand");
         assert_eq!(
             delete_args.get_one::<String>("catalog_name").unwrap(),
             "my-catalog"
         );
-        assert_eq!(
-            delete_args.get_one::<String>("name").unwrap(),
-            "my-entry"
-        );
+        assert_eq!(delete_args.get_one::<String>("name").unwrap(), "my-entry");
     }
 
     #[test]
@@ -2363,7 +2367,9 @@ mod tests {
             .expect("knowledge list should parse");
 
         let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, list_args) = knowledge_args.subcommand().expect("expected list subcommand");
+        let (_, list_args) = knowledge_args
+            .subcommand()
+            .expect("expected list subcommand");
 
         assert_eq!(
             list_args.get_one::<String>("catalog_name").unwrap(),
@@ -2451,7 +2457,9 @@ mod tests {
             .expect("knowledge set with all flags should parse");
 
         let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
+        let (_, set_args) = knowledge_args
+            .subcommand()
+            .expect("expected set subcommand");
 
         assert_eq!(set_args.get_one::<String>("scope").unwrap(), "column");
         assert_eq!(
@@ -2484,7 +2492,9 @@ mod tests {
             .expect("knowledge set should parse");
 
         let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, set_args) = knowledge_args.subcommand().expect("expected set subcommand");
+        let (_, set_args) = knowledge_args
+            .subcommand()
+            .expect("expected set subcommand");
 
         assert_eq!(set_args.get_one::<String>("scope").unwrap(), "catalog");
         assert_eq!(
@@ -2498,8 +2508,13 @@ mod tests {
 
     #[test]
     fn knowledge_set_requires_statement() {
-        let result =
-            catalogs_cmd().try_get_matches_from(["catalogs", "knowledge", "set", "my-catalog", "f"]);
+        let result = catalogs_cmd().try_get_matches_from([
+            "catalogs",
+            "knowledge",
+            "set",
+            "my-catalog",
+            "f",
+        ]);
         assert!(result.is_err());
     }
 
@@ -2513,7 +2528,9 @@ mod tests {
             .try_get_matches_from(["catalogs", "knowledge", "show", "my-catalog", "my-entry"])
             .expect("knowledge show should parse");
         let (_, knowledge_args) = matches.subcommand().expect("expected knowledge subcommand");
-        let (_, show_args) = knowledge_args.subcommand().expect("expected show subcommand");
+        let (_, show_args) = knowledge_args
+            .subcommand()
+            .expect("expected show subcommand");
         assert_eq!(show_args.get_one::<String>("name").unwrap(), "my-entry");
         assert_eq!(
             show_args.get_one::<String>("environment").unwrap(),
@@ -2529,5 +2546,4 @@ mod tests {
         assert_eq!(truncated.chars().count(), 80);
         assert!(truncated.ends_with('…'));
     }
-
 }
