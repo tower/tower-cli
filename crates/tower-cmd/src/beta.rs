@@ -1,8 +1,4 @@
-use std::io::{self, IsTerminal};
-
-use tower_telemetry::debug;
-
-use crate::output::{self, Out};
+use crate::output;
 
 pub(crate) struct BetaFeature {
     id: &'static str,
@@ -21,6 +17,10 @@ impl BetaFeature {
             None => self.message.to_string(),
         }
     }
+
+    pub fn notify_once(&self) {
+        output::notice_once(self.id, "Beta:", &self.notice());
+    }
 }
 
 pub(crate) const STORAGE_BETA_MESSAGE: &str = "Tower Storage is in beta. Core functionality is stable, but some featues and interfaces might change before general availability.";
@@ -31,30 +31,9 @@ pub(crate) const STORAGE: BetaFeature = BetaFeature {
     docs_url: None,
 };
 
-pub(crate) fn notify_once(out: &Out, feature: &BetaFeature) {
-    let stderr_is_terminal = io::stderr().is_terminal();
-
-    if !should_notify(out.interactive(), out.foreground(), stderr_is_terminal) {
-        return;
-    }
-
-    match config::claim_notice(feature.id) {
-        Ok(true) => output::notice_to_stderr("Beta:", &feature.notice()),
-        Ok(false) => {}
-        Err(err) => debug!("Failed to persist CLI notice {}: {}", feature.id, err),
-    }
-}
-
-/// The notice only goes out for a foreground CLI driving an interactive terminal:
-/// human output on a stdout TTY (never JSON or MCP capture), with stderr also a
-/// TTY so the notice itself is seen.
-fn should_notify(interactive: bool, foreground: bool, stderr_is_terminal: bool) -> bool {
-    interactive && foreground && stderr_is_terminal
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{should_notify, BetaFeature, STORAGE, STORAGE_BETA_MESSAGE};
+    use super::{BetaFeature, STORAGE, STORAGE_BETA_MESSAGE};
 
     #[test]
     fn short_about_has_one_beta_suffix() {
@@ -84,17 +63,5 @@ mod tests {
             feature.notice(),
             "Example is in beta. Its interface may change. Learn more: https://example.com/beta"
         );
-    }
-
-    #[test]
-    fn notice_requires_interactive_foreground_and_stderr_terminal() {
-        assert!(should_notify(true, true, true));
-        // stdout not an interactive terminal (redirected, JSON, or MCP capture)
-        assert!(!should_notify(false, true, true));
-        // not a foreground CLI (MCP or discarded output)
-        assert!(!should_notify(true, false, true));
-        // stderr not a terminal
-        assert!(!should_notify(true, true, false));
-        assert!(!should_notify(false, false, false));
     }
 }
