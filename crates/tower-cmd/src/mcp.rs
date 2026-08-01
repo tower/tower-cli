@@ -330,6 +330,21 @@ impl TowerService {
         Ok(CallToolResult::success(vec![Content::text(text)]))
     }
 
+    /// Like `json_success`, but compact. For the data-carrying catalog results,
+    /// whose rows are read under a byte ceiling counted in compact JSON:
+    /// pretty-printing an array of arrays spends several bytes of indentation
+    /// per value, which would let the serialized response outgrow the ceiling
+    /// the rows were admitted under.
+    fn json_success_compact<T: serde::Serialize>(data: T) -> Result<CallToolResult, McpError> {
+        let text = serde_json::to_string(&data).map_err(|e| {
+            McpError::internal_error(
+                "Serialization failed",
+                Some(json!({"error": e.to_string()})),
+            )
+        })?;
+        Ok(CallToolResult::success(vec![Content::text(text)]))
+    }
+
     fn text_success(message: String) -> Result<CallToolResult, McpError> {
         Ok(CallToolResult::success(vec![Content::text(message)]))
     }
@@ -732,7 +747,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Show a catalog's details: its property names and, for Tower-managed storage catalogs, the namespaces and tables you can query."
+        description = "Show a catalog's details: its property names and, for Tower-managed storage catalogs, the namespaces and tables you can query. The table listing is capped; when \"tables_truncated\" is true the catalog has more tables than shown, so query its metadata (e.g. with WHERE filters) to find the rest."
     )]
     async fn tower_catalogs_show(
         &self,
@@ -756,14 +771,18 @@ impl TowerService {
 
                 // Only Tower-managed storage catalogs expose queryable tables;
                 // for anything else `tables` stays null. A listing failure is
-                // surfaced in `tables_error` without failing the whole call.
-                let (tables, tables_error) = if crate::catalogs::is_storage_catalog_type(Some(
-                    &catalog.r#type,
-                )) {
-                    match crate::catalogs::list_catalog_tables(
+                // surfaced in `tables_error` (bounded, since a DuckDB error can
+                // be arbitrarily large) without failing the whole call. The
+                // listing runs under the agent ceilings — this response lands
+                // in a model's context, so a huge catalog is cut short and
+                // flagged via `tables_truncated` rather than dumped whole.
+                let (tables, tables_truncated, tables_error) =
+                    if crate::catalogs::is_storage_catalog_type(Some(&catalog.r#type)) {
+                        match crate::catalogs::list_catalog_tables(
                             &self.config,
                             &request.name,
                             environment,
+                            tower_duckdb::Limits::agent(),
                         )
                         .await
                         {
@@ -780,20 +799,26 @@ impl TowerService {
                                         })
                                         .collect(),
                                 ),
+                                Value::Bool(result.is_truncated()),
                                 Value::Null,
                             ),
-                            Err(e) => (Value::Null, Value::String(e)),
+                            Err(e) => (
+                                Value::Null,
+                                Value::Null,
+                                Value::String(crate::catalogs::bound_agent_error(e)),
+                            ),
                         }
-                } else {
-                    (Value::Null, Value::Null)
-                };
+                    } else {
+                        (Value::Null, Value::Null, Value::Null)
+                    };
 
-                Self::json_success(json!({
+                Self::json_success_compact(json!({
                     "name": catalog.name,
                     "type": catalog.r#type,
                     "environment": catalog.environment,
                     "properties": properties,
                     "tables": tables,
+                    "tables_truncated": tables_truncated,
                     "tables_error": tables_error,
                 }))
             }
@@ -825,7 +850,7 @@ impl TowerService {
         )
         .await
         {
-            Ok(result) => Self::json_success(json!({
+            Ok(result) => Self::json_success_compact(json!({
                 "columns": result.columns,
                 "rows": result.rows,
                 "row_count": result.rows.len(),

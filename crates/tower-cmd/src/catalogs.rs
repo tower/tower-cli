@@ -8,7 +8,7 @@ use tower_api::models::{
     catalog_fact, update_catalog_fact_body, vend_catalog_credentials_body, CatalogCredentials,
     CatalogFact, DescribeCatalogResponse, UpdateCatalogFactBody,
 };
-use tower_duckdb::{guard, params, run_query, Hardening, Limits, QueryResult, Session};
+use tower_duckdb::{guard, params, CancelHandle, Hardening, Limits, QueryResult, Session};
 use tower_telemetry::debug;
 
 use crate::{api, beta, output, util::cmd};
@@ -382,7 +382,7 @@ async fn fetch_catalog_tables(
     let result = if full {
         list_catalog_columns(config, name, env).await
     } else {
-        list_catalog_tables(config, name, env).await
+        list_catalog_tables(config, name, env, Limits::none()).await
     };
 
     match result {
@@ -397,13 +397,97 @@ async fn fetch_catalog_tables(
     }
 }
 
+/// How many DuckDB sessions may run at once across the whole process.
+///
+/// Every catalog query and table listing opens its own in-memory session, and a
+/// hardened session may spend up to `Hardening::agent()`'s ceilings — 1 GiB of
+/// engine memory and 2 GiB of spill — *each*. The MCP server dispatches
+/// requests concurrently, so without a shared budget a handful of parallel
+/// agent calls multiplies those ceilings until the machine runs out. Two slots
+/// keeps one slow scan from blocking every other call outright while capping
+/// the worst case at twice the per-session ceilings; everything else queues.
+const MAX_CONCURRENT_DUCKDB_SESSIONS: usize = 2;
+
+static DUCKDB_SESSION_SLOTS: tokio::sync::Semaphore =
+    tokio::sync::Semaphore::const_new(MAX_CONCURRENT_DUCKDB_SESSIONS);
+
+/// Cancels the session's query when dropped. Held across the await on the
+/// blocking task: if the request future is dropped (an MCP cancellation, a
+/// disconnect), the guard's drop interrupts the query instead of leaving it
+/// running to its ceilings on a thread nobody is waiting on. Dropping after a
+/// normal completion is a no-op.
+struct CancelOnDrop(CancelHandle);
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        self.0.cancel();
+    }
+}
+
+/// Runs `work` with a fresh DuckDB session on a blocking thread, inside the
+/// process-wide session budget and wired for cancellation. Errors come back as
+/// strings with no token redaction — the caller holds the token and redacts.
+async fn run_bounded_session<F>(work: F) -> Result<QueryResult, String>
+where
+    F: FnOnce(&Session) -> Result<QueryResult, tower_duckdb::Error> + Send + 'static,
+{
+    let _slot = DUCKDB_SESSION_SLOTS
+        .acquire()
+        .await
+        .expect("session semaphore is never closed");
+
+    let cancel = CancelHandle::new();
+    let _guard = CancelOnDrop(cancel.clone());
+    tokio::task::spawn_blocking(move || {
+        let session = Session::open().map_err(|err| format!("Query failed: {err}"))?;
+        if cancel.attach(&session) {
+            // Cancelled while queued for a slot; don't start work nobody awaits.
+            return Err("The query was cancelled.".to_string());
+        }
+        work(&session).map_err(|err| format!("Query failed: {err}"))
+    })
+    .await
+    .map_err(|err| format!("Query execution panicked: {err}"))?
+}
+
+/// Ceiling on an error message crossing to an agent. DuckDB errors can echo an
+/// offending *value* (a failed CAST reproduces the whole string it was given),
+/// which turns the error channel into an unbounded output path around the
+/// result ceilings. Generous enough for real diagnostics — parser errors with
+/// candidates, binder suggestions — while closing the loophole.
+const AGENT_MAX_ERROR_BYTES: usize = 4096;
+
+/// Bounds an error message to [`AGENT_MAX_ERROR_BYTES`] for the agent-facing
+/// paths. The full message (already redacted by the caller) goes to the debug
+/// log, so detail is kept where an operator can read it rather than shipped to
+/// the model. Truncates on a char boundary.
+pub(crate) fn bound_agent_error(message: String) -> String {
+    if message.len() <= AGENT_MAX_ERROR_BYTES {
+        return message;
+    }
+    debug!("full error before truncation for agent: {message}");
+    let mut cut = AGENT_MAX_ERROR_BYTES;
+    while !message.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    format!(
+        "{}… [error truncated; {} bytes total]",
+        &message[..cut],
+        message.len()
+    )
+}
+
 /// Attaches a storage catalog read-only and returns its (namespace, table)
-/// rows via `SHOW ALL TABLES`. Shared by the CLI `show` and the MCP server.
-/// Errors are returned with the OAuth token redacted.
+/// rows via `SHOW ALL TABLES`, bounded by `limits`. Shared by the CLI `show`
+/// (which passes `Limits::none()` — a person asked for the listing) and the MCP
+/// server (which passes `Limits::agent()` and reports truncation, so a huge
+/// catalog cannot flood a model's context). Errors are returned with the OAuth
+/// token redacted.
 pub(crate) async fn list_catalog_tables(
     config: &Config,
     name: &str,
     env: &str,
+    limits: Limits,
 ) -> Result<QueryResult, String> {
     let response =
         api::vend_catalog_credentials(config, name, env, vend_catalog_credentials_body::Mode::Read)
@@ -418,17 +502,15 @@ pub(crate) async fn list_catalog_tables(
     );
     let db_name = name.to_string();
 
-    tokio::task::spawn_blocking(move || {
-        run_query(
-            &setup,
+    run_bounded_session(move |session| {
+        session.run_setup(&setup)?;
+        session.query(
             "SELECT \"schema\", name FROM (SHOW ALL TABLES) WHERE database = ? ORDER BY \"schema\", name",
             params![db_name],
-            &Limits::none(),
+            &limits,
         )
     })
     .await
-    .map_err(|err| err.to_string())
-    .and_then(|inner| inner.map_err(|err| err.to_string()))
     .map_err(|err| redact_token(&err, &token))
 }
 
@@ -687,25 +769,17 @@ pub(crate) async fn query_catalog_for_agent(
         &response.credentials,
         vend_catalog_credentials_body::Mode::Read,
     );
-    let result = tokio::task::spawn_blocking(move || -> Result<QueryResult, tower_duckdb::Error> {
-        let session = Session::open()?;
+    run_bounded_session(move |session| {
         session.run_setup(&setup)?;
         session.harden(&Hardening::agent())?;
         session.query(&sql, [], &Limits::agent())
     })
-    .await;
-
-    match result {
-        Ok(Ok(query_result)) => Ok(query_result),
-        Ok(Err(err)) => Err(format!(
-            "Query failed: {}",
-            redact_token(&err.to_string(), &token)
-        )),
-        Err(err) => Err(format!(
-            "Query execution panicked: {}",
-            redact_token(&err.to_string(), &token)
-        )),
-    }
+    .await
+    // Redact before bounding, so truncation cannot cut the message ahead of
+    // the token and leave it intact; bound because a DuckDB error can echo an
+    // arbitrarily large offending value, which would bypass the result
+    // ceilings through the error channel.
+    .map_err(|err| bound_agent_error(redact_token(&err, &token)))
 }
 
 fn read_sql_from_stdin(out: &output::Out) -> String {
@@ -1961,6 +2035,35 @@ mod tests {
             parse_mode(credentials_args.get_one::<String>("mode").unwrap()),
             vend_catalog_credentials_body::Mode::ReadWrite
         );
+    }
+
+    /// A DuckDB error can echo the offending value — a failed CAST reproduces
+    /// the whole string it was given — so an unbounded error message is an
+    /// output channel around the result ceilings. Agent-facing errors are
+    /// bounded; short ones pass through untouched.
+    #[test]
+    fn agent_errors_are_bounded() {
+        let short = "Conversion Error: Could not convert string 'x' to INT32".to_string();
+        assert_eq!(super::bound_agent_error(short.clone()), short);
+
+        let huge = format!(
+            "Conversion Error: Could not convert string '{}' to INT32",
+            "x".repeat(2_000_000)
+        );
+        let total = huge.len();
+        let bounded = super::bound_agent_error(huge);
+        assert!(
+            bounded.len() < super::AGENT_MAX_ERROR_BYTES + 100,
+            "bounded error is still {} bytes",
+            bounded.len()
+        );
+        assert!(bounded.starts_with("Conversion Error"));
+        assert!(bounded.ends_with(&format!("[error truncated; {total} bytes total]")));
+
+        // Truncation must not split a multi-byte character.
+        let unicode = "é".repeat(super::AGENT_MAX_ERROR_BYTES);
+        let bounded = super::bound_agent_error(unicode);
+        assert!(bounded.contains("[error truncated"));
     }
 
     #[test]
