@@ -43,3 +43,66 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests
+
+  iceberg-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - bounds: minimum
+            pyarrow: "pyarrow==23.0.1"
+            pyiceberg: "pyiceberg[sql-sqlite]==0.11.1"
+          - bounds: latest
+            pyarrow: "pyarrow>=23.0.1,<26"
+            pyiceberg: "pyiceberg[sql-sqlite]>=0.11.1,<0.12"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Resolve ${{ matrix.bounds }} supported Iceberg dependencies
+        run: >-
+          uv pip install
+          --python .venv/bin/python
+          --strict
+          --resolution highest
+          --upgrade-package pyarrow
+          --upgrade-package pyiceberg
+          '${{ matrix.pyarrow }}'
+          '${{ matrix.pyiceberg }}'
+
+      - name: Assert resolved dependency versions
+        env:
+          BOUNDS: ${{ matrix.bounds }}
+        run: |
+          uv run --no-sync python - <<'PY'
+          import os
+          from importlib.metadata import version
+
+          from packaging.version import Version
+
+          pyarrow = Version(version("pyarrow"))
+          pyiceberg = Version(version("pyiceberg"))
+
+          print(f"PyArrow {pyarrow}; PyIceberg {pyiceberg}")
+          assert Version("23.0.1") <= pyarrow < Version("26")
+          assert Version("0.11.1") <= pyiceberg < Version("0.12")
+
+          if os.environ["BOUNDS"] == "minimum":
+              assert pyarrow == Version("23.0.1")
+              assert pyiceberg == Version("0.11.1")
+          PY
+
+      - name: Run Iceberg compatibility tests
+        run: uv run --no-sync pytest tests/tower/test_tables.py tests/tower/test_storage.py
