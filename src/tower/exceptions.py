@@ -32,3 +32,14 @@ class RunFailedError(RuntimeError):
 class AppNotFoundError(RuntimeError):
     def __init__(self, app_name: str):
         super().__init__(f"App '{app_name}' not found in the Tower.")
+
+
+class PyArrowFilterMigrationError(TypeError):
+    def __init__(self):
+        super().__init__(
+            "PyArrow compute expressions are no longer accepted as table delete "
+            'filters. Replace pc.field("age") >= 18 with '
+            'table.column("age") >= 18. Combine predicates with &, |, and ~; '
+            "replace [a, b] with a & b. You can also pass a PyIceberg "
+            "BooleanExpression or a SQL-like filter string."
+        )
