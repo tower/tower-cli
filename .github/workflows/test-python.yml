@@ -105,4 +105,7 @@ jobs:
           PY
 
       - name: Run Iceberg compatibility tests
-        run: uv run --no-sync pytest tests/tower/test_tables.py tests/tower/test_storage.py
+        run: >-
+          uv run --no-sync pytest
+          tests/tower/test_table*.py
+          tests/tower/test_storage.py

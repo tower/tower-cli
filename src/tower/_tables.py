@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import math
 import os
+import random
+import time
 from dataclasses import dataclass
-from typing import List, Optional, TypeVar, Union
+from typing import Callable, List, Optional, TypeVar, Union
 
 from pyiceberg.exceptions import CommitFailedException, NoSuchTableError
 
 TTable = TypeVar("TTable", bound="Table")
-
-import random
-import time
+TRetryResult = TypeVar("TRetryResult")
 
 import polars as pl
 import pyarrow as pa
@@ -36,6 +37,8 @@ from .utils.tables import (
     make_table_name,
     namespace_or_default,
 )
+
+_MAX_COMMIT_RETRY_DELAY_SECONDS = 30.0
 
 
 @dataclass
@@ -249,8 +252,30 @@ class Table:
     def _validate_retry_args(max_retries: int, retry_delay_seconds: float) -> None:
         if max_retries < 0:
             raise ValueError("max_retries must be >= 0")
-        if retry_delay_seconds < 0:
-            raise ValueError("retry_delay_seconds must be >= 0")
+        if not math.isfinite(retry_delay_seconds) or retry_delay_seconds < 0:
+            raise ValueError("retry_delay_seconds must be finite and >= 0")
+
+    def _commit_with_retry(
+        self,
+        operation: Callable[[], TRetryResult],
+        max_retries: int,
+        retry_delay_seconds: float,
+    ) -> TRetryResult:
+        retry_ceiling = min(retry_delay_seconds, _MAX_COMMIT_RETRY_DELAY_SECONDS)
+
+        for attempt in range(max_retries + 1):
+            try:
+                return operation()
+            except CommitFailedException:
+                if attempt == max_retries:
+                    raise
+
+                delay = random.uniform(0.0, retry_ceiling)
+                time.sleep(delay)
+                self._table.refresh()
+                retry_ceiling = min(retry_ceiling * 2, _MAX_COMMIT_RETRY_DELAY_SECONDS)
+
+        raise AssertionError("unreachable")
 
     def insert(
         self,
@@ -270,8 +295,8 @@ class Table:
                 must match the schema of the target table.
             max_retries (int): Maximum number of retry attempts on commit conflicts.
                 Defaults to 5.
-            retry_delay_seconds (float): Wait time in seconds between retries.
-                Defaults to 0.5 seconds.
+            retry_delay_seconds (float): Base delay in seconds for bounded exponential
+                backoff with full jitter. Defaults to 0.5 seconds.
 
         Returns:
             TTable: The table instance with the newly inserted rows, allowing for method chaining.
@@ -296,23 +321,11 @@ class Table:
         self._validate_retry_args(max_retries, retry_delay_seconds)
         self._ensure_read_write_table()
 
-        last_exception = None
-
-        for attempt in range(max_retries + 1):
-            try:
-                if attempt > 0:
-                    self._table.refresh()
-
-                self._table.append(data)
-                self._stats.inserts += data.num_rows
-                return self
-
-            except CommitFailedException as e:
-                last_exception = e
-                if attempt < max_retries:
-                    time.sleep(retry_delay_seconds)
-
-        raise last_exception
+        self._commit_with_retry(
+            lambda: self._table.append(data), max_retries, retry_delay_seconds
+        )
+        self._stats.inserts += data.num_rows
+        return self
 
     def upsert(
         self,
@@ -337,8 +350,8 @@ class Table:
                 If not provided, all columns will be used for matching.
             max_retries (int): Maximum number of retry attempts on commit conflicts.
                 Defaults to 5.
-            retry_delay_seconds (float): Wait time in seconds between retries.
-                Defaults to 0.5 seconds.
+            retry_delay_seconds (float): Base delay in seconds for bounded exponential
+                backoff with full jitter. Defaults to 0.5 seconds.
 
         Returns:
             TTable: The table instance with the upserted rows, allowing for method chaining.
@@ -370,34 +383,24 @@ class Table:
         self._validate_retry_args(max_retries, retry_delay_seconds)
         self._ensure_read_write_table()
 
-        last_exception = None
+        res = self._commit_with_retry(
+            lambda: self._table.upsert(
+                data,
+                join_cols=join_cols,
+                # All upserts will always be case sensitive. Perhaps we'll add this
+                # as a parameter in the future?
+                case_sensitive=True,
+                # These are the defaults, but we're including them to be complete.
+                when_matched_update_all=True,
+                when_not_matched_insert_all=True,
+            ),
+            max_retries,
+            retry_delay_seconds,
+        )
 
-        for attempt in range(max_retries + 1):
-            try:
-                if attempt > 0:
-                    self._table.refresh()
-
-                res = self._table.upsert(
-                    data,
-                    join_cols=join_cols,
-                    # All upserts will always be case sensitive. Perhaps we'll add this
-                    # as a parameter in the future?
-                    case_sensitive=True,
-                    # These are the defaults, but we're including them to be complete.
-                    when_matched_update_all=True,
-                    when_not_matched_insert_all=True,
-                )
-
-                self._stats.updates += res.rows_updated
-                self._stats.inserts += res.rows_inserted
-                return self
-
-            except CommitFailedException as e:
-                last_exception = e
-                if attempt < max_retries:
-                    time.sleep(retry_delay_seconds)
-
-        raise last_exception
+        self._stats.updates += res.rows_updated
+        self._stats.inserts += res.rows_inserted
+        return self
 
     def delete(
         self,
@@ -421,8 +424,8 @@ class Table:
                 - A string expression
             max_retries (int): Maximum number of retry attempts on commit conflicts.
                 Defaults to 5.
-            retry_delay_seconds (float): Wait time in seconds between retries.
-                Defaults to 0.5 seconds.
+            retry_delay_seconds (float): Base delay in seconds for bounded exponential
+                backoff with full jitter. Defaults to 0.5 seconds.
 
         Returns:
             TTable: The table instance with the deleted rows, allowing for method chaining.
@@ -455,30 +458,20 @@ class Table:
             next_filters = convert_pyarrow_expressions(filters)
             filters = next_filters
 
-        last_exception = None
+        self._commit_with_retry(
+            lambda: self._table.delete(
+                delete_filter=filters,
+                # We want this to always be the case. Not sure why you wouldn't?
+                case_sensitive=True,
+            ),
+            max_retries,
+            retry_delay_seconds,
+        )
 
-        for attempt in range(max_retries + 1):
-            try:
-                if attempt > 0:
-                    self._table.refresh()
+        # NOTE: There is, unfortunately, no way to get the number of rows
+        # deleted besides comparing the two snapshots that were created.
 
-                self._table.delete(
-                    delete_filter=filters,
-                    # We want this to always be the case. Not sure why you wouldn't?
-                    case_sensitive=True,
-                )
-
-                # NOTE: There is, unfortunately, no way to get the number of rows
-                # deleted besides comparing the two snapshots that were created.
-
-                return self
-
-            except CommitFailedException as e:
-                last_exception = e
-                if attempt < max_retries:
-                    time.sleep(retry_delay_seconds)
-
-        raise last_exception
+        return self
 
     def schema(self) -> pa.Schema:
         """
