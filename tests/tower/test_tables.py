@@ -943,7 +943,7 @@ def test_delete_from_tables(in_memory_catalog):
     assert table.rows_affected().inserts == 3
 
     # Perform the underlying delete from the table...
-    table.delete(filters=[table.column("username") == "bobb"])
+    table.delete(filters=table.column("username") == "bobb")
 
     # ...and let's make sure that record is actually gone.
     df = table.to_polars()

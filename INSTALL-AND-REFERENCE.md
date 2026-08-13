@@ -128,8 +128,23 @@ pip install "tower[ai]"
 pip install "tower[iceberg]"
 ```
 
-- `tower.create_table`: create Iceberg tables  
-- `tower.load_table`: load data from Iceberg tables  
+- `tower.tables(...)`: load, create, update, and delete Iceberg table data
+
+Delete filters are SQL-like strings or native PyIceberg boolean expressions. The
+`Table.column()` builder creates composable PyIceberg predicates:
+
+```python
+table = tower.tables("events").load()
+table.delete(
+    (table.column("age") >= 18)
+    & ~(table.column("status") == "inactive")
+)
+```
+
+PyArrow compute expressions and lists of expressions are no longer accepted as delete
+filters. Replace `pc.field("age") >= 18` with `table.column("age") >= 18`, and replace
+`[a, b]` with `a & b`. Code using PyArrow for Arrow-side filtering can continue to use
+`pyarrow.compute.field()` outside the Tower table API.
 
 ### dbt Core support
 

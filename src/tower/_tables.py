@@ -5,8 +5,17 @@ import os
 import random
 import time
 from dataclasses import dataclass
-from typing import Callable, List, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
+from pyiceberg.expressions import (
+    BooleanExpression,
+    EqualTo,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+    NotEqualTo,
+)
 from pyiceberg.exceptions import CommitFailedException, NoSuchTableError
 
 TTable = TypeVar("TTable", bound="Table")
@@ -28,11 +37,9 @@ from ._storage import (
     get_tower_catalog_credentials,
     load_vended_catalog,
 )
+from .exceptions import PyArrowFilterMigrationError
 from .tower_api_client.models import CatalogCredentials
-from .utils.pyarrow import (
-    convert_pyarrow_expressions,
-    convert_pyarrow_schema,
-)
+from .utils.pyarrow import convert_pyarrow_schema
 from .utils.tables import (
     make_table_name,
     namespace_or_default,
@@ -45,6 +52,29 @@ _MAX_COMMIT_RETRY_DELAY_SECONDS = 30.0
 class RowsAffectedInformation:
     inserts: int
     updates: int
+
+
+@dataclass(frozen=True, eq=False)
+class _TableColumn:
+    name: str
+
+    def __eq__(self, value: Any) -> BooleanExpression:
+        return EqualTo(self.name, value)
+
+    def __ne__(self, value: Any) -> BooleanExpression:
+        return NotEqualTo(self.name, value)
+
+    def __gt__(self, value: Any) -> BooleanExpression:
+        return GreaterThan(self.name, value)
+
+    def __ge__(self, value: Any) -> BooleanExpression:
+        return GreaterThanOrEqual(self.name, value)
+
+    def __lt__(self, value: Any) -> BooleanExpression:
+        return LessThan(self.name, value)
+
+    def __le__(self, value: Any) -> BooleanExpression:
+        return LessThanOrEqual(self.name, value)
 
 
 _VendedCatalogIdentity = tuple[str, str, str]
@@ -404,7 +434,7 @@ class Table:
 
     def delete(
         self,
-        filters: Union[str, List[pc.Expression]],
+        filters: str | BooleanExpression,
         max_retries: int = 5,
         retry_delay_seconds: float = 0.5,
     ) -> TTable:
@@ -417,11 +447,8 @@ class Table:
         cannot be tracked due to limitations in the underlying Iceberg implementation.
 
         Args:
-            filters (Union[str, List[pc.Expression]]): The filter conditions to apply.
-                Can be either:
-                - A single PyArrow compute expression
-                - A list of PyArrow compute expressions (combined with AND)
-                - A string expression
+            filters (str | BooleanExpression): A SQL-like string or a PyIceberg
+                boolean expression. Use ``Table.column()`` to construct expressions.
             max_retries (int): Maximum number of retry attempts on commit conflicts.
                 Defaults to 5.
             retry_delay_seconds (float): Base delay in seconds for bounded exponential
@@ -443,20 +470,16 @@ class Table:
             >>> # Delete rows where age is greater than 30
             >>> table.delete(table.column("age") > 30)
             >>> # Delete rows matching multiple conditions
-            >>> table.delete([
-            ...     table.column("age") > 30,
-            ...     table.column("department") == "IT"
-            ... ])
+            >>> table.delete(
+            ...     (table.column("age") > 30)
+            ...     & (table.column("department") == "IT")
+            ... )
             >>> # Delete rows using a string expression
             >>> table.delete("age > 30 AND department = 'IT'")
         """
         self._validate_retry_args(max_retries, retry_delay_seconds)
+        filters = self._normalize_delete_filter(filters)
         self._ensure_read_write_table()
-
-        if isinstance(filters, list):
-            # We need to convert the pc.Expression into PyIceberg
-            next_filters = convert_pyarrow_expressions(filters)
-            filters = next_filters
 
         self._commit_with_retry(
             lambda: self._table.delete(
@@ -472,6 +495,16 @@ class Table:
         # deleted besides comparing the two snapshots that were created.
 
         return self
+
+    @staticmethod
+    def _normalize_delete_filter(filters: object) -> str | BooleanExpression:
+        if isinstance(filters, (pc.Expression, list)):
+            raise PyArrowFilterMigrationError()
+        if isinstance(filters, (str, BooleanExpression)):
+            return filters
+        raise TypeError(
+            "filters must be a SQL-like string or a PyIceberg BooleanExpression"
+        )
 
     def schema(self) -> pa.Schema:
         """
@@ -489,19 +522,19 @@ class Table:
         iceberg_schema = self._table.schema()
         return iceberg_schema.as_arrow()
 
-    def column(self, name: str) -> pa.compute.Expression:
+    def column(self, name: str) -> _TableColumn:
         """
-        Returns a column from the table as a PyArrow compute expression.
+        Returns a structural builder for PyIceberg filter expressions.
 
         This method is useful for creating column-based expressions that can be used in
-        operations like filtering, sorting, or aggregating data. The returned expression
-        can be used with PyArrow's compute functions.
+        comparison operators build PyIceberg boolean expressions that can be passed to
+        ``delete()`` and composed with ``&``, ``|``, and ``~``.
 
         Args:
             name (str): The name of the column to retrieve from the table schema.
 
         Returns:
-            pa.compute.Expression: A PyArrow compute expression representing the column.
+            _TableColumn: A builder for PyIceberg comparison expressions.
 
         Raises:
             ValueError: If the specified column name is not found in the table schema.
@@ -513,13 +546,12 @@ class Table:
             >>> # Use the expression in a delete operation
             >>> table.delete(age_expr)
         """
-        field = self.schema().field(name)
+        try:
+            self._table.schema().find_field(name, case_sensitive=True)
+        except ValueError:
+            raise ValueError(f"Column {name} not found in table schema") from None
 
-        if field is None:
-            raise ValueError(f"Column {name} not found in table schema")
-
-        # We need to convert the PyArrow field into pa.compute.Expression
-        return pa.compute.field(name)
+        return _TableColumn(name)
 
 
 class TableReference:
