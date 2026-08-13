@@ -39,7 +39,6 @@ from ._storage import (
 )
 from .exceptions import PyArrowFilterMigrationError
 from .tower_api_client.models import CatalogCredentials
-from .utils.pyarrow import convert_pyarrow_schema
 from .utils.tables import (
     make_table_name,
     namespace_or_default,
@@ -643,7 +642,9 @@ class TableReference:
 
         Args:
             schema (pa.Schema): The PyArrow schema defining the structure of the table.
-                This will be converted to an Iceberg schema internally.
+                PyIceberg validates it and assigns Iceberg field IDs. Lossy or
+                unsupported types, including nanosecond timestamps by default, are
+                rejected instead of silently downcast.
 
         Returns:
             Table: A new Table instance wrapping the created Iceberg table.
@@ -678,7 +679,7 @@ class TableReference:
         # along the way.
         table = catalog.create_table(
             identifier=table_name,
-            schema=convert_pyarrow_schema(schema),
+            schema=schema,
         )
 
         return Table(
@@ -705,8 +706,10 @@ class TableReference:
 
         Args:
             schema (pa.Schema): The PyArrow schema defining the structure of the table.
-                This will be converted to an Iceberg schema internally. Note that this
-                schema is only used if the table needs to be created.
+                PyIceberg validates it and assigns Iceberg field IDs. Lossy or
+                unsupported types, including nanosecond timestamps by default, are
+                rejected instead of silently downcast. This schema is only used if the
+                table needs to be created.
 
         Returns:
             Table: A Table instance wrapping either the newly created or existing Iceberg table.
@@ -740,7 +743,7 @@ class TableReference:
         # exists.
         table = catalog.create_table_if_not_exists(
             identifier=table_name,
-            schema=convert_pyarrow_schema(schema),
+            schema=schema,
         )
 
         return Table(

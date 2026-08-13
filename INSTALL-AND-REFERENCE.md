@@ -146,6 +146,15 @@ filters. Replace `pc.field("age") >= 18` with `table.column("age") >= 18`, and r
 `[a, b]` with `a & b`. Code using PyArrow for Arrow-side filtering can continue to use
 `pyarrow.compute.field()` outside the Tower table API.
 
+Arrow schemas passed to `create()` or `create_if_not_exists()` are validated directly by
+PyIceberg, which assigns field IDs and preserves nested nullability and `b"doc"` field
+metadata. Timestamp units from seconds through microseconds, UTC-zoned microsecond
+timestamps, `time64[us]`, `date32`, and Decimal128 values up to precision 38 are supported.
+Nanosecond timestamps are rejected by default instead of being silently downcast, as are
+`time32`, `time64[ns]`, `date64`, Float16, Decimal256, and non-UTC zoned timestamps. Convert
+those fields explicitly before creating the table when the loss is acceptable. PyIceberg's
+native validation exceptions propagate unchanged.
+
 ### dbt Core support
 
 ```bash
