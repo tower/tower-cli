@@ -45,7 +45,13 @@ jobs:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/tower/tower-cli/blob/main/CLA.md'
           branch: 'main'
-          allowlist: dependabot[bot],renovate[bot]
+          # Tower employees are allowlisted (entries after the bots): they have
+          # already signed equivalent agreements as part of employment, so the
+          # CLA record for them lives in their employment paperwork, not in
+          # signatures/. Keep this list in sync with org membership; remove
+          # people when they leave (their later contributions would need a
+          # signature like anyone else's).
+          allowlist: dependabot[bot],renovate[bot],bradhe,datancoffee,giray123,jo-sm,konstantinoscs,MemoAlfa,mesmith027,sammuti,socksy
           # lock-on-merge is left at its default (enabled) on purpose: locking
           # the PR conversation after merge is what makes the signature
           # comments immutable, which is the evidentiary value of the record.
