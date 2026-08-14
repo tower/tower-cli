@@ -9,6 +9,10 @@
 #   - Treat it as frozen: do not add Dependabot/Renovate config for it, and
 #     do not expect upstream updates or fixes.
 #
+# Signature storage: the action writes cla.json directly (no PR), which a
+# branch requiring pull requests would reject — so signatures live on the
+# dedicated, unprotected orphan branch `cla-signatures`, not on main/develop.
+#
 # Signature versioning: signatures are stored under signatures/version1/.
 # If CLA.md is ever materially changed, bump the path to signatures/version2/
 # (and so on) so that prior signatures do not silently appear to cover text
@@ -47,7 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          list=$(gh api "repos/${{ github.repository }}/contents/.github/cla-allowlist.txt" --jq '.content' \
+          list=$(gh api "repos/${{ github.repository }}/contents/.github/cla-allowlist.txt?ref=${{ github.ref }}" --jq '.content' \
             | base64 --decode | grep -vE '^[[:space:]]*(#|$)' | paste -sd, -)
           echo "list=$list" >> "$GITHUB_OUTPUT"
       - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08  # v2.6.1 — upstream archived 2026-03
@@ -56,8 +60,13 @@ jobs:
         with:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/tower/tower-cli/blob/main/CLA.md'
-          branch: 'main'
+          branch: 'cla-signatures'
           allowlist: ${{ steps.allowlist.outputs.list }}
+          # Without this, the action matches the sign phrase as a substring
+          # (regex .*phrase.*), so "... I hereby sign the CLA, but I do not
+          # agree" would count as a signature. Setting custom-pr-sign-comment
+          # switches the action to exact (trimmed, case-insensitive) matching.
+          custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           # lock-on-merge is left at its default (enabled) on purpose: locking
           # the PR conversation after merge is what makes the signature
           # comments immutable, which is the evidentiary value of the record.
