@@ -29,29 +29,35 @@ permissions:
 jobs:
   cla:
     runs-on: ubuntu-latest
+    # The `github.event.issue.pull_request` guard is required: without it,
+    # comments on ordinary issues (not PRs) trigger the workflow. The upstream
+    # README example omits it; that is a known upstream bug.
+    if: >
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request &&
+       contains(fromJSON('["recheck","I have read the CLA Document and I hereby sign the CLA"]'),
+                github.event.comment.body))
     steps:
-      # The `github.event.issue.pull_request` guard is required: without it,
-      # comments on ordinary issues (not PRs) trigger the action. The upstream
-      # README example omits it; that is a known upstream bug.
+      # The action only accepts the allowlist as a string input, so it is
+      # tracked in .github/cla-allowlist.txt and loaded here. It is read from
+      # the DEFAULT branch on purpose: a PR must not be able to allowlist its
+      # own author by editing the file.
+      - name: Load allowlist
+        id: allowlist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          list=$(gh api "repos/${{ github.repository }}/contents/.github/cla-allowlist.txt" --jq '.content' \
+            | base64 --decode | grep -vE '^[[:space:]]*(#|$)' | paste -sd, -)
+          echo "list=$list" >> "$GITHUB_OUTPUT"
       - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08  # v2.6.1 — upstream archived 2026-03
-        if: >
-          github.event_name == 'pull_request_target' ||
-          (github.event.issue.pull_request &&
-           contains(fromJSON('["recheck","I have read the CLA Document and I hereby sign the CLA"]'),
-                    github.event.comment.body))
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/tower/tower-cli/blob/main/CLA.md'
           branch: 'main'
-          # Tower employees are allowlisted (entries after the bots): they have
-          # already signed equivalent agreements as part of employment, so the
-          # CLA record for them lives in their employment paperwork, not in
-          # signatures/. Keep this list in sync with org membership; remove
-          # people when they leave (their later contributions would need a
-          # signature like anyone else's).
-          allowlist: dependabot[bot],renovate[bot],bradhe,datancoffee,giray123,jo-sm,konstantinoscs,MemoAlfa,mesmith027,sammuti,socksy
+          allowlist: ${{ steps.allowlist.outputs.list }}
           # lock-on-merge is left at its default (enabled) on purpose: locking
           # the PR conversation after merge is what makes the signature
           # comments immutable, which is the evidentiary value of the record.
