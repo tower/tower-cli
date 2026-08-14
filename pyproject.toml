@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "tower"
-version = "0.3.70"
+version = "0.3.71"
 description = "Tower CLI and runtime environment for Tower."
 authors = [{ name = "Tower Computing GmbH", email = "brad@tower.dev" }]
 readme = "README.md"
