@@ -700,7 +700,31 @@ pub enum LogStreamEvent {
 #[derive(Debug)]
 pub enum LogStreamError {
     Reqwest(reqwest::Error),
+    /// The server rejected the stream request with a non-success status code.
+    InvalidStatus(StatusCode),
     Unknown,
+}
+
+impl LogStreamError {
+    /// The HTTP status carried by this error, when one is known.
+    pub fn status(&self) -> Option<StatusCode> {
+        match self {
+            LogStreamError::InvalidStatus(status) => Some(*status),
+            LogStreamError::Reqwest(err) => err.status().map(|s| {
+                StatusCode::from_u16(s.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+            }),
+            LogStreamError::Unknown => None,
+        }
+    }
+
+    /// A stream-open failure is fatal (not worth retrying) when the server
+    /// answered with a client error other than 429 Too Many Requests.
+    pub fn is_fatal(&self) -> bool {
+        match self.status() {
+            Some(status) => status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS,
+            None => false,
+        }
+    }
 }
 
 impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
@@ -809,6 +833,11 @@ pub async fn stream_run_logs(
             }
             Err(err) => match err {
                 reqwest_eventsource::Error::Transport(e) => Err(LogStreamError::Reqwest(e)),
+                reqwest_eventsource::Error::InvalidStatusCode(status, _) => {
+                    let status = StatusCode::from_u16(status.as_u16())
+                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+                    Err(LogStreamError::InvalidStatus(status))
+                }
                 reqwest_eventsource::Error::StreamEnded => {
                     drop(tx);
                     Ok(rx)
