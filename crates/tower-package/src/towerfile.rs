@@ -31,8 +31,11 @@ pub struct App {
     #[serde(default)]
     pub schedule: String,
 
-    #[serde(default)]
-    pub description: String,
+    /// Optional short description of the app. `None` means the Towerfile
+    /// didn't set one (and the key is omitted when serializing), which is
+    /// distinct from an explicitly empty description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 
     #[serde(default)]
     pub import_paths: Vec<PathBuf>,
@@ -61,7 +64,7 @@ impl Towerfile {
                 script: String::from(""),
                 source: vec![],
                 schedule: String::from("0 0 * * *"),
-                description: String::from(""),
+                description: None,
                 import_paths: vec![],
             },
         }
@@ -386,6 +389,51 @@ mod test {
         assert!(towerfile.remove_parameter("param1"));
         assert_eq!(towerfile.parameters.len(), 0);
         assert!(!towerfile.remove_parameter("param1"));
+    }
+
+    #[test]
+    fn test_description_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.description, None);
+
+        // Serializing a Towerfile without a description omits the key.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("description"));
+    }
+
+    #[test]
+    fn test_description_distinguishes_empty_from_absent() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            description = ""
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.description, Some(String::new()));
+    }
+
+    #[test]
+    fn test_description_roundtrips_when_present() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            description = "My app"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.description.as_deref(), Some("My app"));
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(serialized.contains(r#"description = "My app""#));
     }
 
     #[test]

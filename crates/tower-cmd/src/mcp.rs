@@ -1034,7 +1034,7 @@ impl TowerService {
                 tf.app.script = script;
             }
             if let Some(description) = request.description {
-                tf.app.description = description;
+                tf.app.description = Some(description);
             }
             if let Some(source) = request.source {
                 tf.app.source = source;

@@ -1,6 +1,6 @@
 use snafu::prelude::*;
 use tower_api::apis::default_api::{
-    DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
+    CreateAppError, DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
 };
 use tower_telemetry::debug;
 
@@ -101,6 +101,12 @@ pub enum Error {
     #[snafu(display("API describe app error: {}", source))]
     ApiDescribeAppError {
         source: tower_api::apis::Error<DescribeAppError>,
+    },
+
+    // API create app error
+    #[snafu(display("API create app error: {}", source))]
+    ApiCreateAppError {
+        source: tower_api::apis::Error<CreateAppError>,
     },
 
     // Channel error

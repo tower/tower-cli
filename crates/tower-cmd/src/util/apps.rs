@@ -1,5 +1,4 @@
 use crate::output;
-use http::StatusCode;
 use promptly::prompt_default;
 use tower_api::apis::{
     configuration::Configuration,
@@ -7,13 +6,20 @@ use tower_api::apis::{
 };
 use tower_api::models::CreateAppParams as CreateAppParamsModel;
 
+/// Distinguishes the two ways `ensure_app_exists` can fail: checking whether
+/// the app exists (describe) versus creating it when it doesn't.
+pub enum EnsureAppError {
+    Describe(tower_api::apis::Error<default_api::DescribeAppError>),
+    Create(tower_api::apis::Error<default_api::CreateAppError>),
+}
+
 pub async fn ensure_app_exists(
     out: &output::Out,
     api_config: &Configuration,
     app_name: &str,
-    description: &str,
+    description: Option<&str>,
     create_app: bool,
-) -> Result<(), tower_api::apis::Error<default_api::DescribeAppError>> {
+) -> Result<(), EnsureAppError> {
     // Try to describe the app first (with spinner)
     let mut spinner = out.spinner("Checking app...");
     let describe_result = default_api::describe_app(
@@ -51,7 +57,7 @@ pub async fn ensure_app_exists(
     // If it's not a 404 error, fail the spinner and return the error
     if !is_not_found {
         spinner.failure(out);
-        return Err(err);
+        return Err(EnsureAppError::Describe(err));
     }
 
     // App not found - stop spinner before prompting user
@@ -70,10 +76,12 @@ pub async fn ensure_app_exists(
 
     // If the user doesn't want to create the app, return the original error
     if !create_app {
-        return Err(err);
+        return Err(EnsureAppError::Describe(err));
     }
 
-    // Try to create the app (with a new spinner)
+    // Try to create the app (with a new spinner). The Towerfile description
+    // (when present) becomes the new app's short description; description is
+    // only ever set at creation time.
     let mut spinner = out.spinner("Creating app...");
     let create_result = default_api::create_app(
         api_config,
@@ -81,7 +89,7 @@ pub async fn ensure_app_exists(
             create_app_params: CreateAppParamsModel {
                 schema: None,
                 name: app_name.to_string(),
-                short_description: Some(description.to_string()),
+                short_description: description.map(|s| s.to_string()),
                 slug: None,
                 is_externally_accessible: None,
                 subdomain: None,
@@ -102,21 +110,7 @@ pub async fn ensure_app_exists(
         }
         Err(create_err) => {
             spinner.failure(out);
-            // Convert any creation error to a response error
-            Err(tower_api::apis::Error::ResponseError(
-                tower_api::apis::ResponseContent {
-                    tower_trace_id: "".to_string(),
-                    status: match &create_err {
-                        tower_api::apis::Error::ResponseError(resp) => resp.status,
-                        _ => StatusCode::INTERNAL_SERVER_ERROR,
-                    },
-                    content: match &create_err {
-                        tower_api::apis::Error::ResponseError(resp) => resp.content.clone(),
-                        _ => create_err.to_string(),
-                    },
-                    entity: None,
-                },
-            ))
+            Err(EnsureAppError::Create(create_err))
         }
     }
 }
