@@ -38,6 +38,26 @@ DEFAULT_COMMAND_PLAN: tuple[DbtCommand, ...] = (
     DbtCommand("build"),
 )
 
+# dbt commands that accept node selection (--select) per dbt's documented
+# node-selection syntax. Commands outside this set (e.g. deps, debug, parse,
+# clean) reject --select, so a configured selector must never be injected
+# into them.
+SELECT_SUPPORTED_COMMANDS: frozenset[str] = frozenset(
+    {
+        "run",
+        "test",
+        "build",
+        "compile",
+        "seed",
+        "snapshot",
+        "docs",
+        "list",
+        "ls",
+        "show",
+        "source",
+    }
+)
+
 
 def parse_command_plan(raw: str | None) -> tuple[DbtCommand, ...]:
     """
@@ -182,8 +202,10 @@ def run_dbt_workflow(config: DbtRunnerConfig) -> list[object]:
             for command in config.commands:
                 args = command.to_arg_list()
 
-                if config.selector and not (
-                    _has_flag(args, "--select") or _has_flag(args, "-s")
+                if (
+                    config.selector
+                    and command.name in SELECT_SUPPORTED_COMMANDS
+                    and not (_has_flag(args, "--select") or _has_flag(args, "-s"))
                 ):
                     args.extend(["--select", config.selector])
 
@@ -220,9 +242,30 @@ def run_dbt_workflow(config: DbtRunnerConfig) -> list[object]:
 
 
 def _log_run_results(log: logging.Logger, entries: Iterable[object] | None) -> None:
+    """Log per-node results when a dbt command produced them.
+
+    dbt commands return heterogeneous payloads: some yield an iterable of
+    node-level results, others a single non-iterable object (a bool, a
+    manifest, a catalog artifact, or nothing). Non-iterable payloads (with
+    strings/bytes treated as non-iterable) are skipped without raising.
+    """
     if not entries:
         return
-    for entry in entries:
+    if isinstance(entries, (str, bytes)):
+        log.debug(
+            "Skipping per-node result logging for non-iterable payload of type %s",
+            type(entries).__name__,
+        )
+        return
+    try:
+        iterator = iter(entries)
+    except TypeError:
+        log.debug(
+            "Skipping per-node result logging for non-iterable payload of type %s",
+            type(entries).__name__,
+        )
+        return
+    for entry in iterator:
         node = getattr(entry, "node", None)
         status = getattr(entry, "status", None)
         if node and hasattr(node, "name"):
