@@ -1,0 +1,25 @@
+# Accounts exempt from the CLA check (.github/workflows/cla.yml).
+# One GitHub username per line; lines starting with # and blank lines are
+# ignored. '*' wildcards are supported (e.g. bot accounts).
+#
+# The workflow reads this file from the default branch, so changes take
+# effect once they land there — a PR cannot allowlist its own author.
+#
+# Bots:
+dependabot[bot]
+renovate[bot]
+
+# Tower employees: exempt because they have already signed equivalent
+# agreements as part of employment; the CLA record for them lives in their
+# employment paperwork, not in signatures/. Keep in sync with org
+# membership; remove people when they leave (their later contributions need
+# a signature like anyone else's).
+bradhe
+datancoffee
+giray123
+jo-sm
+konstantinoscs
+MemoAlfa
+mesmith027
+sammuti
+socksy

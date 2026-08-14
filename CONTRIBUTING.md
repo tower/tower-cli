@@ -27,6 +27,14 @@ If you still need help:
 
 > **Legal Notice:** When contributing, you must agree that you have authored 100% of the content, have the necessary rights, and that it may be provided under the project license.
 
+### Contributor License Agreement
+
+A signed [Contributor License Agreement](CLA.md) is required before any pull request can be merged.
+
+Signing happens on the pull request itself: when you open a PR, a bot comments with a link to the CLA and a required status check fails. Reply to the bot's comment with the exact phrase it asks for (`I have read the CLA Document and I hereby sign the CLA`) and the check clears. You only need to do this once; it covers your future pull requests too.
+
+If you can't sign on your own behalf — for example, because your employer holds rights in your work — please say so before submitting a pull request.
+
 ### Reporting Bugs
 
 #### Before Submitting

@@ -22,7 +22,7 @@
           overlays = [ rust-overlay.overlays.default ];
         };
 
-        maintainer = "Tower Computing Inc. <support@tower.dev>";
+        maintainer = "Tower Computing GmbH <support@tower.dev>";
         homepage = "https://github.com/tower/tower-cli";
         description = "Tower CLI and runtime environment";
         longDescription = " |
@@ -47,7 +47,7 @@
           ${if packager == "rpm" then "release: 1" else "section: utils\npriority: optional"}
           maintainer: ${maintainer}
           description: ${longDescription}
-          vendor: Tower Computing Inc.
+          vendor: Tower Computing GmbH
           homepage: "${homepage}"
           license: MIT
           
