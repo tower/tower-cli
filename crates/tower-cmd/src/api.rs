@@ -694,7 +694,7 @@ pub async fn list_teams(
 
 pub enum LogStreamEvent {
     EventLog(tower_api::models::RunLogLine),
-    EventWarning(tower_api::models::EventWarning),
+    EventWarning(tower_api::models::SseWarning),
 }
 
 #[derive(Debug)]
@@ -725,6 +725,47 @@ impl LogStreamError {
             None => false,
         }
     }
+}
+
+impl std::fmt::Display for LogStreamError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogStreamError::Reqwest(err) => {
+                write!(f, "transport error while streaming run logs: {}", err)
+            }
+            LogStreamError::InvalidStatus(status) => {
+                write!(
+                    f,
+                    "the server rejected the log stream request with status {}",
+                    status
+                )
+            }
+            LogStreamError::Unknown => write!(f, "unknown error while streaming run logs"),
+        }
+    }
+}
+
+impl std::error::Error for LogStreamError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            LogStreamError::Reqwest(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+/// Parses the `data` field of a `warning` SSE event. On the wire it carries
+/// the bare warning payload (the `SseWarning` fields), but the enveloped
+/// `EventWarning` shape (`{event, data, ...}`) is accepted too for
+/// robustness.
+fn parse_warning_payload(data: &str) -> Option<tower_api::models::SseWarning> {
+    if let Ok(warning) = serde_json::from_str::<tower_api::models::SseWarning>(data) {
+        return Some(warning);
+    }
+
+    serde_json::from_str::<tower_api::models::EventWarning>(data)
+        .map(|event| event.data)
+        .ok()
 }
 
 impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
@@ -758,9 +799,8 @@ async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStre
                         };
                     }
                     "warning" => {
-                        let event_warning = serde_json::from_str(&message.data);
-                        if let Ok(event) = event_warning {
-                            tx.send(LogStreamEvent::EventWarning(event)).await.ok();
+                        if let Some(warning) = parse_warning_payload(&message.data) {
+                            tx.send(LogStreamEvent::EventWarning(warning)).await.ok();
                         } else {
                             debug!("Failed to parse warning message: {:?}", message.data);
                         }
@@ -1550,9 +1590,49 @@ impl ResponseEntity for tower_api::apis::default_api::CancelRunSuccess {
 
 #[cfg(test)]
 mod tests {
-    use super::{unwrap_api_response_redacted, ResponseEntity};
+    use super::{
+        parse_warning_payload, unwrap_api_response_redacted, LogStreamError, ResponseEntity,
+    };
     use http::StatusCode;
     use tower_api::apis::{Error, ResponseContent};
+
+    #[test]
+    fn parses_bare_warning_payload() {
+        let data = r#"{"content":"Something looks off","reported_at":"2025-08-22T12:00:00Z"}"#;
+        let warning = parse_warning_payload(data).expect("expected warning to parse");
+
+        assert_eq!(warning.content, "Something looks off");
+        assert_eq!(warning.reported_at, "2025-08-22T12:00:00Z");
+    }
+
+    #[test]
+    fn parses_enveloped_warning_payload() {
+        let data = r#"{"event":"warning","data":{"content":"Wrapped warning","reported_at":"2025-08-22T12:00:00Z"}}"#;
+        let warning = parse_warning_payload(data).expect("expected warning to parse");
+
+        assert_eq!(warning.content, "Wrapped warning");
+    }
+
+    #[test]
+    fn rejects_unparseable_warning_payload() {
+        assert!(parse_warning_payload("not json").is_none());
+        assert!(parse_warning_payload(r#"{"unrelated":true}"#).is_none());
+    }
+
+    #[test]
+    fn log_stream_error_display_mentions_status_code() {
+        let err = LogStreamError::InvalidStatus(StatusCode::NOT_FOUND);
+        assert!(err.to_string().contains("404"));
+
+        let err = LogStreamError::Unknown;
+        assert!(!err.to_string().is_empty());
+    }
+
+    #[test]
+    fn log_stream_error_boxes_as_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(LogStreamError::Unknown);
+        assert!(!err.to_string().is_empty());
+    }
 
     enum SensitiveSuccess {
         UnknownValue,

@@ -664,6 +664,13 @@ def make_log_event(seq: int, line_num: int, content: str, timestamp: str):
     return f"event: log\ndata: {json.dumps(make_log_data(seq, line_num, content, timestamp))}\n\n"
 
 
+def make_warning_event(content: str, timestamp: str):
+    """A warning SSE event. Matching the real server, the data field carries
+    the bare warning payload (not an enveloped {event, data, ...} object)."""
+    data = {"content": content, "reported_at": timestamp}
+    return f"event: warning\ndata: {json.dumps(data)}\n\n"
+
+
 @app.get("/v1/apps/{name}/runs/{seq}/logs")
 async def describe_run_logs(name: str, seq: int):
     """Mock endpoint for getting run logs."""
@@ -696,10 +703,13 @@ async def generate_logs_after_completion_test_stream(seq: int):
 
 
 async def generate_normal_log_stream(seq: int):
-    """Normal log stream for regular tests."""
+    """Normal log stream for regular tests, including a warning event."""
     for line_num, content, timestamp in NORMAL_LOG_ENTRIES:
         yield make_log_event(seq, line_num, content, timestamp)
         await asyncio.sleep(0.1)
+    yield make_warning_event(
+        "This run is using a deprecated runtime", "2025-08-22T12:00:03Z"
+    )
 
 
 @app.get("/v1/apps/{name}/runs/{seq}/logs/stream")

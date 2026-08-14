@@ -53,6 +53,7 @@ Feature: CLI Run Commands
     And I run "tower apps logs {app_name}#{run_number} --follow" via CLI with the created app name and run number
     Then the output should show "Hello, World!"
     And the output should contain "Hello, World!" exactly once
+    And the output should show "Warning: This run is using a deprecated runtime"
 
   Scenario: CLI apps logs --follow on a finished run prints stored logs exactly once
     Given I have a simple hello world application named "app-logs-after-completion"

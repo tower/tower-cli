@@ -374,8 +374,24 @@ async fn wait_completion(rx: &mut Option<oneshot::Receiver<()>>) -> bool {
     completed
 }
 
-/// Drains any remaining buffered lines from the stream for a short grace
-/// window after the run completes.
+/// Prints a single stream event: log lines are deduped through the tracker,
+/// warnings are rendered as `Warning: <content>`. Shared between the live
+/// streaming loop and the post-completion drain.
+fn print_stream_event(out: &output::Out, event: api::LogStreamEvent, tracker: &mut LineTracker) {
+    match event {
+        api::LogStreamEvent::EventLog(log) => {
+            if tracker.accept(log.line_num) {
+                out.remote_log_event(&log);
+            }
+        }
+        api::LogStreamEvent::EventWarning(warning) => {
+            out.write(&format!("Warning: {}\n", warning.content));
+        }
+    }
+}
+
+/// Drains any remaining buffered lines and warnings from the stream for a
+/// short grace window after the run completes.
 async fn drain_stream_with_grace(
     out: &output::Out,
     mut events: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
@@ -383,11 +399,7 @@ async fn drain_stream_with_grace(
 ) {
     let _ = timeout(STREAM_DRAIN_GRACE, async {
         while let Some(event) = events.recv().await {
-            if let api::LogStreamEvent::EventLog(log) = event {
-                if tracker.accept(log.line_num) {
-                    out.remote_log_event(&log);
-                }
-            }
+            print_stream_event(out, event, tracker);
         }
     })
     .await;
@@ -447,14 +459,7 @@ async fn stream_logs_with_reconnect(
                 loop {
                     tokio::select! {
                         event = events.recv() => match event {
-                            Some(api::LogStreamEvent::EventLog(log)) => {
-                                if tracker.accept(log.line_num) {
-                                    out.remote_log_event(&log);
-                                }
-                            }
-                            Some(api::LogStreamEvent::EventWarning(warning)) => {
-                                out.write(&format!("Warning: {}\n", warning.data.content));
-                            }
+                            Some(event) => print_stream_event(out, event, tracker),
                             // Stream closed; fall through to the disconnect path.
                             None => break,
                         },
@@ -477,7 +482,7 @@ async fn stream_logs_with_reconnect(
                 }
             }
             Err(err) => {
-                out.error(&format!("Failed to stream run logs: {:?}", err));
+                out.error(&format!("Failed to stream run logs: {}", err));
                 if err.is_fatal() {
                     std::process::exit(1);
                 }
