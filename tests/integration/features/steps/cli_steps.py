@@ -153,7 +153,9 @@ def step_output_contains_text_exactly_once(context, text):
     """Verify the output contains the text exactly once (no duplicates)."""
     output = _strip_ansi(context.cli_output)
     count = output.count(text)
-    assert count == 1, f"Expected '{text}' exactly once, found {count} times in: {output}"
+    assert (
+        count == 1
+    ), f"Expected '{text}' exactly once, found {count} times in: {output}"
 
 
 @step("I wait for {seconds:d} seconds")

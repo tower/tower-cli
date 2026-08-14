@@ -518,7 +518,10 @@ class TestLogRunResults:
 
     def test_iterable_payload_logs_per_node_entries(self):
         log = MagicMock()
-        entries = [self._make_entry("model_a", "success"), self._make_entry("model_b", "error")]
+        entries = [
+            self._make_entry("model_a", "success"),
+            self._make_entry("model_b", "error"),
+        ]
         _log_run_results(log, entries)
         assert log.info.call_count == 2
 
