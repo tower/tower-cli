@@ -119,9 +119,6 @@ pub async fn do_deploy(out: &output::Out, config: Config, args: &ArgMatches) {
             crate::Error::ApiDeployError { source } => {
                 out.tower_error_and_die(source, "Deploying app failed")
             }
-            crate::Error::ApiCreateAppError { source } => {
-                out.tower_error_and_die(source, "Creating app failed")
-            }
             crate::Error::ApiDescribeAppError { source } => {
                 out.tower_error_and_die(source, "Fetching app details failed")
             }
@@ -159,14 +156,17 @@ pub async fn deploy_from_dir(
     let api_config = config.into();
 
     // Add app existence check before proceeding
-    util::apps::ensure_app_exists(
+    if let Err(err) = util::apps::ensure_app_exists(
         out,
         &api_config,
         &towerfile.app.name,
-        towerfile.app.description.as_deref(),
+        &towerfile.app.description,
         create_app,
     )
-    .await?;
+    .await
+    {
+        return Err(crate::Error::ApiDescribeAppError { source: err });
+    }
 
     let spec = PackageSpec::from_towerfile(&towerfile);
     let mut spinner = out.spinner("Building package...");

@@ -150,10 +150,6 @@ async def create_app(app_data: Dict[str, Any]):
     if app_name in mock_apps_db:
         return {"app": mock_apps_db[app_name]}
 
-    description = app_data.get("description")
-    if description is None:
-        description = app_data.get("short_description", "")
-
     new_app = {
         "created_at": datetime.datetime.now().isoformat(),
         "health_status": "healthy",
@@ -174,7 +170,7 @@ async def create_app(app_data: Dict[str, Any]):
             "starting": 0,
         },
         "schedule": None,
-        "short_description": description or "",
+        "short_description": app_data.get("short_description", ""),
         "status": "active",
         "subdomain": "",
         "version": None,
@@ -195,27 +191,6 @@ async def describe_app(name: str, response: Response):
             "detail": f"App '{name}' not found",
         }
     return {"app": app_info, "runs": []}  # Simplistic, no runs yet
-
-
-@app.put("/v1/apps/{name}")
-async def update_app(name: str, app_data: Dict[str, Any], response: Response):
-    app_info = mock_apps_db.get(name)
-    if not app_info:
-        response.status_code = 404
-        return {
-            "$schema": "https://api.tower.dev/v1/schemas/ErrorModel.json",
-            "title": "Not Found",
-            "status": 404,
-            "detail": f"App '{name}' not found",
-        }
-
-    if "description" in app_data:
-        app_info["short_description"] = app_data.get("description") or ""
-    elif "short_description" in app_data:
-        app_info["short_description"] = app_data.get("short_description") or ""
-
-    mock_apps_db[name] = app_info
-    return {"app": app_info}
 
 
 @app.delete("/v1/apps/{name}")

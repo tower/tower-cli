@@ -1,6 +1,6 @@
 use snafu::prelude::*;
 use tower_api::apis::default_api::{
-    CreateAppError, DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
+    DeployAppError, DescribeAppError, DescribeRunError, RunAppError,
 };
 use tower_telemetry::debug;
 
@@ -97,12 +97,6 @@ pub enum Error {
         source: tower_api::apis::Error<DeployAppError>,
     },
 
-    // API create app error
-    #[snafu(display("API create app error: {}", source))]
-    ApiCreateAppError {
-        source: tower_api::apis::Error<CreateAppError>,
-    },
-
     // API describe app error
     #[snafu(display("API describe app error: {}", source))]
     ApiDescribeAppError {
@@ -173,12 +167,6 @@ impl From<tower_api::apis::Error<RunAppError>> for Error {
 impl From<tower_api::apis::Error<DeployAppError>> for Error {
     fn from(source: tower_api::apis::Error<DeployAppError>) -> Self {
         Self::ApiDeployError { source }
-    }
-}
-
-impl From<tower_api::apis::Error<CreateAppError>> for Error {
-    fn from(source: tower_api::apis::Error<CreateAppError>) -> Self {
-        Self::ApiCreateAppError { source }
     }
 }
 
