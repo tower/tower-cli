@@ -1,10 +1,5 @@
 # Tower Individual Contributor License Agreement
 
-<!-- Based on the Apache Software Foundation Individual Contributor License
-     Agreement ("Agreement") V2.2, retrieved from
-     https://www.apache.org/licenses/icla.pdf. Substantive deviations from the
-     Apache text are marked with LEGAL REVIEW REQUIRED comments. -->
-
 Before your pull request can be merged, Tower asks you to sign this
 contributor license agreement. Signing does not transfer ownership of your
 work: you keep the copyright in your contributions and grant Tower and users
@@ -14,33 +9,19 @@ is recorded in this repository.
 
 ---
 
-Thank you for your interest in Tower <!-- ENTITY: confirm Inc. vs GmbH -->
-("Tower"). To clarify the intellectual property license granted with
-Contributions from any person or entity, Tower must have on file a signed
-Contributor License Agreement ("CLA") from each Contributor, indicating
-agreement with the license terms below. This agreement is for your protection
-as a Contributor as well as the protection of Tower and its users. It does not
-change your rights to use your own Contributions for any other purpose.
+Thank you for your interest in Tower Computing GmbH ("Tower"). To clarify the
+intellectual property license granted with Contributions from any person or
+entity, Tower must have on file a signed Contributor License Agreement
+("CLA") from each Contributor, indicating agreement with the license terms
+below. This agreement is for your protection as a Contributor as well as the
+protection of Tower and its users. It does not change your rights to use your
+own Contributions for any other purpose.
 
-<!-- LEGAL REVIEW REQUIRED: signing mechanics. The Apache form is executed by
-     written signature and emailed to the Foundation, and collects the
-     signer's name, address, and email on the form itself. This version is
-     executed electronically: the Contributor posts the signature comment
-     requested by the CLA workflow on their GitHub pull request, and the
-     workflow records the Contributor's GitHub account and signature metadata
-     in this repository. Confirm this execution method and the associated
-     record-keeping are sufficient. -->
 You sign this Agreement electronically by posting the signature comment
 requested by the CLA workflow on your GitHub pull request. Your GitHub
 username and the metadata recorded by the workflow constitute the record of
 your signature and are stored in this repository.
 
-<!-- LEGAL REVIEW REQUIRED: removed covenant. The Apache text includes a
-     reciprocal commitment that the Foundation "shall not use Your
-     Contributions in a way that is contrary to the public benefit or
-     inconsistent with its nonprofit status and bylaws". Tower is not a
-     nonprofit, so the clause has been removed rather than adapted. Confirm
-     whether any reciprocal commitment should replace it. -->
 You accept and agree to the following terms and conditions for Your
 Contributions (present and future) that you submit to Tower. Except for the
 license granted herein to Tower and recipients of software distributed by
@@ -127,30 +108,14 @@ Contributions.
    become aware that would make these representations inaccurate in any
    respect.
 
-<!-- LEGAL REVIEW REQUIRED: retroactivity. Section 9 is an addition to the
-     Apache text. It extends the Agreement to Contributions submitted before
-     signature, which the prospectively-worded Apache form does not
-     explicitly cover. Confirm the wording achieves the intended coverage of
-     prior Contributions. -->
 9. Prior Contributions. This Agreement applies to all Contributions You
    submitted to Tower before the date You sign this Agreement, as well as to
    all Contributions You submit on or after that date. The licenses granted
    in sections 2 and 3, and the representations made in sections 4, 5, 7,
    and 8, apply equally to such prior Contributions.
 
-<!-- LEGAL REVIEW REQUIRED: governing law + venue. The Apache form contains
-     no governing law or venue clause. This section is an addition, and the
-     jurisdiction and venue have deliberately not been selected. Counsel must
-     choose them (and should confirm they match the entity chosen above). -->
 10. Governing Law. This Agreement shall be governed by and construed in
-    accordance with the laws of [GOVERNING LAW — TO BE DETERMINED BY
-    COUNSEL], without regard to its conflict of laws principles. Any dispute
-    arising out of or relating to this Agreement shall be subject to the
-    exclusive jurisdiction of the courts of [VENUE — TO BE DETERMINED BY
-    COUNSEL].
-
-<!-- LEGAL REVIEW REQUIRED: privacy notice. The Apache form points signers to
-     Apache's CLA privacy policy. That pointer has been removed. Signature
-     records stored in this repository contain personal data (GitHub
-     username, name, signature timestamp); confirm whether Tower needs its
-     own privacy notice covering these records. -->
+    accordance with the laws of the Federal Republic of Germany, without
+    regard to its conflict of laws principles. Any dispute arising out of or
+    relating to this Agreement shall be subject to the exclusive jurisdiction
+    of the courts at the registered seat of Tower Computing GmbH in Germany.
