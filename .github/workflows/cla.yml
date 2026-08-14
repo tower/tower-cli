@@ -11,8 +11,14 @@
 #
 # Signature storage: the action writes cla.json to `develop` directly (it
 # cannot open PRs), which the develop ruleset's pull-request requirement
-# would normally reject. The "GitHub Actions" app must therefore be a bypass
-# actor on the develop ruleset, or signing fails with a 409/permission error.
+# would normally reject — and GitHub does not allow the built-in Actions
+# token to bypass rulesets. So the write goes through a dedicated org-owned
+# GitHub App (Contents: read/write only): its token is minted below and
+# passed as PERSONAL_ACCESS_TOKEN, which the action uses for signature
+# persistence only (comments/status/lock still use GITHUB_TOKEN). The app
+# must be installed on this repo and listed as a bypass actor on the develop
+# ruleset, or signing fails at the moment someone signs.
+# Secrets required: CLA_APP_ID, CLA_APP_PRIVATE_KEY.
 # cla.json reaches main through the normal develop -> main release merges.
 #
 # Signature versioning: signatures are stored under signatures/version1/.
@@ -56,13 +62,26 @@ jobs:
           list=$(gh api "repos/${{ github.repository }}/contents/.github/cla-allowlist.txt?ref=${{ github.ref }}" --jq '.content' \
             | base64 --decode | grep -vE '^[[:space:]]*(#|$)' | paste -sd, -)
           echo "list=$list" >> "$GITHUB_OUTPUT"
+      - name: Mint signature-write token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          app-id: ${{ secrets.CLA_APP_ID }}
+          private-key: ${{ secrets.CLA_APP_PRIVATE_KEY }}
       - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08  # v2.6.1 — upstream archived 2026-03
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PERSONAL_ACCESS_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/tower/tower-cli/blob/main/CLA.md'
           branch: 'develop'
+          # Pointing "remote" at this same repo is what routes the signature
+          # write through PERSONAL_ACCESS_TOKEN (the app token) instead of
+          # GITHUB_TOKEN — the action only uses the PAT client when a remote
+          # repo/org is configured.
+          remote-organization-name: 'tower'
+          remote-repository-name: 'tower-cli'
           allowlist: ${{ steps.allowlist.outputs.list }}
           # Without this, the action matches the sign phrase as a substring
           # (regex .*phrase.*), so "... I hereby sign the CLA, but I do not
