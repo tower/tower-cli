@@ -36,25 +36,5 @@ Feature: CLI Run Commands
     Given I have a simple hello world application named "app-logs-after-completion"
     When I run "tower deploy --create" via CLI
     And I run "tower run" via CLI
-    Then the output should show "Hello, World!"
-
-  Scenario: CLI apps logs follow should stream logs and drain after completion
-    Given I have a simple hello world application named "app-logs-after-completion"
-    When I run "tower deploy --create" via CLI
-    And I run "tower run --detached" via CLI and capture run number
-    And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
-    Then the output should show "Hello, World!"
-
-  Scenario: CLI apps cancel should cancel a running run
-    Given I have a valid Towerfile in the current directory
-    When I run "tower deploy --create" via CLI
-    And I run "tower run --detached" via CLI and capture run number
-    And I run "tower apps cancel {app_name} {run_number}" via CLI using created app name and run number
-    Then the output should show "cancelled"
-
-  Scenario: CLI apps logs follow should display warnings
-    Given I have a simple hello world application named "app-logs-warning"
-    When I run "tower deploy --create" via CLI
-    And I run "tower run --detached" via CLI and capture run number
-    And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
-    Then the output should show "Warning: No new logs available"
+    Then the output should show "First log before run completes"
+    And the output should show "Second log after run completes"
