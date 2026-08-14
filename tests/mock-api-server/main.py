@@ -170,7 +170,11 @@ async def create_app(app_data: Dict[str, Any]):
             "starting": 0,
         },
         "schedule": None,
-        "short_description": app_data.get("short_description", ""),
+        # Accept either field spelling for the description: the API calls it
+        # short_description, the Towerfile/CLI vocabulary is description.
+        "short_description": app_data.get("short_description")
+        or app_data.get("description")
+        or "",
         "status": "active",
         "subdomain": "",
         "version": None,
@@ -191,6 +195,21 @@ async def describe_app(name: str, response: Response):
             "detail": f"App '{name}' not found",
         }
     return {"app": app_info, "runs": []}  # Simplistic, no runs yet
+
+
+@app.put("/v1/apps/{name}")
+async def update_app(name: str, app_data: Dict[str, Any]):
+    """Mock endpoint for updating an app (e.g. its short_description)."""
+    if name not in mock_apps_db:
+        raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    app_info = mock_apps_db[name]
+    if "short_description" in app_data:
+        app_info["short_description"] = app_data["short_description"]
+    elif "description" in app_data:
+        app_info["short_description"] = app_data["description"]
+
+    return {"app": app_info}
 
 
 @app.delete("/v1/apps/{name}")
@@ -660,16 +679,20 @@ async def describe_run_logs(name: str, seq: int):
 
 
 async def generate_logs_after_completion_test_stream(seq: int):
-    """Emit realistic runner logs then close, matching real server behavior."""
-    yield make_log_event(seq, 1, "Using CPython 3.12.9", "2025-08-22T12:00:00Z")
+    """Emit a log before the run completes and one after, then close.
+
+    Runs whose app name contains "logs-after-completion" flip to "exited"
+    after about 1 second (see describe_run), so the second line arrives after
+    the CLI has already observed completion — exercising the post-completion
+    log drain.
+    """
     yield make_log_event(
-        seq, 2, "Creating virtual environment at: .venv", "2025-08-22T12:00:00Z"
+        seq, 1, "First log before run completes", "2025-08-22T12:00:00Z"
     )
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.5)
     yield make_log_event(
-        seq, 3, "Activate with: source .venv/bin/activate", "2025-08-22T12:00:01Z"
+        seq, 2, "Second log after run completes", "2025-08-22T12:00:02Z"
     )
-    yield make_log_event(seq, 4, "Hello, World!", "2025-08-22T12:00:01Z")
 
 
 async def generate_normal_log_stream(seq: int):
