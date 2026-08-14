@@ -49,17 +49,26 @@ jobs:
       (github.event.issue.pull_request &&
        contains(fromJSON('["recheck","I have read the CLA Document and I hereby sign the CLA"]'),
                 github.event.comment.body))
+    # One run at a time per PR: `opened` + `synchronize` arriving together
+    # would otherwise race on the cla.json write.
+    concurrency:
+      group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
     steps:
       # The action only accepts the allowlist as a string input, so it is
-      # tracked in .github/cla-allowlist.txt and loaded here. It is read from
-      # the DEFAULT branch on purpose: a PR must not be able to allowlist its
-      # own author by editing the file.
+      # tracked in .github/cla-allowlist.txt and loaded here. It is pinned to
+      # `develop` (maintainer-controlled, matches the signature branch) so a
+      # PR cannot allowlist its own author by editing the file, and so
+      # issue_comment runs — which execute from the default branch — read the
+      # same copy as pull_request_target runs. pipefail makes a failed fetch
+      # fail the job instead of silently producing an empty allowlist.
       - name: Load allowlist
         id: allowlist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          list=$(gh api "repos/${{ github.repository }}/contents/.github/cla-allowlist.txt?ref=${{ github.ref }}" --jq '.content' \
+          set -euo pipefail
+          list=$(gh api "repos/${{ github.repository }}/contents/.github/cla-allowlist.txt?ref=develop" --jq '.content' \
             | base64 --decode | grep -vE '^[[:space:]]*(#|$)' | paste -sd, -)
           echo "list=$list" >> "$GITHUB_OUTPUT"
       - name: Mint signature-write token
@@ -74,7 +83,7 @@ jobs:
           PERSONAL_ACCESS_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           path-to-signatures: 'signatures/version1/cla.json'
-          path-to-document: 'https://github.com/tower/tower-cli/blob/main/CLA.md'
+          path-to-document: 'https://github.com/tower/tower-cli/blob/develop/CLA.md'
           branch: 'develop'
           # Pointing "remote" at this same repo is what routes the signature
           # write through PERSONAL_ACCESS_TOKEN (the app token) instead of

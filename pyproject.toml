@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "tower"
 version = "0.3.70"
 description = "Tower CLI and runtime environment for Tower."
-authors = [{ name = "Tower Computing Inc.", email = "brad@tower.dev" }]
+authors = [{ name = "Tower Computing GmbH", email = "brad@tower.dev" }]
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
