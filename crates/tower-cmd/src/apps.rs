@@ -1,10 +1,13 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 use colored::Colorize;
 use config::Config;
+use std::time::Duration;
 use tokio::sync::oneshot;
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{sleep, timeout, Instant};
 
-use tower_api::models::{Run, RunLogLine};
+use tower_api::models::run::Status as RunStatus;
+use tower_api::models::Run;
+use tower_telemetry::debug;
 
 use crate::{api, output, util::cmd};
 
@@ -42,6 +45,8 @@ pub fn apps_cmd() -> Command {
                         .help("The environment to resolve the app against")
                         .action(clap::ArgAction::Set),
                 )
+                .override_usage("tower apps show [OPTIONS] <APP_NAME>")
+                .after_help("Example:\n  tower apps show hello-world")
                 .about("Show details for a Tower app and its recent runs"),
         )
         .subcommand(
@@ -62,8 +67,15 @@ pub fn apps_cmd() -> Command {
                     Arg::new("follow")
                         .short('f')
                         .long("follow")
-                        .help("Follow logs in real time")
+                        .help("Follow the logs of the run in real time")
                         .action(clap::ArgAction::SetTrue),
+                )
+                .override_usage("tower apps logs [OPTIONS] <APP_NAME>#<RUN_NUMBER>")
+                .after_help(
+                    "Examples:\n  \
+                     tower apps logs hello-world#11              Show the stored logs of run 11\n  \
+                     tower apps logs hello-world 11              Same, with a separate run number\n  \
+                     tower apps logs hello-world --follow        Follow the latest run in real time",
                 )
                 .about("Get the logs from a previous Tower app run"),
         )
@@ -95,6 +107,8 @@ pub fn apps_cmd() -> Command {
                         .required(true)
                         .help("Name of the app"),
                 )
+                .override_usage("tower apps delete [OPTIONS] <APP_NAME>")
+                .after_help("Example:\n  tower apps delete hello-world")
                 .about("Delete an app in Tower"),
         )
         .subcommand(
@@ -133,10 +147,9 @@ pub async fn do_logs(out: &output::Out, config: Config, cmd: &ArgMatches) {
         };
         (app_name_raw.clone(), num)
     };
-    let follow = cmd.get_one::<bool>("follow").copied().unwrap_or(false);
 
-    if follow {
-        follow_logs(out, config, name, seq).await;
+    if cmd.get_flag("follow") {
+        follow_run_logs(out, &config, &name, seq).await;
         return;
     }
 
@@ -144,6 +157,347 @@ pub async fn do_logs(out: &output::Out, config: Config, cmd: &ArgMatches) {
         for line in resp.log_lines {
             out.remote_log_event(&line);
         }
+    }
+}
+
+/// How often the run's status is polled, both while waiting for it to start
+/// and while monitoring for completion during streaming.
+const STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
+
+/// How long to wait quietly before printing the "Waiting for run to start..."
+/// notice, so fast starts stay quiet but a slow start isn't a silent hang.
+const WAIT_NOTICE_AFTER: Duration = Duration::from_secs(3);
+
+/// How long to wait for a run to start before giving up.
+const WAIT_FOR_START_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Grace window after the run completes for the stream to deliver any
+/// remaining buffered lines.
+const STREAM_DRAIN_GRACE: Duration = Duration::from_secs(5);
+
+/// Consecutive status-check failures tolerated before completion monitoring
+/// gives up (without killing an otherwise healthy stream).
+const MAX_STATUS_CHECK_FAILURES: u32 = 5;
+
+/// The three groups a run status can fall into for follow purposes. The
+/// grouping is deliberately conservative: only known-final statuses are
+/// terminal, only known pre-start statuses count as not started, and anything
+/// else — including statuses introduced after this code was written — counts
+/// as in progress so a follow doesn't silently end early.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RunPhase {
+    Terminal,
+    NotStarted,
+    InProgress,
+}
+
+fn run_phase(status: &RunStatus) -> RunPhase {
+    match status {
+        RunStatus::Crashed | RunStatus::Errored | RunStatus::Exited | RunStatus::Cancelled => {
+            RunPhase::Terminal
+        }
+        RunStatus::Scheduled | RunStatus::Pending | RunStatus::Starting => RunPhase::NotStarted,
+        _ => RunPhase::InProgress,
+    }
+}
+
+/// Tracks the highest log line number printed so far, so a line is never
+/// printed twice across reconnects and the final catch-up fetch. Log line
+/// numbers increase monotonically, so anything at or below the highest number
+/// already printed is a repeat (or out of order) and is dropped.
+struct LineTracker {
+    highest: Option<i64>,
+}
+
+impl LineTracker {
+    fn new() -> Self {
+        Self { highest: None }
+    }
+
+    /// Returns true when the line should be printed, updating the high-water
+    /// mark; false when it's a duplicate or out-of-order line.
+    fn accept(&mut self, line_num: i64) -> bool {
+        match self.highest {
+            Some(highest) if line_num <= highest => false,
+            _ => {
+                self.highest = Some(line_num);
+                true
+            }
+        }
+    }
+}
+
+/// Exponential reconnect backoff: starts at 500ms, doubles per attempt, caps
+/// at 5s, and resets to the initial delay after any successful connection.
+struct Backoff {
+    current: Duration,
+}
+
+impl Backoff {
+    const INITIAL: Duration = Duration::from_millis(500);
+    const MAX: Duration = Duration::from_secs(5);
+
+    fn new() -> Self {
+        Self {
+            current: Self::INITIAL,
+        }
+    }
+
+    fn next_delay(&mut self) -> Duration {
+        let delay = self.current;
+        self.current = std::cmp::min(self.current * 2, Self::MAX);
+        delay
+    }
+
+    fn reset(&mut self) {
+        self.current = Self::INITIAL;
+    }
+}
+
+async fn describe_run_or_die(out: &output::Out, config: &Config, name: &str, seq: i64) -> Run {
+    match api::describe_run(config, name, seq).await {
+        Ok(resp) => resp.run,
+        Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
+    }
+}
+
+/// Prints the stored logs of a run, skipping anything already printed.
+async fn print_stored_logs(
+    out: &output::Out,
+    config: &Config,
+    name: &str,
+    seq: i64,
+    tracker: &mut LineTracker,
+) {
+    match api::describe_run_logs(config, name, seq).await {
+        Ok(resp) => {
+            for line in resp.log_lines {
+                if tracker.accept(line.line_num) {
+                    out.remote_log_event(&line);
+                }
+            }
+        }
+        Err(err) => out.tower_error_and_die(err, "Fetching run logs failed"),
+    }
+}
+
+enum WaitOutcome {
+    Started,
+    Finished,
+    TimedOut,
+}
+
+/// Polls the run until it starts, finishes, or the wait times out. Prints a
+/// single informational notice if the wait takes longer than a few seconds.
+async fn wait_for_run_start(
+    out: &output::Out,
+    config: &Config,
+    name: &str,
+    seq: i64,
+) -> WaitOutcome {
+    let started_waiting = Instant::now();
+    let mut printed_notice = false;
+
+    loop {
+        if started_waiting.elapsed() >= WAIT_FOR_START_TIMEOUT {
+            return WaitOutcome::TimedOut;
+        }
+
+        if !printed_notice && started_waiting.elapsed() >= WAIT_NOTICE_AFTER {
+            out.write("Waiting for run to start...\n");
+            printed_notice = true;
+        }
+
+        sleep(STATUS_POLL_INTERVAL).await;
+
+        let run = describe_run_or_die(out, config, name, seq).await;
+        match run_phase(&run.status) {
+            RunPhase::Terminal => return WaitOutcome::Finished,
+            RunPhase::InProgress => return WaitOutcome::Started,
+            RunPhase::NotStarted => {}
+        }
+    }
+}
+
+/// Watches the run's status in the background and resolves the returned
+/// channel when it reaches a terminal state. If the status check fails several
+/// times in a row, monitoring is abandoned (with a diagnostic) and the channel
+/// closes without resolving, so the stream itself keeps running.
+fn spawn_completion_monitor(
+    out: output::Out,
+    config: Config,
+    name: String,
+    seq: i64,
+) -> oneshot::Receiver<()> {
+    let (tx, rx) = oneshot::channel();
+
+    tokio::spawn(async move {
+        let mut failures: u32 = 0;
+
+        loop {
+            match api::describe_run(&config, &name, seq).await {
+                Ok(resp) => {
+                    failures = 0;
+                    if run_phase(&resp.run.status) == RunPhase::Terminal {
+                        let _ = tx.send(());
+                        return;
+                    }
+                }
+                Err(err) => {
+                    debug!("Failed to check run status: {:?}", err);
+                    failures += 1;
+                    if failures >= MAX_STATUS_CHECK_FAILURES {
+                        out.error(
+                            "Monitoring the run status failed repeatedly; continuing to stream logs.",
+                        );
+                        return;
+                    }
+                }
+            }
+
+            sleep(STATUS_POLL_INTERVAL).await;
+        }
+    });
+
+    rx
+}
+
+/// Waits on the completion monitor. Returns true when the run completed and
+/// false when monitoring was abandoned; either way the receiver is consumed so
+/// the caller stops selecting on it.
+async fn wait_completion(rx: &mut Option<oneshot::Receiver<()>>) -> bool {
+    let receiver = rx
+        .as_mut()
+        .expect("wait_completion called without a receiver");
+    let completed = receiver.await.is_ok();
+    *rx = None;
+    completed
+}
+
+/// Prints a single stream event: log lines are deduped through the tracker,
+/// warnings are rendered as `Warning: <content>`. Shared between the live
+/// streaming loop and the post-completion drain.
+fn print_stream_event(out: &output::Out, event: api::LogStreamEvent, tracker: &mut LineTracker) {
+    match event {
+        api::LogStreamEvent::EventLog(log) => {
+            if tracker.accept(log.line_num) {
+                out.remote_log_event(&log);
+            }
+        }
+        api::LogStreamEvent::EventWarning(warning) => {
+            out.write(&format!("Warning: {}\n", warning.content));
+        }
+    }
+}
+
+/// Drains any remaining buffered lines and warnings from the stream for a
+/// short grace window after the run completes.
+async fn drain_stream_with_grace(
+    out: &output::Out,
+    mut events: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
+    tracker: &mut LineTracker,
+) {
+    let _ = timeout(STREAM_DRAIN_GRACE, async {
+        while let Some(event) = events.recv().await {
+            print_stream_event(out, event, tracker);
+        }
+    })
+    .await;
+}
+
+/// Follows the logs of a run: prints stored logs for a finished run, waits for
+/// a not-yet-started run, and otherwise attaches to the live log stream with
+/// reconnects, dedup, and independent completion detection.
+async fn follow_run_logs(out: &output::Out, config: &Config, name: &str, seq: i64) {
+    let mut tracker = LineTracker::new();
+
+    let run = describe_run_or_die(out, config, name, seq).await;
+
+    match run_phase(&run.status) {
+        RunPhase::Terminal => {
+            print_stored_logs(out, config, name, seq, &mut tracker).await;
+            return;
+        }
+        RunPhase::NotStarted => match wait_for_run_start(out, config, name, seq).await {
+            WaitOutcome::Started => {}
+            WaitOutcome::Finished => {
+                print_stored_logs(out, config, name, seq, &mut tracker).await;
+                return;
+            }
+            WaitOutcome::TimedOut => {
+                out.die("Timed out waiting for the run to start. The runner may be unavailable.");
+            }
+        },
+        RunPhase::InProgress => {}
+    }
+
+    stream_logs_with_reconnect(out, config, name, seq, &run.dollar_link, &mut tracker).await;
+}
+
+async fn stream_logs_with_reconnect(
+    out: &output::Out,
+    config: &Config,
+    name: &str,
+    seq: i64,
+    run_link: &str,
+    tracker: &mut LineTracker,
+) {
+    let enable_ctrl_c = out.foreground();
+    let mut backoff = Backoff::new();
+    let mut run_complete: Option<oneshot::Receiver<()>> = Some(spawn_completion_monitor(
+        out.clone(),
+        config.clone(),
+        name.to_string(),
+        seq,
+    ));
+
+    loop {
+        match api::stream_run_logs(config, name, seq).await {
+            Ok(mut events) => {
+                backoff.reset();
+
+                loop {
+                    tokio::select! {
+                        event = events.recv() => match event {
+                            Some(event) => print_stream_event(out, event, tracker),
+                            // Stream closed; fall through to the disconnect path.
+                            None => break,
+                        },
+                        completed = wait_completion(&mut run_complete), if run_complete.is_some() => {
+                            if completed {
+                                drain_stream_with_grace(out, events, tracker).await;
+                                print_stored_logs(out, config, name, seq, tracker).await;
+                                return;
+                            }
+                            // Monitoring was abandoned; keep streaming and rely
+                            // on the disconnect path to notice completion.
+                        }
+                        _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
+                            out.write("Received Ctrl+C, stopping log streaming...\n");
+                            out.write("Note: The run will continue in Tower cloud\n");
+                            out.write(&format!("  See more: {}\n", run_link));
+                            return;
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                out.error(&format!("Failed to stream run logs: {}", err));
+                if err.is_fatal() {
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        // Disconnected (or a transient open failure): re-check the run status,
+        // stop if the run is done, otherwise retry with backoff.
+        let run = describe_run_or_die(out, config, name, seq).await;
+        if run_phase(&run.status) == RunPhase::Terminal {
+            print_stored_logs(out, config, name, seq, tracker).await;
+            return;
+        }
+
+        sleep(backoff.next_delay()).await;
     }
 }
 
@@ -301,327 +655,139 @@ async fn latest_run_number(out: &output::Out, config: &Config, name: &str) -> i6
     }
 }
 
-const FOLLOW_BACKOFF_INITIAL: Duration = Duration::from_millis(500);
-const FOLLOW_BACKOFF_MAX: Duration = Duration::from_secs(5);
-const LOG_DRAIN_DURATION: Duration = Duration::from_secs(5);
-const RUN_START_POLL_INTERVAL: Duration = Duration::from_millis(500);
-const RUN_START_MESSAGE_DELAY: Duration = Duration::from_secs(3);
-const RUN_START_TIMEOUT: Duration = Duration::from_secs(30);
-
-async fn follow_logs(out: &output::Out, config: Config, name: String, seq: i64) {
-    let mut backoff = FOLLOW_BACKOFF_INITIAL;
-    let mut cancel_monitor: Option<oneshot::Sender<()>> = None;
-    let mut last_line_num: Option<i64> = None;
-
-    loop {
-        let mut run = match api::describe_run(&config, &name, seq).await {
-            Ok(res) => res.run,
-            Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
-        };
-
-        if is_run_finished(&run) {
-            if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
-                for line in resp.log_lines {
-                    emit_log_if_new(out, &line, &mut last_line_num);
-                }
-            }
-            return;
-        }
-
-        if !is_run_started(&run) {
-            let wait_started = Instant::now();
-            let mut notified = false;
-            loop {
-                sleep(RUN_START_POLL_INTERVAL).await;
-
-                if wait_started.elapsed() > RUN_START_TIMEOUT {
-                    out.error("Timed out waiting for run to start. The runner may be unavailable.");
-                    return;
-                }
-
-                // Avoid blank output on slow starts while keeping fast starts quiet.
-                if should_notify_run_wait(notified, wait_started.elapsed()) {
-                    out.write("Waiting for run to start...\n");
-                    notified = true;
-                }
-                run = match api::describe_run(&config, &name, seq).await {
-                    Ok(res) => res.run,
-                    Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
-                };
-                if is_run_finished(&run) {
-                    if let Ok(resp) = api::describe_run_logs(&config, &name, seq).await {
-                        for line in resp.log_lines {
-                            emit_log_if_new(out, &line, &mut last_line_num);
-                        }
-                    }
-                    return;
-                }
-                if is_run_started(&run) {
-                    break;
-                }
-            }
-        }
-
-        // Cancel any prior watcher so we don't accumulate pollers after reconnects.
-        if let Some(cancel) = cancel_monitor.take() {
-            let _ = cancel.send(());
-        }
-        let (cancel_tx, cancel_rx) = oneshot::channel();
-        cancel_monitor = Some(cancel_tx);
-        let run_complete = monitor_run_completion(&config, &name, seq, cancel_rx);
-        match api::stream_run_logs(&config, &name, seq).await {
-            Ok(log_stream) => {
-                // Reset after a successful connection so transient drops recover quickly.
-                backoff = FOLLOW_BACKOFF_INITIAL;
-                match stream_logs_until_complete(
-                    out,
-                    log_stream,
-                    run_complete,
-                    out.foreground(),
-                    &run.dollar_link,
-                    &mut last_line_num,
-                )
-                .await
-                {
-                    Ok(LogFollowOutcome::Completed) => {
-                        if let Some(cancel) = cancel_monitor.take() {
-                            let _ = cancel.send(());
-                        }
-                        return;
-                    }
-                    Ok(LogFollowOutcome::Interrupted) => {
-                        if let Some(cancel) = cancel_monitor.take() {
-                            let _ = cancel.send(());
-                        }
-                        return;
-                    }
-                    Ok(LogFollowOutcome::Disconnected) => {}
-                    Err(_) => {
-                        if let Some(cancel) = cancel_monitor.take() {
-                            let _ = cancel.send(());
-                        }
-                        return;
-                    }
-                }
-            }
-            Err(err) => {
-                if is_fatal_stream_error(&err) {
-                    out.error(&format!("Failed to stream run logs: {}", err));
-                    return;
-                }
-                out.error(&format!("Failed to stream run logs: {}", err));
-                sleep(backoff).await;
-                backoff = next_backoff(backoff);
-                continue;
-            }
-        }
-
-        let latest = match api::describe_run(&config, &name, seq).await {
-            Ok(res) => res.run,
-            Err(err) => out.tower_error_and_die(err, "Fetching run details failed"),
-        };
-        if is_run_finished(&latest) {
-            return;
-        }
-
-        sleep(backoff).await;
-        backoff = next_backoff(backoff);
-    }
-}
-
-fn next_backoff(current: Duration) -> Duration {
-    let next = current.checked_mul(2).unwrap_or(FOLLOW_BACKOFF_MAX);
-    if next > FOLLOW_BACKOFF_MAX {
-        FOLLOW_BACKOFF_MAX
-    } else {
-        next
-    }
-}
-
-enum LogFollowOutcome {
-    Completed,
-    Disconnected,
-    Interrupted,
-}
-
-async fn stream_logs_until_complete(
-    out: &output::Out,
-    mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
-    mut run_complete: oneshot::Receiver<Run>,
-    enable_ctrl_c: bool,
-    run_link: &str,
-    last_line_num: &mut Option<i64>,
-) -> Result<LogFollowOutcome, crate::Error> {
-    loop {
-        tokio::select! {
-            event = log_stream.recv() => match event {
-                Some(api::LogStreamEvent::EventLog(log)) => {
-                    emit_log_if_new(out, &log, last_line_num);
-                },
-                Some(api::LogStreamEvent::EventWarning(warning)) => {
-                    out.write(&format!("Warning: {}\n", warning.data.content));
-                }
-                None => return Ok(LogFollowOutcome::Disconnected),
-            },
-            res = &mut run_complete => {
-                match res {
-                    Ok(_) => {
-                        drain_remaining_logs(out, log_stream, last_line_num).await;
-                        return Ok(LogFollowOutcome::Completed);
-                    }
-                    // If monitoring failed, keep following and let the caller retry.
-                    Err(_) => return Ok(LogFollowOutcome::Disconnected),
-                }
-            },
-            _ = tokio::signal::ctrl_c(), if enable_ctrl_c => {
-                out.write("Received Ctrl+C, stopping log streaming...\n");
-                out.write("Note: The run will continue in Tower cloud\n");
-                out.write(&format!("  See more: {}\n", run_link));
-                return Ok(LogFollowOutcome::Interrupted);
-            },
-        }
-    }
-}
-
-async fn drain_remaining_logs(
-    out: &output::Out,
-    mut log_stream: tokio::sync::mpsc::Receiver<api::LogStreamEvent>,
-    last_line_num: &mut Option<i64>,
-) {
-    let _ = tokio::time::timeout(LOG_DRAIN_DURATION, async {
-        while let Some(event) = log_stream.recv().await {
-            match event {
-                api::LogStreamEvent::EventLog(log) => {
-                    emit_log_if_new(out, &log, last_line_num);
-                }
-                api::LogStreamEvent::EventWarning(warning) => {
-                    out.write(&format!("Warning: {}\n", warning.data.content));
-                }
-            }
-        }
-    })
-    .await;
-}
-
-fn emit_log_if_new(out: &output::Out, log: &RunLogLine, last_line_num: &mut Option<i64>) {
-    if should_emit_line(last_line_num, log.line_num) {
-        out.remote_log_event(log);
-    }
-}
-
-fn should_emit_line(last_line_num: &mut Option<i64>, line_num: i64) -> bool {
-    if last_line_num.map_or(true, |last| line_num > last) {
-        *last_line_num = Some(line_num);
-        true
-    } else {
-        false
-    }
-}
-
-fn is_fatal_stream_error(err: &api::LogStreamError) -> bool {
-    match err {
-        api::LogStreamError::Reqwest(reqwest_err) => reqwest_err
-            .status()
-            .map(|status| status.is_client_error() && status.as_u16() != 429)
-            .unwrap_or(false),
-        api::LogStreamError::Unknown => false,
-    }
-}
-
-fn monitor_run_completion(
-    config: &Config,
-    app_name: &str,
-    seq: i64,
-    mut cancel: oneshot::Receiver<()>,
-) -> oneshot::Receiver<Run> {
-    let (tx, rx) = oneshot::channel();
-    let config_clone = config.clone();
-    let app_name = app_name.to_string();
-
-    tokio::spawn(async move {
-        let mut failures = 0;
-        loop {
-            tokio::select! {
-                _ = &mut cancel => return,
-                result = api::describe_run(&config_clone, &app_name, seq) => match result {
-                    Ok(res) => {
-                        failures = 0;
-                        if is_run_finished(&res.run) {
-                            let _ = tx.send(res.run);
-                            return;
-                        }
-                    }
-                    Err(_) => {
-                        failures += 1;
-                        if failures >= 5 {
-                            output::background_error(
-                                "Failed to monitor run completion after repeated errors",
-                            );
-                            return;
-                        }
-                    }
-                },
-            }
-            sleep(Duration::from_millis(500)).await;
-        }
-    });
-
-    rx
-}
-
-fn is_run_finished(run: &Run) -> bool {
-    match run.status {
-        // Be explicit about terminal states so new non-terminal statuses
-        // don't cause us to stop following logs too early.
-        tower_api::models::run::Status::Crashed
-        | tower_api::models::run::Status::Errored
-        | tower_api::models::run::Status::Exited
-        | tower_api::models::run::Status::Cancelled => true,
-        _ => false,
-    }
-}
-
-fn is_run_started(run: &Run) -> bool {
-    match run.status {
-        tower_api::models::run::Status::Scheduled
-        | tower_api::models::run::Status::Pending
-        | tower_api::models::run::Status::Starting => false,
-        _ => true,
-    }
-}
-
-fn should_notify_run_wait(already_notified: bool, elapsed: Duration) -> bool {
-    !already_notified && elapsed >= RUN_START_MESSAGE_DELAY
-}
-
 #[cfg(test)]
 mod tests {
-    use super::is_run_finished;
-    use super::{
-        apps_cmd, is_run_started, next_backoff, should_emit_line, should_notify_run_wait,
-        stream_logs_until_complete, LogFollowOutcome, FOLLOW_BACKOFF_INITIAL, FOLLOW_BACKOFF_MAX,
-    };
-    use tokio::sync::{mpsc, oneshot};
-    use tokio::time::Duration;
-    use tower_api::models::run::Status;
-    use tower_api::models::Run;
+    use super::{apps_cmd, run_phase, Backoff, LineTracker, RunPhase};
+    use std::time::Duration;
+    use tower_api::models::run::Status as RunStatus;
 
     #[test]
-    fn test_follow_flag_parsing() {
+    fn follow_flag_with_hash_form() {
         let matches = apps_cmd()
-            .try_get_matches_from(["apps", "logs", "--follow", "hello-world#11"])
+            .try_get_matches_from(["apps", "logs", "hello-world#11", "--follow"])
             .unwrap();
-        let (cmd, sub_matches) = matches.subcommand().unwrap();
+        let (_, sub_matches) = matches.subcommand().unwrap();
 
-        assert_eq!(cmd, "logs");
-        assert_eq!(sub_matches.get_one::<bool>("follow"), Some(&true));
         assert_eq!(
             sub_matches
                 .get_one::<String>("app_name")
                 .map(|s| s.as_str()),
             Some("hello-world#11")
         );
+        assert!(sub_matches.get_flag("follow"));
+    }
+
+    #[test]
+    fn follow_flag_with_separate_run_number() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "logs", "hello-world", "11", "--follow"])
+            .unwrap();
+        let (_, sub_matches) = matches.subcommand().unwrap();
+
+        assert_eq!(sub_matches.get_one::<i64>("run_number"), Some(&11));
+        assert!(sub_matches.get_flag("follow"));
+    }
+
+    #[test]
+    fn follow_flag_short_form_with_app_only() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "logs", "hello-world", "-f"])
+            .unwrap();
+        let (_, sub_matches) = matches.subcommand().unwrap();
+
+        assert_eq!(
+            sub_matches
+                .get_one::<String>("app_name")
+                .map(|s| s.as_str()),
+            Some("hello-world")
+        );
         assert_eq!(sub_matches.get_one::<i64>("run_number"), None);
+        assert!(sub_matches.get_flag("follow"));
+    }
+
+    #[test]
+    fn follow_flag_defaults_to_false() {
+        let matches = apps_cmd()
+            .try_get_matches_from(["apps", "logs", "hello-world"])
+            .unwrap();
+        let (_, sub_matches) = matches.subcommand().unwrap();
+
+        assert!(!sub_matches.get_flag("follow"));
+    }
+
+    #[test]
+    fn terminal_statuses_group_as_terminal() {
+        for status in [
+            RunStatus::Crashed,
+            RunStatus::Errored,
+            RunStatus::Exited,
+            RunStatus::Cancelled,
+        ] {
+            assert_eq!(run_phase(&status), RunPhase::Terminal);
+        }
+    }
+
+    #[test]
+    fn pre_start_statuses_group_as_not_started() {
+        for status in [
+            RunStatus::Scheduled,
+            RunStatus::Pending,
+            RunStatus::Starting,
+        ] {
+            assert_eq!(run_phase(&status), RunPhase::NotStarted);
+        }
+    }
+
+    #[test]
+    fn other_statuses_group_as_in_progress() {
+        // Running and Retrying aren't in either explicit list, so they (like
+        // any future status) count as in progress.
+        assert_eq!(run_phase(&RunStatus::Running), RunPhase::InProgress);
+        assert_eq!(run_phase(&RunStatus::Retrying), RunPhase::InProgress);
+    }
+
+    #[test]
+    fn backoff_starts_small_doubles_and_caps() {
+        let mut backoff = Backoff::new();
+
+        assert_eq!(backoff.next_delay(), Duration::from_millis(500));
+        assert_eq!(backoff.next_delay(), Duration::from_secs(1));
+        assert_eq!(backoff.next_delay(), Duration::from_secs(2));
+        assert_eq!(backoff.next_delay(), Duration::from_secs(4));
+        assert_eq!(backoff.next_delay(), Duration::from_secs(5));
+        assert_eq!(backoff.next_delay(), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn backoff_resets_to_initial_delay() {
+        let mut backoff = Backoff::new();
+        backoff.next_delay();
+        backoff.next_delay();
+        backoff.next_delay();
+
+        backoff.reset();
+        assert_eq!(backoff.next_delay(), Duration::from_millis(500));
+    }
+
+    #[test]
+    fn line_tracker_accepts_monotonically_increasing_lines() {
+        let mut tracker = LineTracker::new();
+
+        assert!(tracker.accept(1));
+        assert!(tracker.accept(2));
+        assert!(tracker.accept(5));
+    }
+
+    #[test]
+    fn line_tracker_drops_repeats_and_out_of_order_lines() {
+        let mut tracker = LineTracker::new();
+
+        assert!(tracker.accept(3));
+        assert!(!tracker.accept(3));
+        assert!(!tracker.accept(2));
+        assert!(!tracker.accept(1));
+        assert!(tracker.accept(4));
+        assert!(!tracker.accept(4));
     }
 
     #[test]
@@ -638,174 +804,6 @@ mod tests {
             Some("hello-world")
         );
         assert_eq!(sub_matches.get_one::<i64>("run_number"), Some(&11));
-    }
-
-    #[test]
-    fn test_terminal_statuses_explicit() {
-        let non_terminal = [
-            Status::Scheduled,
-            Status::Pending,
-            Status::Running,
-            Status::Retrying,
-        ];
-        for status in non_terminal {
-            let run = Run {
-                status,
-                ..Default::default()
-            };
-            assert!(!is_run_finished(&run));
-        }
-
-        let terminal = [
-            Status::Crashed,
-            Status::Errored,
-            Status::Exited,
-            Status::Cancelled,
-        ];
-        for status in terminal {
-            let run = Run {
-                status,
-                ..Default::default()
-            };
-            assert!(is_run_finished(&run));
-        }
-    }
-
-    #[test]
-    fn test_status_variants_exhaustive() {
-        let status = Status::Scheduled;
-        match status {
-            Status::Scheduled => {}
-            Status::Starting => {}
-            Status::Pending => {}
-            Status::Running => {}
-            Status::Retrying => {}
-            Status::Crashed => {}
-            Status::Errored => {}
-            Status::Exited => {}
-            Status::Cancelled => {}
-        }
-    }
-
-    #[test]
-    fn test_run_started_statuses() {
-        let not_started = [Status::Scheduled, Status::Pending, Status::Starting];
-        for status in not_started {
-            let run = Run {
-                status,
-                ..Default::default()
-            };
-            assert!(!is_run_started(&run));
-        }
-
-        let started = [
-            Status::Running,
-            Status::Retrying,
-            Status::Crashed,
-            Status::Errored,
-            Status::Exited,
-            Status::Cancelled,
-        ];
-        for status in started {
-            let run = Run {
-                status,
-                ..Default::default()
-            };
-            assert!(is_run_started(&run));
-        }
-    }
-
-    #[test]
-    fn test_run_wait_notification_logic() {
-        assert!(!should_notify_run_wait(
-            true,
-            super::RUN_START_MESSAGE_DELAY
-        ));
-        assert!(!should_notify_run_wait(
-            false,
-            super::RUN_START_MESSAGE_DELAY - Duration::from_millis(1)
-        ));
-        assert!(should_notify_run_wait(
-            false,
-            super::RUN_START_MESSAGE_DELAY
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_stream_completion_on_run_finish() {
-        let (tx, rx) = mpsc::channel(1);
-        let (done_tx, done_rx) = oneshot::channel();
-        let mut last_line_num = None;
-
-        let done_task = tokio::spawn(async move {
-            let _ = done_tx.send(Run::default());
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            drop(tx);
-        });
-
-        let out = crate::output::Out::sink();
-        let res =
-            stream_logs_until_complete(&out, rx, done_rx, false, "link", &mut last_line_num).await;
-        done_task.await.unwrap();
-
-        assert!(matches!(res, Ok(LogFollowOutcome::Completed)));
-    }
-
-    #[tokio::test]
-    async fn test_stream_disconnection_on_close() {
-        let (tx, rx) = mpsc::channel(1);
-        drop(tx);
-        let (_done_tx, done_rx) = oneshot::channel::<Run>();
-        let mut last_line_num = None;
-
-        let out = crate::output::Out::sink();
-        let res =
-            stream_logs_until_complete(&out, rx, done_rx, false, "link", &mut last_line_num).await;
-
-        assert!(matches!(res, Ok(LogFollowOutcome::Disconnected)));
-    }
-
-    #[test]
-    fn test_backoff_growth_and_cap() {
-        let mut backoff = FOLLOW_BACKOFF_INITIAL;
-        backoff = next_backoff(backoff);
-        assert_eq!(backoff, Duration::from_secs(1));
-        backoff = next_backoff(backoff);
-        assert_eq!(backoff, Duration::from_secs(2));
-        backoff = next_backoff(backoff);
-        assert_eq!(backoff, Duration::from_secs(4));
-        backoff = next_backoff(backoff);
-        assert_eq!(backoff, FOLLOW_BACKOFF_MAX);
-        backoff = next_backoff(backoff);
-        assert_eq!(backoff, FOLLOW_BACKOFF_MAX);
-    }
-
-    #[test]
-    fn test_duplicate_line_filtering() {
-        let mut last_line_num = None;
-        assert!(should_emit_line(&mut last_line_num, 1));
-        assert_eq!(last_line_num, Some(1));
-        assert!(!should_emit_line(&mut last_line_num, 1));
-        assert_eq!(last_line_num, Some(1));
-        assert!(!should_emit_line(&mut last_line_num, 0));
-        assert_eq!(last_line_num, Some(1));
-        assert!(should_emit_line(&mut last_line_num, 2));
-        assert_eq!(last_line_num, Some(2));
-        assert!(should_emit_line(&mut last_line_num, 10));
-        assert_eq!(last_line_num, Some(10));
-    }
-
-    #[test]
-    fn test_out_of_order_log_handling() {
-        let mut last_line_num = None;
-        assert!(should_emit_line(&mut last_line_num, 1));
-        assert_eq!(last_line_num, Some(1));
-        assert!(should_emit_line(&mut last_line_num, 3));
-        assert_eq!(last_line_num, Some(3));
-        assert!(!should_emit_line(&mut last_line_num, 2));
-        assert_eq!(last_line_num, Some(3));
-        assert!(should_emit_line(&mut last_line_num, 4));
-        assert_eq!(last_line_num, Some(4));
     }
 
     #[test]

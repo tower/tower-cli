@@ -36,25 +36,30 @@ Feature: CLI Run Commands
     Given I have a simple hello world application named "app-logs-after-completion"
     When I run "tower deploy --create" via CLI
     And I run "tower run" via CLI
-    Then the output should show "Hello, World!"
+    Then the output should show "First log before run completes"
+    And the output should show "Second log after run completes"
 
-  Scenario: CLI apps logs follow should stream logs and drain after completion
-    Given I have a simple hello world application named "app-logs-after-completion"
-    When I run "tower deploy --create" via CLI
-    And I run "tower run --detached" via CLI and capture run number
-    And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
-    Then the output should show "Hello, World!"
-
-  Scenario: CLI apps cancel should cancel a running run
+  Scenario: CLI apps cancel stops a running run
     Given I have a valid Towerfile in the current directory
     When I run "tower deploy --create" via CLI
-    And I run "tower run --detached" via CLI and capture run number
-    And I run "tower apps cancel {app_name} {run_number}" via CLI using created app name and run number
+    And I run "tower run --detached" via CLI and capture the run number
+    And I run "tower apps cancel {app_name} {run_number}" via CLI with the created app name and run number
     Then the output should show "cancelled"
 
-  Scenario: CLI apps logs follow should display warnings
-    Given I have a simple hello world application named "app-logs-warning"
+  Scenario: CLI apps logs --follow streams logs for a running run without duplicates
+    Given I have a valid Towerfile in the current directory
     When I run "tower deploy --create" via CLI
-    And I run "tower run --detached" via CLI and capture run number
-    And I run "tower apps logs --follow {app_name}#{run_number}" via CLI using created app name and run number
-    Then the output should show "Warning: No new logs available"
+    And I run "tower run --detached" via CLI and capture the run number
+    And I run "tower apps logs {app_name}#{run_number} --follow" via CLI with the created app name and run number
+    Then the output should show "Hello, World!"
+    And the output should contain "Hello, World!" exactly once
+    And the output should show "Warning: This run is using a deprecated runtime"
+
+  Scenario: CLI apps logs --follow on a finished run prints stored logs exactly once
+    Given I have a simple hello world application named "app-logs-after-completion"
+    When I run "tower deploy --create" via CLI
+    And I run "tower run --detached" via CLI and capture the run number
+    And I wait for 2 seconds
+    And I run "tower apps logs {app_name} {run_number} --follow" via CLI with the created app name and run number
+    Then the output should show "Hello, World!"
+    And the output should contain "Hello, World!" exactly once

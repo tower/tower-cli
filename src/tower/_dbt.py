@@ -5,7 +5,6 @@ import logging
 import os
 import shlex
 import tempfile
-from collections.abc import Iterable as IterableABC
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,9 +38,11 @@ DEFAULT_COMMAND_PLAN: tuple[DbtCommand, ...] = (
     DbtCommand("build"),
 )
 
-# Commands that support --select flag
-# See: https://docs.getdbt.com/reference/node-selection/syntax
-COMMANDS_WITH_SELECT: frozenset[str] = frozenset(
+# dbt commands that accept node selection (--select) per dbt's documented
+# node-selection syntax. Commands outside this set (e.g. deps, debug, parse,
+# clean) reject --select, so a configured selector must never be injected
+# into them.
+SELECT_SUPPORTED_COMMANDS: frozenset[str] = frozenset(
     {
         "run",
         "test",
@@ -203,7 +204,7 @@ def run_dbt_workflow(config: DbtRunnerConfig) -> list[object]:
 
                 if (
                     config.selector
-                    and command.name in COMMANDS_WITH_SELECT
+                    and command.name in SELECT_SUPPORTED_COMMANDS
                     and not (_has_flag(args, "--select") or _has_flag(args, "-s"))
                 ):
                     args.extend(["--select", config.selector])
@@ -241,35 +242,30 @@ def run_dbt_workflow(config: DbtRunnerConfig) -> list[object]:
 
 
 def _log_run_results(log: logging.Logger, entries: Iterable[object] | None) -> None:
-    """Log individual model/test results from dbt commands that produce them.
+    """Log per-node results when a dbt command produced them.
 
-    Based on dbt-core's return types (see dbt.cli.main.dbtRunnerResult):
-
-    Commands returning RunExecutionResult (iterable, has node-level results):
-    - build, compile, run, seed, snapshot, test, run-operation
-
-    Commands returning non-iterable results:
-    - docs generate → CatalogArtifact
-    - parse → Manifest
-    - list/ls → List[str] (iterable but no node results)
-    - debug → bool
-    - clean, deps, init, docs serve → None
-
-    This function logs node-level results when available (RunExecutionResult).
-    For other return types, dbt's own logging is sufficient.
+    dbt commands return heterogeneous payloads: some yield an iterable of
+    node-level results, others a single non-iterable object (a bool, a
+    manifest, a catalog artifact, or nothing). Non-iterable payloads (with
+    strings/bytes treated as non-iterable) are skipped without raising.
     """
     if not entries:
         return
-
-    if not isinstance(entries, IterableABC) or isinstance(entries, (str, bytes)):
-        result_type = type(entries).__name__
+    if isinstance(entries, (str, bytes)):
         log.debug(
-            "Command returned %s (not iterable node results), skipping detailed logging",
-            result_type,
+            "Skipping per-node result logging for non-iterable payload of type %s",
+            type(entries).__name__,
         )
         return
-
-    for entry in entries:
+    try:
+        iterator = iter(entries)
+    except TypeError:
+        log.debug(
+            "Skipping per-node result logging for non-iterable payload of type %s",
+            type(entries).__name__,
+        )
+        return
+    for entry in iterator:
         node = getattr(entry, "node", None)
         status = getattr(entry, "status", None)
         if node and hasattr(node, "name"):

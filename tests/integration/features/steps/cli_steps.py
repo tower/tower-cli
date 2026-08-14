@@ -2,11 +2,12 @@
 
 import subprocess
 import os
+import re
 import tempfile
 import shutil
 import json
 import shlex
-import re
+import time
 from datetime import datetime
 from pathlib import Path
 import requests
@@ -116,6 +117,70 @@ def step_run_cli_command_with_temp_session(context, command):
     return run_command_with_env(context, command, test_env)
 
 
+def _substitute_captured_values(context, command):
+    """Substitute the created app name and captured run number into a command."""
+    if "{app_name}" in command:
+        command = command.replace("{app_name}", context.app_name)
+    if "{run_number}" in command:
+        command = command.replace("{run_number}", str(context.run_number))
+    return command
+
+
+@step('I run "{command}" via CLI with the created app name')
+def step_run_cli_with_app_name(context, command):
+    """Run a CLI command with {app_name} replaced by the created app's name."""
+    step_run_cli_command(context, _substitute_captured_values(context, command))
+
+
+@step('I run "{command}" via CLI and capture the run number')
+def step_run_cli_capture_run_number(context, command):
+    """Run a CLI command and capture the run number from 'Run #<n>' output."""
+    step_run_cli_command(context, _substitute_captured_values(context, command))
+    output = _strip_ansi(context.cli_output)
+    match = re.search(r"Run #(\d+)", output)
+    assert match, f"Expected 'Run #<n>' in output, got: {output}"
+    context.run_number = int(match.group(1))
+
+
+@step('I run "{command}" via CLI with the created app name and run number')
+def step_run_cli_with_app_name_and_run_number(context, command):
+    """Run a CLI command with {app_name} and {run_number} substituted."""
+    step_run_cli_command(context, _substitute_captured_values(context, command))
+
+
+@step('the output should contain "{text}" exactly once')
+def step_output_contains_text_exactly_once(context, text):
+    """Verify the output contains the text exactly once (no duplicates)."""
+    output = _strip_ansi(context.cli_output)
+    count = output.count(text)
+    assert (
+        count == 1
+    ), f"Expected '{text}' exactly once, found {count} times in: {output}"
+
+
+@step("I wait for {seconds:d} seconds")
+def step_wait_seconds(context, seconds):
+    """Sleep, e.g. to let a mock run reach a terminal state."""
+    time.sleep(seconds)
+
+
+@step('the JSON app short description should be "{expected}"')
+def step_json_app_short_description(context, expected):
+    """Verify the app's short_description in JSON output."""
+    data = parse_cli_json(context)
+    app = None
+    if isinstance(data, dict):
+        if "app" in data:
+            app = data["app"]
+        elif "data" in data and isinstance(data["data"], dict):
+            app = data["data"].get("app")
+    assert app is not None, f"Could not find app object in JSON response: {data}"
+    actual = app.get("short_description")
+    assert (
+        actual == expected
+    ), f"Expected short_description '{expected}', got '{actual}'"
+
+
 @step("no session.json should exist in the temp home")
 def step_no_session_json(context):
     """Verify that API key auth did not create a session.json file"""
@@ -123,37 +188,6 @@ def step_no_session_json(context):
     assert (
         not session_path.exists()
     ), f"session.json should not exist but found at {session_path}"
-
-
-@step('I run "{command}" via CLI using created app name')
-def step_run_cli_command_with_app_name(context, command):
-    """Run a Tower CLI command with the generated app name injected."""
-    if not hasattr(context, "app_name"):
-        raise AssertionError("Expected context.app_name to be set by app setup step")
-    formatted = command.format(app_name=context.app_name)
-    step_run_cli_command(context, formatted)
-
-
-@step('I run "{command}" via CLI and capture run number')
-def step_run_cli_command_capture_run_number(context, command):
-    """Run a Tower CLI command and capture the run number from its output."""
-    step_run_cli_command(context, command)
-    output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", context.cli_output)
-    match = re.search(r"Run #(?P<number>\d+)", output)
-    if not match:
-        raise AssertionError(f"Expected run number in output, got: {output}")
-    context.run_number = match.group("number")
-
-
-@step('I run "{command}" via CLI using created app name and run number')
-def step_run_cli_command_with_app_name_and_run(context, command):
-    """Run a Tower CLI command with the generated app name and run number injected."""
-    if not hasattr(context, "app_name"):
-        raise AssertionError("Expected context.app_name to be set by app setup step")
-    if not hasattr(context, "run_number"):
-        raise AssertionError("Expected context.run_number to be set by run step")
-    formatted = command.format(app_name=context.app_name, run_number=context.run_number)
-    step_run_cli_command(context, formatted)
 
 
 @step("timestamps should be yellow colored")
@@ -430,38 +464,6 @@ def step_app_name_should_be(context, expected_name):
     assert (
         actual_name == expected_name
     ), f"Expected app name '{expected_name}', got '{actual_name}'"
-
-
-@step('the app description should be "{expected_description}"')
-def step_app_description_should_be(context, expected_description):
-    """Verify app description matches expected value"""
-    data = parse_cli_json(context)
-    candidates = []
-
-    if "app" in data:
-        candidates.append(data["app"])
-    if "data" in data and "app" in data["data"]:
-        candidates.append(data["data"]["app"])
-
-    if not candidates:
-        candidates.append(data)
-
-    actual_description = None
-    for candidate in candidates:
-        if isinstance(candidate, dict):
-            if "short_description" in candidate:
-                actual_description = candidate["short_description"]
-                break
-            if "description" in candidate:
-                actual_description = candidate["description"]
-                break
-
-    assert (
-        actual_description is not None
-    ), f"Could not find app description in JSON response: {data}"
-    assert (
-        actual_description == expected_description
-    ), f"Expected description '{expected_description}', got '{actual_description}'"
 
 
 # Pagination test steps

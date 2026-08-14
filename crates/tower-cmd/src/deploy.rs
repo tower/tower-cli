@@ -119,11 +119,11 @@ pub async fn do_deploy(out: &output::Out, config: Config, args: &ArgMatches) {
             crate::Error::ApiDeployError { source } => {
                 out.tower_error_and_die(source, "Deploying app failed")
             }
-            crate::Error::ApiCreateAppError { source } => {
-                out.tower_error_and_die(source, "Creating app failed")
-            }
             crate::Error::ApiDescribeAppError { source } => {
                 out.tower_error_and_die(source, "Fetching app details failed")
+            }
+            crate::Error::ApiCreateAppError { source } => {
+                out.tower_error_and_die(source, "Creating app failed")
             }
             crate::Error::PackageError { source } => {
                 out.package_error(source);
@@ -158,15 +158,27 @@ pub async fn deploy_from_dir(
         })?;
     let api_config = config.into();
 
-    // Add app existence check before proceeding
-    util::apps::ensure_app_exists(
+    // Add app existence check before proceeding. When the app is created here,
+    // the Towerfile description (if present) is applied at creation time only;
+    // an already-existing app's description is never touched by deploy.
+    if let Err(err) = util::apps::ensure_app_exists(
         out,
         &api_config,
         &towerfile.app.name,
         towerfile.app.description.as_deref(),
         create_app,
     )
-    .await?;
+    .await
+    {
+        return Err(match err {
+            util::apps::EnsureAppError::Describe(source) => {
+                crate::Error::ApiDescribeAppError { source }
+            }
+            util::apps::EnsureAppError::Create(source) => {
+                crate::Error::ApiCreateAppError { source }
+            }
+        });
+    }
 
     let spec = PackageSpec::from_towerfile(&towerfile);
     let mut spinner = out.spinner("Building package...");
