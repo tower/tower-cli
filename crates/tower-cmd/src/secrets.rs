@@ -19,7 +19,6 @@ pub fn secrets_cmd() -> Command {
                     Arg::new("show")
                         .short('s')
                         .long("show")
-                        .help("Show secrets in plain text")
                         .action(clap::ArgAction::SetTrue),
                 )
                 .arg(
@@ -28,14 +27,12 @@ pub fn secrets_cmd() -> Command {
                         .long("environment")
                         .default_value("default")
                         .value_parser(value_parser!(String))
-                        .help("List secrets in this environment")
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
                     Arg::new("all")
                         .short('a')
                         .long("all")
-                        .help("List secrets across all environments")
                         .action(clap::ArgAction::SetTrue),
                 )
                 .about("List secrets in your Tower account"),
@@ -48,7 +45,6 @@ pub fn secrets_cmd() -> Command {
                         .long("name")
                         .value_parser(value_parser!(String))
                         .required(true)
-                        .help("Secret name to create")
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -57,7 +53,6 @@ pub fn secrets_cmd() -> Command {
                         .long("environment")
                         .default_value("default")
                         .value_parser(value_parser!(String))
-                        .help("Environment to store the secret in")
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -66,7 +61,6 @@ pub fn secrets_cmd() -> Command {
                         .long("value")
                         .value_parser(value_parser!(String))
                         .required(true)
-                        .help("Secret value to store")
                         .action(clap::ArgAction::Set),
                 )
                 .about("Create a new secret in your Tower account"),
