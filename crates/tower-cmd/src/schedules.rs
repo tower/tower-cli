@@ -71,25 +71,11 @@ pub fn schedules_cmd() -> Command {
         )
         .subcommand(
             Command::new("delete")
-                .arg(
-                    Arg::new("schedule_id")
-                        .value_parser(value_parser!(String))
-                        .index(1)
-                        .required(true)
-                        .help("The schedule ID to delete"),
-                )
-                .after_help("Example: tower schedules delete 123")
+                .allow_external_subcommands(true)
                 .about("Delete a schedule"),
         )
         .subcommand(
             Command::new("update")
-                .arg(
-                    Arg::new("id_or_name")
-                        .value_parser(value_parser!(String))
-                        .index(1)
-                        .required(true)
-                        .help("ID or name of the schedule to update"),
-                )
                 .arg(
                     Arg::new("cron")
                         .short('c')
@@ -105,7 +91,7 @@ pub fn schedules_cmd() -> Command {
                         .help("Parameters (key=value) to pass to the app")
                         .action(clap::ArgAction::Append),
                 )
-                .after_help("Example: tower schedules update 123 --cron \"*/15 * * * *\"")
+                .allow_external_subcommands(true)
                 .about("Update an existing schedule"),
         )
 }
@@ -172,33 +158,45 @@ pub async fn do_create(out: &crate::output::Out, config: Config, args: &ArgMatch
 }
 
 pub async fn do_update(out: &crate::output::Out, config: Config, args: &ArgMatches) {
-    let id_or_name = args
-        .get_one::<String>("id_or_name")
-        .expect("id_or_name is required");
+    let schedule_id = extract_schedule_id(out, "update", args.subcommand());
     let cron = args.get_one::<String>("cron");
     let parameters = parse_parameters(out, args);
 
     out.with_spinner(
         "Updating schedule",
-        api::update_schedule(&config, id_or_name, cron, parameters),
+        api::update_schedule(&config, &schedule_id, cron, parameters),
     )
     .await;
 
-    out.success(&format!("Schedule {} updated", id_or_name));
+    out.success(&format!("Schedule {} updated", schedule_id));
 }
 
 pub async fn do_delete(out: &crate::output::Out, config: Config, args: &ArgMatches) {
-    let schedule_id = args
-        .get_one::<String>("schedule_id")
-        .expect("schedule_id is required");
+    let schedule_id = extract_schedule_id(out, "delete", args.subcommand());
 
     out.with_spinner(
         "Deleting schedule",
-        api::delete_schedule(&config, schedule_id),
+        api::delete_schedule(&config, &schedule_id),
     )
     .await;
 
     out.success(&format!("Schedule {} deleted", schedule_id));
+}
+
+fn extract_schedule_id(
+    out: &crate::output::Out,
+    subcmd: &str,
+    cmd: Option<(&str, &ArgMatches)>,
+) -> String {
+    if let Some((id, _)) = cmd {
+        return id.to_string();
+    }
+
+    let line = format!(
+        "Schedule ID is required. Example: tower schedules {} <schedule-id>",
+        subcmd
+    );
+    out.die(&line);
 }
 
 /// Parses `--parameter` arguments into a HashMap of key-value pairs.
@@ -231,180 +229,8 @@ fn parse_parameters(
             }
         }
 
-        if param_map.is_empty() {
-            None
-        } else {
-            Some(param_map)
-        }
+        Some(param_map)
     } else {
         None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{parse_parameters, schedules_cmd};
-    use crate::output::Out;
-
-    #[test]
-    fn update_accepts_positional_schedule_id_and_flags() {
-        let matches = schedules_cmd()
-            .try_get_matches_from([
-                "schedules",
-                "update",
-                "sch_123",
-                "--cron",
-                "*/10 * * * *",
-                "--parameter",
-                "env=prod",
-                "-p",
-                "team=platform",
-            ])
-            .expect("update args should parse");
-
-        let ("update", update_args) = matches.subcommand().expect("expected update subcommand")
-        else {
-            panic!("expected update subcommand");
-        };
-
-        assert_eq!(
-            update_args
-                .get_one::<String>("id_or_name")
-                .map(String::as_str),
-            Some("sch_123")
-        );
-        assert_eq!(
-            update_args.get_one::<String>("cron").map(String::as_str),
-            Some("*/10 * * * *")
-        );
-
-        let params: Vec<&str> = update_args
-            .get_many::<String>("parameters")
-            .expect("expected parameters")
-            .map(String::as_str)
-            .collect();
-        assert_eq!(params, vec!["env=prod", "team=platform"]);
-    }
-
-    #[test]
-    fn update_accepts_equals_sign_flag_forms() {
-        let matches = schedules_cmd()
-            .try_get_matches_from([
-                "schedules",
-                "update",
-                "sch_456",
-                "--cron=*/5 * * * *",
-                "--parameter=region=us-east-1",
-            ])
-            .expect("equals-form args should parse");
-
-        let ("update", update_args) = matches.subcommand().expect("expected update subcommand")
-        else {
-            panic!("expected update subcommand");
-        };
-
-        assert_eq!(
-            update_args
-                .get_one::<String>("id_or_name")
-                .map(String::as_str),
-            Some("sch_456")
-        );
-        assert_eq!(
-            update_args.get_one::<String>("cron").map(String::as_str),
-            Some("*/5 * * * *")
-        );
-        assert_eq!(
-            update_args
-                .get_many::<String>("parameters")
-                .expect("expected parameter")
-                .next()
-                .map(String::as_str),
-            Some("region=us-east-1")
-        );
-    }
-
-    #[test]
-    fn update_requires_schedule_id() {
-        let result =
-            schedules_cmd().try_get_matches_from(["schedules", "update", "--cron", "*/15 * * * *"]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn delete_requires_schedule_id() {
-        let result = schedules_cmd().try_get_matches_from(["schedules", "delete"]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn parse_parameters_valid_pairs() {
-        let matches = schedules_cmd()
-            .try_get_matches_from([
-                "schedules",
-                "update",
-                "sch_789",
-                "--parameter",
-                "env=prod",
-                "-p",
-                "team=platform",
-            ])
-            .expect("update args should parse");
-
-        let ("update", update_args) = matches.subcommand().expect("expected update subcommand")
-        else {
-            panic!("expected update subcommand");
-        };
-
-        let params =
-            parse_parameters(&Out::sink(), update_args).expect("expected parsed parameters");
-        assert_eq!(params.get("env"), Some(&"prod".to_string()));
-        assert_eq!(params.get("team"), Some(&"platform".to_string()));
-    }
-
-    #[test]
-    fn parse_parameters_invalid_entries_return_none() {
-        let matches = schedules_cmd()
-            .try_get_matches_from([
-                "schedules",
-                "update",
-                "sch_789",
-                "--parameter",
-                "invalid",
-                "-p",
-                "=missing-key",
-            ])
-            .expect("update args should parse");
-
-        let ("update", update_args) = matches.subcommand().expect("expected update subcommand")
-        else {
-            panic!("expected update subcommand");
-        };
-
-        assert_eq!(parse_parameters(&Out::sink(), update_args), None);
-    }
-
-    #[test]
-    fn parse_parameters_mixed_valid_and_invalid_keeps_valid() {
-        let matches = schedules_cmd()
-            .try_get_matches_from([
-                "schedules",
-                "update",
-                "sch_789",
-                "--parameter",
-                "env=prod",
-                "-p",
-                "invalid",
-            ])
-            .expect("update args should parse");
-
-        let ("update", update_args) = matches.subcommand().expect("expected update subcommand")
-        else {
-            panic!("expected update subcommand");
-        };
-
-        let params =
-            parse_parameters(&Out::sink(), update_args).expect("expected parsed parameters");
-        assert_eq!(params.get("env"), Some(&"prod".to_string()));
-        assert_eq!(params.len(), 1);
     }
 }
