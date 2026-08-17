@@ -12,6 +12,7 @@ from ..models.app_status import AppStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.app_tag import AppTag
     from ..models.run import Run
     from ..models.run_results import RunResults
     from ..models.run_retry_policy import RunRetryPolicy
@@ -26,6 +27,7 @@ class App:
     Attributes:
         created_at (datetime.datetime): The date and time this app was created.
         health_status (AppHealthStatus): This property is deprecated. It will always be 'healthy'.
+        is_example (bool): Whether this app was deployed from the Tower examples catalog.
         is_externally_accessible (bool):
         name (str): The name of the app.
         next_run_at (datetime.datetime | None): The next time this app will run as part of it's schedule, null if none.
@@ -43,10 +45,12 @@ class App:
         slug (str | Unset): This property is deprecated. Use name instead.
         status (AppStatus | Unset): The status of the app.
         subdomain (str | Unset): The subdomain that this app is accessible via. Must be externally accessible first.
+        tags (list[AppTag] | Unset): The tags applied to the app.
     """
 
     created_at: datetime.datetime
     health_status: AppHealthStatus
+    is_example: bool
     is_externally_accessible: bool
     name: str
     next_run_at: datetime.datetime | None
@@ -62,11 +66,14 @@ class App:
     slug: str | Unset = UNSET
     status: AppStatus | Unset = UNSET
     subdomain: str | Unset = UNSET
+    tags: list[AppTag] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
 
         health_status = self.health_status.value
+
+        is_example = self.is_example
 
         is_externally_accessible = self.is_externally_accessible
 
@@ -112,12 +119,20 @@ class App:
 
         subdomain = self.subdomain
 
+        tags: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.tags, Unset):
+            tags = []
+            for tags_item_data in self.tags:
+                tags_item = tags_item_data.to_dict()
+                tags.append(tags_item)
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
             {
                 "created_at": created_at,
                 "health_status": health_status,
+                "is_example": is_example,
                 "is_externally_accessible": is_externally_accessible,
                 "name": name,
                 "next_run_at": next_run_at,
@@ -141,11 +156,14 @@ class App:
             field_dict["status"] = status
         if subdomain is not UNSET:
             field_dict["subdomain"] = subdomain
+        if tags is not UNSET:
+            field_dict["tags"] = tags
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.app_tag import AppTag
         from ..models.run import Run
         from ..models.run_results import RunResults
         from ..models.run_retry_policy import RunRetryPolicy
@@ -154,6 +172,8 @@ class App:
         created_at = isoparse(d.pop("created_at"))
 
         health_status = AppHealthStatus(d.pop("health_status"))
+
+        is_example = d.pop("is_example")
 
         is_externally_accessible = d.pop("is_externally_accessible")
 
@@ -228,9 +248,19 @@ class App:
 
         subdomain = d.pop("subdomain", UNSET)
 
+        _tags = d.pop("tags", UNSET)
+        tags: list[AppTag] | Unset = UNSET
+        if _tags is not UNSET:
+            tags = []
+            for tags_item_data in _tags:
+                tags_item = AppTag.from_dict(tags_item_data)
+
+                tags.append(tags_item)
+
         app = cls(
             created_at=created_at,
             health_status=health_status,
+            is_example=is_example,
             is_externally_accessible=is_externally_accessible,
             name=name,
             next_run_at=next_run_at,
@@ -246,6 +276,7 @@ class App:
             slug=slug,
             status=status,
             subdomain=subdomain,
+            tags=tags,
         )
 
         return app

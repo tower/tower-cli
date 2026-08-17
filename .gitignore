@@ -8,7 +8,7 @@ __pycache__
 # may contain sensitive data
 pytest.ini
 
-# 
+#
 # Artifacts from the Rust client generation process
 #
 /crates/tower-api/.openapi-generator-ignore
@@ -31,3 +31,8 @@ pytest.ini
 
 # local MCP overrides (e.g. internal tooling with secrets)
 .mcp.json.local
+
+# llm/AI harness folders plus a .plans folder for storing LLM plans
+.claude
+.codex
+.plans

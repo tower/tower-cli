@@ -20,6 +20,7 @@ def _get_kwargs(
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     x_tower_idempotency_key: str | Unset = UNSET,
+    x_tower_request_number: int | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -28,6 +29,9 @@ def _get_kwargs(
 
     if not isinstance(x_tower_idempotency_key, Unset):
         headers["X-Tower-Idempotency-Key"] = x_tower_idempotency_key
+
+    if not isinstance(x_tower_request_number, Unset):
+        headers["X-Tower-Request-Number"] = str(x_tower_request_number)
 
     if not isinstance(content_length, Unset):
         headers["Content-Length"] = str(content_length)
@@ -74,6 +78,11 @@ def _parse_response(
 
         return response_400
 
+    if response.status_code == 412:
+        response_412 = ErrorModel.from_dict(response.json())
+
+        return response_412
+
     if response.status_code == 422:
         response_422 = ErrorModel.from_dict(response.json())
 
@@ -110,6 +119,7 @@ def sync_detailed(
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     x_tower_idempotency_key: str | Unset = UNSET,
+    x_tower_request_number: int | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> Response[DeployAppResponse | ErrorModel]:
     """Deploy app
@@ -128,6 +138,9 @@ def sync_detailed(
             CI build ID). If a prior deploy for this app supplied the same value, the server reuses
             that AppVersion instead of creating a new one — letting consecutive deploys to different
             environments share a single version when the source hasn't changed.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -149,6 +162,7 @@ def sync_detailed(
         all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
         x_tower_idempotency_key=x_tower_idempotency_key,
+        x_tower_request_number=x_tower_request_number,
         content_length=content_length,
     )
 
@@ -168,6 +182,7 @@ def sync(
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     x_tower_idempotency_key: str | Unset = UNSET,
+    x_tower_request_number: int | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> DeployAppResponse | ErrorModel | None:
     """Deploy app
@@ -186,6 +201,9 @@ def sync(
             CI build ID). If a prior deploy for this app supplied the same value, the server reuses
             that AppVersion instead of creating a new one — letting consecutive deploys to different
             environments share a single version when the source hasn't changed.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -208,6 +226,7 @@ def sync(
         all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
         x_tower_idempotency_key=x_tower_idempotency_key,
+        x_tower_request_number=x_tower_request_number,
         content_length=content_length,
     ).parsed
 
@@ -221,6 +240,7 @@ async def asyncio_detailed(
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     x_tower_idempotency_key: str | Unset = UNSET,
+    x_tower_request_number: int | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> Response[DeployAppResponse | ErrorModel]:
     """Deploy app
@@ -239,6 +259,9 @@ async def asyncio_detailed(
             CI build ID). If a prior deploy for this app supplied the same value, the server reuses
             that AppVersion instead of creating a new one — letting consecutive deploys to different
             environments share a single version when the source hasn't changed.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -260,6 +283,7 @@ async def asyncio_detailed(
         all_environments=all_environments,
         x_tower_checksum_sha256=x_tower_checksum_sha256,
         x_tower_idempotency_key=x_tower_idempotency_key,
+        x_tower_request_number=x_tower_request_number,
         content_length=content_length,
     )
 
@@ -277,6 +301,7 @@ async def asyncio(
     all_environments: bool | Unset = False,
     x_tower_checksum_sha256: str | Unset = UNSET,
     x_tower_idempotency_key: str | Unset = UNSET,
+    x_tower_request_number: int | Unset = UNSET,
     content_length: int | Unset = UNSET,
 ) -> DeployAppResponse | ErrorModel | None:
     """Deploy app
@@ -295,6 +320,9 @@ async def asyncio(
             CI build ID). If a prior deploy for this app supplied the same value, the server reuses
             that AppVersion instead of creating a new one — letting consecutive deploys to different
             environments share a single version when the source hasn't changed.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         content_length (int | Unset): Size of the uploaded bundle in bytes.
         body (DeployAppJsonBody):  Example: {'source_uri': 'https://github.com/tower/tower-
             examples/tree/main/01-hello-world'}.
@@ -318,6 +346,7 @@ async def asyncio(
             all_environments=all_environments,
             x_tower_checksum_sha256=x_tower_checksum_sha256,
             x_tower_idempotency_key=x_tower_idempotency_key,
+            x_tower_request_number=x_tower_request_number,
             content_length=content_length,
         )
     ).parsed

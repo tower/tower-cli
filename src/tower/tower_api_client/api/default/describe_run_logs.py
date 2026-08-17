@@ -16,6 +16,8 @@ def _get_kwargs(
     seq: int,
     *,
     start_at: datetime.datetime | Unset = UNSET,
+    head: int | Unset = UNSET,
+    tail: int | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -23,6 +25,10 @@ def _get_kwargs(
     if not isinstance(start_at, Unset):
         json_start_at = start_at.isoformat()
     params["start_at"] = json_start_at
+
+    params["head"] = head
+
+    params["tail"] = tail
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -68,6 +74,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     start_at: datetime.datetime | Unset = UNSET,
+    head: int | Unset = UNSET,
+    tail: int | Unset = UNSET,
 ) -> Response[DescribeRunLogsResponse | ErrorModel]:
     """Describe run logs
 
@@ -77,6 +85,8 @@ def sync_detailed(
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
         start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
+        head (int | Unset): Return only the first N log lines. Cannot be combined with tail.
+        tail (int | Unset): Return only the last N log lines. Cannot be combined with head.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -90,6 +100,8 @@ def sync_detailed(
         name=name,
         seq=seq,
         start_at=start_at,
+        head=head,
+        tail=tail,
     )
 
     response = client.get_httpx_client().request(
@@ -105,6 +117,8 @@ def sync(
     *,
     client: AuthenticatedClient,
     start_at: datetime.datetime | Unset = UNSET,
+    head: int | Unset = UNSET,
+    tail: int | Unset = UNSET,
 ) -> DescribeRunLogsResponse | ErrorModel | None:
     """Describe run logs
 
@@ -114,6 +128,8 @@ def sync(
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
         start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
+        head (int | Unset): Return only the first N log lines. Cannot be combined with tail.
+        tail (int | Unset): Return only the last N log lines. Cannot be combined with head.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -128,6 +144,8 @@ def sync(
         seq=seq,
         client=client,
         start_at=start_at,
+        head=head,
+        tail=tail,
     ).parsed
 
 
@@ -137,6 +155,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     start_at: datetime.datetime | Unset = UNSET,
+    head: int | Unset = UNSET,
+    tail: int | Unset = UNSET,
 ) -> Response[DescribeRunLogsResponse | ErrorModel]:
     """Describe run logs
 
@@ -146,6 +166,8 @@ async def asyncio_detailed(
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
         start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
+        head (int | Unset): Return only the first N log lines. Cannot be combined with tail.
+        tail (int | Unset): Return only the last N log lines. Cannot be combined with head.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,6 +181,8 @@ async def asyncio_detailed(
         name=name,
         seq=seq,
         start_at=start_at,
+        head=head,
+        tail=tail,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -172,6 +196,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     start_at: datetime.datetime | Unset = UNSET,
+    head: int | Unset = UNSET,
+    tail: int | Unset = UNSET,
 ) -> DescribeRunLogsResponse | ErrorModel | None:
     """Describe run logs
 
@@ -181,6 +207,8 @@ async def asyncio(
         name (str): The name of the app to get logs for.
         seq (int): The sequence number of the run to get logs for.
         start_at (datetime.datetime | Unset): Fetch logs from this timestamp onwards (inclusive).
+        head (int | Unset): Return only the first N log lines. Cannot be combined with tail.
+        tail (int | Unset): Return only the last N log lines. Cannot be combined with head.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,5 +224,7 @@ async def asyncio(
             seq=seq,
             client=client,
             start_at=start_at,
+            head=head,
+            tail=tail,
         )
     ).parsed

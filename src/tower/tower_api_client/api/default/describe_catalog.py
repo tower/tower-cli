@@ -64,11 +64,14 @@ def sync_detailed(
 ) -> Response[DescribeCatalogResponse | ErrorModel]:
     """Describe catalog
 
-     Returns details for a specific catalog, including its property names and previews.
+     Returns non-secret details for a catalog in the selected environment. When that environment has no
+    same-named catalog, the catalog from default is returned instead. The response's catalog environment
+    identifies where its definition is stored.
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog to return. When it has no same-named
+            catalog, the catalog from default is returned instead. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -98,11 +101,14 @@ def sync(
 ) -> DescribeCatalogResponse | ErrorModel | None:
     """Describe catalog
 
-     Returns details for a specific catalog, including its property names and previews.
+     Returns non-secret details for a catalog in the selected environment. When that environment has no
+    same-named catalog, the catalog from default is returned instead. The response's catalog environment
+    identifies where its definition is stored.
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog to return. When it has no same-named
+            catalog, the catalog from default is returned instead. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -127,11 +133,14 @@ async def asyncio_detailed(
 ) -> Response[DescribeCatalogResponse | ErrorModel]:
     """Describe catalog
 
-     Returns details for a specific catalog, including its property names and previews.
+     Returns non-secret details for a catalog in the selected environment. When that environment has no
+    same-named catalog, the catalog from default is returned instead. The response's catalog environment
+    identifies where its definition is stored.
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog to return. When it has no same-named
+            catalog, the catalog from default is returned instead. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,11 +168,14 @@ async def asyncio(
 ) -> DescribeCatalogResponse | ErrorModel | None:
     """Describe catalog
 
-     Returns details for a specific catalog, including its property names and previews.
+     Returns non-secret details for a catalog in the selected environment. When that environment has no
+    same-named catalog, the catalog from default is returned instead. The response's catalog environment
+    identifies where its definition is stored.
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog to return. When it has no same-named
+            catalog, the catalog from default is returned instead. Default: 'default'.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
