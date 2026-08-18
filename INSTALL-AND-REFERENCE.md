@@ -128,8 +128,18 @@ pip install "tower[ai]"
 pip install "tower[iceberg]"
 ```
 
-- `tower.create_table`: create Iceberg tables  
-- `tower.load_table`: load data from Iceberg tables  
+- `tower.tables(...)`: load, create, update, and delete Iceberg table data
+
+Delete filters are SQL-like strings or native PyIceberg boolean expressions. The
+`Table.column()` builder creates composable PyIceberg predicates:
+
+```python
+table = tower.tables("events").load()
+table.delete(
+    (table.column("age") >= 18)
+    & ~(table.column("status") == "inactive")
+)
+```
 
 ### dbt Core support
 
