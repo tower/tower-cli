@@ -1,0 +1,117 @@
+name: Backend Regression
+
+# Runs the BDD suite (tests/integration/features) against a real Tower
+# backend at its current development head, on a build host that Tower
+# operates. The Integration Tests workflow covers the same suite against the
+# mock API server; this one catches drift between the CLI and the actual API.
+#
+# The job talks to the host through short-lived AWS credentials minted from
+# a GitHub OIDC token, which only workflow runs from this repository (not
+# from forks) can obtain. Pull requests from forks therefore skip this check;
+# a maintainer can run it by pushing the branch into this repository and
+# opening the PR from there. The check reports pass/fail plus behave's
+# summary lines only; the full run log stays on the host side.
+#
+# Configuration lives in two repo-level Actions variables:
+#   BACKEND_CI_ROLE_ARN    IAM role that trusts this repo's pull_request runs
+#   BACKEND_CI_AWS_REGION  region the build host runs in
+
+on:
+  pull_request:
+
+permissions:
+  id-token: write
+  contents: read
+
+# one run at a time across the whole repo: the backend the suite runs
+# against is a single shared environment that each run resets
+concurrency:
+  group: backend-regression
+  cancel-in-progress: false
+
+jobs:
+  bdd:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.BACKEND_CI_ROLE_ARN }}
+          aws-region: ${{ vars.BACKEND_CI_AWS_REGION }}
+
+      - name: find build host
+        id: host
+        run: |
+          set -euo pipefail
+          id=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=branchbuild" \
+                      "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [[ -z "$id" || "$id" == *[[:space:]]* ]]; then
+            echo "expected exactly one build host, found: '${id:-none}'" >&2; exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: ensure build host running
+        env:
+          ID: ${{ steps.host.outputs.id }}
+        run: |
+          set -euo pipefail
+          # the host stops itself when idle; only `stopped` accepts StartInstances
+          for _ in $(seq 1 60); do
+            state=$(aws ec2 describe-instances --instance-ids "$ID" \
+              --query 'Reservations[0].Instances[0].State.Name' --output text)
+            case "$state" in
+              running) break ;;
+              stopped) aws ec2 start-instances --instance-ids "$ID" >/dev/null ;;
+              pending|stopping) ;;
+              *) echo "build host is $state" >&2; exit 1 ;;
+            esac
+            sleep 10
+          done
+          aws ec2 wait instance-running --instance-ids "$ID"
+          for _ in $(seq 1 30); do
+            status=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$ID" \
+              --query 'InstanceInformationList[0].PingStatus' --output text)
+            [[ "$status" == "Online" ]] && exit 0
+            sleep 5
+          done
+          echo "build host did not come online" >&2; exit 1
+
+      - name: run BDD suite against backend
+        env:
+          ID: ${{ steps.host.outputs.id }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # the sha comes from the event payload; keep the remote command
+          # to a literal 40-hex commit
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "unexpected sha: $SHA" >&2; exit 1; }
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$ID" \
+            --document-name AWS-RunShellScript \
+            --timeout-seconds 3600 \
+            --cloud-watch-output-config "CloudWatchOutputEnabled=true,CloudWatchLogGroupName=/branchbuild/ssm" \
+            --parameters "commands=[\"sudo -u branchbuild -H branchbuild test-cli $SHA\"]" \
+            --query Command.CommandId --output text)
+          echo "testing $SHA (command $CMD_ID)"
+          # a cold host builds the backend, then the CLI, then runs the
+          # suite; poll up to the command's own timeout
+          for _ in $(seq 1 1200); do
+            ST=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$ST" in Success|Failed|Cancelled|TimedOut) break ;; *) sleep 3 ;; esac
+          done
+          # stdout is only the behave summary (failing scenarios + totals);
+          # everything else the run printed stays in the host's own log
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$ID" \
+            --query StandardOutputContent --output text
+          if [[ "$ST" != "Success" ]]; then
+            echo "backend regression suite failed ($ST)" >&2
+            echo "full run log (maintainers): CloudWatch log group /branchbuild/ssm, streams prefixed $CMD_ID" >&2
+            exit 1
+          fi
+          echo "backend regression suite passed"
