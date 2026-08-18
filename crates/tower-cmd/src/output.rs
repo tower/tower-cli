@@ -616,8 +616,23 @@ pub fn background_error(msg: &str) {
     write_to_stderr(&format!("{} {}\n", "Oh no!".red(), msg));
 }
 
+/// Writes a labelled notice to stderr once per user, ever. The once-per-user
+/// claim is only spent when stderr is a terminal, so a script, MCP capture, or
+/// CI run can't use it up on a notice nobody saw.
+pub(crate) fn notice_once(id: &str, label: &str, msg: &str) {
+    if !io::stderr().is_terminal() {
+        return;
+    }
+
+    match config::claim_notice(id) {
+        Ok(true) => notice_to_stderr(label, msg),
+        Ok(false) => {}
+        Err(err) => debug!("Failed to persist CLI notice {}: {}", id, err),
+    }
+}
+
 /// Writes a labelled notice to stderr, keeping stdout clean for command output.
-pub(crate) fn notice_to_stderr(label: &str, msg: &str) {
+fn notice_to_stderr(label: &str, msg: &str) {
     let line = format!("{} {}\n", label.bold().yellow(), msg);
     write_to_stderr(&line);
 }

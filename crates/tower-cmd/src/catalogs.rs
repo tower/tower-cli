@@ -186,7 +186,7 @@ pub async fn do_list(out: &output::Out, config: Config, args: &ArgMatches) {
     };
 
     if is_storage_catalog_type(catalog_type) {
-        beta::notify_once(out, &beta::STORAGE);
+        beta::STORAGE.notify_once();
     }
 
     let catalogs = out
@@ -214,7 +214,7 @@ pub async fn do_list(out: &output::Out, config: Config, args: &ArgMatches) {
 }
 
 pub async fn do_credentials(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
+    beta::STORAGE.notify_once();
 
     let name = args
         .get_one::<String>("catalog_name")
@@ -263,7 +263,7 @@ pub async fn do_show(out: &output::Out, config: Config, args: &ArgMatches) {
 
     let is_storage = is_storage_catalog_type(Some(&response.catalog.r#type));
     if is_storage {
-        beta::notify_once(out, &beta::STORAGE);
+        beta::STORAGE.notify_once();
     }
 
     let tables = if is_storage {
@@ -464,7 +464,7 @@ fn redact_token(message: &str, token: &str) -> String {
 }
 
 pub async fn do_query(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
+    beta::STORAGE.notify_once();
 
     let name = args
         .get_one::<String>("catalog_name")
@@ -1550,7 +1550,7 @@ fn knowledge_cmd() -> Command {
 }
 
 pub async fn do_knowledge_list(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
+    beta::STORAGE.notify_once();
 
     let catalog = args
         .get_one::<String>("catalog_name")
@@ -1587,7 +1587,7 @@ pub async fn do_knowledge_list(out: &output::Out, config: Config, args: &ArgMatc
 }
 
 pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
+    beta::STORAGE.notify_once();
 
     let catalog = args
         .get_one::<String>("catalog_name")
@@ -1609,7 +1609,7 @@ pub async fn do_knowledge_show(out: &output::Out, config: Config, args: &ArgMatc
 }
 
 pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
+    beta::STORAGE.notify_once();
 
     let catalog = args
         .get_one::<String>("catalog_name")
@@ -1657,7 +1657,7 @@ pub async fn do_knowledge_set(out: &output::Out, config: Config, args: &ArgMatch
 }
 
 pub async fn do_knowledge_delete(out: &output::Out, config: Config, args: &ArgMatches) {
-    beta::notify_once(out, &beta::STORAGE);
+    beta::STORAGE.notify_once();
 
     let catalog = args
         .get_one::<String>("catalog_name")
