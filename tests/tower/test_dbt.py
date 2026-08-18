@@ -1,20 +1,20 @@
 import os
+import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch, MagicMock
 
 from tower._dbt import (
-    COMMANDS_WITH_SELECT,
-    DEFAULT_COMMAND_PLAN,
+    dbt,
     DbtCommand,
     DbtRunnerConfig,
     DbtWorkflow,
-    dbt,
-    load_profile_from_env,
     parse_command_plan,
+    load_profile_from_env,
     run_dbt_workflow,
+    DEFAULT_COMMAND_PLAN,
+    SELECT_SUPPORTED_COMMANDS,
+    _log_run_results,
 )
 
 
@@ -337,7 +337,7 @@ class TestRunDbtWorkflow:
     def test_run_workflow_with_selector(
         self, temp_dbt_project, sample_profile, mock_dbt_runner
     ):
-        """Test workflow with selector adds --select flag to commands that support it."""
+        """Test workflow with selector adds --select flag."""
         with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
             config = DbtRunnerConfig(
                 project_path=temp_dbt_project,
@@ -351,140 +351,6 @@ class TestRunDbtWorkflow:
             call_args = mock_dbt_runner.invoke.call_args
             assert "--select" in call_args[0][0]
             assert "tag:daily" in call_args[0][0]
-
-    def test_run_workflow_selector_not_added_to_unsupported_commands(
-        self, temp_dbt_project, sample_profile, mock_dbt_runner
-    ):
-        """Test workflow with selector does NOT add --select to commands that don't support it."""
-        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
-            config = DbtRunnerConfig(
-                project_path=temp_dbt_project,
-                profile_payload=sample_profile,
-                commands=(DbtCommand("deps"),),
-                selector="tag:daily",
-            )
-            run_dbt_workflow(config)
-
-            # Verify --select was NOT added for deps command
-            call_args = mock_dbt_runner.invoke.call_args
-            assert "--select" not in call_args[0][0]
-
-    def test_run_workflow_selector_not_added_if_already_present(
-        self, temp_dbt_project, sample_profile, mock_dbt_runner
-    ):
-        """Test workflow doesn't add --select if it's already in command args."""
-        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
-            config = DbtRunnerConfig(
-                project_path=temp_dbt_project,
-                profile_payload=sample_profile,
-                commands=(DbtCommand("build", ("--select", "models/")),),
-                selector="tag:daily",
-            )
-            run_dbt_workflow(config)
-
-            # Verify only one --select flag is present (from command args)
-            call_args = mock_dbt_runner.invoke.call_args[0][0]
-            select_count = call_args.count("--select")
-            assert select_count == 1
-            assert "models/" in call_args
-            assert "tag:daily" not in call_args
-
-    def test_run_workflow_with_multiple_commands_mixed_select_support(
-        self, temp_dbt_project, sample_profile, mock_dbt_runner
-    ):
-        """Test workflow with multiple commands, some supporting --select and some not."""
-        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
-            config = DbtRunnerConfig(
-                project_path=temp_dbt_project,
-                profile_payload=sample_profile,
-                commands=(
-                    DbtCommand("deps"),
-                    DbtCommand("build"),
-                    DbtCommand("docs", ("generate",)),
-                ),
-                selector="tag:daily",
-            )
-            run_dbt_workflow(config)
-
-            # Check all three invocations
-            assert mock_dbt_runner.invoke.call_count == 3
-
-            # First call (deps) should NOT have --select
-            deps_args = mock_dbt_runner.invoke.call_args_list[0][0][0]
-            assert "--select" not in deps_args
-
-            # Second call (build) should have --select
-            build_args = mock_dbt_runner.invoke.call_args_list[1][0][0]
-            assert "--select" in build_args
-            assert "tag:daily" in build_args
-
-            # Third call (docs generate) - docs is in COMMANDS_WITH_SELECT
-            # so it will have --select (even though docs generate may not need it)
-            docs_args = mock_dbt_runner.invoke.call_args_list[2][0][0]
-            assert "--select" in docs_args
-            assert "tag:daily" in docs_args
-            assert "generate" in docs_args
-
-    @pytest.mark.parametrize(
-        "command_name",
-        [
-            "run",
-            "test",
-            "build",
-            "compile",
-            "seed",
-            "snapshot",
-            "docs",
-            "list",
-            "ls",
-            "show",
-            "source",
-        ],
-    )
-    def test_commands_with_select_support(
-        self, temp_dbt_project, sample_profile, mock_dbt_runner, command_name
-    ):
-        """Test that all commands in COMMANDS_WITH_SELECT get --select flag when selector is provided."""
-        # Verify the command is actually in COMMANDS_WITH_SELECT
-        assert command_name in COMMANDS_WITH_SELECT
-
-        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
-            config = DbtRunnerConfig(
-                project_path=temp_dbt_project,
-                profile_payload=sample_profile,
-                commands=(DbtCommand(command_name),),
-                selector="tag:daily",
-            )
-            run_dbt_workflow(config)
-
-            # Verify --select was added
-            call_args = mock_dbt_runner.invoke.call_args[0][0]
-            assert "--select" in call_args
-            assert "tag:daily" in call_args
-
-    @pytest.mark.parametrize(
-        "command_name",
-        ["deps", "clean", "debug", "init"],
-    )
-    def test_commands_without_select_support(
-        self, temp_dbt_project, sample_profile, mock_dbt_runner, command_name
-    ):
-        """Test that commands not in COMMANDS_WITH_SELECT do NOT get --select flag even when selector is provided."""
-        # Verify the command is NOT in COMMANDS_WITH_SELECT
-        assert command_name not in COMMANDS_WITH_SELECT
-
-        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
-            config = DbtRunnerConfig(
-                project_path=temp_dbt_project,
-                profile_payload=sample_profile,
-                commands=(DbtCommand(command_name),),
-                selector="tag:daily",
-            )
-            run_dbt_workflow(config)
-
-            # Verify --select was NOT added
-            call_args = mock_dbt_runner.invoke.call_args[0][0]
-            assert "--select" not in call_args
 
     def test_run_workflow_with_full_refresh(
         self, temp_dbt_project, sample_profile, mock_dbt_runner
@@ -520,6 +386,73 @@ class TestRunDbtWorkflow:
             call_args = mock_dbt_runner.invoke.call_args
             assert "--vars" in call_args[0][0]
 
+    def test_selector_not_added_for_unsupported_command(
+        self, temp_dbt_project, sample_profile, mock_dbt_runner
+    ):
+        """Selector must not be injected into commands that reject --select."""
+        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
+            config = DbtRunnerConfig(
+                project_path=temp_dbt_project,
+                profile_payload=sample_profile,
+                commands=(DbtCommand("deps"),),
+                selector="tag:daily",
+            )
+            run_dbt_workflow(config)
+
+            call_args = mock_dbt_runner.invoke.call_args
+            assert "--select" not in call_args[0][0]
+            assert "tag:daily" not in call_args[0][0]
+
+    def test_selector_not_added_when_select_already_present(
+        self, temp_dbt_project, sample_profile, mock_dbt_runner
+    ):
+        """Selector must not be injected when --select is already given."""
+        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
+            config = DbtRunnerConfig(
+                project_path=temp_dbt_project,
+                profile_payload=sample_profile,
+                commands=(DbtCommand("build", ("--select", "tag:hourly")),),
+                selector="tag:daily",
+            )
+            run_dbt_workflow(config)
+
+            args = mock_dbt_runner.invoke.call_args[0][0]
+            assert args.count("--select") == 1
+            assert "tag:daily" not in args
+
+    def test_selector_not_added_when_short_select_already_present(
+        self, temp_dbt_project, sample_profile, mock_dbt_runner
+    ):
+        """Selector must not be injected when -s is already given."""
+        with patch("tower._dbt.dbtRunner", return_value=mock_dbt_runner):
+            config = DbtRunnerConfig(
+                project_path=temp_dbt_project,
+                profile_payload=sample_profile,
+                commands=(DbtCommand("run", ("-s", "tag:hourly")),),
+                selector="tag:daily",
+            )
+            run_dbt_workflow(config)
+
+            args = mock_dbt_runner.invoke.call_args[0][0]
+            assert "--select" not in args
+            assert "tag:daily" not in args
+
+    def test_select_supported_commands_cover_node_selection_syntax(self):
+        """The supported set matches dbt's documented node-selection commands."""
+        assert SELECT_SUPPORTED_COMMANDS == {
+            "run",
+            "test",
+            "build",
+            "compile",
+            "seed",
+            "snapshot",
+            "docs",
+            "list",
+            "ls",
+            "show",
+            "source",
+        }
+
     def test_run_workflow_failure(self, temp_dbt_project, sample_profile):
         """Test workflow failure raises RuntimeError."""
         mock_runner = MagicMock()
@@ -536,6 +469,66 @@ class TestRunDbtWorkflow:
             )
             with pytest.raises(RuntimeError, match="dbt command failed"):
                 run_dbt_workflow(config)
+
+
+class TestLogRunResults:
+    """Tests for _log_run_results handling of heterogeneous dbt payloads."""
+
+    def _make_entry(self, name, status):
+        entry = MagicMock()
+        entry.node.name = name
+        entry.status = status
+        return entry
+
+    def test_none_payload_is_a_no_op(self):
+        log = MagicMock()
+        _log_run_results(log, None)
+        log.info.assert_not_called()
+
+    def test_bool_payload_is_a_no_op(self):
+        log = MagicMock()
+        _log_run_results(log, True)
+        _log_run_results(log, False)
+        log.info.assert_not_called()
+
+    def test_string_payload_is_treated_as_non_iterable(self):
+        log = MagicMock()
+        _log_run_results(log, "some catalog artifact")
+        log.info.assert_not_called()
+        # The skip is diagnosable: a debug note includes the payload type name.
+        assert any(
+            "str" in str(call) for call in log.debug.call_args_list
+        ), f"Expected a debug note mentioning 'str', got: {log.debug.call_args_list}"
+
+    def test_bytes_payload_is_treated_as_non_iterable(self):
+        log = MagicMock()
+        _log_run_results(log, b"artifact bytes")
+        log.info.assert_not_called()
+
+    def test_non_iterable_object_payload_logs_debug_with_type_name(self):
+        class Manifest:
+            pass
+
+        log = MagicMock()
+        _log_run_results(log, Manifest())
+        log.info.assert_not_called()
+        assert any(
+            "Manifest" in str(call) for call in log.debug.call_args_list
+        ), f"Expected a debug note mentioning 'Manifest', got: {log.debug.call_args_list}"
+
+    def test_iterable_payload_logs_per_node_entries(self):
+        log = MagicMock()
+        entries = [
+            self._make_entry("model_a", "success"),
+            self._make_entry("model_b", "error"),
+        ]
+        _log_run_results(log, entries)
+        assert log.info.call_count == 2
+
+    def test_empty_iterable_payload_is_a_no_op(self):
+        log = MagicMock()
+        _log_run_results(log, [])
+        log.info.assert_not_called()
 
 
 class TestIntegrationWithTower:

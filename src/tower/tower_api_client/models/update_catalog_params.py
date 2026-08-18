@@ -18,7 +18,8 @@ T = TypeVar("T", bound="UpdateCatalogParams")
 class UpdateCatalogParams:
     """
     Attributes:
-        environment (str): New environment for the catalog
+        environment (str): The environment containing the catalog to update. Catalogs cannot be moved between
+            environments.
         properties (list[EncryptedCatalogProperty]):
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/UpdateCatalogParams.json.

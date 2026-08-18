@@ -128,8 +128,27 @@ pip install "tower[ai]"
 pip install "tower[iceberg]"
 ```
 
-- `tower.create_table`: create Iceberg tables  
-- `tower.load_table`: load data from Iceberg tables  
+- `tower.tables(...)`: load, create, update, and delete Iceberg table data
+
+Delete filters are SQL-like strings or native PyIceberg boolean expressions. The
+`Table.column()` builder creates composable PyIceberg predicates:
+
+```python
+table = tower.tables("events").load()
+table.delete(
+    (table.column("age") >= 18)
+    & ~(table.column("status") == "inactive")
+)
+```
+
+Arrow schemas passed to `create()` or `create_if_not_exists()` are validated directly by
+PyIceberg, which assigns field IDs and preserves nested nullability and `b"doc"` field
+metadata. Timestamp units from seconds through microseconds, UTC-zoned microsecond
+timestamps, `time64[us]`, `date32`, and Decimal128 values up to precision 38 are supported.
+Nanosecond timestamps are rejected by default instead of being silently downcast, as are
+`time32`, `time64[ns]`, `date64`, Float16, Decimal256, and non-UTC zoned timestamps. Convert
+those fields explicitly before creating the table when the loss is acceptable. PyIceberg's
+native validation exceptions propagate unchanged.
 
 ### dbt Core support
 

@@ -19,7 +19,7 @@ pub fn secrets_cmd() -> Command {
                     Arg::new("show")
                         .short('s')
                         .long("show")
-                        .help("Show secrets in plain text")
+                        .help("Show the secret values in plain text")
                         .action(clap::ArgAction::SetTrue),
                 )
                 .arg(
@@ -28,7 +28,7 @@ pub fn secrets_cmd() -> Command {
                         .long("environment")
                         .default_value("default")
                         .value_parser(value_parser!(String))
-                        .help("List secrets in this environment")
+                        .help("The environment to list secrets from")
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -48,7 +48,7 @@ pub fn secrets_cmd() -> Command {
                         .long("name")
                         .value_parser(value_parser!(String))
                         .required(true)
-                        .help("Secret name to create")
+                        .help("The name of the secret to create")
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -57,7 +57,7 @@ pub fn secrets_cmd() -> Command {
                         .long("environment")
                         .default_value("default")
                         .value_parser(value_parser!(String))
-                        .help("Environment to store the secret in")
+                        .help("The environment to create the secret in")
                         .action(clap::ArgAction::Set),
                 )
                 .arg(
@@ -66,7 +66,7 @@ pub fn secrets_cmd() -> Command {
                         .long("value")
                         .value_parser(value_parser!(String))
                         .required(true)
-                        .help("Secret value to store")
+                        .help("The value of the secret")
                         .action(clap::ArgAction::Set),
                 )
                 .about("Create a new secret in your Tower account"),
@@ -89,6 +89,8 @@ pub fn secrets_cmd() -> Command {
                         .help("environment to delete the secret from")
                         .action(clap::ArgAction::Set),
                 )
+                .override_usage("tower secrets delete [OPTIONS] <SECRET_NAME>")
+                .after_help("Example:\n  tower secrets delete MY_API_KEY")
                 .about("Delete a secret in Tower"),
         )
 }

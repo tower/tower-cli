@@ -6,13 +6,20 @@ use tower_api::apis::{
 };
 use tower_api::models::CreateAppParams as CreateAppParamsModel;
 
+/// Distinguishes the two ways `ensure_app_exists` can fail: checking whether
+/// the app exists (describe) versus creating it when it doesn't.
+pub enum EnsureAppError {
+    Describe(tower_api::apis::Error<default_api::DescribeAppError>),
+    Create(tower_api::apis::Error<default_api::CreateAppError>),
+}
+
 pub async fn ensure_app_exists(
     out: &output::Out,
     api_config: &Configuration,
     app_name: &str,
     description: Option<&str>,
     create_app: bool,
-) -> Result<(), crate::Error> {
+) -> Result<(), EnsureAppError> {
     // Try to describe the app first (with spinner)
     let mut spinner = out.spinner("Checking app...");
     let describe_result = default_api::describe_app(
@@ -28,7 +35,7 @@ pub async fn ensure_app_exists(
     )
     .await;
 
-    // If the app exists, return Ok (description is create-only).
+    // If the app exists, return Ok
     if describe_result.is_ok() {
         spinner.success(out);
         return Ok(());
@@ -50,7 +57,7 @@ pub async fn ensure_app_exists(
     // If it's not a 404 error, fail the spinner and return the error
     if !is_not_found {
         spinner.failure(out);
-        return Err(crate::Error::ApiDescribeAppError { source: err });
+        return Err(EnsureAppError::Describe(err));
     }
 
     // App not found - stop spinner before prompting user
@@ -69,10 +76,12 @@ pub async fn ensure_app_exists(
 
     // If the user doesn't want to create the app, return the original error
     if !create_app {
-        return Err(crate::Error::ApiDescribeAppError { source: err });
+        return Err(EnsureAppError::Describe(err));
     }
 
-    // Try to create the app (with a new spinner)
+    // Try to create the app (with a new spinner). The Towerfile description
+    // (when present) becomes the new app's short description; description is
+    // only ever set at creation time.
     let mut spinner = out.spinner("Creating app...");
     let create_result = default_api::create_app(
         api_config,
@@ -80,8 +89,7 @@ pub async fn ensure_app_exists(
             create_app_params: CreateAppParamsModel {
                 schema: None,
                 name: app_name.to_string(),
-                // API create expects short_description; CLI/Towerfile expose "description".
-                short_description: description.map(|desc| desc.to_string()),
+                short_description: description.map(|s| s.to_string()),
                 slug: None,
                 is_externally_accessible: None,
                 subdomain: None,
@@ -102,7 +110,7 @@ pub async fn ensure_app_exists(
         }
         Err(create_err) => {
             spinner.failure(out);
-            Err(crate::Error::ApiCreateAppError { source: create_err })
+            Err(EnsureAppError::Create(create_err))
         }
     }
 }

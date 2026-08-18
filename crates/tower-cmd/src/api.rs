@@ -200,7 +200,6 @@ pub async fn create_app(
         create_app_params: tower_api::models::CreateAppParams {
             schema: None,
             name: name.to_string(),
-            // API create expects short_description; CLI/Towerfile expose "description".
             short_description: Some(description.to_string()),
             slug: None,
             is_externally_accessible: None,
@@ -695,25 +694,79 @@ pub async fn list_teams(
 
 pub enum LogStreamEvent {
     EventLog(tower_api::models::RunLogLine),
-    EventWarning(tower_api::models::EventWarning),
+    EventWarning(tower_api::models::SseWarning),
 }
 
 #[derive(Debug)]
 pub enum LogStreamError {
     Reqwest(reqwest::Error),
+    /// The server rejected the stream request with a non-success status code.
+    InvalidStatus(StatusCode),
     Unknown,
+}
+
+impl LogStreamError {
+    /// The HTTP status carried by this error, when one is known.
+    pub fn status(&self) -> Option<StatusCode> {
+        match self {
+            LogStreamError::InvalidStatus(status) => Some(*status),
+            LogStreamError::Reqwest(err) => err.status().map(|s| {
+                StatusCode::from_u16(s.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+            }),
+            LogStreamError::Unknown => None,
+        }
+    }
+
+    /// A stream-open failure is fatal (not worth retrying) when the server
+    /// answered with a client error other than 429 Too Many Requests.
+    pub fn is_fatal(&self) -> bool {
+        match self.status() {
+            Some(status) => status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS,
+            None => false,
+        }
+    }
 }
 
 impl std::fmt::Display for LogStreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LogStreamError::Reqwest(err) => write!(f, "{err}"),
-            LogStreamError::Unknown => write!(f, "unknown log stream error"),
+            LogStreamError::Reqwest(err) => {
+                write!(f, "transport error while streaming run logs: {}", err)
+            }
+            LogStreamError::InvalidStatus(status) => {
+                write!(
+                    f,
+                    "the server rejected the log stream request with status {}",
+                    status
+                )
+            }
+            LogStreamError::Unknown => write!(f, "unknown error while streaming run logs"),
         }
     }
 }
 
-impl std::error::Error for LogStreamError {}
+impl std::error::Error for LogStreamError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            LogStreamError::Reqwest(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+/// Parses the `data` field of a `warning` SSE event. On the wire it carries
+/// the bare warning payload (the `SseWarning` fields), but the enveloped
+/// `EventWarning` shape (`{event, data, ...}`) is accepted too for
+/// robustness.
+fn parse_warning_payload(data: &str) -> Option<tower_api::models::SseWarning> {
+    if let Ok(warning) = serde_json::from_str::<tower_api::models::SseWarning>(data) {
+        return Some(warning);
+    }
+
+    serde_json::from_str::<tower_api::models::EventWarning>(data)
+        .map(|event| event.data)
+        .ok()
+}
 
 impl From<reqwest_eventsource::CannotCloneRequestError> for LogStreamError {
     fn from(err: reqwest_eventsource::CannotCloneRequestError) -> Self {
@@ -746,31 +799,10 @@ async fn drain_run_logs_stream(mut source: EventSource, tx: mpsc::Sender<LogStre
                         };
                     }
                     "warning" => {
-                        let event_warning = serde_json::from_str(&message.data);
-                        match event_warning {
-                            Ok(event) => {
-                                tx.send(LogStreamEvent::EventWarning(event)).await.ok();
-                            }
-                            Err(err) => {
-                                let warning_data = serde_json::from_str(&message.data);
-                                match warning_data {
-                                    Ok(data) => {
-                                        let event = tower_api::models::EventWarning {
-                                            data,
-                                            event: tower_api::models::event_warning::Event::Warning,
-                                            id: None,
-                                            retry: None,
-                                        };
-                                        tx.send(LogStreamEvent::EventWarning(event)).await.ok();
-                                    }
-                                    Err(_) => {
-                                        debug!(
-                                            "Failed to parse warning message: {:?}. Error: {}",
-                                            message.data, err
-                                        );
-                                    }
-                                }
-                            }
+                        if let Some(warning) = parse_warning_payload(&message.data) {
+                            tx.send(LogStreamEvent::EventWarning(warning)).await.ok();
+                        } else {
+                            debug!("Failed to parse warning message: {:?}", message.data);
                         }
                     }
                     _ => {
@@ -841,6 +873,11 @@ pub async fn stream_run_logs(
             }
             Err(err) => match err {
                 reqwest_eventsource::Error::Transport(e) => Err(LogStreamError::Reqwest(e)),
+                reqwest_eventsource::Error::InvalidStatusCode(status, _) => {
+                    let status = StatusCode::from_u16(status.as_u16())
+                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+                    Err(LogStreamError::InvalidStatus(status))
+                }
                 reqwest_eventsource::Error::StreamEnded => {
                     drop(tx);
                     Ok(rx)
@@ -1435,13 +1472,11 @@ pub async fn update_schedule(
     let params = tower_api::apis::default_api::UpdateScheduleParams {
         id_or_name: schedule_id.to_string(),
         update_schedule_params: tower_api::models::UpdateScheduleParams {
-            schema: None,
-            cron: cron.cloned(),
-            environment: None,
-            app_version: None,
+            cron: cron.map(|s| s.clone()),
             parameters: run_parameters,
             ..Default::default()
         },
+        x_tower_request_number: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::update_schedule(
@@ -1556,9 +1591,49 @@ impl ResponseEntity for tower_api::apis::default_api::CancelRunSuccess {
 
 #[cfg(test)]
 mod tests {
-    use super::{unwrap_api_response_redacted, ResponseEntity};
+    use super::{
+        parse_warning_payload, unwrap_api_response_redacted, LogStreamError, ResponseEntity,
+    };
     use http::StatusCode;
     use tower_api::apis::{Error, ResponseContent};
+
+    #[test]
+    fn parses_bare_warning_payload() {
+        let data = r#"{"content":"Something looks off","reported_at":"2025-08-22T12:00:00Z"}"#;
+        let warning = parse_warning_payload(data).expect("expected warning to parse");
+
+        assert_eq!(warning.content, "Something looks off");
+        assert_eq!(warning.reported_at, "2025-08-22T12:00:00Z");
+    }
+
+    #[test]
+    fn parses_enveloped_warning_payload() {
+        let data = r#"{"event":"warning","data":{"content":"Wrapped warning","reported_at":"2025-08-22T12:00:00Z"}}"#;
+        let warning = parse_warning_payload(data).expect("expected warning to parse");
+
+        assert_eq!(warning.content, "Wrapped warning");
+    }
+
+    #[test]
+    fn rejects_unparseable_warning_payload() {
+        assert!(parse_warning_payload("not json").is_none());
+        assert!(parse_warning_payload(r#"{"unrelated":true}"#).is_none());
+    }
+
+    #[test]
+    fn log_stream_error_display_mentions_status_code() {
+        let err = LogStreamError::InvalidStatus(StatusCode::NOT_FOUND);
+        assert!(err.to_string().contains("404"));
+
+        let err = LogStreamError::Unknown;
+        assert!(!err.to_string().is_empty());
+    }
+
+    #[test]
+    fn log_stream_error_boxes_as_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(LogStreamError::Unknown);
+        assert!(!err.to_string().is_empty());
+    }
 
     enum SensitiveSuccess {
         UnknownValue,

@@ -31,6 +31,9 @@ pub struct App {
     #[serde(default)]
     pub schedule: String,
 
+    /// Optional short description of the app. `None` means the Towerfile
+    /// didn't set one (and the key is omitted when serializing), which is
+    /// distinct from an explicitly empty description.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
@@ -189,7 +192,6 @@ mod test {
         assert_eq!(towerfile.app.script, "./script.py");
         assert_eq!(towerfile.app.source, vec!["*.py"]);
         assert_eq!(towerfile.app.schedule, "0 0 * * *");
-        assert_eq!(towerfile.app.description, None);
     }
 
     #[test]
@@ -206,7 +208,6 @@ mod test {
         assert_eq!(towerfile.app.script, "./script.py");
         assert_eq!(towerfile.app.source, vec!["*.py"]);
         assert_eq!(towerfile.app.schedule, "");
-        assert_eq!(towerfile.app.description, None);
     }
 
     #[test]
@@ -391,6 +392,51 @@ mod test {
     }
 
     #[test]
+    fn test_description_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.description, None);
+
+        // Serializing a Towerfile without a description omits the key.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("description"));
+    }
+
+    #[test]
+    fn test_description_distinguishes_empty_from_absent() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            description = ""
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.description, Some(String::new()));
+    }
+
+    #[test]
+    fn test_description_roundtrips_when_present() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            description = "My app"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.description.as_deref(), Some("My app"));
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(serialized.contains(r#"description = "My app""#));
+    }
+
+    #[test]
     fn test_roundtrip_serialization() {
         let original_toml = r#"[app]
 name = "test-app"
@@ -417,7 +463,6 @@ default = "value2"
         assert_eq!(towerfile.app.name, reparsed.app.name);
         assert_eq!(towerfile.app.script, reparsed.app.script);
         assert_eq!(towerfile.app.source, reparsed.app.source);
-        assert_eq!(towerfile.app.description, reparsed.app.description);
         assert_eq!(towerfile.parameters.len(), reparsed.parameters.len());
         assert_eq!(towerfile.parameters[0].name, reparsed.parameters[0].name);
     }

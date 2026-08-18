@@ -8,6 +8,7 @@ from attrs import define as _attrs_define
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.organization_storage_usage import OrganizationStorageUsage
     from ..models.usage_limit import UsageLimit
 
 
@@ -25,6 +26,7 @@ class OrganizationUsage:
         members (UsageLimit):
         organization_name (str): The name of the organization.
         self_hosted_runners (UsageLimit):
+        storage (OrganizationStorageUsage):
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/OrganizationUsage.json.
     """
@@ -36,6 +38,7 @@ class OrganizationUsage:
     members: UsageLimit
     organization_name: str
     self_hosted_runners: UsageLimit
+    storage: OrganizationStorageUsage
     schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,6 +56,8 @@ class OrganizationUsage:
 
         self_hosted_runners = self.self_hosted_runners.to_dict()
 
+        storage = self.storage.to_dict()
+
         schema = self.schema
 
         field_dict: dict[str, Any] = {}
@@ -66,6 +71,7 @@ class OrganizationUsage:
                 "members": members,
                 "organization_name": organization_name,
                 "self_hosted_runners": self_hosted_runners,
+                "storage": storage,
             }
         )
         if schema is not UNSET:
@@ -75,6 +81,7 @@ class OrganizationUsage:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.organization_storage_usage import OrganizationStorageUsage
         from ..models.usage_limit import UsageLimit
 
         d = dict(src_dict)
@@ -92,6 +99,8 @@ class OrganizationUsage:
 
         self_hosted_runners = UsageLimit.from_dict(d.pop("self_hosted_runners"))
 
+        storage = OrganizationStorageUsage.from_dict(d.pop("storage"))
+
         schema = d.pop("$schema", UNSET)
 
         organization_usage = cls(
@@ -102,6 +111,7 @@ class OrganizationUsage:
             members=members,
             organization_name=organization_name,
             self_hosted_runners=self_hosted_runners,
+            storage=storage,
             schema=schema,
         )
 

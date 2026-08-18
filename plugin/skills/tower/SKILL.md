@@ -173,7 +173,7 @@ Get the logs from a previous Tower app run
 
 - `<app_name>`  *(required)* — app_name#run_number
 - `<run_number>` 
-- `-f`, `--follow` — Follow logs in real time
+- `-f`, `--follow` — Follow the logs of the run in real time
 
 #### `tower apps create`
 
@@ -331,7 +331,7 @@ Delete a schedule
 
 **Arguments:**
 
-- `<schedule_id>`  *(required)* — The schedule ID to delete
+- `<schedule_id>`  *(required)* — The ID of the schedule to delete
 
 #### `tower schedules update`
 
@@ -339,7 +339,7 @@ Update an existing schedule
 
 **Arguments:**
 
-- `<id_or_name>`  *(required)* — ID or name of the schedule to update
+- `<schedule_id>`  *(required)* — The ID of the schedule to update
 - `-c`, `--cron` — The cron expression defining when the app should run
 - `-p`, `--parameter` — Parameters (key=value) to pass to the app
 
@@ -353,8 +353,8 @@ List secrets in your Tower account
 
 **Arguments:**
 
-- `-s`, `--show` — Show secrets in plain text
-- `-e`, `--environment` — List secrets in this environment
+- `-s`, `--show` — Show the secret values in plain text
+- `-e`, `--environment` — The environment to list secrets from
 - `-a`, `--all` — List secrets across all environments
 
 #### `tower secrets create`
@@ -363,9 +363,9 @@ Create a new secret in your Tower account
 
 **Arguments:**
 
-- `-n`, `--name` *(required)* — Secret name to create
-- `-e`, `--environment` — Environment to store the secret in
-- `-v`, `--value` *(required)* — Secret value to store
+- `-n`, `--name` *(required)* — The name of the secret to create
+- `-e`, `--environment` — The environment to create the secret in
+- `-v`, `--value` *(required)* — The value of the secret
 
 #### `tower secrets delete`
 

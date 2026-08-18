@@ -144,6 +144,8 @@ def sql_catalog():
     [
         (None, "tower-catalog", True, "vend"),
         (None, "s3-tables", True, "load_catalog"),
+        (None, "s3-tables", False, "load_catalog"),
+        (None, "apache-polaris", True, "load_catalog"),
         (None, None, True, "load_catalog"),
         (None, None, False, "vend"),
         (True, "s3-tables", True, "vend"),
@@ -214,6 +216,8 @@ def test_string_catalog_precedence(
         assert ("describe_catalog", "default", "production") in calls
         if catalog_type is None:
             assert ("has_pyiceberg_config", "default") in calls
+        else:
+            assert ("has_pyiceberg_config", "default") not in calls
     else:
         assert ("describe_catalog", "default", "production") not in calls
         assert ("has_pyiceberg_config", "default") not in calls
@@ -224,6 +228,132 @@ def test_pyiceberg_catalog_config_detects_runner_env(monkeypatch):
 
     assert tables_module._has_pyiceberg_catalog_config("s3-tables") is True
     assert tables_module._has_pyiceberg_catalog_config("other") is False
+
+
+def test_pyiceberg_catalog_config_detects_loaded_config(monkeypatch):
+    from pyiceberg.catalog import _ENV_CONFIG
+
+    monkeypatch.setattr(
+        _ENV_CONFIG,
+        "get_catalog_config",
+        lambda name: {"uri": "https://example.com"} if name == "external" else None,
+    )
+
+    assert tables_module._has_pyiceberg_catalog_config("external") is True
+    assert tables_module._has_pyiceberg_catalog_config("other") is False
+
+
+@pytest.mark.parametrize("tower_credentials", [None, True, False])
+def test_explicit_catalog_bypasses_string_catalog_resolution(
+    monkeypatch, in_memory_catalog, tower_credentials
+):
+    patch_tower_context(monkeypatch, api_key=None)
+
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("explicit catalogs must bypass string catalog resolution")
+
+    monkeypatch.setattr(
+        tables_module, "_should_vend_tower_credentials", unexpected_call
+    )
+    monkeypatch.setattr(tables_module, "load_catalog", unexpected_call)
+    monkeypatch.setattr(tables_module, "_load_tower_catalog", unexpected_call)
+    monkeypatch.setattr(tables_module, "_describe_tower_catalog_type", unexpected_call)
+    monkeypatch.setattr(tables_module, "_has_pyiceberg_catalog_config", unexpected_call)
+
+    ref = tables_module.tables(
+        "events", catalog=in_memory_catalog, tower_credentials=tower_credentials
+    )
+
+    assert ref._catalog is in_memory_catalog
+    assert ref._catalog_name is None
+    assert ref._tower_vended is False
+    assert ref._ensure_catalog_mode("read-write") is in_memory_catalog
+
+
+def test_no_tower_auth_preserves_ambient_pyiceberg_catalog(monkeypatch):
+    _storage._clear_credential_cache()
+    patch_tower_context(monkeypatch, api_key=None)
+    monkeypatch.setenv(
+        "PYICEBERG_CATALOG__S3_TABLES__URI", "https://s3tables.example.com"
+    )
+    catalog = FakeCatalog("configured")
+    calls = []
+
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("ambient catalogs must not call Tower without Tower auth")
+
+    def load_catalog(name):
+        calls.append(("load_catalog", name))
+        return catalog
+
+    monkeypatch.setattr(_storage.describe_catalog_api, "sync", unexpected_call)
+    monkeypatch.setattr(tables_module, "get_tower_catalog_credentials", unexpected_call)
+    monkeypatch.setattr(tables_module, "load_catalog", load_catalog)
+
+    ref = tables_module.tables("events", catalog="s3-tables")
+
+    assert calls == [("load_catalog", "s3-tables")]
+    assert ref._tower_vended is False
+    assert ref._ensure_catalog_mode("read-write") is catalog
+
+
+def test_managed_catalog_vend_failure_does_not_fall_back_to_pyiceberg(monkeypatch):
+    _storage._clear_credential_cache()
+    patch_tower_context(monkeypatch)
+    calls = []
+
+    def describe_catalog_api_sync(name, client, environment):
+        return make_describe_catalog_response(name, "tower-catalog")
+
+    def get_tower_catalog_credentials(name, environment=None, mode="read"):
+        calls.append(("vend", name, environment, mode))
+        raise RuntimeError("credential vending failed")
+
+    def load_catalog(name):
+        calls.append(("load_catalog", name))
+        return FakeCatalog("configured")
+
+    monkeypatch.setattr(
+        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
+    )
+    monkeypatch.setattr(
+        tables_module, "get_tower_catalog_credentials", get_tower_catalog_credentials
+    )
+    monkeypatch.setattr(tables_module, "load_catalog", load_catalog)
+    monkeypatch.setattr(
+        tables_module, "_has_pyiceberg_catalog_config", lambda name: True
+    )
+
+    with pytest.raises(RuntimeError, match="credential vending failed"):
+        tables_module.tables("events", catalog="analytics")
+
+    assert calls == [("vend", "analytics", "production", "read")]
+
+
+@pytest.mark.parametrize("catalog_type", ["s3-tables", "apache-polaris"])
+def test_external_catalog_write_mode_keeps_ambient_pyiceberg_catalog(
+    monkeypatch, catalog_type
+):
+    _storage._clear_credential_cache()
+    patch_tower_context(monkeypatch)
+    catalog = FakeCatalog("configured")
+
+    def describe_catalog_api_sync(name, client, environment):
+        return make_describe_catalog_response(name, catalog_type)
+
+    def unexpected_vend(*args, **kwargs):
+        raise AssertionError("external catalogs must not vend Tower credentials")
+
+    monkeypatch.setattr(
+        _storage.describe_catalog_api, "sync", describe_catalog_api_sync
+    )
+    monkeypatch.setattr(tables_module, "load_catalog", lambda name: catalog)
+    monkeypatch.setattr(tables_module, "get_tower_catalog_credentials", unexpected_vend)
+
+    ref = tables_module.tables("events", catalog="external")
+
+    assert ref._tower_vended is False
+    assert ref._ensure_catalog_mode("read-write") is catalog
 
 
 def test_string_catalog_type_describe_is_cached(monkeypatch):
@@ -813,7 +943,7 @@ def test_delete_from_tables(in_memory_catalog):
     assert table.rows_affected().inserts == 3
 
     # Perform the underlying delete from the table...
-    table.delete(filters=[table.column("username") == "bobb"])
+    table.delete(filters=table.column("username") == "bobb")
 
     # ...and let's make sure that record is actually gone.
     df = table.to_polars()

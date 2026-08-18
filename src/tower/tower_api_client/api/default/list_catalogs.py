@@ -80,10 +80,11 @@ def sync_detailed(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
-            environments are returned.
-        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
-            current environment.
+        environment (str | Unset): The environment of the catalogs. Catalogs from the default
+            environment will be returned for names that don't exist in the requested environment. When
+            omitted, catalogs across all environments are returned.
+        all_ (bool | Unset): Whether to return catalogs across all environments, without applying
+            default-environment inheritance or deduplication.
         type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
             catalog types are returned.
 
@@ -126,10 +127,11 @@ def sync(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
-            environments are returned.
-        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
-            current environment.
+        environment (str | Unset): The environment of the catalogs. Catalogs from the default
+            environment will be returned for names that don't exist in the requested environment. When
+            omitted, catalogs across all environments are returned.
+        all_ (bool | Unset): Whether to return catalogs across all environments, without applying
+            default-environment inheritance or deduplication.
         type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
             catalog types are returned.
 
@@ -167,10 +169,11 @@ async def asyncio_detailed(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
-            environments are returned.
-        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
-            current environment.
+        environment (str | Unset): The environment of the catalogs. Catalogs from the default
+            environment will be returned for names that don't exist in the requested environment. When
+            omitted, catalogs across all environments are returned.
+        all_ (bool | Unset): Whether to return catalogs across all environments, without applying
+            default-environment inheritance or deduplication.
         type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
             catalog types are returned.
 
@@ -211,10 +214,11 @@ async def asyncio(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
-        environment (str | Unset): The environment to filter by. When omitted, catalogs across all
-            environments are returned.
-        all_ (bool | Unset): Whether to fetch all catalogs across all environments or only for the
-            current environment.
+        environment (str | Unset): The environment of the catalogs. Catalogs from the default
+            environment will be returned for names that don't exist in the requested environment. When
+            omitted, catalogs across all environments are returned.
+        all_ (bool | Unset): Whether to return catalogs across all environments, without applying
+            default-environment inheritance or deduplication.
         type_ (str | Unset): Filter catalogs by type, e.g. "tower-catalog". When omitted, all
             catalog types are returned.
 

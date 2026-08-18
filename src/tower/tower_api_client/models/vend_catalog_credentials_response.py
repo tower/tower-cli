@@ -19,15 +19,19 @@ class VendCatalogCredentialsResponse:
     """
     Attributes:
         credentials (CatalogCredentials):
+        environment (str): Environment containing the catalog definition.
         schema (str | Unset): A URL to the JSON Schema for this object. Example:
             https://api.tower.dev/v1/schemas/VendCatalogCredentialsResponse.json.
     """
 
     credentials: CatalogCredentials
+    environment: str
     schema: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         credentials = self.credentials.to_dict()
+
+        environment = self.environment
 
         schema = self.schema
 
@@ -36,6 +40,7 @@ class VendCatalogCredentialsResponse:
         field_dict.update(
             {
                 "credentials": credentials,
+                "environment": environment,
             }
         )
         if schema is not UNSET:
@@ -50,10 +55,13 @@ class VendCatalogCredentialsResponse:
         d = dict(src_dict)
         credentials = CatalogCredentials.from_dict(d.pop("credentials"))
 
+        environment = d.pop("environment")
+
         schema = d.pop("$schema", UNSET)
 
         vend_catalog_credentials_response = cls(
             credentials=credentials,
+            environment=environment,
             schema=schema,
         )
 
