@@ -7,6 +7,9 @@ name: "[tower] Test python"
 
 on:
   pull_request:
+  schedule:
+    # Detect new stable PyArrow/PyIceberg releases even when no PR is open.
+    - cron: "17 6 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,3 +47,52 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests
+
+  iceberg-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dependency_set: minimum
+            pyarrow: "pyarrow==23.0.1"
+            pyiceberg: "pyiceberg[sql-sqlite]==0.11.1"
+          - dependency_set: latest
+            pyarrow: "pyarrow"
+            pyiceberg: "pyiceberg[sql-sqlite]"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Resolve ${{ matrix.dependency_set }} Iceberg dependencies
+        run: >-
+          uv pip install
+          --python .venv/bin/python
+          --strict
+          --resolution highest
+          --upgrade-package pyarrow
+          --upgrade-package pyiceberg
+          '${{ matrix.pyarrow }}'
+          '${{ matrix.pyiceberg }}'
+
+      - name: Show resolved dependency versions
+        run: |
+          uv run --no-sync python - <<'PY'
+          from importlib.metadata import version
+
+          print(f"PyArrow {version('pyarrow')}; PyIceberg {version('pyiceberg')}")
+          PY
+
+      - name: Run Iceberg compatibility tests
+        run: uv run --no-sync pytest tests/tower/test_tables.py tests/tower/test_storage.py
