@@ -1,4 +1,4 @@
-@serial @deploy
+@serial @deploy @mock-only
 Feature: CLI Deploy Idempotency Key
   As a developer promoting unchanged source across environments
   I want tower deploy to send an X-Tower-Idempotency-Key
