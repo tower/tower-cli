@@ -4,19 +4,23 @@ from urllib.parse import quote
 
 import httpx
 
+from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_model import ErrorModel
 from ...models.update_app_params import UpdateAppParams
 from ...models.update_app_response import UpdateAppResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     name: str,
     *,
     body: UpdateAppParams,
+    x_tower_request_number: int | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(x_tower_request_number, Unset):
+        headers["X-Tower-Request-Number"] = str(x_tower_request_number)
 
     _kwargs: dict[str, Any] = {
         "method": "put",
@@ -35,15 +39,31 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorModel | UpdateAppResponse:
+) -> ErrorModel | UpdateAppResponse | None:
     if response.status_code == 200:
         response_200 = UpdateAppResponse.from_dict(response.json())
 
         return response_200
 
-    response_default = ErrorModel.from_dict(response.json())
+    if response.status_code == 412:
+        response_412 = ErrorModel.from_dict(response.json())
 
-    return response_default
+        return response_412
+
+    if response.status_code == 422:
+        response_422 = ErrorModel.from_dict(response.json())
+
+        return response_422
+
+    if response.status_code == 500:
+        response_500 = ErrorModel.from_dict(response.json())
+
+        return response_500
+
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
 
 
 def _build_response(
@@ -62,6 +82,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
+    x_tower_request_number: int | Unset = UNSET,
 ) -> Response[ErrorModel | UpdateAppResponse]:
     """Update app
 
@@ -69,6 +90,9 @@ def sync_detailed(
 
     Args:
         name (str): The name of the App to update.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         body (UpdateAppParams):
 
     Raises:
@@ -82,6 +106,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         name=name,
         body=body,
+        x_tower_request_number=x_tower_request_number,
     )
 
     response = client.get_httpx_client().request(
@@ -96,6 +121,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
+    x_tower_request_number: int | Unset = UNSET,
 ) -> ErrorModel | UpdateAppResponse | None:
     """Update app
 
@@ -103,6 +129,9 @@ def sync(
 
     Args:
         name (str): The name of the App to update.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         body (UpdateAppParams):
 
     Raises:
@@ -117,6 +146,7 @@ def sync(
         name=name,
         client=client,
         body=body,
+        x_tower_request_number=x_tower_request_number,
     ).parsed
 
 
@@ -125,6 +155,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
+    x_tower_request_number: int | Unset = UNSET,
 ) -> Response[ErrorModel | UpdateAppResponse]:
     """Update app
 
@@ -132,6 +163,9 @@ async def asyncio_detailed(
 
     Args:
         name (str): The name of the App to update.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         body (UpdateAppParams):
 
     Raises:
@@ -145,6 +179,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         name=name,
         body=body,
+        x_tower_request_number=x_tower_request_number,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -157,6 +192,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: UpdateAppParams,
+    x_tower_request_number: int | Unset = UNSET,
 ) -> ErrorModel | UpdateAppResponse | None:
     """Update app
 
@@ -164,6 +200,9 @@ async def asyncio(
 
     Args:
         name (str): The name of the App to update.
+        x_tower_request_number (int | Unset): Optional account-scoped monotonic sequence token
+            used to reject out-of-order writes. See the fence documentation for the acceptance window
+            and retry behavior.
         body (UpdateAppParams):
 
     Raises:
@@ -179,5 +218,6 @@ async def asyncio(
             name=name,
             client=client,
             body=body,
+            x_tower_request_number=x_tower_request_number,
         )
     ).parsed

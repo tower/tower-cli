@@ -67,6 +67,7 @@ mock_apps_db["predeployed-test-app"] = {
     "created_at": datetime.datetime.now().isoformat(),
     "next_run_at": None,
     "health_status": "healthy",
+    "is_example": False,
     "pending_timeout": 300,
     "running_timeout": 0,
     "run_results": {
@@ -153,6 +154,7 @@ async def create_app(app_data: Dict[str, Any]):
     new_app = {
         "created_at": datetime.datetime.now().isoformat(),
         "health_status": "healthy",
+        "is_example": False,
         "is_externally_accessible": True,
         "name": app_name,
         "next_run_at": None,

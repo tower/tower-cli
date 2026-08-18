@@ -108,7 +108,9 @@ def sync_detailed(
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog credentials to vend. When it has no
+            same-named catalog, credentials for the catalog from default are vended instead. Default:
+            'default'.
         body (VendCatalogCredentialsBody):
 
     Raises:
@@ -148,7 +150,9 @@ def sync(
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog credentials to vend. When it has no
+            same-named catalog, credentials for the catalog from default are vended instead. Default:
+            'default'.
         body (VendCatalogCredentialsBody):
 
     Raises:
@@ -183,7 +187,9 @@ async def asyncio_detailed(
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog credentials to vend. When it has no
+            same-named catalog, credentials for the catalog from default are vended instead. Default:
+            'default'.
         body (VendCatalogCredentialsBody):
 
     Raises:
@@ -221,7 +227,9 @@ async def asyncio(
 
     Args:
         name (str): The name of the catalog.
-        environment (str | Unset): The environment of the catalog. Default: 'default'.
+        environment (str | Unset): Environment whose catalog credentials to vend. When it has no
+            same-named catalog, credentials for the catalog from default are vended instead. Default:
+            'default'.
         body (VendCatalogCredentialsBody):
 
     Raises:

@@ -15,7 +15,7 @@ class Token:
     """
     Attributes:
         access_token (str): The access token to use when authenticating API requests with Tower.
-        jwt (str):
+        jwt (str): This property is deprecated. Use access_token instead.
         refresh_token (str | Unset): The refresh token to use when refreshing an expired access token. For security
             reasons, refresh tokens should only be transmitted over secure channels and never logged or stored in plaintext.
             It will only be returned upon initial authentication or when explicitly refreshing the access token.

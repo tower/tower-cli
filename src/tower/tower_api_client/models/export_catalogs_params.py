@@ -14,8 +14,10 @@ T = TypeVar("T", bound="ExportCatalogsParams")
 class ExportCatalogsParams:
     """
     Attributes:
-        all_ (bool): Whether to fetch all catalogs or only the ones in the supplied environment. Default: False.
-        environment (str): The environment to filter by. Default: 'default'.
+        all_ (bool): Whether to export catalogs across all environments, without applying default-environment
+            inheritance or deduplication. Default: False.
+        environment (str): Environment whose catalogs to export when all is false. When it has no same-named catalog, a
+            catalog from default is selected instead. Default: 'default'.
         page (int): The page number to fetch. Default: 1.
         page_size (int): The number of records to fetch on each page. Default: 20.
         public_key (str): The PEM-encoded public key you want to use to encrypt sensitive catalog properties.

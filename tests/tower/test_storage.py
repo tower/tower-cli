@@ -95,7 +95,10 @@ def test_get_tower_catalog_credentials_caches_vended_credentials(monkeypatch):
 
     def vend(ctx, name, environment, mode):
         calls.append((name, environment, mode))
-        return VendCatalogCredentialsResponse(credentials=credentials)
+        return VendCatalogCredentialsResponse(
+            credentials=credentials,
+            environment=environment,
+        )
 
     monkeypatch.setattr(_storage.TowerContext, "build", staticmethod(lambda: ctx))
     monkeypatch.setattr(_storage, "_vend_catalog_credentials", vend)
@@ -135,7 +138,10 @@ def test_get_tower_catalog_credentials_prunes_expired_cache_entries(monkeypatch)
     )
 
     def vend(ctx, name, environment, mode):
-        return VendCatalogCredentialsResponse(credentials=fresh_credentials)
+        return VendCatalogCredentialsResponse(
+            credentials=fresh_credentials,
+            environment=environment,
+        )
 
     monkeypatch.setattr(_storage.TowerContext, "build", staticmethod(lambda: ctx))
     monkeypatch.setattr(_storage, "_vend_catalog_credentials", vend)
@@ -164,7 +170,10 @@ def test_default_catalog_vend_retries_after_legacy_provisioning(monkeypatch):
     responses = [
         ErrorModel(status=404, detail="not found"),
         ErrorModel(status=404, detail="still provisioning"),
-        VendCatalogCredentialsResponse(credentials=credentials),
+        VendCatalogCredentialsResponse(
+            credentials=credentials,
+            environment="default",
+        ),
     ]
     legacy_calls = []
 

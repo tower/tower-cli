@@ -21,7 +21,7 @@ class ExportedCatalog:
     """
     Attributes:
         created_at (datetime.datetime):
-        environment (str):
+        environment (str): Environment containing the catalog definition.
         name (str):
         properties (list[ExportedCatalogProperty]):
         type_ (str):

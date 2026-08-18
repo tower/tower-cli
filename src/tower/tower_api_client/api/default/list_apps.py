@@ -15,6 +15,7 @@ def _get_kwargs(
     *,
     page: int | Unset = 1,
     page_size: int | Unset = 20,
+    tag_filter: str | Unset = UNSET,
     query: str | Unset = UNSET,
     num_runs: int | Unset = 20,
     sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
@@ -26,6 +27,8 @@ def _get_kwargs(
     params["page"] = page
 
     params["page_size"] = page_size
+
+    params["tag_filter"] = tag_filter
 
     params["query"] = query
 
@@ -85,6 +88,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     page_size: int | Unset = 20,
+    tag_filter: str | Unset = UNSET,
     query: str | Unset = UNSET,
     num_runs: int | Unset = 20,
     sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
@@ -98,6 +102,9 @@ def sync_detailed(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        tag_filter (str | Unset): The tag query to filter apps by. Provide a serialized TagFilter
+            as the value for the parameter. Example:
+            tag_filter={"op":"eq","name":"foo","value":"bar"}.
         query (str | Unset): The search query to filter apps by.
         num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
             Default: 20.
@@ -117,6 +124,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         page=page,
         page_size=page_size,
+        tag_filter=tag_filter,
         query=query,
         num_runs=num_runs,
         sort=sort,
@@ -136,6 +144,7 @@ def sync(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     page_size: int | Unset = 20,
+    tag_filter: str | Unset = UNSET,
     query: str | Unset = UNSET,
     num_runs: int | Unset = 20,
     sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
@@ -149,6 +158,9 @@ def sync(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        tag_filter (str | Unset): The tag query to filter apps by. Provide a serialized TagFilter
+            as the value for the parameter. Example:
+            tag_filter={"op":"eq","name":"foo","value":"bar"}.
         query (str | Unset): The search query to filter apps by.
         num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
             Default: 20.
@@ -169,6 +181,7 @@ def sync(
         client=client,
         page=page,
         page_size=page_size,
+        tag_filter=tag_filter,
         query=query,
         num_runs=num_runs,
         sort=sort,
@@ -182,6 +195,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     page_size: int | Unset = 20,
+    tag_filter: str | Unset = UNSET,
     query: str | Unset = UNSET,
     num_runs: int | Unset = 20,
     sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
@@ -195,6 +209,9 @@ async def asyncio_detailed(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        tag_filter (str | Unset): The tag query to filter apps by. Provide a serialized TagFilter
+            as the value for the parameter. Example:
+            tag_filter={"op":"eq","name":"foo","value":"bar"}.
         query (str | Unset): The search query to filter apps by.
         num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
             Default: 20.
@@ -214,6 +231,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         page=page,
         page_size=page_size,
+        tag_filter=tag_filter,
         query=query,
         num_runs=num_runs,
         sort=sort,
@@ -231,6 +249,7 @@ async def asyncio(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     page_size: int | Unset = 20,
+    tag_filter: str | Unset = UNSET,
     query: str | Unset = UNSET,
     num_runs: int | Unset = 20,
     sort: ListAppsSort | Unset = ListAppsSort.CREATED_AT,
@@ -244,6 +263,9 @@ async def asyncio(
     Args:
         page (int | Unset): The page number to fetch. Default: 1.
         page_size (int | Unset): The number of records to fetch on each page. Default: 20.
+        tag_filter (str | Unset): The tag query to filter apps by. Provide a serialized TagFilter
+            as the value for the parameter. Example:
+            tag_filter={"op":"eq","name":"foo","value":"bar"}.
         query (str | Unset): The search query to filter apps by.
         num_runs (int | Unset): Number of recent runs to fetch (-1 for all runs, defaults to 20)
             Default: 20.
@@ -265,6 +287,7 @@ async def asyncio(
             client=client,
             page=page,
             page_size=page_size,
+            tag_filter=tag_filter,
             query=query,
             num_runs=num_runs,
             sort=sort,

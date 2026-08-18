@@ -1476,6 +1476,7 @@ pub async fn update_schedule(
             parameters: run_parameters,
             ..Default::default()
         },
+        x_tower_request_number: None,
     };
 
     unwrap_api_response(tower_api::apis::default_api::update_schedule(
