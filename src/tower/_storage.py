@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from dataclasses import dataclass
+from concurrent.futures import Future
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 from typing import TYPE_CHECKING
 
 import httpx
@@ -15,6 +17,7 @@ if TYPE_CHECKING:
 from ._context import TowerContext
 from .exceptions import (
     StorageConnectionError,
+    StorageError,
     StorageInvalidCredentialError,
     StorageMissingAuthenticationError,
 )
@@ -51,6 +54,12 @@ INVALID_CREDENTIAL_SENTINEL = "<redacted>"
 logger = logging.getLogger("tower.storage")
 
 
+@dataclass(frozen=True, slots=True)
+class _AccessCacheKey:
+    name: str
+    mode: str
+
+
 def _auth_from_context(context: TowerContext) -> tuple[str, str, str]:
     if context.jwt is not None:
         token = context.jwt
@@ -69,7 +78,7 @@ def _auth_from_context(context: TowerContext) -> tuple[str, str, str]:
 
     if token.strip() == INVALID_CREDENTIAL_SENTINEL:
         raise StorageInvalidCredentialError(
-            f"{source} contains the {INVALID_CREDENTIAL_SENTINEL!r} placeholder, "
+            f"{source} contains the {INVALID_CREDENTIAL_SENTINEL} placeholder, "
             "not a usable Tower credential."
         )
     if not token.strip():
@@ -104,6 +113,33 @@ def _auth_hash(token: str, auth_header_name: str, prefix: str) -> str:
     return hashlib.sha256(presented_auth.encode("utf-8")).hexdigest()
 
 
+@dataclass(frozen=True)
+class _ResolvedCatalogAccess:
+    target_environment: str
+    catalog_environment: str
+    catalog_name: str
+    catalog_uri: str
+    warehouse: str
+    mode: str
+    oauth_token: str = field(repr=False)
+    expires_at: datetime
+
+    def is_inherited(self) -> bool:
+        return self.catalog_environment != self.target_environment
+
+    def is_usable(self, now: datetime) -> bool:
+        return self.expires_at - now > CREDENTIAL_REFRESH_WINDOW
+
+    def to_credentials(self) -> CatalogCredentials:
+        return CatalogCredentials(
+            catalog_uri=self.catalog_uri,
+            expires_at=self.expires_at,
+            mode=self.mode,
+            oauth_token=self.oauth_token,
+            warehouse=self.warehouse,
+        )
+
+
 class _StorageResolver:
     """Private Tower configuration and authentication for catalog resolution."""
 
@@ -120,18 +156,20 @@ class _StorageResolver:
         if environment is not None and not environment.strip():
             raise ValueError("environment must not be blank")
 
-        self._target_environment = (
+        self._target_environment: str = (
             environment or context.environment or DEFAULT_ENVIRONMENT_NAME
         )
-        self._base_url = _api_base_url(context.tower_url)
+        self._base_url: str = _api_base_url(context.tower_url)
+
+        self._token: str
+        self._auth_header_name: str
+        self._auth_prefix: str
         self._token, self._auth_header_name, self._auth_prefix = _auth_from_context(
             context
         )
-        self._auth_hash = _auth_hash(
-            self._token,
-            self._auth_header_name,
-            self._auth_prefix,
-        )
+        self._access_cache: dict[_AccessCacheKey, _ResolvedCatalogAccess] = {}
+        self._access_flights: dict[_AccessCacheKey, Future[_ResolvedCatalogAccess]] = {}
+        self._access_lock: Lock = Lock()
 
     def _new_client(self) -> AuthenticatedClient:
         return _new_tower_control_plane_client(
@@ -141,6 +179,79 @@ class _StorageResolver:
             prefix=self._auth_prefix,
             timeout=DEFAULT_STORAGE_TIMEOUT_SECONDS,
         )
+
+    def _resolve_catalog_access(
+        self,
+        name: str,
+        mode: str,
+    ) -> _ResolvedCatalogAccess:
+        mode = _normalize_mode(mode)
+        target_environment = self._target_environment
+        # Host, authentication, and target are fixed for this resolver.
+        cache_key = _AccessCacheKey(name=name, mode=mode)
+
+        with self._access_lock:
+            cached = self._access_cache.get(cache_key)
+            if cached is not None and cached.is_usable(datetime.now(timezone.utc)):
+                return cached
+            _ = self._access_cache.pop(cache_key, None)
+
+            flight = self._access_flights.get(cache_key)
+            if flight is None:
+                flight = Future()
+                self._access_flights[cache_key] = flight
+                should_vend = True
+            else:
+                should_vend = False
+
+        if not should_vend:
+            return flight.result()
+
+        try:
+            response = _vend_with_default_catalog_fallback(
+                self,
+                name,
+                mode,
+            )
+            credentials = response.credentials
+            if credentials.mode != mode:
+                raise StorageError(
+                    f"Tower returned {credentials.mode} credentials after "
+                    f"{mode} access was requested."
+                )
+            if response.environment not in (
+                target_environment,
+                DEFAULT_ENVIRONMENT_NAME,
+            ):
+                raise StorageError(
+                    f"Tower resolved catalog {name} from unexpected environment "
+                    f"{response.environment}."
+                )
+
+            access = _ResolvedCatalogAccess(
+                target_environment=target_environment,
+                catalog_environment=response.environment,
+                catalog_name=name,
+                catalog_uri=credentials.catalog_uri,
+                warehouse=credentials.warehouse,
+                mode=credentials.mode,
+                oauth_token=credentials.oauth_token,
+                expires_at=_ensure_aware(credentials.expires_at),
+            )
+            cacheable = access.is_usable(datetime.now(timezone.utc))
+        except BaseException as error:
+            with self._access_lock:
+                flight.set_exception(error)
+                _ = self._access_flights.pop(cache_key, None)
+            raise
+
+        with self._access_lock:
+            if cacheable:
+                self._access_cache[cache_key] = access
+            flight.set_result(access)
+            _ = self._access_flights.pop(cache_key, None)
+
+        return access
 
     def _request_catalog_credentials(
         self,
@@ -173,13 +284,12 @@ def _api_base_url(tower_url: str) -> str:
     return str(url.copy_with(path="/v1", query=None, fragment=None))
 
 
-@dataclass
-class _CachedCredentials:
-    credentials: CatalogCredentials
-
-    def is_usable(self, now: datetime) -> bool:
-        expires_at = _ensure_aware(self.credentials.expires_at)
-        return now < expires_at - CREDENTIAL_REFRESH_WINDOW
+@dataclass(frozen=True, slots=True)
+class _CatalogTypeCacheKey:
+    base_url: str
+    auth_hash: str
+    name: str
+    environment: str
 
 
 @dataclass
@@ -188,8 +298,7 @@ class _CachedCatalogType:
     retry_at: float | None = None
 
 
-_credential_cache: dict[tuple[str, str, str, str, str], _CachedCredentials] = {}
-_catalog_type_cache: dict[tuple[str, str, str, str], _CachedCatalogType] = {}
+_catalog_type_cache: dict[_CatalogTypeCacheKey, _CachedCatalogType] = {}
 
 
 def get_tower_catalog(
@@ -210,18 +319,8 @@ def get_tower_catalog_credentials(
     mode: str = "read",
 ) -> CatalogCredentials:
     storage_resolver = _StorageResolver(environment=environment)
-    mode = _normalize_mode(mode)
-    cache_key = _cache_key(storage_resolver, name, mode)
-
-    now = datetime.now(timezone.utc)
-    _prune_credential_cache(now)
-    cached = _credential_cache.get(cache_key)
-    if cached is not None and cached.is_usable(now):
-        return cached.credentials
-
-    credentials = _vend_with_default_catalog_fallback(storage_resolver, name, mode)
-    _credential_cache[cache_key] = _CachedCredentials(credentials)
-    return credentials
+    access = storage_resolver._resolve_catalog_access(name, mode)
+    return access.to_credentials()
 
 
 def load_vended_catalog(name: str, credentials: CatalogCredentials) -> Catalog:
@@ -240,7 +339,7 @@ def _vend_with_default_catalog_fallback(
     storage_resolver: _StorageResolver,
     name: str,
     mode: str,
-) -> CatalogCredentials:
+) -> VendCatalogCredentialsResponse:
     environment = storage_resolver._target_environment
     result = storage_resolver._request_catalog_credentials(name, mode)
     if not _is_not_found(result):
@@ -258,7 +357,7 @@ def _vend_with_default_catalog_fallback(
         return _unwrap_vend_result(result, name, environment)
 
     raise RuntimeError(
-        f"Tower catalog {name!r} does not exist in environment {environment!r}."
+        f"Tower catalog {name} does not exist in environment {environment}."
     )
 
 
@@ -271,7 +370,12 @@ def _describe_tower_catalog_type(
     token, auth_header_name, prefix = _auth_from_context(ctx)
     base_url = _api_base_url(ctx.tower_url)
     auth_hash = _auth_hash(token, auth_header_name, prefix)
-    cache_key = (base_url, auth_hash, name, environment)
+    cache_key = _CatalogTypeCacheKey(
+        base_url=base_url,
+        auth_hash=auth_hash,
+        name=name,
+        environment=environment,
+    )
     cached = _catalog_type_cache.get(cache_key)
     if cached is not None:
         if cached.retry_at is None:
@@ -346,43 +450,21 @@ def _unwrap_vend_result(
     result: ErrorModel | VendCatalogCredentialsResponse | None,
     name: str,
     environment: str,
-) -> CatalogCredentials:
+) -> VendCatalogCredentialsResponse:
     if isinstance(result, VendCatalogCredentialsResponse):
-        return result.credentials
+        return result
 
     if isinstance(result, ErrorModel):
         detail = _error_text(result)
         raise RuntimeError(
-            f"Failed to vend credentials for Tower catalog {name!r} "
-            f"in environment {environment!r}: {detail}"
+            f"Failed to vend credentials for Tower catalog {name} "
+            f"in environment {environment}: {detail}"
         )
 
     raise RuntimeError(
-        f"Failed to vend credentials for Tower catalog {name!r} "
-        f"in environment {environment!r}."
+        f"Failed to vend credentials for Tower catalog {name} "
+        f"in environment {environment}."
     )
-
-
-def _cache_key(
-    storage_resolver: _StorageResolver,
-    name: str,
-    mode: str,
-) -> tuple[str, str, str, str, str]:
-    return (
-        storage_resolver._base_url,
-        storage_resolver._auth_hash,
-        name,
-        storage_resolver._target_environment,
-        mode,
-    )
-
-
-def _prune_credential_cache(now: datetime) -> None:
-    expired_keys = [
-        key for key, cached in _credential_cache.items() if not cached.is_usable(now)
-    ]
-    for key in expired_keys:
-        _credential_cache.pop(key, None)
 
 
 def _normalize_mode(mode: str) -> str:
@@ -416,6 +498,5 @@ def _ensure_aware(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def _clear_credential_cache() -> None:
-    _credential_cache.clear()
+def _clear_catalog_type_cache() -> None:
     _catalog_type_cache.clear()
