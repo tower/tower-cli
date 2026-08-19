@@ -642,10 +642,11 @@ async def refresh_session(refresh_params: Dict[str, Any] = None):
     }
 
 
+# What the integration suite's hello-world fixture app actually prints. The
+# mock only ever relays program output, so anything here that the fixture
+# doesn't print is content no real run could produce.
 NORMAL_LOG_ENTRIES = [
-    (1, "Starting application...", "2025-08-22T12:00:00Z"),
-    (2, "Hello, World!", "2025-08-22T12:00:01Z"),
-    (3, "Application completed successfully", "2025-08-22T12:00:02Z"),
+    (1, "Hello, World!", "2025-08-22T12:00:01Z"),
 ]
 
 
@@ -664,11 +665,22 @@ def make_log_event(seq: int, line_num: int, content: str, timestamp: str):
     return f"event: log\ndata: {json.dumps(make_log_data(seq, line_num, content, timestamp))}\n\n"
 
 
-def make_warning_event(content: str, timestamp: str):
+def make_warning_event(content: str, timestamp: str, end_of_stream: bool = False):
     """A warning SSE event. Matching the real server, the data field carries
-    the bare warning payload (not an enveloped {event, data, ...} object)."""
+    the bare warning payload (not an enveloped {event, data, ...} object) and
+    omits end_of_stream unless it is set."""
     data = {"content": content, "reported_at": timestamp}
+    if end_of_stream:
+        data["end_of_stream"] = True
     return f"event: warning\ndata: {json.dumps(data)}\n\n"
+
+
+# The only warnings the real API emits on a run log stream (see
+# sendRunLogNotifications in tower-services). Warnings the server cannot send
+# do not belong here: the suite runs these same features against the real API,
+# where anything invented here fails.
+NO_NEW_LOGS_WARNING = "No new logs available"
+STREAM_COMPLETE_WARNING = "stream complete"
 
 
 @app.get("/v1/apps/{name}/runs/{seq}/logs")
@@ -692,6 +704,10 @@ async def generate_logs_after_completion_test_stream(seq: int):
     after about 1 second (see describe_run), so the second line arrives after
     the CLI has already observed completion — exercising the post-completion
     log drain.
+
+    These two lines are the program output of the suite's
+    templates/logs_after_completion.py fixture, so the same scenario asserts
+    the same content whether it runs against this mock or the real API.
     """
     yield make_log_event(
         seq, 1, "First log before run completes", "2025-08-22T12:00:00Z"
@@ -703,12 +719,14 @@ async def generate_logs_after_completion_test_stream(seq: int):
 
 
 async def generate_normal_log_stream(seq: int):
-    """Normal log stream for regular tests, including a warning event."""
+    """Normal log stream for regular tests, closing the way the server does:
+    the log lines, then the idle warning, then the terminal end-of-stream."""
     for line_num, content, timestamp in NORMAL_LOG_ENTRIES:
         yield make_log_event(seq, line_num, content, timestamp)
         await asyncio.sleep(0.1)
+    yield make_warning_event(NO_NEW_LOGS_WARNING, "2025-08-22T12:00:03Z")
     yield make_warning_event(
-        "This run is using a deprecated runtime", "2025-08-22T12:00:03Z"
+        STREAM_COMPLETE_WARNING, "2025-08-22T12:00:03Z", end_of_stream=True
     )
 
 

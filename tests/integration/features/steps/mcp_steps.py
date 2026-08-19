@@ -908,6 +908,11 @@ def step_create_hello_world_app_named(context, app_name):
     create_towerfile(context, app_name=app_name)
 
 
+@given('I have an application named "{app_name}" that logs either side of completion')
+def step_create_logs_after_completion_app(context, app_name):
+    create_towerfile(context, app_name=app_name, script_name="logs_after_completion.py")
+
+
 # --- Catalog querying (gated on TOWER_TEST_CATALOG; see environment.py) -------
 
 
