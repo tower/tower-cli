@@ -8,6 +8,9 @@
 # Bots:
 dependabot[bot]
 renovate[bot]
+# The app that persists signatures to develop; its own commits land in
+# release PRs, where the check would otherwise demand a CLA from it.
+tower-cla-app[bot]
 
 # Tower employees: exempt because they have already signed equivalent
 # agreements as part of employment; the CLA record for them lives in their
