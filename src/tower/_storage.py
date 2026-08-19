@@ -5,11 +5,17 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from http import HTTPStatus
 from typing import Any, Optional
 
-from ._client import _env_client
+import httpx
+
 from ._context import TowerContext
+from .exceptions import (
+    StorageConnectionError,
+    StorageInvalidCredentialError,
+    StorageMissingAuthenticationError,
+)
+from .tower_api_client import AuthenticatedClient
 from .tower_api_client.api.default import describe_catalog as describe_catalog_api
 from .tower_api_client.api.default import (
     describe_default_catalog as describe_default_catalog_api,
@@ -33,11 +39,148 @@ CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS = 2.0
 # only cache failed catalog type describe requests for this long
 # retry only after this period
 CATALOG_TYPE_FAILURE_CACHE_TTL_SECONDS = 30.0
+DEFAULT_STORAGE_TIMEOUT_SECONDS = 30.0
 DEFAULT_CATALOG_PROVISION_RETRY_DELAYS = (0.25, 0.5, 1.0, 2.0)
 DEFAULT_CATALOG_NAME = "default"
 DEFAULT_ENVIRONMENT_NAME = "default"
 TOWER_CATALOG_TYPE = "tower-catalog"
+INVALID_CREDENTIAL_SENTINEL = "<redacted>"
 logger = logging.getLogger("tower.storage")
+
+
+def _auth_from_context(context: TowerContext) -> tuple[str, str, str]:
+    if context.jwt is not None:
+        token = context.jwt
+        auth_header_name = "Authorization"
+        prefix = "Bearer"
+        source = "TOWER_JWT"
+    elif context.api_key is not None:
+        token = context.api_key
+        auth_header_name = "X-API-Key"
+        prefix = ""
+        source = "TOWER_API_KEY"
+    else:
+        raise StorageMissingAuthenticationError(
+            "No Tower authentication found. Set TOWER_API_KEY or TOWER_JWT."
+        )
+
+    if token.strip() == INVALID_CREDENTIAL_SENTINEL:
+        raise StorageInvalidCredentialError(
+            f"{source} contains the {INVALID_CREDENTIAL_SENTINEL!r} placeholder, "
+            "not a usable Tower credential."
+        )
+    if not token.strip():
+        raise StorageMissingAuthenticationError(
+            "No Tower authentication found. Set TOWER_API_KEY or TOWER_JWT."
+        )
+
+    return token, auth_header_name, prefix
+
+
+def _build_tower_control_plane_client(
+    *,
+    context: TowerContext,
+    tower_url: str,
+    timeout: float,
+    verify_tls: bool,
+) -> tuple[str, str, AuthenticatedClient]:
+    token, auth_header_name, prefix = _auth_from_context(context)
+    base_url = _api_base_url(tower_url)
+    # hash whatever auth token was provided so we can cache catalogs tokens per account.
+    auth_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    client = AuthenticatedClient(
+        verify_ssl=verify_tls,
+        base_url=base_url,
+        token=token,
+        auth_header_name=auth_header_name,
+        prefix=prefix,
+        timeout=httpx.Timeout(timeout),
+        raise_on_unexpected_status=True,
+    )
+    return base_url, auth_hash, client
+
+
+class StorageClient:
+    """Configuration and authenticated Tower Storage-specific client.
+
+    This remains an internal foundation until the public catalog-loading surface is
+    added. It intentionally does not alter the clients used by unrelated SDK calls.
+    """
+
+    def __init__(
+        self,
+        *,
+        tower_url: str | None = None,
+        environment: str | None = None,
+        timeout: float = DEFAULT_STORAGE_TIMEOUT_SECONDS,
+        verify_tls: bool = True,
+    ) -> None:
+        context = TowerContext.build()
+
+        if tower_url is not None and not isinstance(tower_url, str):
+            raise TypeError("tower_url must be a string or None")
+
+        if tower_url is not None and not tower_url.strip():
+            raise ValueError("tower_url must not be blank")
+
+        if environment is not None and not isinstance(environment, str):
+            raise TypeError("environment must be a string or None")
+
+        if environment is not None and not environment.strip():
+            raise ValueError("environment must not be blank")
+
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+            raise TypeError("timeout must be a positive number")
+
+        if not 0 < float(timeout) < float("inf"):
+            raise ValueError("timeout must be a positive finite number")
+
+        if not isinstance(verify_tls, bool):
+            raise TypeError("verify_tls must be a bool")
+
+        self.tower_url = tower_url or context.tower_url
+        self.environment = (
+            environment or context.environment or DEFAULT_ENVIRONMENT_NAME
+        )
+        self.timeout = float(timeout)
+        self.verify_tls = verify_tls
+        self._base_url, self._auth_hash, self._tower_client = (
+            _build_tower_control_plane_client(
+                context=context,
+                tower_url=self.tower_url,
+                timeout=self.timeout,
+                verify_tls=self.verify_tls,
+            )
+        )
+
+    def _request_catalog_credentials(
+        self,
+        name: str,
+        mode: str,
+    ) -> ErrorModel | VendCatalogCredentialsResponse | None:
+        body = VendCatalogCredentialsBody(mode=_vend_mode(mode))
+
+        try:
+            return vend_catalog_credentials_api.sync(
+                name=name,
+                client=self._tower_client,
+                environment=self.environment,
+                body=body,
+            )
+        except httpx.RequestError as error:
+            raise StorageConnectionError(
+                f"Could not connect to Tower at {self._base_url!r}."
+            ) from error
+
+
+def _api_base_url(tower_url: str) -> str:
+    try:
+        url = httpx.URL(tower_url)
+    except (TypeError, httpx.InvalidURL) as error:
+        raise ValueError(f"Invalid Tower URL: {tower_url!r}") from error
+    if not url.is_absolute_url or url.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid Tower URL: {tower_url!r}")
+    return str(url.copy_with(path="/v1", query=None, fragment=None)).rstrip("/")
 
 
 @dataclass
@@ -56,7 +199,7 @@ class _CachedCatalogType:
 
 
 _credential_cache: dict[tuple[str, str, str, str, str], _CachedCredentials] = {}
-_catalog_type_cache: dict[tuple[str, str, str], _CachedCatalogType] = {}
+_catalog_type_cache: dict[tuple[str, str, str, str], _CachedCatalogType] = {}
 
 
 def get_tower_catalog(
@@ -76,10 +219,9 @@ def get_tower_catalog_credentials(
     environment: Optional[str] = None,
     mode: str = "read",
 ) -> CatalogCredentials:
-    ctx = TowerContext.build()
-    environment = environment or ctx.environment or DEFAULT_ENVIRONMENT_NAME
+    storage_client = StorageClient(environment=environment)
     mode = _normalize_mode(mode)
-    cache_key = _cache_key(ctx, name, environment, mode)
+    cache_key = _cache_key(storage_client, name, mode)
 
     now = datetime.now(timezone.utc)
     _prune_credential_cache(now)
@@ -87,7 +229,8 @@ def get_tower_catalog_credentials(
     if cached is not None and cached.is_usable(now):
         return cached.credentials
 
-    credentials = _vend_with_default_catalog_fallback(ctx, name, environment, mode)
+    with storage_client._tower_client:
+        credentials = _vend_with_default_catalog_fallback(storage_client, name, mode)
     _credential_cache[cache_key] = _CachedCredentials(credentials)
     return credentials
 
@@ -105,20 +248,23 @@ def load_vended_catalog(name: str, credentials: CatalogCredentials) -> Any:
 
 
 def _vend_with_default_catalog_fallback(
-    ctx: TowerContext, name: str, environment: str, mode: str
+    storage_client: StorageClient,
+    name: str,
+    mode: str,
 ) -> CatalogCredentials:
-    result = _vend_catalog_credentials(ctx, name, environment, mode)
+    environment = storage_client.environment
+    result = storage_client._request_catalog_credentials(name, mode)
     if not _is_not_found(result):
         return _unwrap_vend_result(result, name, environment)
 
     if name == DEFAULT_CATALOG_NAME and environment == DEFAULT_ENVIRONMENT_NAME:
-        _ensure_legacy_default_catalog(ctx)
+        _ensure_legacy_default_catalog(storage_client)
         for delay in DEFAULT_CATALOG_PROVISION_RETRY_DELAYS:
             time.sleep(delay)
-            result = _vend_catalog_credentials(ctx, name, environment, mode)
+            result = storage_client._request_catalog_credentials(name, mode)
             if not _is_not_found(result):
                 return _unwrap_vend_result(result, name, environment)
-            _ensure_legacy_default_catalog(ctx)
+            _ensure_legacy_default_catalog(storage_client)
 
         return _unwrap_vend_result(result, name, environment)
 
@@ -127,26 +273,19 @@ def _vend_with_default_catalog_fallback(
     )
 
 
-def _vend_catalog_credentials(
-    ctx: TowerContext, name: str, environment: str, mode: str
-) -> ErrorModel | VendCatalogCredentialsResponse | None:
-    _ensure_tower_auth(ctx)
-    body = VendCatalogCredentialsBody(mode=_vend_mode(mode))
-    return vend_catalog_credentials_api.sync(
-        name=name,
-        client=_env_client(ctx),
-        environment=environment,
-        body=body,
-    )
-
-
 def _describe_tower_catalog_type(
     ctx: TowerContext, name: str, environment: str
 ) -> str | None:
-    if not (ctx.api_key or ctx.jwt):
+    if ctx.jwt is None and ctx.api_key is None:
         return None
 
-    cache_key = (ctx.tower_url, name, environment)
+    base_url, auth_hash, tower_client = _build_tower_control_plane_client(
+        context=ctx,
+        tower_url=ctx.tower_url,
+        timeout=CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS,
+        verify_tls=True,
+    )
+    cache_key = (base_url, auth_hash, name, environment)
     cached = _catalog_type_cache.get(cache_key)
     if cached is not None:
         if cached.retry_at is None:
@@ -158,11 +297,12 @@ def _describe_tower_catalog_type(
         _catalog_type_cache.pop(cache_key, None)
 
     try:
-        result = describe_catalog_api.sync(
-            name=name,
-            client=_env_client(ctx, timeout=CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS),
-            environment=environment,
-        )
+        with tower_client:
+            result = describe_catalog_api.sync(
+                name=name,
+                client=tower_client,
+                environment=environment,
+            )
     except Exception:
         logger.debug(
             "Failed to describe Tower catalog %r in environment %r; "
@@ -199,11 +339,9 @@ def _failed_catalog_type_cache_entry() -> _CachedCatalogType:
     )
 
 
-def _ensure_legacy_default_catalog(ctx: TowerContext) -> None:
+def _ensure_legacy_default_catalog(storage_client: StorageClient) -> None:
     try:
-        response = describe_default_catalog_api.sync_detailed(client=_env_client(ctx))
-        if response.status_code not in (HTTPStatus.OK, HTTPStatus.ACCEPTED):
-            return
+        describe_default_catalog_api.sync(client=storage_client._tower_client)
     except Exception:
         # The following vend retry will surface the actionable backend/auth error.
         return
@@ -230,19 +368,18 @@ def _unwrap_vend_result(
     )
 
 
-def _ensure_tower_auth(ctx: TowerContext) -> None:
-    if ctx.api_key or ctx.jwt:
-        return
-
-    raise RuntimeError("No Tower authentication found. Set TOWER_API_KEY or TOWER_JWT.")
-
-
 def _cache_key(
-    ctx: TowerContext, name: str, environment: str, mode: str
+    storage_client: StorageClient,
+    name: str,
+    mode: str,
 ) -> tuple[str, str, str, str, str]:
-    token = ctx.api_key or ctx.jwt or ""
-    principal_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-    return (ctx.tower_url, principal_hash, name, environment, mode)
+    return (
+        storage_client._base_url,
+        storage_client._auth_hash,
+        name,
+        storage_client.environment,
+        mode,
+    )
 
 
 def _prune_credential_cache(now: datetime) -> None:
