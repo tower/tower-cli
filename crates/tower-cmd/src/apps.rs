@@ -405,30 +405,22 @@ async fn drain_stream_with_grace(
     .await;
 }
 
-/// Follows the logs of a run: prints stored logs for a finished run, waits for
-/// a not-yet-started run, and otherwise attaches to the live log stream with
-/// reconnects, dedup, and independent completion detection.
+/// Follows the logs of a run: waits for a not-yet-started run, then attaches
+/// to the live log stream. Finished runs take the same path — the stream
+/// replays from the start and the server closes it — because stored logs can
+/// trail a run's terminal status. The post-stream catch-up covers runs whose
+/// stream has expired.
 async fn follow_run_logs(out: &output::Out, config: &Config, name: &str, seq: i64) {
     let mut tracker = LineTracker::new();
 
     let run = describe_run_or_die(out, config, name, seq).await;
-
-    match run_phase(&run.status) {
-        RunPhase::Terminal => {
-            print_stored_logs(out, config, name, seq, &mut tracker).await;
-            return;
-        }
-        RunPhase::NotStarted => match wait_for_run_start(out, config, name, seq).await {
-            WaitOutcome::Started => {}
-            WaitOutcome::Finished => {
-                print_stored_logs(out, config, name, seq, &mut tracker).await;
-                return;
-            }
+    if run_phase(&run.status) == RunPhase::NotStarted {
+        match wait_for_run_start(out, config, name, seq).await {
+            WaitOutcome::Started | WaitOutcome::Finished => {}
             WaitOutcome::TimedOut => {
                 out.die("Timed out waiting for the run to start. The runner may be unavailable.");
             }
-        },
-        RunPhase::InProgress => {}
+        }
     }
 
     stream_logs_with_reconnect(out, config, name, seq, &run.dollar_link, &mut tracker).await;
