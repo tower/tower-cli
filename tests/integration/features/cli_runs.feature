@@ -33,7 +33,7 @@ Feature: CLI Run Commands
     And both spinners should complete successfully
 
   Scenario: CLI run should show logs that arrive after run completes
-    Given I have a simple hello world application named "app-logs-after-completion"
+    Given I have an application named "app-logs-after-completion" that logs either side of completion
     When I run "tower deploy --create" via CLI
     And I run "tower run" via CLI
     Then the output should show "First log before run completes"
@@ -53,7 +53,7 @@ Feature: CLI Run Commands
     And I run "tower apps logs {app_name}#{run_number} --follow" via CLI with the created app name and run number
     Then the output should show "Hello, World!"
     And the output should contain "Hello, World!" exactly once
-    And the output should show "Warning: This run is using a deprecated runtime"
+    And the output should show "Warning: No new logs available"
 
   Scenario: CLI apps logs --follow on a finished run prints stored logs exactly once
     Given I have a simple hello world application named "app-logs-after-completion"
