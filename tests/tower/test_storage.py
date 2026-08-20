@@ -2,17 +2,27 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from threading import Event
+from typing import get_type_hints
 
 import httpx
+import pyiceberg.catalog
 import pytest
+from pyiceberg.catalog import Catalog as PyIcebergCatalog
+from pyiceberg.catalog.memory import InMemoryCatalog
 
+import tower
+from tower import _features
 from tower import _storage
 from tower._context import TowerContext
 from tower.exceptions import (
+    StorageAuthenticationError,
+    StorageCatalogNotFoundError,
     StorageConnectionError,
     StorageError,
     StorageInvalidCredentialError,
     StorageMissingAuthenticationError,
+    StoragePermissionError,
+    StorageUnsupportedCatalogError,
 )
 from tower.tower_api_client.models import (
     Catalog,
@@ -158,7 +168,7 @@ def test_missing_auth_fails_before_cache_or_vend(monkeypatch):
     )
 
     with pytest.raises(StorageMissingAuthenticationError):
-        _storage.get_tower_catalog_credentials("analytics")
+        tower.load_catalog("analytics")
 
 
 def test_storage_resolver_rejects_redacted_jwt_without_falling_back(monkeypatch):
@@ -336,7 +346,7 @@ def test_storage_resolver_normalizes_and_validates_tower_api_url(monkeypatch):
         _storage._api_base_url("not-a-url")
 
 
-def test_get_tower_catalog_credentials_rejects_invalid_mode_before_cache_or_vend(
+def test_load_catalog_rejects_invalid_mode_before_cache_or_vend(
     monkeypatch,
 ):
     monkeypatch.setenv("TOWER_API_KEY", "api-key")
@@ -347,7 +357,7 @@ def test_get_tower_catalog_credentials_rejects_invalid_mode_before_cache_or_vend
     )
 
     with pytest.raises(ValueError, match="mode must be 'read' or 'read-write'"):
-        _storage.get_tower_catalog_credentials("analytics", mode="write")
+        tower.load_catalog("analytics", mode="write")
 
 
 def test_storage_resolver_rejects_invalid_environment():
@@ -369,8 +379,7 @@ def test_storage_resolver_maps_connection_errors_and_closes_client(monkeypatch):
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
     with pytest.raises(StorageConnectionError) as error:
-        resolver = _storage._StorageResolver()
-        resolver._request_catalog_credentials("analytics", "read")
+        tower.load_catalog("analytics")
 
     assert error.value.__cause__ is cause
     assert clients[0]._client is not None
@@ -421,7 +430,7 @@ def test_access_cache_is_owned_by_resolver(monkeypatch):
     assert len(calls) == 2
 
 
-def test_one_shot_credential_loads_do_not_share_cache(monkeypatch):
+def test_load_catalog_calls_do_not_share_resolvers(monkeypatch):
     monkeypatch.setenv("TOWER_API_KEY", "api-key")
     calls = script_vend(
         monkeypatch,
@@ -434,13 +443,170 @@ def test_one_shot_credential_loads_do_not_share_cache(monkeypatch):
             for number in (1, 2)
         ],
     )
+    loaded_credentials = []
 
-    first = _storage.get_tower_catalog_credentials("analytics")
-    second = _storage.get_tower_catalog_credentials("analytics")
+    def load_vended_catalog(name, credentials):
+        loaded_credentials.append(credentials)
+        return InMemoryCatalog(name)
 
-    assert first.oauth_token == "provider-token-1"
-    assert second.oauth_token == "provider-token-2"
+    monkeypatch.setattr(_storage, "load_vended_catalog", load_vended_catalog)
+
+    first = tower.load_catalog("analytics")
+    second = tower.load_catalog("analytics")
+
+    assert isinstance(first, PyIcebergCatalog)
+    assert isinstance(second, PyIcebergCatalog)
+    assert first is not second
+    assert [credentials.oauth_token for credentials in loaded_credentials] == [
+        "provider-token-1",
+        "provider-token-2",
+    ]
     assert len(calls) == 2
+
+
+def test_load_catalog_returns_plain_native_catalog(monkeypatch):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    calls = script_vend(
+        monkeypatch,
+        [
+            make_vend_response(
+                environment="production",
+                token="provider-token",
+                expires_at=expires_at,
+            )
+        ],
+    )
+    native_catalog = InMemoryCatalog("analytics")
+    loaded = {}
+
+    def load_pyiceberg_catalog(name, **properties):
+        loaded["name"] = name
+        loaded["properties"] = properties
+        return native_catalog
+
+    monkeypatch.setattr(pyiceberg.catalog, "load_catalog", load_pyiceberg_catalog)
+
+    catalog = tower.load_catalog("analytics", environment="production")
+
+    assert catalog is native_catalog
+    assert catalog.list_namespaces() == []
+    assert calls == [("analytics", "read")]
+    assert loaded["name"] == "analytics"
+    assert loaded["properties"] == {
+        "type": "rest",
+        "uri": "https://catalog.example.com",
+        "warehouse": "warehouse-id",
+        "token": "provider-token",
+    }
+
+
+def test_load_catalog_preserves_provider_errors_and_reloads_explicitly(monkeypatch):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    calls = script_vend(
+        monkeypatch,
+        [
+            make_vend_response(
+                environment="default",
+                token=f"provider-token-{number}",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            )
+            for number in (1, 2)
+        ],
+    )
+    expired_catalog = InMemoryCatalog("analytics")
+    fresh_catalog = InMemoryCatalog("analytics")
+    catalogs = iter((expired_catalog, fresh_catalog))
+    provider_error = RuntimeError("provider token expired")
+
+    def load_pyiceberg_catalog(name, **properties):
+        return next(catalogs)
+
+    def raise_provider_error(*args, **kwargs):
+        raise provider_error
+
+    monkeypatch.setattr(pyiceberg.catalog, "load_catalog", load_pyiceberg_catalog)
+    monkeypatch.setattr(expired_catalog, "list_namespaces", raise_provider_error)
+
+    first = tower.load_catalog("analytics")
+    with pytest.raises(RuntimeError) as error:
+        first.list_namespaces()
+
+    assert error.value is provider_error
+    assert len(calls) == 1
+
+    second = tower.load_catalog("analytics")
+
+    assert second is fresh_catalog
+    assert len(calls) == 2
+
+
+def test_load_catalog_supports_explicit_read_write_access(monkeypatch):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    calls = script_vend(
+        monkeypatch,
+        [
+            make_vend_response(
+                environment="default",
+                token="write-token",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+                mode="read-write",
+            )
+        ],
+    )
+    loaded = []
+
+    def load_vended_catalog(name, credentials):
+        loaded.append((name, credentials))
+        return InMemoryCatalog(name)
+
+    monkeypatch.setattr(_storage, "load_vended_catalog", load_vended_catalog)
+
+    tower.load_catalog("analytics", mode="read-write")
+
+    assert calls == [("analytics", "read-write")]
+    assert loaded[0][1].mode == "read-write"
+
+
+def test_load_catalog_rejects_unsupported_catalog_without_fallback(monkeypatch):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    monkeypatch.setenv(
+        "PYICEBERG_CATALOG__ANALYTICS__URI",
+        "https://configured.example.com",
+    )
+    calls = script_vend(
+        monkeypatch,
+        [ErrorModel(status=422, detail="only tower-managed catalogs are supported")],
+    )
+
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("unsupported catalogs must not use another catalog path")
+
+    monkeypatch.setattr(_storage, "_describe_tower_catalog_type", unexpected_call)
+    monkeypatch.setattr(pyiceberg.catalog, "load_catalog", unexpected_call)
+
+    with pytest.raises(StorageUnsupportedCatalogError, match="tower-managed"):
+        tower.load_catalog("analytics")
+
+    assert calls == [("analytics", "read")]
+
+
+def test_load_catalog_is_an_optional_iceberg_export(monkeypatch):
+    assert tower.load_catalog is _storage.load_catalog
+    assert get_type_hints(tower.load_catalog)["return"] is PyIcebergCatalog
+    assert tower.get_available_features()["iceberg"]["exports"] == [
+        "load_catalog",
+        "tables",
+    ]
+    assert not hasattr(tower, "StorageResolver")
+
+    monkeypatch.setattr(
+        _features,
+        "is_installed",
+        lambda dependency: dependency != "pyiceberg",
+    )
+    with pytest.raises(ImportError, match=r"tower\[iceberg\]"):
+        _features.override_get_attr("load_catalog")
 
 
 def test_near_expiry_access_retains_inherited_and_local_identity(monkeypatch):
@@ -585,54 +751,32 @@ def test_inconsistent_vend_response_is_not_cached(
     assert len(calls) == 2
 
 
-def test_default_catalog_retries_reuse_client_auth_snapshot(monkeypatch):
-    monkeypatch.setenv("TOWER_API_KEY", "operation-token")
-    credentials = CatalogCredentials(
-        catalog_uri="https://catalog.example.com",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        mode="read",
-        oauth_token="oauth-token",
-        warehouse="warehouse-id",
+@pytest.mark.parametrize(
+    ("status", "error_type"),
+    [
+        (HTTPStatus.UNAUTHORIZED, StorageAuthenticationError),
+        (HTTPStatus.FORBIDDEN, StoragePermissionError),
+        (HTTPStatus.NOT_FOUND, StorageCatalogNotFoundError),
+        (HTTPStatus.UNPROCESSABLE_ENTITY, StorageUnsupportedCatalogError),
+        (HTTPStatus.INTERNAL_SERVER_ERROR, StorageError),
+    ],
+)
+def test_load_catalog_maps_tower_errors_without_retry(
+    monkeypatch,
+    status,
+    error_type,
+):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    calls = script_vend(
+        monkeypatch,
+        [ErrorModel(status=int(status), detail="request rejected")],
     )
-    responses = [
-        ErrorModel(status=404, detail="not found"),
-        ErrorModel(status=404, detail="still provisioning"),
-        VendCatalogCredentialsResponse(
-            credentials=credentials,
-            environment="default",
-        ),
-    ]
-    vend_tokens = []
-    legacy_tokens = []
-    clients = []
 
-    def vend(*, client, **kwargs):
-        clients.append(client)
-        vend_tokens.append(client.token)
-        monkeypatch.setenv("TOWER_API_KEY", "changed-after-client-construction")
-        return responses.pop(0)
+    with pytest.raises(error_type, match="request rejected") as error:
+        tower.load_catalog("default")
 
-    def legacy_default(*, client):
-        clients.append(client)
-        legacy_tokens.append(client.token)
-        return ErrorModel(status=404, detail="not provisioned")
-
-    monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
-    monkeypatch.setattr(
-        _storage.describe_default_catalog_api,
-        "sync",
-        legacy_default,
-    )
-    monkeypatch.setattr(_storage.time, "sleep", lambda delay: None)
-
-    result = _storage.get_tower_catalog_credentials("default")
-
-    assert result == credentials
-    assert vend_tokens == ["operation-token"] * 3
-    assert legacy_tokens == ["operation-token"] * 2
-    assert len({id(client) for client in clients}) == 5
-    assert all(client._client is not None for client in clients)
-    assert all(client._client.is_closed for client in clients)
+    assert type(error.value) is error_type
+    assert calls == [("default", "read")]
 
 
 def test_describe_tower_catalog_type_uses_timeout_and_recovers_after_cooldown(

@@ -7,25 +7,24 @@ from concurrent.futures import Future
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import Literal
 
 import httpx
-
-if TYPE_CHECKING:
-    from pyiceberg.catalog import Catalog
+from pyiceberg.catalog import Catalog
 
 from ._context import TowerContext
 from .exceptions import (
+    StorageAuthenticationError,
+    StorageCatalogNotFoundError,
     StorageConnectionError,
     StorageError,
     StorageInvalidCredentialError,
     StorageMissingAuthenticationError,
+    StoragePermissionError,
+    StorageUnsupportedCatalogError,
 )
 from .tower_api_client import AuthenticatedClient
 from .tower_api_client.api.default import describe_catalog as describe_catalog_api
-from .tower_api_client.api.default import (
-    describe_default_catalog as describe_default_catalog_api,
-)
 from .tower_api_client.api.default import (
     vend_catalog_credentials as vend_catalog_credentials_api,
 )
@@ -46,7 +45,6 @@ CATALOG_TYPE_DESCRIBE_TIMEOUT_SECONDS = 2.0
 # retry only after this period
 CATALOG_TYPE_FAILURE_CACHE_TTL_SECONDS = 30.0
 DEFAULT_STORAGE_TIMEOUT_SECONDS = 30.0
-DEFAULT_CATALOG_PROVISION_RETRY_DELAYS = (0.25, 0.5, 1.0, 2.0)
 DEFAULT_CATALOG_NAME = "default"
 DEFAULT_ENVIRONMENT_NAME = "default"
 TOWER_CATALOG_TYPE = "tower-catalog"
@@ -208,10 +206,10 @@ class _StorageResolver:
             return flight.result()
 
         try:
-            response = _vend_with_default_catalog_fallback(
-                self,
+            response = _unwrap_vend_result(
+                self._request_catalog_credentials(name, mode),
                 name,
-                mode,
+                target_environment,
             )
             credentials = response.credentials
             if credentials.mode != mode:
@@ -301,16 +299,58 @@ class _CachedCatalogType:
 _catalog_type_cache: dict[_CatalogTypeCacheKey, _CachedCatalogType] = {}
 
 
-def get_tower_catalog(
+def load_catalog(
     name: str = DEFAULT_CATALOG_NAME,
+    *,
     environment: str | None = None,
-    mode: str = "read",
+    mode: Literal["read", "read-write"] = "read",
 ) -> Catalog:
+    """Load a Tower-managed catalog as a native PyIceberg catalog.
+
+    The SDK authenticates from the process environment. ``TOWER_JWT`` takes
+    precedence over ``TOWER_API_KEY`` when both are set. A Tower CLI login does
+    not authenticate this Python API.
+
+    The returned catalog uses one fixed set of temporary provider credentials.
+    It does not retain a Tower resolver or renew itself. If those credentials
+    expire, the provider's original error is raised; call ``load_catalog`` again
+    to obtain a fresh catalog handle.
+
+    Args:
+        name: Name of the Tower-managed catalog. Defaults to ``"default"``.
+        environment: Target Tower environment. Tower first resolves the catalog
+            in this environment, then in the shared ``default`` environment. If
+            omitted, the configured Tower environment is used.
+        mode: ``"read"`` for read-only credentials, or ``"read-write"`` for
+            namespace and table mutations. Defaults to ``"read"``.
+
+    Returns:
+        A caller-owned :class:`pyiceberg.catalog.Catalog` configured with the
+        resolved REST endpoint, warehouse, and temporary provider token.
+
+    Raises:
+        StorageMissingAuthenticationError: If neither supported Tower
+            credential is configured.
+        StorageAuthenticationError: If Tower rejects the configured credential.
+        StorageCatalogNotFoundError: If the environment or catalog is not found.
+        StoragePermissionError: If the credential lacks the requested access.
+        StorageUnsupportedCatalogError: If the catalog is not Tower-managed or
+            otherwise cannot vend native PyIceberg access.
+        StorageConnectionError: If Tower's control-plane API cannot be reached.
+        TypeError: If ``environment`` is not a string or ``None``.
+        ValueError: If ``environment`` is blank or ``mode`` is invalid.
+
+    Examples:
+        >>> import tower
+        >>> catalog = tower.load_catalog(
+        ...     "analytics",
+        ...     environment="production",
+        ... )
+        >>> catalog.list_namespaces()
     """
-    Load a PyIceberg REST catalog using short-lived credentials vended by Tower.
-    """
-    credentials = get_tower_catalog_credentials(name, environment, mode)
-    return load_vended_catalog(name, credentials)
+    storage_resolver = _StorageResolver(environment=environment)
+    access = storage_resolver._resolve_catalog_access(name, mode)
+    return load_vended_catalog(name, access.to_credentials())
 
 
 def get_tower_catalog_credentials(
@@ -332,32 +372,6 @@ def load_vended_catalog(name: str, credentials: CatalogCredentials) -> Catalog:
         uri=credentials.catalog_uri,
         warehouse=credentials.warehouse,
         token=credentials.oauth_token,
-    )
-
-
-def _vend_with_default_catalog_fallback(
-    storage_resolver: _StorageResolver,
-    name: str,
-    mode: str,
-) -> VendCatalogCredentialsResponse:
-    environment = storage_resolver._target_environment
-    result = storage_resolver._request_catalog_credentials(name, mode)
-    if not _is_not_found(result):
-        return _unwrap_vend_result(result, name, environment)
-
-    if name == DEFAULT_CATALOG_NAME and environment == DEFAULT_ENVIRONMENT_NAME:
-        _ensure_legacy_default_catalog(storage_resolver)
-        for delay in DEFAULT_CATALOG_PROVISION_RETRY_DELAYS:
-            time.sleep(delay)
-            result = storage_resolver._request_catalog_credentials(name, mode)
-            if not _is_not_found(result):
-                return _unwrap_vend_result(result, name, environment)
-            _ensure_legacy_default_catalog(storage_resolver)
-
-        return _unwrap_vend_result(result, name, environment)
-
-    raise RuntimeError(
-        f"Tower catalog {name} does not exist in environment {environment}."
     )
 
 
@@ -437,15 +451,6 @@ def _failed_catalog_type_cache_entry() -> _CachedCatalogType:
     )
 
 
-def _ensure_legacy_default_catalog(storage_resolver: _StorageResolver) -> None:
-    try:
-        with storage_resolver._new_client() as client:
-            describe_default_catalog_api.sync(client=client)
-    except Exception:
-        # The following vend retry will surface the actionable backend/auth error.
-        return
-
-
 def _unwrap_vend_result(
     result: ErrorModel | VendCatalogCredentialsResponse | None,
     name: str,
@@ -456,14 +461,25 @@ def _unwrap_vend_result(
 
     if isinstance(result, ErrorModel):
         detail = _error_text(result)
-        raise RuntimeError(
-            f"Failed to vend credentials for Tower catalog {name} "
-            f"in environment {environment}: {detail}"
+        message = (
+            f"Could not load Tower catalog {name!r} "
+            f"in environment {environment!r}: {detail}"
         )
+        error_type: type[StorageError]
+        if result.status == 401:
+            error_type = StorageAuthenticationError
+        elif result.status == 403:
+            error_type = StoragePermissionError
+        elif result.status == 404:
+            error_type = StorageCatalogNotFoundError
+        elif result.status == 422:
+            error_type = StorageUnsupportedCatalogError
+        else:
+            error_type = StorageError
+        raise error_type(message)
 
-    raise RuntimeError(
-        f"Failed to vend credentials for Tower catalog {name} "
-        f"in environment {environment}."
+    raise StorageError(
+        f"Could not load Tower catalog {name!r} in environment {environment!r}."
     )
 
 
@@ -479,10 +495,6 @@ def _vend_mode(mode: str) -> VendCatalogCredentialsBodyMode:
         if mode == "read-write"
         else VendCatalogCredentialsBodyMode.READ
     )
-
-
-def _is_not_found(result: ErrorModel | VendCatalogCredentialsResponse | None) -> bool:
-    return isinstance(result, ErrorModel) and result.status == 404
 
 
 def _error_text(error: ErrorModel) -> str:

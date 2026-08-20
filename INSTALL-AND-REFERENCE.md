@@ -128,7 +128,54 @@ pip install "tower[ai]"
 pip install "tower[iceberg]"
 ```
 
-- `tower.tables(...)`: load, create, update, and delete Iceberg table data
+- `tower.load_catalog(...)`: use a Tower-managed catalog through native PyIceberg APIs
+- `tower.tables(...)`: load, create, update, and delete Iceberg table data through Tower's convenience API
+
+#### Native PyIceberg access
+
+Set `TOWER_JWT` or `TOWER_API_KEY` in the Python process, then load a catalog for
+the target environment:
+
+```python
+import tower
+
+catalog = tower.load_catalog(
+    "analytics",
+    environment="production",
+)
+
+catalog.list_namespaces()
+events = catalog.load_table(("analytics", "events"))
+```
+
+`tower.load_catalog()` returns an unwrapped `pyiceberg.catalog.Catalog`. Tower
+first looks for the named catalog in the target environment, then uses the
+same-named catalog from the shared `default` environment when it is not locally
+defined. Only Tower-managed catalogs are supported by this API.
+
+Access is read-only by default. Request write credentials explicitly for
+namespace or table mutations:
+
+```python
+catalog = tower.load_catalog(
+    "analytics",
+    environment="production",
+    mode="read-write",
+)
+```
+
+When both authentication variables are set, `TOWER_JWT` takes precedence over
+`TOWER_API_KEY`. `tower login` authenticates the CLI and MCP server only; it does
+not authenticate Python SDK calls.
+
+The returned catalog has one fixed temporary provider token and does not renew
+itself. If the token expires, the original PyIceberg or provider error is
+preserved. Call `tower.load_catalog()` again to obtain a fresh handle. Missing,
+forbidden, unsupported, and connection failures are available as distinct
+exceptions in `tower.exceptions`. A missing `default` catalog is not created
+automatically.
+
+#### Tower table convenience API
 
 Delete filters are SQL-like strings or native PyIceberg boolean expressions. The
 `Table.column()` builder creates composable PyIceberg predicates:

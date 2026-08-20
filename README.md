@@ -122,7 +122,7 @@ If you find Tower useful, consider giving the repo a ⭐.
 - **Consistent execution environment everywhere** - `tower run` on Tower serverless or your own compute.
 - **Deploy in under 30 seconds** - `tower deploy` packages and ships.
 - **Secrets** - CLI-managed; injected as env vars in runner only (E2E encrypted).
-- **Optional AI inference, Iceberg or dbt** - `tower[ai]`, `tower[iceberg]` or `tower[dbt]`; [details](INSTALL-AND-REFERENCE.md#optional-features).
+- **Optional AI inference, native PyIceberg catalogs, or dbt** - `tower[ai]`, `tower[iceberg]` or `tower[dbt]`; [details](INSTALL-AND-REFERENCE.md#optional-features).
 - **MCP server** - Deploy and launch runs from AI coding assistants; [details](https://docs.tower.dev/docs/reference/mcp-server).
 
 ---

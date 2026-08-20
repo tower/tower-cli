@@ -42,7 +42,7 @@ _module_cache: Dict[str, Any] = {}
 # export_type can be "function" (return specific function) or "module" (return entire module)
 _feature_modules: Dict[str, tuple[str, List[str], str]] = {
     "ai": ("_llms", ["llms"], "function"),
-    "iceberg": ("_tables", ["tables"], "function"),
+    "iceberg": ("_iceberg", ["load_catalog", "tables"], "function"),
     "dbt": ("_dbt", ["dbt"], "function"),
 }
 

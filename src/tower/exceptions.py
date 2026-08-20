@@ -63,3 +63,15 @@ class StorageInvalidCredentialError(StorageAuthenticationError):
 
 class StorageConnectionError(StorageError):
     """Tower's control-plane API could not be reached."""
+
+
+class StorageCatalogNotFoundError(StorageError):
+    """The target environment or requested catalog could not be found."""
+
+
+class StoragePermissionError(StorageError):
+    """The Tower credential lacks permission for the requested catalog access."""
+
+
+class StorageUnsupportedCatalogError(StorageError):
+    """Tower cannot vend native PyIceberg access for the requested catalog."""

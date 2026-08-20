@@ -30,6 +30,7 @@ from ._native import _run_cli
 from ._features import override_get_attr, get_available_features, is_feature_enabled
 
 if TYPE_CHECKING:
+    from ._storage import load_catalog as load_catalog
     from ._tables import tables as tables
     from ._llms import llms as llms
     from ._dbt import dbt as dbt
