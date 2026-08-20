@@ -16,7 +16,7 @@ use tower_api::models::DeployAppResponse;
 
 /// Advisory only: the server enforces the actual bundle-size limit and reports
 /// it in its error response when a bundle is too large.
-pub const LARGE_PACKAGE_WARNING_THRESHOLD: u64 = 50 * 1024 * 1024;
+pub const LARGE_PACKAGE_WARNING_THRESHOLD: u64 = 500 * 1024 * 1024;
 
 pub async fn upload_file_with_progress(
     out: &output::Out,
