@@ -5,9 +5,12 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import TYPE_CHECKING
 
 import httpx
+
+if TYPE_CHECKING:
+    from pyiceberg.catalog import Catalog
 
 from ._context import TowerContext
 from .exceptions import (
@@ -156,7 +159,7 @@ class _StorageResolver:
                 )
         except httpx.RequestError as error:
             raise StorageConnectionError(
-                f"Could not connect to Tower at {self._base_url!r}."
+                f"Could not connect to Tower at {self._base_url}."
             ) from error
 
 
@@ -164,10 +167,10 @@ def _api_base_url(tower_url: str) -> str:
     try:
         url = httpx.URL(tower_url)
     except (TypeError, httpx.InvalidURL) as error:
-        raise ValueError(f"Invalid Tower URL: {tower_url!r}") from error
+        raise ValueError(f"Invalid Tower URL: {tower_url}") from error
     if not url.is_absolute_url or url.scheme not in ("http", "https"):
-        raise ValueError(f"Invalid Tower URL: {tower_url!r}")
-    return str(url.copy_with(path="/v1", query=None, fragment=None)).rstrip("/")
+        raise ValueError(f"Invalid Tower URL: {tower_url}")
+    return str(url.copy_with(path="/v1", query=None, fragment=None))
 
 
 @dataclass
@@ -191,9 +194,9 @@ _catalog_type_cache: dict[tuple[str, str, str, str], _CachedCatalogType] = {}
 
 def get_tower_catalog(
     name: str = DEFAULT_CATALOG_NAME,
-    environment: Optional[str] = None,
+    environment: str | None = None,
     mode: str = "read",
-) -> Any:
+) -> Catalog:
     """
     Load a PyIceberg REST catalog using short-lived credentials vended by Tower.
     """
@@ -203,7 +206,7 @@ def get_tower_catalog(
 
 def get_tower_catalog_credentials(
     name: str = DEFAULT_CATALOG_NAME,
-    environment: Optional[str] = None,
+    environment: str | None = None,
     mode: str = "read",
 ) -> CatalogCredentials:
     storage_resolver = _StorageResolver(environment=environment)
@@ -221,7 +224,7 @@ def get_tower_catalog_credentials(
     return credentials
 
 
-def load_vended_catalog(name: str, credentials: CatalogCredentials) -> Any:
+def load_vended_catalog(name: str, credentials: CatalogCredentials) -> Catalog:
     from pyiceberg.catalog import load_catalog
 
     return load_catalog(
