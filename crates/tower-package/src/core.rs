@@ -15,8 +15,6 @@ use crate::towerfile::{Parameter, Towerfile};
 // 3 - Change checksum algorithm to be cross-platform
 pub const CURRENT_PACKAGE_VERSION: i32 = 3;
 
-pub const MAX_PACKAGE_SIZE: u64 = 50 * 1024 * 1024;
-
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("Invalid path"))]

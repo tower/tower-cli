@@ -14,6 +14,10 @@ use tower_api::apis::Error;
 use tower_api::apis::ResponseContent;
 use tower_api::models::DeployAppResponse;
 
+/// Advisory only: the server enforces the actual bundle-size limit and reports
+/// it in its error response when a bundle is too large.
+pub const LARGE_PACKAGE_WARNING_THRESHOLD: u64 = 50 * 1024 * 1024;
+
 pub async fn upload_file_with_progress(
     out: &output::Out,
     api_config: &Configuration,
@@ -36,13 +40,11 @@ pub async fn upload_file_with_progress(
     let metadata = file.metadata().await?;
     let file_size = metadata.len();
 
-    // Check if bundle size exceeds the maximum allowed size
-    if file_size > tower_package::MAX_PACKAGE_SIZE {
+    if file_size > LARGE_PACKAGE_WARNING_THRESHOLD {
         let size_mb = file_size as f64 / (1024.0 * 1024.0);
-        let max_mb = tower_package::MAX_PACKAGE_SIZE as f64 / (1024.0 * 1024.0);
-        out.die(&format!(
-            "Your App is too big! ({:.2} MB) exceeds maximum allowed size ({:.0} MB). Please consider reducing app size by removing unnecessary files or import_paths in the Towerfile.",
-            size_mb, max_mb
+        out.write(&format!(
+            "Warning: Your app package is large ({:.2} MB). The server may reject it depending on its configured maximum bundle size. You can reduce app size by removing unnecessary files or import_paths in the Towerfile.\n",
+            size_mb
         ));
     }
 
