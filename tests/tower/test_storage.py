@@ -1,4 +1,3 @@
-import hashlib
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
@@ -56,26 +55,19 @@ def test_context_treats_blank_auth_env_as_missing(monkeypatch):
     assert ctx.jwt is None
 
 
-def test_storage_client_configuration_and_tls_defaults(monkeypatch):
+def test_storage_resolver_configuration_and_tls_defaults(monkeypatch):
+    monkeypatch.setenv("TOWER_URL", "https://tower.example.com/")
     monkeypatch.setenv("TOWER_API_KEY", "ambient-key")
-    client = _storage.StorageClient(
-        tower_url="https://tower.example.com/",
-        environment="production",
-        timeout=12.5,
-    )
-    transport = client._tower_client
+    resolver = _storage._StorageResolver(environment="production")
+    client = resolver._new_client()
 
-    assert client.tower_url == "https://tower.example.com/"
-    assert client.environment == "production"
-    assert client.timeout == 12.5
-    assert client.verify_tls is True
+    assert resolver._target_environment == "production"
+    assert resolver._base_url == "https://tower.example.com/v1"
     assert client._base_url == "https://tower.example.com/v1"
-    assert client._auth_hash == hashlib.sha256(b"ambient-key").hexdigest()
-    assert transport._base_url == "https://tower.example.com/v1"
-    assert transport._timeout == httpx.Timeout(12.5)
-    assert transport._verify_ssl is True
+    assert client._timeout == httpx.Timeout(_storage.DEFAULT_STORAGE_TIMEOUT_SECONDS)
+    assert client._verify_ssl is True
 
-    http_client = transport.get_httpx_client()
+    http_client = client.get_httpx_client()
     try:
         assert http_client.headers["X-API-Key"] == "ambient-key"
         assert "Authorization" not in http_client.headers
@@ -95,7 +87,7 @@ def test_storage_client_configuration_and_tls_defaults(monkeypatch):
     ],
     ids=("jwt-over-api-key", "api-key-fallback"),
 )
-def test_storage_client_static_auth_precedence(
+def test_storage_resolver_static_auth_precedence(
     monkeypatch,
     ambient_auth,
     expected_header,
@@ -104,8 +96,8 @@ def test_storage_client_static_auth_precedence(
     for name, value in ambient_auth.items():
         monkeypatch.setenv(name, value)
 
-    transport = _storage.StorageClient()._tower_client
-    http_client = transport.get_httpx_client()
+    client = _storage._StorageResolver()._new_client()
+    http_client = client.get_httpx_client()
     try:
         assert http_client.headers[expected_header] == expected_value
         other_header = (
@@ -114,6 +106,12 @@ def test_storage_client_static_auth_precedence(
         assert other_header not in http_client.headers
     finally:
         http_client.close()
+
+
+def test_auth_hash_includes_how_the_credential_is_presented():
+    assert _storage._auth_hash("same-token", "Authorization", "Bearer") != (
+        _storage._auth_hash("same-token", "X-API-Key", "")
+    )
 
 
 def test_missing_auth_fails_before_cache_or_vend(monkeypatch):
@@ -134,12 +132,12 @@ def test_missing_auth_fails_before_cache_or_vend(monkeypatch):
         _storage.get_tower_catalog_credentials("analytics")
 
 
-def test_storage_client_rejects_redacted_jwt_without_falling_back(monkeypatch):
+def test_storage_resolver_rejects_redacted_jwt_without_falling_back(monkeypatch):
     monkeypatch.setenv("TOWER_JWT", " <redacted> ")
     monkeypatch.setenv("TOWER_API_KEY", "otherwise-valid-api-key")
 
     with pytest.raises(StorageInvalidCredentialError):
-        _storage.StorageClient()
+        _storage._StorageResolver()
 
 
 @pytest.mark.parametrize("status", [HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN])
@@ -154,36 +152,37 @@ def test_static_auth_rejection_is_returned(monkeypatch, status):
 
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
-    result = _storage.StorageClient()._request_catalog_credentials("analytics", "read")
+    result = _storage._StorageResolver()._request_catalog_credentials(
+        "analytics", "read"
+    )
 
     assert result is rejected
     assert len(vend_calls) == 1
 
 
-def test_storage_client_vends_with_ambient_api_key(monkeypatch):
+def test_storage_resolver_vends_with_ambient_api_key(monkeypatch):
+    monkeypatch.setenv("TOWER_URL", "https://api.example.com")
     monkeypatch.setenv("TOWER_API_KEY", "service-account-key")
     captured = {}
+    clients = []
     response = ErrorModel(status=418, detail="captured")
 
     def vend(*, name, client, environment, body):
+        clients.append(client)
         http_client = client.get_httpx_client()
-        try:
-            captured.update(
-                name=name,
-                environment=environment,
-                api_key=http_client.headers.get("X-API-Key"),
-                authorization=http_client.headers.get("Authorization"),
-                mode=body.mode,
-            )
-        finally:
-            http_client.close()
+        captured.update(
+            name=name,
+            environment=environment,
+            api_key=http_client.headers.get("X-API-Key"),
+            authorization=http_client.headers.get("Authorization"),
+            mode=body.mode,
+        )
         return response
 
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
-    result = _storage.StorageClient(
-        tower_url="https://api.example.com",
-        environment="production",
+    result = _storage._StorageResolver(
+        environment="production"
     )._request_catalog_credentials("analytics", "read")
 
     assert result is response
@@ -194,6 +193,8 @@ def test_storage_client_vends_with_ambient_api_key(monkeypatch):
         "authorization": None,
         "mode": _storage.VendCatalogCredentialsBodyMode.READ,
     }
+    assert clients[0]._client is not None
+    assert clients[0]._client.is_closed
 
 
 def test_describe_and_vend_prefer_jwt_when_both_auth_vars_are_set(monkeypatch):
@@ -206,16 +207,13 @@ def test_describe_and_vend_prefer_jwt_when_both_auth_vars_are_set(monkeypatch):
 
     def capture_auth(operation, client):
         http_client = client.get_httpx_client()
-        try:
-            captured_auth.append(
-                (
-                    operation,
-                    http_client.headers.get("Authorization"),
-                    http_client.headers.get("X-API-Key"),
-                )
+        captured_auth.append(
+            (
+                operation,
+                http_client.headers.get("Authorization"),
+                http_client.headers.get("X-API-Key"),
             )
-        finally:
-            http_client.close()
+        )
 
     def describe(*, name, client, environment):
         capture_auth("describe", client)
@@ -244,7 +242,7 @@ def test_describe_and_vend_prefer_jwt_when_both_auth_vars_are_set(monkeypatch):
         == _storage.TOWER_CATALOG_TYPE
     )
     assert (
-        _storage.StorageClient()._request_catalog_credentials("analytics", "read")
+        _storage._StorageResolver()._request_catalog_credentials("analytics", "read")
         is vended
     )
     assert captured_auth == [
@@ -253,18 +251,13 @@ def test_describe_and_vend_prefer_jwt_when_both_auth_vars_are_set(monkeypatch):
     ]
 
 
-@pytest.mark.parametrize("verify_tls", [True, False], ids=("verified", "unverified"))
-def test_storage_client_allows_http_independently_of_tls_verification(
-    monkeypatch, verify_tls
-):
+def test_storage_resolver_allows_explicit_http_tower_url(monkeypatch):
+    monkeypatch.setenv("TOWER_URL", "http://localhost:9000")
     monkeypatch.setenv("TOWER_API_KEY", "key")
-    transport = _storage.StorageClient(
-        tower_url="http://localhost:9000",
-        verify_tls=verify_tls,
-    )._tower_client
+    client = _storage._StorageResolver()._new_client()
 
-    assert transport._base_url == "http://localhost:9000/v1"
-    assert transport._verify_ssl is verify_tls
+    assert client._base_url == "http://localhost:9000/v1"
+    assert client._verify_ssl is True
 
 
 def test_get_tower_catalog_credentials_allows_http_and_reaches_vend(monkeypatch):
@@ -306,15 +299,17 @@ def test_get_tower_catalog_credentials_allows_http_and_reaches_vend(monkeypatch)
     ]
 
 
-def test_storage_client_normalizes_and_validates_tower_api_url(monkeypatch):
-    monkeypatch.setenv("TOWER_API_KEY", "key")
-    client = _storage.StorageClient(
-        tower_url="https://TOWER.example.com:443/old/path?debug=true#fragment",
+def test_storage_resolver_normalizes_and_validates_tower_api_url(monkeypatch):
+    monkeypatch.setenv(
+        "TOWER_URL",
+        "https://TOWER.example.com:443/old/path?debug=true#fragment",
     )
-    assert client._tower_client._base_url == "https://tower.example.com/v1"
+    monkeypatch.setenv("TOWER_API_KEY", "key")
+    resolver = _storage._StorageResolver()
+    assert resolver._base_url == "https://tower.example.com/v1"
 
     with pytest.raises(ValueError, match="Invalid Tower URL"):
-        _storage.StorageClient(tower_url="not-a-url")
+        _storage._api_base_url("not-a-url")
 
 
 def test_get_tower_catalog_credentials_rejects_invalid_mode_before_cache_or_vend(
@@ -336,35 +331,41 @@ def test_get_tower_catalog_credentials_rejects_invalid_mode_before_cache_or_vend
         _storage.get_tower_catalog_credentials("analytics", mode="write")
 
 
-@pytest.mark.parametrize("field", ["tower_url", "environment"])
-def test_storage_client_rejects_non_string_text_configuration(field):
-    with pytest.raises(TypeError, match=f"{field} must be a string or None"):
-        _storage.StorageClient(**{field: 123})
+def test_storage_resolver_rejects_invalid_environment():
+    with pytest.raises(TypeError, match="environment must be a string or None"):
+        _storage._StorageResolver(environment=123)
+    with pytest.raises(ValueError, match="environment must not be blank"):
+        _storage._StorageResolver(environment=" ")
 
 
-def test_storage_client_maps_httpx_connection_errors(monkeypatch):
+def test_storage_resolver_maps_connection_errors_and_closes_client(monkeypatch):
     monkeypatch.setenv("TOWER_API_KEY", "key")
     cause = httpx.ConnectError("connection refused")
+    clients = []
 
-    def vend(**kwargs):
+    def vend(*, client, **kwargs):
+        clients.append(client)
         raise cause
 
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
     with pytest.raises(StorageConnectionError) as error:
-        _storage.StorageClient()._request_catalog_credentials("analytics", "read")
+        _storage._StorageResolver()._request_catalog_credentials("analytics", "read")
 
     assert error.value.__cause__ is cause
+    assert clients[0]._client is not None
+    assert clients[0]._client.is_closed
 
 
-def test_storage_client_uses_runtime_environment_only_as_target_config(monkeypatch):
+def test_storage_resolver_uses_runtime_environment_only_as_target_config(monkeypatch):
     monkeypatch.setenv("TOWER_API_KEY", "key")
     monkeypatch.setenv("TOWER_ENVIRONMENT", "ambient-env")
     monkeypatch.setenv("TOWER__RUNTIME__ENVIRONMENT_NAME", "run-env")
 
-    assert _storage.StorageClient().environment == "run-env"
+    assert _storage._StorageResolver()._target_environment == "run-env"
     assert (
-        _storage.StorageClient(environment="explicit-env").environment == "explicit-env"
+        _storage._StorageResolver(environment="explicit-env")._target_environment
+        == "explicit-env"
     )
 
 
@@ -384,13 +385,13 @@ def test_get_tower_catalog_credentials_caches_vended_credentials(monkeypatch):
     calls = []
 
     def vend(client, name, mode):
-        calls.append((name, client.environment, mode))
+        calls.append((name, client._target_environment, mode))
         return VendCatalogCredentialsResponse(
             credentials=credentials,
-            environment=client.environment,
+            environment=client._target_environment,
         )
 
-    monkeypatch.setattr(_storage.StorageClient, "_request_catalog_credentials", vend)
+    monkeypatch.setattr(_storage._StorageResolver, "_request_catalog_credentials", vend)
 
     first = _storage.get_tower_catalog_credentials("default")
     second = _storage.get_tower_catalog_credentials("default")
@@ -419,8 +420,8 @@ def test_get_tower_catalog_credentials_prunes_expired_cache_entries(monkeypatch)
         oauth_token="oauth-token",
         warehouse="warehouse-id",
     )
-    storage_client = _storage.StorageClient()
-    expired_key = _storage._cache_key(storage_client, "stale", "read")
+    storage_resolver = _storage._StorageResolver()
+    expired_key = _storage._cache_key(storage_resolver, "stale", "read")
     _storage._credential_cache[expired_key] = _storage._CachedCredentials(
         expired_credentials
     )
@@ -428,10 +429,10 @@ def test_get_tower_catalog_credentials_prunes_expired_cache_entries(monkeypatch)
     def vend(client, name, mode):
         return VendCatalogCredentialsResponse(
             credentials=fresh_credentials,
-            environment=client.environment,
+            environment=client._target_environment,
         )
 
-    monkeypatch.setattr(_storage.StorageClient, "_request_catalog_credentials", vend)
+    monkeypatch.setattr(_storage._StorageResolver, "_request_catalog_credentials", vend)
 
     result = _storage.get_tower_catalog_credentials("default")
 
@@ -459,20 +460,25 @@ def test_default_catalog_retries_reuse_client_auth_snapshot(monkeypatch):
     ]
     vend_tokens = []
     legacy_tokens = []
-    transports = []
+    clients = []
 
     def vend(*, client, **kwargs):
-        transports.append(client)
+        clients.append(client)
         vend_tokens.append(client.token)
         monkeypatch.setenv("TOWER_API_KEY", "changed-after-client-construction")
         return responses.pop(0)
 
-    def legacy_default(client):
-        transports.append(client._tower_client)
-        legacy_tokens.append(client._tower_client.token)
+    def legacy_default(*, client):
+        clients.append(client)
+        legacy_tokens.append(client.token)
+        return ErrorModel(status=404, detail="not provisioned")
 
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
-    monkeypatch.setattr(_storage, "_ensure_legacy_default_catalog", legacy_default)
+    monkeypatch.setattr(
+        _storage.describe_default_catalog_api,
+        "sync",
+        legacy_default,
+    )
     monkeypatch.setattr(_storage.time, "sleep", lambda delay: None)
 
     result = _storage.get_tower_catalog_credentials("default")
@@ -480,9 +486,9 @@ def test_default_catalog_retries_reuse_client_auth_snapshot(monkeypatch):
     assert result is credentials
     assert vend_tokens == ["operation-token"] * 3
     assert legacy_tokens == ["operation-token"] * 2
-    assert all(transport is transports[0] for transport in transports)
-    assert transports[0]._client is not None
-    assert transports[0]._client.is_closed
+    assert len({id(client) for client in clients}) == 5
+    assert all(client._client is not None for client in clients)
+    assert all(client._client.is_closed for client in clients)
 
 
 def test_describe_tower_catalog_type_uses_timeout_and_recovers_after_cooldown(
