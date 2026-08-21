@@ -1,5 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
+from threading import Event
 
 import httpx
 import pytest
@@ -8,6 +10,7 @@ from tower import _storage
 from tower._context import TowerContext
 from tower.exceptions import (
     StorageConnectionError,
+    StorageError,
     StorageInvalidCredentialError,
     StorageMissingAuthenticationError,
 )
@@ -18,6 +21,39 @@ from tower.tower_api_client.models import (
     ErrorModel,
     VendCatalogCredentialsResponse,
 )
+
+
+def make_vend_response(
+    environment,
+    token,
+    expires_at,
+    mode="read",
+):
+    return VendCatalogCredentialsResponse(
+        credentials=CatalogCredentials(
+            catalog_uri="https://catalog.example.com",
+            expires_at=expires_at,
+            mode=mode,
+            oauth_token=token,
+            warehouse="warehouse-id",
+        ),
+        environment=environment,
+    )
+
+
+def script_vend(monkeypatch, results):
+    results = iter(results)
+    calls = []
+
+    def vend(client, name, mode):
+        calls.append((name, mode))
+        result = next(results)
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    monkeypatch.setattr(_storage._StorageResolver, "_request_catalog_credentials", vend)
+    return calls
 
 
 @pytest.fixture(autouse=True)
@@ -115,13 +151,6 @@ def test_auth_hash_includes_how_the_credential_is_presented():
 
 
 def test_missing_auth_fails_before_cache_or_vend(monkeypatch):
-    _storage._clear_credential_cache()
-
-    monkeypatch.setattr(
-        _storage,
-        "_prune_credential_cache",
-        lambda now: pytest.fail("cache access must not run without authentication"),
-    )
     monkeypatch.setattr(
         _storage.vend_catalog_credentials_api,
         "sync",
@@ -152,9 +181,8 @@ def test_static_auth_rejection_is_returned(monkeypatch, status):
 
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
-    result = _storage._StorageResolver()._request_catalog_credentials(
-        "analytics", "read"
-    )
+    resolver = _storage._StorageResolver()
+    result = resolver._request_catalog_credentials("analytics", "read")
 
     assert result is rejected
     assert len(vend_calls) == 1
@@ -181,9 +209,8 @@ def test_storage_resolver_vends_with_ambient_api_key(monkeypatch):
 
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
-    result = _storage._StorageResolver(
-        environment="production"
-    )._request_catalog_credentials("analytics", "read")
+    resolver = _storage._StorageResolver(environment="production")
+    result = resolver._request_catalog_credentials("analytics", "read")
 
     assert result is response
     assert captured == {
@@ -198,7 +225,7 @@ def test_storage_resolver_vends_with_ambient_api_key(monkeypatch):
 
 
 def test_describe_and_vend_prefer_jwt_when_both_auth_vars_are_set(monkeypatch):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     monkeypatch.setenv("TOWER_URL", "https://api.example.com")
     monkeypatch.setenv("TOWER_ENVIRONMENT", "production")
     monkeypatch.setenv("TOWER_API_KEY", "ambient-api-key")
@@ -241,10 +268,8 @@ def test_describe_and_vend_prefer_jwt_when_both_auth_vars_are_set(monkeypatch):
         _storage._describe_tower_catalog_type(ctx, "analytics", "production")
         == _storage.TOWER_CATALOG_TYPE
     )
-    assert (
-        _storage._StorageResolver()._request_catalog_credentials("analytics", "read")
-        is vended
-    )
+    resolver = _storage._StorageResolver()
+    assert resolver._request_catalog_credentials("analytics", "read") is vended
     assert captured_auth == [
         ("describe", "Bearer ambient-jwt", None),
         ("vend", "Bearer ambient-jwt", None),
@@ -261,7 +286,6 @@ def test_storage_resolver_allows_explicit_http_tower_url(monkeypatch):
 
 
 def test_get_tower_catalog_credentials_allows_http_and_reaches_vend(monkeypatch):
-    _storage._clear_credential_cache()
     monkeypatch.setenv("TOWER_URL", "http://localhost:9000")
     monkeypatch.setenv("TOWER_ENVIRONMENT", "production")
     monkeypatch.setenv("TOWER_API_KEY", "api-key")
@@ -287,7 +311,7 @@ def test_get_tower_catalog_credentials_allows_http_and_reaches_vend(monkeypatch)
 
     result = _storage.get_tower_catalog_credentials("analytics")
 
-    assert result is credentials
+    assert result == credentials
     assert vend_calls == [
         (
             "analytics",
@@ -317,11 +341,6 @@ def test_get_tower_catalog_credentials_rejects_invalid_mode_before_cache_or_vend
 ):
     monkeypatch.setenv("TOWER_API_KEY", "api-key")
     monkeypatch.setattr(
-        _storage,
-        "_prune_credential_cache",
-        lambda now: pytest.fail("cache access must not run for an invalid mode"),
-    )
-    monkeypatch.setattr(
         _storage.vend_catalog_credentials_api,
         "sync",
         lambda **kwargs: pytest.fail("vend must not run for an invalid mode"),
@@ -350,7 +369,8 @@ def test_storage_resolver_maps_connection_errors_and_closes_client(monkeypatch):
     monkeypatch.setattr(_storage.vend_catalog_credentials_api, "sync", vend)
 
     with pytest.raises(StorageConnectionError) as error:
-        _storage._StorageResolver()._request_catalog_credentials("analytics", "read")
+        resolver = _storage._StorageResolver()
+        resolver._request_catalog_credentials("analytics", "read")
 
     assert error.value.__cause__ is cause
     assert clients[0]._client is not None
@@ -369,79 +389,203 @@ def test_storage_resolver_uses_runtime_environment_only_as_target_config(monkeyp
     )
 
 
-def test_get_tower_catalog_credentials_caches_vended_credentials(monkeypatch):
-    _storage._clear_credential_cache()
+def test_access_cache_is_owned_by_resolver(monkeypatch):
     monkeypatch.setenv("TOWER_URL", "https://api.example.com")
     monkeypatch.setenv("TOWER_ENVIRONMENT", "production")
     monkeypatch.setenv("TOWER_API_KEY", "api-key")
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    credentials = CatalogCredentials(
-        catalog_uri="https://catalog.example.com",
-        expires_at=expires_at,
-        mode="read",
-        oauth_token="oauth-token",
-        warehouse="warehouse-id",
+    first_resolver = _storage._StorageResolver()
+    second_resolver = _storage._StorageResolver()
+    calls = script_vend(
+        monkeypatch,
+        [
+            make_vend_response(
+                environment="production",
+                token=f"provider-token-{number}",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            )
+            for number in (1, 2)
+        ],
     )
+
+    first = first_resolver._resolve_catalog_access("analytics", "read")
+    first_again = first_resolver._resolve_catalog_access("analytics", "read")
+    second = second_resolver._resolve_catalog_access("analytics", "read")
+    second_again = second_resolver._resolve_catalog_access("analytics", "read")
+
+    assert first == first_again
+    assert second == second_again
+    assert {first.oauth_token, second.oauth_token} == {
+        "provider-token-1",
+        "provider-token-2",
+    }
+    assert len(calls) == 2
+
+
+def test_one_shot_credential_loads_do_not_share_cache(monkeypatch):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    calls = script_vend(
+        monkeypatch,
+        [
+            make_vend_response(
+                environment="default",
+                token=f"provider-token-{number}",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            )
+            for number in (1, 2)
+        ],
+    )
+
+    first = _storage.get_tower_catalog_credentials("analytics")
+    second = _storage.get_tower_catalog_credentials("analytics")
+
+    assert first.oauth_token == "provider-token-1"
+    assert second.oauth_token == "provider-token-2"
+    assert len(calls) == 2
+
+
+def test_near_expiry_access_retains_inherited_and_local_identity(monkeypatch):
+    monkeypatch.setenv("TOWER_ENVIRONMENT", "production")
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    responses = [
+        make_vend_response(
+            environment="default",
+            token="inherited-token",
+            expires_at=datetime.now(timezone.utc)
+            + _storage.CREDENTIAL_REFRESH_WINDOW
+            - timedelta(seconds=1),
+        ),
+        make_vend_response(
+            environment="production",
+            token="local-token",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        ),
+    ]
+    calls = script_vend(monkeypatch, responses)
+
+    resolver = _storage._StorageResolver()
+    inherited = resolver._resolve_catalog_access("analytics", "read")
+    local = resolver._resolve_catalog_access("analytics", "read")
+    resolver._resolve_catalog_access("analytics", "read")
+
+    assert inherited.target_environment == "production"
+    assert inherited.catalog_environment == "default"
+    assert inherited.is_inherited() is True
+    assert inherited.oauth_token == "inherited-token"
+    assert local.catalog_environment == "production"
+    assert local.is_inherited() is False
+    assert local.oauth_token == "local-token"
+    assert len(calls) == 2
+
+
+def test_concurrent_access_shares_one_vend_request(monkeypatch):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    timeout = 10
+    vend_started = Event()
+    waiter_joined = Event()
+    release_vend = Event()
     calls = []
 
+    class ObservableFuture(_storage.Future):
+        def result(self, timeout=None):
+            waiter_joined.set()
+            return super().result(timeout)
+
     def vend(client, name, mode):
-        calls.append((name, client._target_environment, mode))
-        return VendCatalogCredentialsResponse(
-            credentials=credentials,
-            environment=client._target_environment,
+        calls.append((name, mode))
+        vend_started.set()
+        assert release_vend.wait(timeout=timeout)
+        return make_vend_response(
+            environment="default",
+            token="shared-token",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
 
+    def resolve(resolver):
+        return resolver._resolve_catalog_access("analytics", "read")
+
+    monkeypatch.setattr(_storage, "Future", ObservableFuture)
     monkeypatch.setattr(_storage._StorageResolver, "_request_catalog_credentials", vend)
 
-    first = _storage.get_tower_catalog_credentials("default")
-    second = _storage.get_tower_catalog_credentials("default")
+    resolver = _storage._StorageResolver()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        leader = executor.submit(resolve, resolver)
+        started = vend_started.wait(timeout=timeout)
+        waiter = executor.submit(resolve, resolver)
+        joined = waiter_joined.wait(timeout=timeout)
+        release_vend.set()
+        accesses = [
+            leader.result(timeout=timeout),
+            waiter.result(timeout=timeout),
+        ]
 
-    assert first is credentials
-    assert second is credentials
-    assert calls == [("default", "production", "read")]
+    assert started
+    assert joined
+    assert len(calls) == 1
+    assert all(access == accesses[0] for access in accesses)
 
 
-def test_get_tower_catalog_credentials_prunes_expired_cache_entries(monkeypatch):
-    _storage._clear_credential_cache()
-    monkeypatch.setenv("TOWER_URL", "https://api.example.com")
-    monkeypatch.setenv("TOWER_ENVIRONMENT", "production")
+def test_failed_vend_is_not_cached(monkeypatch):
     monkeypatch.setenv("TOWER_API_KEY", "api-key")
-    expired_credentials = CatalogCredentials(
-        catalog_uri="https://old-catalog.example.com",
-        expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
-        mode="read",
-        oauth_token="old-oauth-token",
-        warehouse="old-warehouse-id",
-    )
-    fresh_credentials = CatalogCredentials(
-        catalog_uri="https://catalog.example.com",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        mode="read",
-        oauth_token="oauth-token",
-        warehouse="warehouse-id",
-    )
-    storage_resolver = _storage._StorageResolver()
-    expired_key = _storage._cache_key(storage_resolver, "stale", "read")
-    _storage._credential_cache[expired_key] = _storage._CachedCredentials(
-        expired_credentials
+    calls = script_vend(
+        monkeypatch,
+        [
+            RuntimeError("vend failed"),
+            make_vend_response(
+                environment="default",
+                token="retry-token",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            ),
+        ],
     )
 
-    def vend(client, name, mode):
-        return VendCatalogCredentialsResponse(
-            credentials=fresh_credentials,
-            environment=client._target_environment,
-        )
+    resolver = _storage._StorageResolver()
+    with pytest.raises(RuntimeError, match="vend failed"):
+        resolver._resolve_catalog_access("analytics", "read")
+    access = resolver._resolve_catalog_access("analytics", "read")
 
-    monkeypatch.setattr(_storage._StorageResolver, "_request_catalog_credentials", vend)
+    assert access.oauth_token == "retry-token"
+    assert len(calls) == 2
 
-    result = _storage.get_tower_catalog_credentials("default")
 
-    assert result is fresh_credentials
-    assert expired_key not in _storage._credential_cache
+@pytest.mark.parametrize(
+    ("environment", "mode", "message"),
+    [
+        ("staging", "read", "unexpected environment"),
+        ("default", "read-write", "after read access was requested"),
+    ],
+)
+def test_inconsistent_vend_response_is_not_cached(
+    monkeypatch,
+    environment,
+    mode,
+    message,
+):
+    monkeypatch.setenv("TOWER_API_KEY", "api-key")
+    responses = [
+        make_vend_response(
+            environment=environment,
+            token="invalid-token",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            mode=mode,
+        ),
+        make_vend_response(
+            environment="default",
+            token="valid-token",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        ),
+    ]
+    calls = script_vend(monkeypatch, responses)
+
+    resolver = _storage._StorageResolver()
+    with pytest.raises(StorageError, match=message):
+        resolver._resolve_catalog_access("analytics", "read")
+    access = resolver._resolve_catalog_access("analytics", "read")
+
+    assert access.oauth_token == "valid-token"
+    assert len(calls) == 2
 
 
 def test_default_catalog_retries_reuse_client_auth_snapshot(monkeypatch):
-    _storage._clear_credential_cache()
     monkeypatch.setenv("TOWER_API_KEY", "operation-token")
     credentials = CatalogCredentials(
         catalog_uri="https://catalog.example.com",
@@ -483,7 +627,7 @@ def test_default_catalog_retries_reuse_client_auth_snapshot(monkeypatch):
 
     result = _storage.get_tower_catalog_credentials("default")
 
-    assert result is credentials
+    assert result == credentials
     assert vend_tokens == ["operation-token"] * 3
     assert legacy_tokens == ["operation-token"] * 2
     assert len({id(client) for client in clients}) == 5
@@ -494,7 +638,7 @@ def test_default_catalog_retries_reuse_client_auth_snapshot(monkeypatch):
 def test_describe_tower_catalog_type_uses_timeout_and_recovers_after_cooldown(
     monkeypatch,
 ):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     ctx = TowerContext(
         tower_url="https://api.example.com",
         environment="production",
