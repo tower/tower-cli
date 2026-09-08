@@ -155,7 +155,7 @@ def sql_catalog():
 def test_string_catalog_precedence(
     monkeypatch, tower_credentials, catalog_type, has_pyiceberg_config, expected_source
 ):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     patch_tower_context(monkeypatch)
     vend_catalog = FakeCatalog("vend")
     configured_catalog = FakeCatalog("configured")
@@ -271,7 +271,7 @@ def test_explicit_catalog_bypasses_string_catalog_resolution(
 
 
 def test_no_tower_auth_preserves_ambient_pyiceberg_catalog(monkeypatch):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     patch_tower_context(monkeypatch, api_key=None)
     monkeypatch.setenv(
         "PYICEBERG_CATALOG__S3_TABLES__URI", "https://s3tables.example.com"
@@ -298,7 +298,7 @@ def test_no_tower_auth_preserves_ambient_pyiceberg_catalog(monkeypatch):
 
 
 def test_managed_catalog_vend_failure_does_not_fall_back_to_pyiceberg(monkeypatch):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     patch_tower_context(monkeypatch)
     calls = []
 
@@ -334,7 +334,7 @@ def test_managed_catalog_vend_failure_does_not_fall_back_to_pyiceberg(monkeypatc
 def test_external_catalog_write_mode_keeps_ambient_pyiceberg_catalog(
     monkeypatch, catalog_type
 ):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     patch_tower_context(monkeypatch)
     catalog = FakeCatalog("configured")
 
@@ -357,7 +357,7 @@ def test_external_catalog_write_mode_keeps_ambient_pyiceberg_catalog(
 
 
 def test_string_catalog_type_describe_is_cached(monkeypatch):
-    _storage._clear_credential_cache()
+    _storage._clear_catalog_type_cache()
     patch_tower_context(monkeypatch)
     calls = []
     vend_catalogs = []

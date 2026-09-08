@@ -351,7 +351,9 @@ mod tests {
 
     #[test]
     fn root_help_scopes_beta_label_to_storage() {
-        let help = root_cmd().render_help().to_string();
+        // term_width(0) turns off help wrapping, which otherwise follows the
+        // width of the terminal the tests run in.
+        let help = root_cmd().term_width(0).render_help().to_string();
 
         assert!(help.contains(
             "Interact with the catalogs in your Tower account (includes Storage [beta])"

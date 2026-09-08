@@ -43,3 +43,23 @@ class PyArrowFilterMigrationError(TypeError):
             "replace [a, b] with a & b. You can also pass a PyIceberg "
             "BooleanExpression or a SQL-like filter string."
         )
+
+
+class StorageError(RuntimeError):
+    """Base error for Tower Storage control-plane operations."""
+
+
+class StorageAuthenticationError(StorageError):
+    """Base error for Storage authentication failures."""
+
+
+class StorageMissingAuthenticationError(StorageAuthenticationError):
+    """No supported Tower API key or JWT was available."""
+
+
+class StorageInvalidCredentialError(StorageAuthenticationError):
+    """A configured credential is a known placeholder rather than a secret."""
+
+
+class StorageConnectionError(StorageError):
+    """Tower's control-plane API could not be reached."""
