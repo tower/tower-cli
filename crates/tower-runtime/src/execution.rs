@@ -114,17 +114,27 @@ pub enum CacheBackend {
     None,
 }
 
-/// ResourceLimits defines compute resource constraints
+/// ResourceLimits defines compute resource requests and limits.
+/// Missing values are resolved by the execution backend.
 #[derive(Debug, Clone)]
 pub struct ResourceLimits {
     /// CPU limit in millicores (e.g., 1000 = 1 CPU)
-    pub cpu_millicores: Option<u32>,
+    pub cpu_limit_millicores: Option<u32>,
+
+    /// CPU request in millicores
+    pub cpu_request_millicores: Option<u32>,
 
     /// Memory limit in megabytes
-    pub memory_mb: Option<u32>,
+    pub memory_limit_mb: Option<u32>,
+
+    /// Memory request in megabytes
+    pub memory_request_mb: Option<u32>,
 
     /// Ephemeral storage limit in megabytes
-    pub storage_mb: Option<u32>,
+    pub storage_limit_mb: Option<u32>,
+
+    /// Ephemeral storage request in megabytes
+    pub storage_request_mb: Option<u32>,
 
     /// Maximum number of processes
     pub max_pids: Option<u32>,
