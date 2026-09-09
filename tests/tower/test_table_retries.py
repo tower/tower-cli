@@ -13,6 +13,7 @@ from pyiceberg.exceptions import (
     ServerError,
     ServiceUnavailableError,
     UnauthorizedError,
+    ValidationException,
     WaitingForLockException,
 )
 
@@ -217,14 +218,13 @@ def test_commit_retry_exhaustion_preserves_final_exception(monkeypatch, max_retr
         ServerError,
         BadRequestError,
         WaitingForLockException,
+        ValidationException,
         httpx.TimeoutException,
         httpx.ConnectError,
         ValueError,
     ],
 )
-def test_mutation_errors_other_than_commit_conflicts_are_not_retried(
-    monkeypatch, exception_type
-):
+def test_non_retryable_mutation_errors_are_not_retried(monkeypatch, exception_type):
     failure = exception_type("not retryable")
     iceberg_table = FakeMutationTable([failure])
     table = make_table(iceberg_table)
