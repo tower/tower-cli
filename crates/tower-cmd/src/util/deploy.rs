@@ -16,8 +16,10 @@ use tower_api::models::DeployAppResponse;
 
 /// Advisory only: the server enforces the actual bundle-size limit and reports
 /// it in its error response when a bundle is too large.
-pub const LARGE_PACKAGE_WARNING_THRESHOLD: u64 = 500 * 1024 * 1024;
+const LARGE_PACKAGE_WARNING_THRESHOLD: u64 = 500 * 1024 * 1024;
 
+/// Streams a package to the server, reporting progress and leaving size enforcement
+/// to the server. Large-package warnings are suppressed in JSON output mode.
 pub async fn upload_file_with_progress(
     out: &output::Out,
     api_config: &Configuration,
@@ -41,10 +43,9 @@ pub async fn upload_file_with_progress(
     let file_size = metadata.len();
 
     if file_size > LARGE_PACKAGE_WARNING_THRESHOLD {
-        let size_mb = file_size as f64 / (1024.0 * 1024.0);
-        out.write(&format!(
-            "Warning: Your app package is large ({:.2} MB). The server may reject it depending on its configured maximum bundle size. You can reduce app size by removing unnecessary files or import_paths in the Towerfile.\n",
-            size_mb
+        out.note(&format!(
+            "Warning: Your app package is large ({}). The server may reject it depending on its configured maximum bundle size. You can reduce app size by removing unnecessary files or import_paths in the Towerfile.\n",
+            indicatif::BinaryBytes(file_size)
         ));
     }
 
@@ -59,6 +60,7 @@ pub async fn upload_file_with_progress(
         .header("X-Tower-Checksum-SHA256", package_hash)
         .header("Content-Type", content_type)
         .header("Content-Encoding", "gzip")
+        .header(reqwest::header::CONTENT_LENGTH, file_size)
         .body(Body::wrap_stream(progress_stream));
 
     // When supplied, ask the server to reuse an existing AppVersion that was
@@ -175,4 +177,46 @@ pub async fn deploy_app_package(
     out.newline();
 
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::Bytes, http::HeaderMap, routing::post, Json, Router};
+    use std::io::Write;
+
+    #[tokio::test]
+    async fn upload_advertises_exact_streamed_length() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let payload = b"test package contents";
+        let mut package = tempfile::NamedTempFile::new().unwrap();
+        package.write_all(payload).unwrap();
+
+        let app = Router::new().route(
+            "/deploy",
+            post(|headers: HeaderMap, body: Bytes| async move {
+                assert_eq!(headers["content-length"], "21");
+                assert_eq!(headers["content-encoding"], "gzip");
+                assert!(!headers.contains_key("transfer-encoding"));
+                assert_eq!(body.as_ref(), b"test package contents");
+                Json(DeployAppResponse::default())
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let result = upload_file_with_progress(
+            &output::Out::sink(),
+            &Configuration::default(),
+            format!("http://{address}/deploy"),
+            package.path().to_path_buf(),
+            "application/tar",
+            None,
+            Box::new(|_, _| {}),
+        )
+        .await;
+        server.abort();
+        result.unwrap();
+    }
 }
