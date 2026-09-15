@@ -364,13 +364,15 @@ async def describe_run(name: str, seq: int):
 
             # For logs-after-completion test apps, complete quickly to test log draining
             # Use 1 second so CLI has time to start streaming before completion
-            completion_threshold = 1.0 if "logs-after-completion" in name else 5.0
+            quick = "logs-after-completion" in name or "logs-finished" in name
+            completion_threshold = 1.0 if quick else 5.0
 
             if elapsed > completion_threshold:
                 run_data["status"] = "exited"
                 run_data["status_group"] = "successful"
                 run_data["exit_code"] = 0
-                run_data["ended_at"] = now_time.isoformat()
+                if not run_data.get("ended_at"):
+                    run_data["ended_at"] = now_time.isoformat()
 
             return {
                 "run": run_data,
@@ -685,11 +687,27 @@ NO_NEW_LOGS_WARNING = "No new logs available"
 STREAM_COMPLETE_WARNING = "stream complete"
 
 
+# The real server persists log lines a beat after a run turns terminal;
+# fetch too soon and the list is empty. Mirror that window.
+STORED_LOGS_PERSIST_LAG = datetime.timedelta(seconds=2.5)
+
+
 @app.get("/v1/apps/{name}/runs/{seq}/logs")
 async def describe_run_logs(name: str, seq: int):
     """Mock endpoint for getting run logs."""
     if name not in mock_apps_db:
         raise HTTPException(status_code=404, detail=f"App '{name}' not found")
+
+    for run_data in mock_runs_db.values():
+        if run_data["app_name"] == name and run_data["number"] == seq:
+            ended = run_data.get("ended_at")
+            if (
+                not ended
+                or datetime.datetime.now() - datetime.datetime.fromisoformat(ended)
+                < STORED_LOGS_PERSIST_LAG
+            ):
+                return {"log_lines": []}
+            break
 
     return {
         "log_lines": [
