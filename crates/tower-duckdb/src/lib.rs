@@ -1241,7 +1241,7 @@ mod tests {
         }
 
         let bucket = "warehouse";
-        let image = GenericImage::new("minio/minio", MINIO_IMAGE_TAG)
+        let image = GenericImage::new("quay.io/minio/minio", MINIO_IMAGE_TAG)
             .with_wait_for(WaitFor::seconds(1))
             .with_exposed_port(9000.tcp())
             .with_entrypoint("sh")
