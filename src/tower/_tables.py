@@ -294,6 +294,8 @@ class Table:
             initial_retry_ceiling_seconds, _MAX_COMMIT_RETRY_DELAY_SECONDS
         )
 
+        # A PyIceberg ValidationException means that data changed incompatibly.
+        # It deliberately propagates instead of becoming last-writer-wins.
         for attempt in range(max_retries + 1):
             try:
                 return operation()
@@ -369,12 +371,17 @@ class Table:
         retry_delay_seconds: float = 0.5,
     ) -> TTable:
         """
-        Performs an upsert operation (update or insert) on the Iceberg table. In case of commit conflicts, reloads the metadata and retries.
+        Performs an upsert operation (update or insert) on the Iceberg table.
+
+        PyIceberg 0.12 and newer retry compatible commit races internally. If
+        PyIceberg detects that a concurrent write changed data relevant to this
+        upsert, its ``ValidationException`` propagates instead of Tower retrying
+        the complete operation with last-writer-wins behavior.
 
         This method will:
         - Update existing rows if they match the join columns
         - Insert new rows if no match is found
-        - Retry for max_retries if commits fail
+        - Preserve PyIceberg's concurrency validation semantics
         All operations are case-sensitive by default.
 
         Args:
@@ -382,8 +389,9 @@ class Table:
                 must match the schema of the target table.
             join_cols (Optional[list[str]]): The columns that form the key to match rows on.
                 If not provided, all columns will be used for matching.
-            max_retries (int): Maximum number of retry attempts on commit conflicts.
-                Defaults to 5.
+            max_retries (int): Maximum number of Tower retry attempts when PyIceberg
+                surfaces a ``CommitFailedException``. This does not apply to validated
+                data conflicts. Defaults to 5.
             retry_delay_seconds (float): Maximum randomized wait before the first retry,
                 in seconds. The maximum doubles after each conflict but never exceeds
                 30 seconds; values above 30 are treated as 30. Defaults to 0.5 seconds.
@@ -393,6 +401,8 @@ class Table:
 
         Raises:
             CommitFailedException: If all retry attempts are exhausted.
+            pyiceberg.exceptions.ValidationException: If PyIceberg detects an
+                incompatible concurrent write.
 
         Note:
             - The operation is always case-sensitive
@@ -445,7 +455,10 @@ class Table:
     ) -> TTable:
         """
         Deletes rows from the Iceberg table that match the specified filter conditions.
-        In case of commit conflicts, reloads the metadata and retries.
+        PyIceberg 0.12 and newer retry compatible commit races internally, but reject
+        incompatible concurrent data changes with ``ValidationException``. Tower lets
+        that conflict propagate rather than retrying the complete delete against newer
+        data.
 
         This method removes rows from the table based on the provided filter expressions.
         The operation is always case-sensitive. Note that the number of deleted rows
@@ -454,8 +467,9 @@ class Table:
         Args:
             filters (str | BooleanExpression): A SQL-like string or a PyIceberg
                 boolean expression. Use ``Table.column()`` to construct expressions.
-            max_retries (int): Maximum number of retry attempts on commit conflicts.
-                Defaults to 5.
+            max_retries (int): Maximum number of Tower retry attempts when PyIceberg
+                surfaces a ``CommitFailedException``. This does not apply to validated
+                data conflicts. Defaults to 5.
             retry_delay_seconds (float): Maximum randomized wait before the first retry,
                 in seconds. The maximum doubles after each conflict but never exceeds
                 30 seconds; values above 30 are treated as 30. Defaults to 0.5 seconds.
@@ -465,6 +479,8 @@ class Table:
 
         Raises:
             CommitFailedException: If all retry attempts are exhausted.
+            pyiceberg.exceptions.ValidationException: If PyIceberg detects an
+                incompatible concurrent write.
 
         Note:
             - The operation is always case-sensitive
