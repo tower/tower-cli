@@ -3,7 +3,7 @@ mod towerfile;
 
 pub use core::{
     build_package, compute_sha256_bytes, compute_sha256_package, normalize_path, BuiltPackage,
-    Entry, Manifest, PackageInputs, CURRENT_PACKAGE_VERSION, MAX_PACKAGE_SIZE,
+    Entry, Manifest, PackageInputs, CURRENT_PACKAGE_VERSION,
 };
 pub use towerfile::{App, Parameter, Towerfile};
 

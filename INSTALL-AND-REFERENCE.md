@@ -146,9 +146,19 @@ PyIceberg, which assigns field IDs and preserves nested nullability and `b"doc"`
 metadata. Timestamp units from seconds through microseconds, UTC-zoned microsecond
 timestamps, `time64[us]`, `date32`, and Decimal128 values up to precision 38 are supported.
 Nanosecond timestamps are rejected by default instead of being silently downcast, as are
-`time32`, `time64[ns]`, `date64`, Float16, Decimal256, and non-UTC zoned timestamps. Convert
-those fields explicitly before creating the table when the loss is acceptable. PyIceberg's
-native validation exceptions propagate unchanged.
+`time32`, `time64[ns]`, `date64`, Decimal256, and non-UTC zoned timestamps. Float16 handling
+follows the installed PyIceberg version: PyIceberg 0.12 and newer accept it and widen it
+losslessly to Iceberg `float` (Arrow float32 on read), while PyIceberg 0.11 rejects it.
+Convert unsupported fields explicitly before creating the table when the loss is acceptable.
+PyIceberg's native validation exceptions propagate unchanged.
+
+With PyIceberg 0.12 and newer, compatible commit races are retried internally. When an
+upsert or delete was planned from stale data and conflicts with a concurrent change,
+PyIceberg raises `pyiceberg.exceptions.ValidationException`; Tower does not automatically
+re-run the complete operation with last-writer-wins behavior. The failed operation does not
+commit. Reload, reconcile the newer data, and explicitly retry only when that is appropriate
+for the application. Tower's per-call retry options still handle a surfaced
+`CommitFailedException`, including for supported PyIceberg 0.11 installations.
 
 ### dbt Core support
 

@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 import pyarrow as pa
 import pytest
 from pyiceberg import types as iceberg_types
@@ -7,6 +9,11 @@ from pyiceberg.io.pyarrow import UnsupportedPyArrowTypeException
 
 import tower._tables as tables_module
 from tower._context import TowerContext
+
+
+_PYICEBERG_SUPPORTS_FLOAT16 = tuple(
+    int(component) for component in version("pyiceberg").split(".")[:2]
+) >= (0, 12)
 
 
 class RecordingCatalog:
@@ -201,6 +208,20 @@ def test_pyiceberg_accepts_supported_arrow_precision(
     assert table.schema().find_field("value").field_type == iceberg_type
 
 
+def test_float16_schema_follows_pyiceberg_version(in_memory_schema_catalog):
+    schema = pa.schema([pa.field("value", pa.float16())])
+
+    if not _PYICEBERG_SUPPORTS_FLOAT16:
+        with pytest.raises(UnsupportedPyArrowTypeException):
+            make_reference(in_memory_schema_catalog, "float16").create(schema)
+        return
+
+    make_reference(in_memory_schema_catalog, "float16").create(schema)
+
+    table = in_memory_schema_catalog.load_table("default.float16")
+    assert table.schema().find_field("value").field_type == iceberg_types.FloatType()
+
+
 @pytest.mark.parametrize(
     ("name", "arrow_type"),
     [
@@ -208,7 +229,6 @@ def test_pyiceberg_accepts_supported_arrow_precision(
         ("timestamp_non_utc", pa.timestamp("us", tz="Europe/Berlin")),
         ("time32", pa.time32("s")),
         ("time_ns", pa.time64("ns")),
-        ("float16", pa.float16()),
         ("date64", pa.date64()),
         ("decimal256", pa.decimal256(38, 10)),
     ],

@@ -3,6 +3,7 @@ import shutil
 import datetime
 import tempfile
 import pathlib
+from importlib.metadata import version
 from urllib.parse import urljoin
 from urllib.request import pathname2url
 import threading
@@ -12,7 +13,7 @@ import tower.polars as pl
 import pyarrow as pa
 from pyiceberg.catalog.memory import InMemoryCatalog
 from pyiceberg.catalog.sql import SqlCatalog
-from pyiceberg.exceptions import CommitFailedException
+from pyiceberg.exceptions import CommitFailedException, ValidationException
 
 import concurrent.futures
 
@@ -26,6 +27,11 @@ from tower.tower_api_client.models import (
     CatalogCredentials,
     DescribeCatalogResponse,
 )
+
+
+_PYICEBERG_HAS_WRITE_CONFLICT_VALIDATION = tuple(
+    int(component) for component in version("pyiceberg").split(".")[:2]
+) >= (0, 12)
 
 
 class FakeLoadedTable:
@@ -622,8 +628,9 @@ def test_upsert_to_tables(in_memory_catalog):
     assert res["age"].item() == 26
 
 
-def test_upsert_concurrent_writes_with_retry(sql_catalog):
-    """Test that concurrent upserts succeed with retry logic handling conflicts."""
+def test_stale_upserts_to_different_rows_follow_pyiceberg_conflict_semantics(
+    sql_catalog,
+):
     schema = pa.schema(
         [
             pa.field("ticker", pa.string()),
@@ -645,40 +652,28 @@ def test_upsert_concurrent_writes_with_retry(sql_catalog):
     )
     table.insert(initial_data)
 
-    retry_count = {"value": 0}
-    retry_lock = threading.Lock()
+    first_writer = tower.tables("concurrent_test", catalog=sql_catalog).load()
+    stale_writer = tower.tables("concurrent_test", catalog=sql_catalog).load()
 
-    def upsert_ticker(ticker: str, new_price: float):
-        t = tower.tables("concurrent_test", catalog=sql_catalog).load()
-
-        original_refresh = t._table.refresh
-
-        def tracked_refresh():
-            with retry_lock:
-                retry_count["value"] += 1
-            return original_refresh()
-
-        t._table.refresh = tracked_refresh
-
-        data = pa.Table.from_pylist(
-            [{"ticker": ticker, "date": "2024-01-01", "price": new_price}],
+    first_writer.upsert(
+        pa.Table.from_pylist(
+            [{"ticker": "AAPL", "date": "2024-01-01", "price": 150.0}],
             schema=schema,
-        )
-        t.upsert(data, join_cols=["ticker", "date"])
-        return ticker
+        ),
+        join_cols=["ticker", "date"],
+    )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [
-            executor.submit(upsert_ticker, "AAPL", 150.0),
-            executor.submit(upsert_ticker, "GOOGL", 250.0),
-            executor.submit(upsert_ticker, "MSFT", 350.0),
-        ]
-        results = [f.result() for f in concurrent.futures.as_completed(futures)]
-
-    assert len(results) == 3
-    assert (
-        retry_count["value"] > 0
-    ), "Expected at least one retry due to concurrent conflicts"
+    stale_upsert = pa.Table.from_pylist(
+        [{"ticker": "GOOGL", "date": "2024-01-01", "price": 250.0}],
+        schema=schema,
+    )
+    if _PYICEBERG_HAS_WRITE_CONFLICT_VALIDATION:
+        with pytest.raises(ValidationException):
+            stale_writer.upsert(stale_upsert, join_cols=["ticker", "date"])
+    else:
+        # PyIceberg 0.11 surfaces CommitFailedException, so Tower refreshes and
+        # replans the whole operation for supported older installations.
+        stale_writer.upsert(stale_upsert, join_cols=["ticker", "date"])
 
     final_table = tower.tables("concurrent_test", catalog=sql_catalog).load()
     df = final_table.read()
@@ -688,12 +683,13 @@ def test_upsert_concurrent_writes_with_retry(sql_catalog):
     ticker_prices = {row["ticker"]: row["price"] for row in df.iter_rows(named=True)}
 
     assert ticker_prices["AAPL"] == 150.0
-    assert ticker_prices["GOOGL"] == 250.0
-    assert ticker_prices["MSFT"] == 350.0
+    assert ticker_prices["GOOGL"] == (
+        200.0 if _PYICEBERG_HAS_WRITE_CONFLICT_VALIDATION else 250.0
+    )
+    assert ticker_prices["MSFT"] == 300.0
 
 
-def test_upsert_concurrent_writes_same_row(sql_catalog):
-    """Test concurrent upserts to the SAME row - last write wins."""
+def test_stale_upserts_to_same_row_follow_pyiceberg_conflict_semantics(sql_catalog):
     schema = pa.schema(
         [
             pa.field("id", pa.int64()),
@@ -710,37 +706,20 @@ def test_upsert_concurrent_writes_same_row(sql_catalog):
     )
     table.insert(initial_data)
 
-    retry_count = {"value": 0}
-    retry_lock = threading.Lock()
+    first_writer = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
+    stale_writer = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
 
-    def upsert_counter(value: int):
-        t = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
+    first_writer.upsert(
+        pa.Table.from_pylist([{"id": 1, "counter": 1}], schema=schema),
+        join_cols=["id"],
+    )
 
-        original_refresh = t._table.refresh
-
-        def tracked_refresh():
-            with retry_lock:
-                retry_count["value"] += 1
-            return original_refresh()
-
-        t._table.refresh = tracked_refresh
-
-        data = pa.Table.from_pylist(
-            [{"id": 1, "counter": value}],
-            schema=schema,
-        )
-        t.upsert(data, join_cols=["id"])
-        return value
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(upsert_counter, i) for i in range(1, 6)]
-        results = [f.result() for f in concurrent.futures.as_completed(futures)]
-
-    assert len(results) == 5
-
-    assert (
-        retry_count["value"] > 0
-    ), "Expected at least one retry due to concurrent conflicts"
+    stale_upsert = pa.Table.from_pylist([{"id": 1, "counter": 2}], schema=schema)
+    if _PYICEBERG_HAS_WRITE_CONFLICT_VALIDATION:
+        with pytest.raises(ValidationException):
+            stale_writer.upsert(stale_upsert, join_cols=["id"])
+    else:
+        stale_writer.upsert(stale_upsert, join_cols=["id"])
 
     final_table = tower.tables("concurrent_same_row_test", catalog=sql_catalog).load()
     df = final_table.read()
@@ -748,7 +727,7 @@ def test_upsert_concurrent_writes_same_row(sql_catalog):
     assert len(df) == 1
 
     final_counter = df.select("counter").item()
-    assert final_counter in [1, 2, 3, 4, 5]
+    assert final_counter == (1 if _PYICEBERG_HAS_WRITE_CONFLICT_VALIDATION else 2)
 
 
 def test_insert_concurrent_writes_with_retry(sql_catalog):

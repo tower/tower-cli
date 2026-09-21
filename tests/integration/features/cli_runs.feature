@@ -56,7 +56,7 @@ Feature: CLI Run Commands
     And the output should show "Warning: No new logs available"
 
   Scenario: CLI apps logs --follow on a finished run prints stored logs exactly once
-    Given I have a simple hello world application named "app-logs-after-completion"
+    Given I have a simple hello world application named "app-logs-finished"
     When I run "tower deploy --create" via CLI
     And I run "tower run --detached" via CLI and capture the run number
     And I wait for 2 seconds
