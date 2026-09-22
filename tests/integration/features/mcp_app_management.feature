@@ -52,6 +52,13 @@ Feature: MCP App Management
     Then I should receive a success response
     And the Towerfile on disk should contain run_size "basic.small"
 
+  Scenario: Editing the Towerfile preserves sections the CLI does not model
+    Given I have a valid Towerfile in the current directory
+    When I call tower_file_update with description "an edited description"
+    Then I should receive a success response
+    And the Towerfile on disk should contain "[build]"
+    And the Towerfile on disk should contain "3.11"
+
   Scenario: Run simple application successfully locally
     Given I have a simple hello world application
     When I call tower_run_local via MCP

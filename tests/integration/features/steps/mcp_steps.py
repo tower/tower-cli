@@ -261,6 +261,12 @@ async def step_update_description(context, description):
     await call_mcp_tool(context, "tower_file_update", {"description": description})
 
 
+@then('the Towerfile on disk should contain "{text}"')
+def step_check_towerfile_contains(context, text):
+    contents = Path("Towerfile").read_text()
+    assert text in contents, f"Towerfile should contain {text!r}, got: {contents}"
+
+
 @then('the Towerfile on disk should contain run_size "{run_size}"')
 def step_check_towerfile_run_size(context, run_size):
     contents = Path("Towerfile").read_text()

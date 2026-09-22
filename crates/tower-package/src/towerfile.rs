@@ -1,4 +1,5 @@
 use crate::core::Error;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -23,7 +24,7 @@ pub struct Parameter {
     pub hidden: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Serialize, Debug)]
 pub struct App {
     #[serde(default)]
     pub name: String,
@@ -51,9 +52,64 @@ pub struct App {
     /// serializing), leaving the server to apply its default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_size: Option<String>,
+
+    /// Keys under `[app]` that this version of the CLI doesn't model. They are
+    /// carried through unchanged so that editing a Towerfile never drops
+    /// something a newer server, or the user, put there.
+    ///
+    /// `flatten` is only used for serializing. Deserializing through it would
+    /// buffer the leftover values through serde's generic representation,
+    /// which turns TOML datetimes into an inline table with a private marker
+    /// key — so `from_table` fills this in from the parsed table directly.
+    #[serde(flatten)]
+    pub extra: toml::Table,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// take removes `key` from `table` and converts it into `T`, falling back to
+/// `T::default()` when the key is absent — the same semantics `#[serde(default)]`
+/// gave these fields before unknown keys were preserved. `path` is the dotted
+/// location used in error messages.
+fn take<T: DeserializeOwned + Default>(
+    table: &mut toml::Table,
+    key: &str,
+    path: &str,
+) -> Result<T, Error> {
+    match table.remove(key) {
+        Some(value) => {
+            toml::Value::try_into(value).map_err(|err: toml::de::Error| Error::InvalidTowerfile {
+                message: format!("invalid value for `{}`: {}", path, err.message()),
+            })
+        }
+        None => Ok(T::default()),
+    }
+}
+
+impl App {
+    /// from_table builds an App from the parsed `[app]` table. Known keys are
+    /// removed and converted; whatever is left over lands in `extra` with its
+    /// values untouched.
+    pub fn from_table(mut table: toml::Table) -> Result<Self, Error> {
+        Ok(App {
+            name: take(&mut table, "name", "app.name")?,
+            script: take(&mut table, "script", "app.script")?,
+            source: take(&mut table, "source", "app.source")?,
+            schedule: take(&mut table, "schedule", "app.schedule")?,
+            description: take(&mut table, "description", "app.description")?,
+            import_paths: take(&mut table, "import_paths", "app.import_paths")?,
+            run_size: take(&mut table, "run_size", "app.run_size")?,
+            extra: table,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for App {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let table = toml::Table::deserialize(deserializer)?;
+        App::from_table(table).map_err(<D::Error as serde::de::Error>::custom)
+    }
+}
+
+#[derive(Serialize, Debug)]
 pub struct Towerfile {
     /// file_path is the path to where this file was read on disk. It's always populated by the
     /// parser/application, never by the data.
@@ -64,6 +120,47 @@ pub struct Towerfile {
 
     #[serde(default)]
     pub parameters: Vec<Parameter>,
+
+    /// Top-level sections other than `[app]` and `[[parameters]]`, e.g. `[build]`.
+    /// Preserved verbatim across read → modify → save. See `App::extra` for why
+    /// this is filled in by hand rather than through `flatten`.
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+impl Towerfile {
+    /// from_table builds a Towerfile from the parsed document. `[app]` is
+    /// required; every other top-level key the CLI doesn't know about is kept
+    /// in `extra`.
+    pub fn from_table(mut table: toml::Table) -> Result<Self, Error> {
+        let app = match table.remove("app") {
+            Some(toml::Value::Table(app)) => App::from_table(app)?,
+            Some(other) => {
+                return Err(Error::InvalidTowerfile {
+                    message: format!("`app` must be a table, found {}", other.type_str()),
+                })
+            }
+            None => {
+                return Err(Error::InvalidTowerfile {
+                    message: "missing `[app]` section".to_string(),
+                })
+            }
+        };
+
+        Ok(Towerfile {
+            file_path: PathBuf::new(),
+            app,
+            parameters: take(&mut table, "parameters", "parameters")?,
+            extra: table,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for Towerfile {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let table = toml::Table::deserialize(deserializer)?;
+        Towerfile::from_table(table).map_err(<D::Error as serde::de::Error>::custom)
+    }
 }
 
 impl Towerfile {
@@ -71,6 +168,7 @@ impl Towerfile {
         Self {
             file_path: PathBuf::new(),
             parameters: vec![],
+            extra: toml::Table::new(),
             app: App {
                 name: String::from(""),
                 script: String::from(""),
@@ -79,6 +177,7 @@ impl Towerfile {
                 description: None,
                 import_paths: vec![],
                 run_size: None,
+                extra: toml::Table::new(),
             },
         }
     }
@@ -593,6 +692,108 @@ mod test {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
 
         drop(tempfile);
+    }
+
+    #[test]
+    fn test_unknown_keys_survive_read_modify_write() {
+        // The struct is not the whole schema: the server reads the raw
+        // Towerfile, and users add sections the CLI doesn't know about. An
+        // MCP edit of one field must not delete any of that.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            python_version = "3.12"
+
+            [build]
+            python = "3.11"
+        "#;
+
+        let mut towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.extra["python_version"].as_str(), Some("3.12"));
+        assert_eq!(towerfile.extra["build"]["python"].as_str(), Some("3.11"));
+
+        towerfile.app.description = Some("edited".to_string());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+
+        assert_eq!(reparsed.app.description.as_deref(), Some("edited"));
+        assert_eq!(reparsed.app.extra["python_version"].as_str(), Some("3.12"));
+        assert_eq!(reparsed.extra["build"]["python"].as_str(), Some("3.11"));
+    }
+
+    #[test]
+    fn test_unknown_keys_are_flattened_not_nested() {
+        // A plain Towerfile must serialize exactly as before: no `extra` key
+        // or `[extra]` table may leak into the user's file.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert!(towerfile.extra.is_empty());
+        assert!(towerfile.app.extra.is_empty());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("extra"), "was: {}", serialized);
+    }
+
+    #[test]
+    fn test_unknown_datetime_values_survive_round_trip() {
+        // TOML datetimes take a special path through serde; make sure they
+        // don't get mangled when buffered through the flattened map.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+
+            [release]
+            date = 2024-06-01
+            at = 2024-06-01T12:30:00Z
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert!(towerfile.extra["release"]["date"].is_datetime());
+        assert!(towerfile.extra["release"]["at"].is_datetime());
+
+        // Assert on the written text, not the re-parsed value: toml's Value
+        // visitor recognises its own private marker key on the way back in, so
+        // a corrupted `date = { "$__toml_private_datetime" = ... }` would
+        // silently round-trip into a datetime again and hide the damage.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(
+            serialized.contains("date = 2024-06-01"),
+            "datetime was not written as a TOML literal:\n{}",
+            serialized
+        );
+        assert!(
+            !serialized.contains("$__toml_private_datetime"),
+            "private marker leaked into the file:\n{}",
+            serialized
+        );
+    }
+
+    #[test]
+    fn test_wrong_type_for_known_key_is_rejected() {
+        let toml = r#"
+            [app]
+            name = 123
+            script = "./script.py"
+        "#;
+
+        let err = crate::Towerfile::from_toml(toml).unwrap_err().to_string();
+        assert!(err.contains("app.name"), "was: {}", err);
+    }
+
+    #[test]
+    fn test_missing_app_section_is_rejected() {
+        let err = crate::Towerfile::from_toml("[build]\npython = \"3.11\"\n")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("[app]"), "was: {}", err);
     }
 
     #[test]
