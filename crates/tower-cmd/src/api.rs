@@ -290,6 +290,7 @@ pub async fn run_app(
             parent_run_id: None,
             initiator: None,
             retry_policy: None,
+            run_size: None,
         },
     };
 

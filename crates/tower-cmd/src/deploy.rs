@@ -297,6 +297,7 @@ mod tests {
             created_at: created_at.to_string(),
             parameters: vec![],
             towerfile: String::new(),
+            run_size: "basic.medium".to_string(),
             version: "v3".to_string(),
             idempotency_key: idempotency_key.map(|s| s.to_string()),
             content_checksum: None,
