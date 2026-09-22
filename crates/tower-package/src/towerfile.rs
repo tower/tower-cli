@@ -2,6 +2,12 @@ use crate::core::Error;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Compute sizes accepted by `[app] run_size`. Managed runners apply the size;
+/// self-hosted runners ignore it and use their own configured resources. When
+/// the Towerfile omits it, the server applies its own default, so this list
+/// deliberately has no default of its own.
+pub const RUN_SIZES: [&str; 4] = ["basic.xsmall", "basic.small", "basic.medium", "basic.large"];
+
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
     #[serde(default)]
@@ -39,6 +45,12 @@ pub struct App {
 
     #[serde(default)]
     pub import_paths: Vec<PathBuf>,
+
+    /// Compute size every run of this app gets, e.g. "basic.medium". `None`
+    /// means the Towerfile didn't set one (and the key is omitted when
+    /// serializing), leaving the server to apply its default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_size: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -66,6 +78,7 @@ impl Towerfile {
                 schedule: String::from("0 0 * * *"),
                 description: None,
                 import_paths: vec![],
+                run_size: None,
             },
         }
     }
@@ -74,20 +87,27 @@ impl Towerfile {
     /// the base_dir field always needs to be set after parsing.
     pub fn from_toml(toml: &str) -> Result<Self, Error> {
         let towerfile: Towerfile = toml::from_str(toml)?;
+        towerfile.validate()?;
+        Ok(towerfile)
+    }
 
-        if towerfile.app.name.is_empty() {
+    /// validate checks the semantic rules that TOML parsing alone can't enforce.
+    /// It runs both when a Towerfile is read and before one is written back, so a
+    /// mutation can't leave an invalid file on disk.
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.app.name.is_empty() {
             return Err(Error::MissingRequiredAppField {
                 field: "name".to_string(),
             });
         }
 
-        if towerfile.app.script.is_empty() {
+        if self.app.script.is_empty() {
             return Err(Error::MissingRequiredAppField {
                 field: "script".to_string(),
             });
         }
 
-        for import_path in &towerfile.app.import_paths {
+        for import_path in &self.app.import_paths {
             let as_str = import_path.to_string_lossy();
             if as_str.is_empty() {
                 return Err(Error::InvalidTowerfile {
@@ -106,7 +126,21 @@ impl Towerfile {
             }
         }
 
-        Ok(towerfile)
+        if let Some(run_size) = &self.app.run_size {
+            // The server rejects unknown sizes at deploy time. Catching it here
+            // means the user finds out before the upload rather than after.
+            if !RUN_SIZES.contains(&run_size.as_str()) {
+                return Err(Error::InvalidTowerfile {
+                    message: format!(
+                        "run_size {:?} is not a valid size (expected one of: {})",
+                        run_size,
+                        RUN_SIZES.join(", ")
+                    ),
+                });
+            }
+        }
+
+        Ok(())
     }
 
     /// set_parameter upserts a parameter by lookup name. If a parameter with the given name
@@ -160,6 +194,8 @@ impl Towerfile {
     /// save writes the Towerfile as TOML to the specified path, defaulting to current dir
     pub fn save(&self, path: Option<&std::path::Path>) -> Result<(), crate::error::Error> {
         use crate::error::Error as OuterError;
+
+        self.validate()?;
 
         let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
         let serialized =
@@ -434,6 +470,129 @@ mod test {
 
         let serialized = toml::to_string_pretty(&towerfile).unwrap();
         assert!(serialized.contains(r#"description = "My app""#));
+    }
+
+    #[test]
+    fn test_run_size_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.run_size, None);
+
+        // An unset run_size must not be written into the user's Towerfile, so
+        // the server keeps applying its own default.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("run_size"));
+    }
+
+    #[test]
+    fn test_run_size_accepts_every_known_size() {
+        for size in crate::RUN_SIZES {
+            let toml = format!(
+                r#"
+                [app]
+                name = "test"
+                script = "./script.py"
+                run_size = "{}"
+            "#,
+                size
+            );
+
+            let towerfile = crate::Towerfile::from_toml(&toml).unwrap();
+            assert_eq!(towerfile.app.run_size.as_deref(), Some(size));
+        }
+    }
+
+    #[test]
+    fn test_run_size_rejects_unknown_size() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            run_size = "basic.enormous"
+        "#;
+
+        let err = crate::Towerfile::from_toml(toml).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("basic.enormous"), "was: {}", message);
+        assert!(message.contains("basic.medium"), "was: {}", message);
+    }
+
+    #[test]
+    fn test_run_size_is_case_and_prefix_sensitive() {
+        // The size names are matched exactly; near misses must not slip through
+        // to the server.
+        for bad in ["medium", "basic.Medium", "BASIC.MEDIUM", " basic.medium"] {
+            let toml = format!(
+                r#"
+                [app]
+                name = "test"
+                script = "./script.py"
+                run_size = "{}"
+            "#,
+                bad
+            );
+
+            assert!(
+                crate::Towerfile::from_toml(&toml).is_err(),
+                "expected {:?} to be rejected",
+                bad
+            );
+        }
+    }
+
+    #[test]
+    fn test_run_size_survives_read_modify_write() {
+        // Regression: every MCP write round-trips the Towerfile through this
+        // struct, so a field that isn't modelled is silently dropped from the
+        // user's file. Editing an unrelated field must leave run_size intact.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            run_size = "basic.large"
+        "#;
+
+        let mut towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        towerfile.app.description = Some("edited".to_string());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+
+        assert_eq!(reparsed.app.run_size.as_deref(), Some("basic.large"));
+        assert_eq!(reparsed.app.description.as_deref(), Some("edited"));
+    }
+
+    #[test]
+    fn test_save_refuses_to_persist_an_invalid_run_size() {
+        // MCP edits mutate the struct and write it straight back, so save() has
+        // to hold the mutation to the same rules as a read. Otherwise a bad
+        // value lands on disk and the user only finds out on the next read.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            run_size = "basic.small"
+        "#;
+
+        let mut towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        towerfile.app.run_size = Some("basic.enormous".to_string());
+
+        let tempfile =
+            TestFile::new("Towerfile-save-invalid").expect("Failed to create temporary file");
+        let path = PathBuf::from("Towerfile-save-invalid");
+
+        let err = towerfile.save(Some(&path)).unwrap_err();
+        assert!(err.to_string().contains("basic.enormous"), "was: {}", err);
+
+        // The file must be untouched, not half-written.
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
+
+        drop(tempfile);
     }
 
     #[test]

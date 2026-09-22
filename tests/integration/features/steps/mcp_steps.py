@@ -249,6 +249,26 @@ async def step_call_mcp_tool_with_unique_app_name(context, tool_name, app_name):
     )
 
 
+@step('I call tower_file_update with run_size "{run_size}"')
+@async_run_until_complete
+async def step_update_run_size(context, run_size):
+    await call_mcp_tool(context, "tower_file_update", {"run_size": run_size})
+
+
+@step('I call tower_file_update with description "{description}"')
+@async_run_until_complete
+async def step_update_description(context, description):
+    await call_mcp_tool(context, "tower_file_update", {"description": description})
+
+
+@then('the Towerfile on disk should contain run_size "{run_size}"')
+def step_check_towerfile_run_size(context, run_size):
+    contents = Path("Towerfile").read_text()
+    assert (
+        f'run_size = "{run_size}"' in contents
+    ), f"Towerfile should keep run_size {run_size!r}, got: {contents}"
+
+
 @step("I should receive a response")
 def step_check_response_exists(context):
     assert hasattr(context, "mcp_response") and context.mcp_response is not None
