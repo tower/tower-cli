@@ -65,6 +65,27 @@ def step_run_cli_command(context, command):
     return run_command_with_env(context, command, test_env)
 
 
+@given("I have a Towerfile that is missing its script")
+def step_create_towerfile_missing_script(context):
+    # Deliberately invalid: `script` is required. Used to check that commands
+    # fail loudly rather than printing an error and exiting 0.
+    Path("Towerfile").write_text('[app]\nname = "broken-app"\n')
+
+
+@then("the command should exit with a non-zero status")
+def step_check_nonzero_exit(context):
+    assert (
+        context.cli_return_code != 0
+    ), f"Expected a non-zero exit, got {context.cli_return_code}. Output: {context.cli_output}"
+
+
+@then("the command should exit with status 0")
+def step_check_zero_exit(context):
+    assert (
+        context.cli_return_code == 0
+    ), f"Expected exit 0, got {context.cli_return_code}. Output: {context.cli_output}"
+
+
 @step('I run "{command}" via CLI with API key')
 def step_run_cli_command_with_api_key(context, command):
     """Run a Tower CLI command authenticating via TOWER_API_KEY instead of session.json"""

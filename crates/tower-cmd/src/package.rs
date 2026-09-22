@@ -58,17 +58,20 @@ pub async fn do_package(out: &crate::output::Out, _config: Config, args: &ArgMat
                         }
                         Err(err) => {
                             out.error(&format!("Failed to save package: {}", err));
+                            std::process::exit(1);
                         }
                     }
                 }
                 Err(err) => {
                     spinner.failure(out);
                     out.package_error(err);
+                    std::process::exit(1);
                 }
             }
         }
         Err(err) => {
             out.package_error(err);
+            std::process::exit(1);
         }
     }
 }
