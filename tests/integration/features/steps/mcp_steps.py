@@ -249,6 +249,12 @@ async def step_call_mcp_tool_with_unique_app_name(context, tool_name, app_name):
     )
 
 
+@step('I call tower_run_remote with run_size "{run_size}"')
+@async_run_until_complete
+async def step_run_remote_with_run_size(context, run_size):
+    await call_mcp_tool(context, "tower_run_remote", {"run_size": run_size})
+
+
 @step('I call tower_file_update with run_size "{run_size}"')
 @async_run_until_complete
 async def step_update_run_size(context, run_size):

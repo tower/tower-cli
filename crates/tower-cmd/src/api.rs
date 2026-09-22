@@ -278,6 +278,7 @@ pub async fn run_app(
     name: &str,
     env: &str,
     params: HashMap<String, String>,
+    run_size: Option<tower_api::models::run_app_params::RunSize>,
 ) -> Result<tower_api::models::RunAppResponse, Error<tower_api::apis::default_api::RunAppError>> {
     let api_config = &config.into();
 
@@ -290,7 +291,7 @@ pub async fn run_app(
             parent_run_id: None,
             initiator: None,
             retry_policy: None,
-            run_size: None,
+            run_size,
         },
     };
 

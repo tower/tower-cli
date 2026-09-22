@@ -164,6 +164,9 @@ struct RunRequest {
     parameters: Option<std::collections::HashMap<String, String>>,
     /// The environment to run the app in (defaults to "default")
     environment: Option<String>,
+    /// Compute size for this run on managed runners: one of basic.xsmall,
+    /// basic.small, basic.medium, basic.large. Overrides the Towerfile's run_size.
+    run_size: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -972,6 +975,11 @@ impl TowerService {
         let path = working_dir;
         let env = request.environment.unwrap_or_else(|| "default".to_string());
         let params = request.parameters.unwrap_or_default();
+        let run_size = match request.run_size.as_deref().map(run::parse_run_size) {
+            Some(Ok(size)) => Some(size),
+            Some(Err(message)) => return Self::error_result("Invalid run_size", message),
+            None => None,
+        };
 
         // Load Towerfile to get app name
         let towerfile = match Towerfile::from_dir_str(path.to_str().unwrap()) {
@@ -983,7 +991,7 @@ impl TowerService {
 
         let (result, output) = self
             .execute_with_streaming(&ctx, |out| {
-                run::do_run_remote(out, config, path, &env, params, None, true)
+                run::do_run_remote(out, config, path, &env, params, run_size, None, true)
             })
             .await;
         match result {

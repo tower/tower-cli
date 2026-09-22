@@ -563,6 +563,41 @@ def _last_deploy(context):
     return deploys[-1]
 
 
+def _last_run(context):
+    resp = requests.get(f"{context.tower_url}/test/run-log", timeout=10)
+    resp.raise_for_status()
+    runs = resp.json().get("runs", [])
+    # Same trick as _last_deploy: app names are unique per scenario, so filter
+    # to ours and the assertion can't see another scenario's run.
+    if hasattr(context, "app_name"):
+        runs = [r for r in runs if r.get("name") == context.app_name]
+    assert runs, "Expected at least one run to have been recorded by the mock server"
+    return runs[-1]
+
+
+@given("the run log is reset")
+def step_reset_run_log(context):
+    """Clear the mock server's record of received run requests."""
+    resp = requests.post(f"{context.tower_url}/test/reset-run-log", timeout=10)
+    resp.raise_for_status()
+
+
+@then('the last run should have been sent with run size "{size}"')
+def step_check_last_run_size(context, size):
+    last = _last_run(context)
+    assert (
+        last.get("run_size") == size
+    ), f"Expected run_size {size!r} on the wire, got {last.get('run_size')!r}"
+
+
+@then("the last run should have been sent without a run size")
+def step_check_last_run_no_size(context):
+    last = _last_run(context)
+    assert (
+        last.get("run_size") is None
+    ), f"Expected no run_size on the wire, got {last.get('run_size')!r}"
+
+
 @given("the deploy log is reset")
 def step_reset_deploy_log(context):
     """Clear the mock server's record of received deploys/idempotency keys."""

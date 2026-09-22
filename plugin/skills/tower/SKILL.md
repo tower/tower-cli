@@ -426,6 +426,7 @@ Run your code in Tower or locally
 - `--local` — Run this app locally
 - `-e`, `--environment` — The environment to invoke the app in
 - `-p`, `--parameter` — Parameters (key=value) to pass to the app
+- `--run-size` — Compute size for this run on managed runners; overrides the Towerfile's run_size
 - `-d`, `--detached` — Don't follow the run output in your CLI
 
 ### `tower version`

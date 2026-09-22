@@ -53,6 +53,7 @@ mock_deployed_apps = set()  # Track which apps have been deployed
 # mock_deploy_log records the idempotency key seen on every deploy (None when the
 # header was absent) so tests can assert exactly what the CLI sent.
 mock_deploy_log = []  # list of {"name": str, "idempotency_key": Optional[str]}
+mock_run_log = []  # list of {"name": str, "run_size": Optional[str]}
 # mock_idempotent_versions maps (app_name, key) -> a stored version dict that is
 # returned verbatim on a repeat deploy with the same key.
 mock_idempotent_versions = {}
@@ -245,6 +246,7 @@ async def deploy_app(name: str, request: Request, response: Response):
         "parameters": [],
         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "towerfile": "mock_towerfile_content",
+        "run_size": "basic.medium",
         "idempotency_key": idempotency_key,
         "content_checksum": "mock-content-checksum",
     }
@@ -276,6 +278,19 @@ async def reset_deploy_log():
     """Test-only: clear deploy bookkeeping so each scenario starts clean."""
     mock_deploy_log.clear()
     mock_idempotent_versions.clear()
+    return {"ok": True}
+
+
+@app.get("/test/run-log")
+async def get_run_log():
+    """Test-only: return the run_size seen on every run request so far."""
+    return {"runs": mock_run_log}
+
+
+@app.post("/test/reset-run-log")
+async def reset_run_log():
+    """Test-only: clear the run log so each scenario starts clean."""
+    mock_run_log.clear()
     return {"ok": True}
 
 
@@ -313,6 +328,8 @@ async def run_app(name: str, run_params: Dict[str, Any]):
                 ],
             },
         )
+
+    mock_run_log.append({"name": name, "run_size": run_params.get("run_size")})
 
     run_id = generate_id()
     new_run = {

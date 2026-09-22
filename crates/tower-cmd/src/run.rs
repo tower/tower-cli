@@ -18,6 +18,8 @@ use tokio::sync::{
     Mutex,
 };
 use tokio::time::{sleep, timeout, Duration};
+use tower_api::models::run_app_params::RunSize;
+use tower_package::RUN_SIZES;
 use tower_runtime::execution::ExecutionHandle;
 use tower_runtime::execution::{
     CacheBackend, CacheConfig, CacheIsolation, ExecutionBackend, ExecutionSpec, ResourceLimits,
@@ -66,6 +68,14 @@ pub fn run_cmd() -> Command {
                 .long("parameter")
                 .help("Parameters (key=value) to pass to the app")
                 .action(clap::ArgAction::Append),
+        )
+        .arg(
+            Arg::new("run_size")
+                .long("run-size")
+                .value_name("SIZE")
+                .help("Compute size for this run on managed runners; overrides the Towerfile's run_size")
+                .value_parser(clap::builder::PossibleValuesParser::new(RUN_SIZES))
+                .conflicts_with("local"),
         )
         .arg(
             Arg::new("detached")
@@ -121,6 +131,16 @@ pub async fn do_run_inner(
     // default value.
     let env = args.get_one::<String>("environment").unwrap();
 
+    // clap has already limited this to RUN_SIZES, so the parse only fails if the
+    // two lists drift — and then failing loudly is the right thing.
+    let run_size = match args.get_one::<String>("run_size") {
+        Some(value) => match parse_run_size(value) {
+            Ok(size) => Some(size),
+            Err(message) => out.die(&message),
+        },
+        None => None,
+    };
+
     match res {
         Ok((local, path, params, app_name)) => {
             debug!(
@@ -138,7 +158,17 @@ pub async fn do_run_inner(
                 }
             } else {
                 let follow = should_follow_run(args);
-                do_run_remote(out.clone(), config, path, env, params, app_name, follow).await
+                do_run_remote(
+                    out.clone(),
+                    config,
+                    path,
+                    env,
+                    params,
+                    run_size,
+                    app_name,
+                    follow,
+                )
+                .await
             }
         }
         Err(err) => Err(err.into()),
@@ -362,6 +392,23 @@ pub async fn do_run_local(
     .await
 }
 
+/// parse_run_size maps a size name from the CLI or MCP onto the API's enum. The
+/// generated `RunSize` has no `Deserialize`, so the mapping is spelled out here;
+/// a test pins it to `tower_package::RUN_SIZES` so the two lists can't drift.
+pub fn parse_run_size(value: &str) -> Result<RunSize, String> {
+    match value {
+        "basic.xsmall" => Ok(RunSize::BasicXsmall),
+        "basic.small" => Ok(RunSize::BasicSmall),
+        "basic.medium" => Ok(RunSize::BasicMedium),
+        "basic.large" => Ok(RunSize::BasicLarge),
+        other => Err(format!(
+            "run_size {:?} is not a valid size (expected one of: {})",
+            other,
+            RUN_SIZES.join(", ")
+        )),
+    }
+}
+
 /// do_run_remote is the entrypoint for running an app remotely. It uses the Towerfile in the
 /// supplied directory (locally or remotely) to sort out what application to run exactly.
 pub async fn do_run_remote(
@@ -370,6 +417,7 @@ pub async fn do_run_remote(
     path: PathBuf,
     env: &str,
     params: HashMap<String, String>,
+    run_size: Option<RunSize>,
     app_name: Option<String>,
     should_follow_run: bool,
 ) -> Result<(), Error> {
@@ -385,7 +433,7 @@ pub async fn do_run_remote(
     let res = out
         .try_with_spinner(
             "Scheduling run",
-            api::run_app(&config, &app_slug, env, params),
+            api::run_app(&config, &app_slug, env, params, run_size),
         )
         .await
         .map_err(|source| Error::ApiRunError { source })?;
@@ -948,5 +996,45 @@ mod tests {
         );
         let params: Vec<&String> = m.get_many::<String>("parameters").unwrap().collect();
         assert_eq!(params, vec!["key=val"]);
+    }
+}
+
+#[cfg(test)]
+mod run_size_tests {
+    use super::*;
+
+    #[test]
+    fn every_known_size_maps_onto_the_api_enum_with_the_same_wire_name() {
+        // Ties the Towerfile-side list to the generated enum's serde names, so
+        // adding a size to one without the other fails here.
+        for size in RUN_SIZES {
+            let parsed = parse_run_size(size).unwrap_or_else(|e| panic!("{}", e));
+            assert_eq!(
+                serde_json::to_value(parsed).unwrap(),
+                serde_json::json!(size)
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_size_is_rejected_with_the_valid_list() {
+        let err = parse_run_size("basic.enormous").unwrap_err();
+        assert!(err.contains("basic.enormous"), "was: {}", err);
+        assert!(err.contains("basic.medium"), "was: {}", err);
+    }
+
+    #[test]
+    fn run_size_flag_is_validated_by_clap() {
+        let ok = run_cmd().try_get_matches_from(["run", "--run-size", "basic.large"]);
+        assert!(ok.is_ok(), "{:?}", ok.err());
+
+        let bad = run_cmd().try_get_matches_from(["run", "--run-size", "basic.Large"]);
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn run_size_flag_conflicts_with_local() {
+        let res = run_cmd().try_get_matches_from(["run", "--local", "--run-size", "basic.small"]);
+        assert!(res.is_err());
     }
 }
