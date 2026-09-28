@@ -605,3 +605,44 @@ where
         .expect("Failed to read string from stream");
     content
 }
+
+#[tokio::test]
+async fn it_ships_run_size_in_the_packaged_towerfile() {
+    // The server reads run_size out of the Towerfile stored on the app version,
+    // not out of the MANIFEST, so the raw file has to survive packaging verbatim.
+    let tmp_dir = TmpDir::new("example")
+        .await
+        .expect("Failed to create temp dir");
+
+    let towerfile = "[app]\nname = \"test\"\nscript = \"main.py\"\nrun_size = \"basic.large\"\n";
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", towerfile).await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    let spec = PackageSpec {
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec!["*.py".to_string()],
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    let packaged = files
+        .get("Towerfile")
+        .expect("package was missing the Towerfile entry");
+    assert!(
+        packaged.contains(r#"run_size = "basic.large""#),
+        "packaged Towerfile lost run_size: {:?}",
+        packaged
+    );
+
+    // run_size deliberately stays out of the MANIFEST: the runner doesn't act on
+    // it, and a second copy could disagree with the Towerfile above.
+    let manifest = files.get("MANIFEST").expect("package was missing MANIFEST");
+    assert!(
+        !manifest.contains("run_size"),
+        "MANIFEST should not carry run_size: {:?}",
+        manifest
+    );
+}
