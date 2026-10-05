@@ -20,10 +20,9 @@ use crate::core::{
 use crate::error::Error;
 use crate::towerfile::Towerfile;
 
-// PackageSpec describes how to build a package. Everything core needs (invoke, parameters,
-// import_paths as manifest entries) is derived from the Towerfile on disk, so this struct only
-// carries what the file resolver needs: where the Towerfile lives, what's considered the project
-// root, which globs match app files, and which import paths to walk.
+// PackageSpec describes how to build a package. Manifest fields are derived from the Towerfile
+// on disk, so this struct only carries what the file resolver needs: where the Towerfile lives,
+// what's considered the project root, which globs match app files, and which import paths to walk.
 #[derive(Debug)]
 pub struct PackageSpec {
     pub towerfile_path: PathBuf,
@@ -85,6 +84,7 @@ impl Package {
                 invoke: "".to_string(),
                 parameters: vec![],
                 schedule: None,
+                run_size: None,
                 import_paths: vec![],
                 app_dir_name: "app".to_string(),
                 modules_dir_name: "modules".to_string(),
@@ -573,6 +573,7 @@ mod test {
             invoke: invoke.to_string(),
             parameters: vec![],
             schedule: None,
+            run_size: None,
             import_paths: vec![],
             app_dir_name: "app".to_string(),
             modules_dir_name: "modules".to_string(),
