@@ -57,6 +57,11 @@ async fn it_creates_package() {
         "files {:?} was missing MANIFEST",
         files
     );
+
+    let manifest = &files["MANIFEST"];
+    let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
+    assert!(json.get("run_size").is_none());
+    assert_eq!(Manifest::from_json(manifest).unwrap().run_size, None);
 }
 
 #[tokio::test]
@@ -607,9 +612,8 @@ where
 }
 
 #[tokio::test]
-async fn it_ships_run_size_in_the_packaged_towerfile() {
-    // The server reads run_size out of the Towerfile stored on the app version,
-    // not out of the MANIFEST, so the raw file has to survive packaging verbatim.
+async fn it_preserves_run_size_in_the_manifest_and_towerfile() {
+    // The deploy handler reads run_size from MANIFEST when creating the app version.
     let tmp_dir = TmpDir::new("example")
         .await
         .expect("Failed to create temp dir");
@@ -631,18 +635,13 @@ async fn it_ships_run_size_in_the_packaged_towerfile() {
     let packaged = files
         .get("Towerfile")
         .expect("package was missing the Towerfile entry");
-    assert!(
-        packaged.contains(r#"run_size = "basic.large""#),
-        "packaged Towerfile lost run_size: {:?}",
-        packaged
-    );
+    assert_eq!(packaged, towerfile);
 
-    // run_size deliberately stays out of the MANIFEST: the runner doesn't act on
-    // it, and a second copy could disagree with the Towerfile above.
     let manifest = files.get("MANIFEST").expect("package was missing MANIFEST");
-    assert!(
-        !manifest.contains("run_size"),
-        "MANIFEST should not carry run_size: {:?}",
-        manifest
+    let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
+    assert_eq!(json["run_size"], "basic.large");
+    assert_eq!(
+        Manifest::from_json(manifest).unwrap().run_size.as_deref(),
+        Some("basic.large")
     );
 }
