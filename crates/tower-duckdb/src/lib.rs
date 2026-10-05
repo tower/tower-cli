@@ -1188,12 +1188,15 @@ mod tests {
         false
     }
 
-    /// MinIO pinned to an immutable release tag rather than `latest`.
+    /// Coollabs builds official MinIO sources; upstream's prebuilt images are unavailable.
+    /// https://github.com/coollabsio/minio
     ///
-    /// A floating tag lets a new upstream image change this test's behaviour, or
-    /// break it into a skip, without anyone choosing that. A security regression
-    /// test should only change when someone means it. Bump deliberately and re-run.
-    const MINIO_IMAGE_TAG: &str = "RELEASE.2025-09-07T16-13-09Z";
+    /// Pin the multi-platform image digest so a rebuilt tag cannot change this security test.
+    /// Bump deliberately and re-run the object-store test on Linux.
+    const MINIO_IMAGE_TAG: &str = concat!(
+        "RELEASE.2025-10-15T17-29-55Z@",
+        "sha256:69b55a1c1c5dc285ce04db96689f5b2102317fc77a50680a1874ca6efd1c87f9"
+    );
 
     /// Whether a container runtime that can run this image is reachable.
     ///
@@ -1241,7 +1244,7 @@ mod tests {
         }
 
         let bucket = "warehouse";
-        let image = GenericImage::new("quay.io/minio/minio", MINIO_IMAGE_TAG)
+        let image = GenericImage::new("ghcr.io/coollabsio/minio", MINIO_IMAGE_TAG)
             .with_wait_for(WaitFor::seconds(1))
             .with_exposed_port(9000.tcp())
             .with_entrypoint("sh")
