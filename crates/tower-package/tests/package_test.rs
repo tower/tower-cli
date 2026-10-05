@@ -57,6 +57,11 @@ async fn it_creates_package() {
         "files {:?} was missing MANIFEST",
         files
     );
+
+    let manifest = &files["MANIFEST"];
+    let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
+    assert!(json.get("run_size").is_none());
+    assert_eq!(Manifest::from_json(manifest).unwrap().run_size, None);
 }
 
 #[tokio::test]
@@ -604,4 +609,39 @@ where
         .await
         .expect("Failed to read string from stream");
     content
+}
+
+#[tokio::test]
+async fn it_preserves_run_size_in_the_manifest_and_towerfile() {
+    // The deploy handler reads run_size from MANIFEST when creating the app version.
+    let tmp_dir = TmpDir::new("example")
+        .await
+        .expect("Failed to create temp dir");
+
+    let towerfile = "[app]\nname = \"test\"\nscript = \"main.py\"\nrun_size = \"basic.large\"\n";
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", towerfile).await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    let spec = PackageSpec {
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec!["*.py".to_string()],
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    let packaged = files
+        .get("Towerfile")
+        .expect("package was missing the Towerfile entry");
+    assert_eq!(packaged, towerfile);
+
+    let manifest = files.get("MANIFEST").expect("package was missing MANIFEST");
+    let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
+    assert_eq!(json["run_size"], "basic.large");
+    assert_eq!(
+        Manifest::from_json(manifest).unwrap().run_size.as_deref(),
+        Some("basic.large")
+    );
 }

@@ -34,6 +34,24 @@ Feature: MCP App Management
     When I call tower_file_read via MCP
     Then I should receive the parsed Towerfile configuration
 
+  Scenario: Set the app's compute size through the Towerfile
+    Given I have a valid Towerfile in the current directory
+    When I call tower_file_update with run_size "basic.large"
+    Then I should receive a success response
+    And the Towerfile on disk should contain run_size "basic.large"
+
+  Scenario: Reject an invalid compute size
+    Given I have a valid Towerfile in the current directory
+    When I call tower_file_update with run_size "basic.enormous"
+    Then I should receive an error response
+    And the Towerfile on disk should contain run_size "basic.small"
+
+  Scenario: Editing an unrelated field preserves the compute size
+    Given I have a valid Towerfile in the current directory
+    When I call tower_file_update with description "an edited description"
+    Then I should receive a success response
+    And the Towerfile on disk should contain run_size "basic.small"
+
   Scenario: Run simple application successfully locally
     Given I have a simple hello world application
     When I call tower_run_local via MCP
