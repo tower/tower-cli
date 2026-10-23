@@ -62,6 +62,8 @@ async fn it_creates_package() {
     let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
     assert!(json.get("run_size").is_none());
     assert_eq!(Manifest::from_json(manifest).unwrap().run_size, None);
+    assert!(json.get("max_concurrent_runs").is_none());
+    assert!(json.get("concurrency_policy").is_none());
 }
 
 #[tokio::test]
@@ -644,4 +646,36 @@ async fn it_preserves_run_size_in_the_manifest_and_towerfile() {
         Manifest::from_json(manifest).unwrap().run_size.as_deref(),
         Some("basic.large")
     );
+}
+
+#[tokio::test]
+async fn it_copies_concurrency_settings_into_the_manifest() {
+    // The deploy handler reads the concurrency settings from MANIFEST when
+    // creating the app version.
+    let tmp_dir = TmpDir::new("example")
+        .await
+        .expect("Failed to create temp dir");
+
+    let towerfile = "[app]\nname = \"test\"\nscript = \"main.py\"\nmax_concurrent_runs = 1\nconcurrency_policy = \"cancel\"\n";
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", towerfile).await;
+    create_test_file(tmp_dir.to_path_buf(), "main.py", "print('Hello, world!')").await;
+
+    let spec = PackageSpec {
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec!["*.py".to_string()],
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    let manifest = files.get("MANIFEST").expect("package was missing MANIFEST");
+    let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
+    assert_eq!(json["max_concurrent_runs"], 1);
+    assert_eq!(json["concurrency_policy"], "cancel");
+
+    let parsed = Manifest::from_json(manifest).unwrap();
+    assert_eq!(parsed.max_concurrent_runs, Some(1));
+    assert_eq!(parsed.concurrency_policy.as_deref(), Some("cancel"));
 }

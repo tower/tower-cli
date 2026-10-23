@@ -8,6 +8,11 @@ use std::path::PathBuf;
 /// deliberately has no default of its own.
 pub const RUN_SIZES: [&str; 4] = ["basic.xsmall", "basic.small", "basic.medium", "basic.large"];
 
+/// Policies accepted by `[app] concurrency_policy`: what happens to a run that
+/// is ready to start while the app is at `max_concurrent_runs` in its
+/// environment. When the Towerfile omits it, the server queues the run.
+pub const CONCURRENCY_POLICIES: [&str; 2] = ["queue", "cancel"];
+
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
     #[serde(default)]
@@ -51,6 +56,19 @@ pub struct App {
     /// serializing), leaving the server to apply its default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_size: Option<String>,
+
+    /// Maximum number of runs of this app that can run at once in an
+    /// environment; 0 means no limit. `None` means the Towerfile didn't set one
+    /// (and the key is omitted when serializing), leaving the app's limit in
+    /// place.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_concurrent_runs: Option<u32>,
+
+    /// What happens to a run that reaches `max_concurrent_runs`: "queue" or
+    /// "cancel". `None` means the Towerfile didn't set one, leaving the server
+    /// to queue.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub concurrency_policy: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -79,6 +97,8 @@ impl Towerfile {
                 description: None,
                 import_paths: vec![],
                 run_size: None,
+                max_concurrent_runs: None,
+                concurrency_policy: None,
             },
         }
     }
@@ -135,6 +155,20 @@ impl Towerfile {
                         "run_size {:?} is not a valid size (expected one of: {})",
                         run_size,
                         RUN_SIZES.join(", ")
+                    ),
+                });
+            }
+        }
+
+        if let Some(policy) = &self.app.concurrency_policy {
+            // Same reasoning as run_size: the server rejects unknown policies at
+            // deploy time, but the user should find out before the upload.
+            if !CONCURRENCY_POLICIES.contains(&policy.as_str()) {
+                return Err(Error::InvalidTowerfile {
+                    message: format!(
+                        "concurrency_policy {:?} is not a valid policy (expected one of: {})",
+                        policy,
+                        CONCURRENCY_POLICIES.join(", ")
                     ),
                 });
             }
@@ -593,6 +627,94 @@ mod test {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
 
         drop(tempfile);
+    }
+
+    #[test]
+    fn test_concurrency_settings_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.max_concurrent_runs, None);
+        assert_eq!(towerfile.app.concurrency_policy, None);
+
+        // Unset settings must not be written into the user's Towerfile, so the
+        // app's own limit keeps applying.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("max_concurrent_runs"));
+        assert!(!serialized.contains("concurrency_policy"));
+    }
+
+    #[test]
+    fn test_concurrency_settings_accept_every_known_policy() {
+        for policy in crate::CONCURRENCY_POLICIES {
+            let toml = format!(
+                r#"
+                [app]
+                name = "test"
+                script = "./script.py"
+                max_concurrent_runs = 0
+                concurrency_policy = "{}"
+            "#,
+                policy
+            );
+
+            let towerfile = crate::Towerfile::from_toml(&toml).unwrap();
+            assert_eq!(towerfile.app.max_concurrent_runs, Some(0));
+            assert_eq!(towerfile.app.concurrency_policy.as_deref(), Some(policy));
+        }
+    }
+
+    #[test]
+    fn test_concurrency_settings_reject_invalid_values() {
+        for (key, value) in [
+            ("concurrency_policy", r#""replace""#),
+            ("concurrency_policy", r#""Cancel""#),
+            ("max_concurrent_runs", "-1"),
+            ("max_concurrent_runs", r#""2""#),
+        ] {
+            let toml = format!(
+                r#"
+                [app]
+                name = "test"
+                script = "./script.py"
+                {} = {}
+            "#,
+                key, value
+            );
+
+            assert!(
+                crate::Towerfile::from_toml(&toml).is_err(),
+                "expected {} = {} to be rejected",
+                key,
+                value
+            );
+        }
+    }
+
+    #[test]
+    fn test_concurrency_settings_survive_read_modify_write() {
+        // Same regression as run_size: MCP writes round-trip the struct, so an
+        // unmodelled field would be dropped from the user's file.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            max_concurrent_runs = 1
+            concurrency_policy = "cancel"
+        "#;
+
+        let mut towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        towerfile.app.description = Some("edited".to_string());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+
+        assert_eq!(reparsed.app.max_concurrent_runs, Some(1));
+        assert_eq!(reparsed.app.concurrency_policy.as_deref(), Some("cancel"));
     }
 
     #[test]

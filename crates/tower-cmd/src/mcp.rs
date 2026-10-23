@@ -83,6 +83,12 @@ struct UpdateTowerfileRequest {
     /// Compute size for each run: one of basic.xsmall, basic.small,
     /// basic.medium, basic.large. Omit to let Tower apply its default.
     run_size: Option<String>,
+    /// Maximum number of runs that can run at once in an environment; 0 means
+    /// no limit. Omit to keep the app's limit.
+    max_concurrent_runs: Option<u32>,
+    /// What happens to a run that reaches max_concurrent_runs: queue (wait for
+    /// a free slot, the default) or cancel (skip the run).
+    concurrency_policy: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1023,7 +1029,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Update Towerfile config (app name, script, description, source, run_size). Use this instead of editing TOML. Optional: working_directory."
+        description = "Update Towerfile config (app name, script, description, source, run_size, max_concurrent_runs, concurrency_policy). Use this instead of editing TOML. Optional: working_directory."
     )]
     async fn tower_file_update(
         &self,
@@ -1044,6 +1050,12 @@ impl TowerService {
             }
             if let Some(run_size) = request.run_size {
                 tf.app.run_size = Some(run_size);
+            }
+            if let Some(max_concurrent_runs) = request.max_concurrent_runs {
+                tf.app.max_concurrent_runs = Some(max_concurrent_runs);
+            }
+            if let Some(concurrency_policy) = request.concurrency_policy {
+                tf.app.concurrency_policy = Some(concurrency_policy);
             }
             Ok("Towerfile updated".into())
         })

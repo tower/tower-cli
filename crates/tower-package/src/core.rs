@@ -77,6 +77,12 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_size: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_concurrent_runs: Option<u32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub concurrency_policy: Option<String>,
+
     #[serde(default)]
     pub import_paths: Vec<String>,
 
@@ -111,7 +117,8 @@ pub struct PackageInputs {
     // module_files have archive_name already rooted under "modules/".
     pub module_files: Vec<Entry>,
 
-    // towerfile_bytes is the sole source of invoke, parameters, run_size, and import_paths.
+    // towerfile_bytes is the sole source of invoke, parameters, run_size, the concurrency
+    // settings, and import_paths.
     pub towerfile_bytes: Vec<u8>,
 }
 
@@ -158,6 +165,8 @@ pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
         parameters: towerfile.parameters,
         schedule: None,
         run_size: towerfile.app.run_size,
+        max_concurrent_runs: towerfile.app.max_concurrent_runs,
+        concurrency_policy: towerfile.app.concurrency_policy,
         import_paths,
         app_dir_name: "app".to_string(),
         modules_dir_name: "modules".to_string(),
