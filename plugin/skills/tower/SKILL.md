@@ -92,7 +92,7 @@ Always use `tower_file_update` or `tower_file_add/edit/remove_parameter` to modi
 
 To give an app more compute, set `run_size` via `tower_file_update`: one of `basic.xsmall`, `basic.small`, `basic.medium` (the default), `basic.large`. It is versioned with the code, and self-hosted runners ignore it.
 
-To limit how many runs of an app run at once in an environment, set `max_concurrent_runs` via `tower_file_update` (`0` means no limit). `concurrency_policy` decides what happens to a run that finds the limit reached: `queue` (the default) waits for a free slot, `cancel` skips the run. Both are versioned with the code.
+To limit how many runs of an app run at once in an environment, set `max_concurrent_runs` via `tower_file_update` (`0` means no limit). `concurrency_policy` decides what happens to a run that finds the limit reached: `cancel` (the default) records it as a cancelled run, `skip` drops it without a record (a manual run is refused with 409), `queue` waits for a free slot. Both are versioned with the code.
 
 ### 2. Local development (preferred)
 

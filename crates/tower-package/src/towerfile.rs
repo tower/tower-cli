@@ -10,8 +10,8 @@ pub const RUN_SIZES: [&str; 4] = ["basic.xsmall", "basic.small", "basic.medium",
 
 /// Policies accepted by `[app] concurrency_policy`: what happens to a run that
 /// is ready to start while the app is at `max_concurrent_runs` in its
-/// environment. When the Towerfile omits it, the server queues the run.
-pub const CONCURRENCY_POLICIES: [&str; 2] = ["queue", "cancel"];
+/// environment. When the Towerfile omits it, the server cancels the run.
+pub const CONCURRENCY_POLICIES: [&str; 3] = ["cancel", "skip", "queue"];
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
@@ -64,9 +64,9 @@ pub struct App {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_concurrent_runs: Option<u32>,
 
-    /// What happens to a run that reaches `max_concurrent_runs`: "queue" or
-    /// "cancel". `None` means the Towerfile didn't set one, leaving the server
-    /// to queue.
+    /// What happens to a run that reaches `max_concurrent_runs`: "cancel",
+    /// "skip" or "queue". `None` means the Towerfile didn't set one, leaving
+    /// the server to cancel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub concurrency_policy: Option<String>,
 }

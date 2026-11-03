@@ -86,8 +86,9 @@ struct UpdateTowerfileRequest {
     /// Maximum number of runs that can run at once in an environment; 0 means
     /// no limit. Omit to keep the app's limit.
     max_concurrent_runs: Option<u32>,
-    /// What happens to a run that reaches max_concurrent_runs: queue (wait for
-    /// a free slot, the default) or cancel (skip the run).
+    /// What happens to a run that reaches max_concurrent_runs: cancel (the
+    /// default; recorded as a cancelled run), skip (dropped without a record)
+    /// or queue (waits for a free slot).
     concurrency_policy: Option<String>,
 }
 
