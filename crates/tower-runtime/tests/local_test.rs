@@ -431,3 +431,132 @@ async fn test_running_app_with_multiple_import_paths() {
         status
     );
 }
+
+// Regression test: the runtime looked for shell scripts at the package root while the packager
+// puts them under app/, so packaged .sh apps failed to load. Their output was also never read,
+// which lost it and blocked any script that filled the pipe buffer. Unix-only: the runtime looks
+// for bash on PATH as `bash`, never `bash.exe`.
+#[cfg(unix)]
+#[tokio::test]
+async fn test_running_bash_script() {
+    debug!("Running 07-bash-script");
+
+    // Protected mode must keep this out of the script's environment.
+    std::env::set_var("BASH_TEST_PARENT_VARIABLE", "should not reach the script");
+
+    let dir = get_example_app_dir("07-bash-script");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let mut parameters = HashMap::new();
+    parameters.insert("GREETING".to_string(), "hello from a parameter".to_string());
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters,
+        env_vars: HashMap::new(),
+        // No cache dir means protected mode.
+        cache_dir: None,
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    let mut outputs = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        assert!(
+            matches!(output.channel, tower_runtime::Channel::Program),
+            "bash output should be on the program channel: {:?}",
+            output.line
+        );
+        outputs.push(output.line);
+    }
+
+    assert!(
+        outputs.contains(&"The greeting is: hello from a parameter".to_string()),
+        "expected the parameter in the output; got {:?}",
+        &outputs[..outputs.len().min(5)]
+    );
+    assert!(
+        outputs.contains(&"The parent variable is: unset".to_string()),
+        "protected mode should not pass the host environment through"
+    );
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|line| line.starts_with("filler "))
+            .count(),
+        2000
+    );
+
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Exited,
+        "App should have exited cleanly, got {:?}",
+        status
+    );
+}
+
+// Cancelling a bash app must stop the processes it started, not only bash itself.
+#[cfg(unix)]
+#[tokio::test]
+async fn test_terminating_bash_script_stops_its_children() {
+    use nix::{sys::signal::kill, unistd::Pid};
+
+    let dir = get_example_app_dir("07-bash-script");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let mut parameters = HashMap::new();
+    parameters.insert("MODE".to_string(), "sleep".to_string());
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters,
+        env_vars: HashMap::new(),
+        cache_dir: None,
+    };
+
+    let mut app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    let child_pid = loop {
+        let output = receiver
+            .recv()
+            .await
+            .expect("script exited before reporting its child");
+        if let Some(pid) = output.line.strip_prefix("child pid: ") {
+            break Pid::from_raw(pid.trim().parse().expect("child pid should be a number"));
+        }
+    };
+
+    app.terminate().await.expect("Failed to terminate app");
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Cancelled,
+        "App should be cancelled, got {:?}",
+        status
+    );
+
+    // The orphaned child is reaped by init shortly after it dies.
+    let mut alive = true;
+    for _ in 0..50 {
+        if kill(child_pid, None).is_err() {
+            alive = false;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    if alive {
+        let _ = kill(child_pid, nix::sys::signal::Signal::SIGKILL);
+    }
+    assert!(!alive, "the script's child should have been stopped");
+}

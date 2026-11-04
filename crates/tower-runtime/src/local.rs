@@ -29,7 +29,7 @@ use nix::{
 
 use tokio_util::sync::CancellationToken;
 
-use tower_package::{Manifest, Package};
+use tower_package::Package;
 use tower_telemetry::debug;
 use tower_uv::Uv;
 
@@ -149,11 +149,7 @@ async fn inner_execute_local_app(
     let package_path = package.unpacked_path.clone().unwrap().to_path_buf();
 
     // set for later on.
-    let working_dir = if package.manifest.version == Some(1) {
-        package_path.to_path_buf()
-    } else {
-        package_path.join(&package.manifest.app_dir_name)
-    };
+    let working_dir = Package::working_dir(&package.manifest, &package_path);
 
     debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
 
@@ -182,18 +178,25 @@ async fn inner_execute_local_app(
         return Err(Error::Cancelled);
     }
 
+    // Without a cache, an app runs in protected mode: its process gets a cleared environment
+    // plus only what we pass in.
+    let protected_mode = opts.cache_dir.is_none();
+
     if is_bash_package(&package) {
-        let child = execute_bash_program(
+        let script = Package::resolve_invoke_path(manifest, &package_path);
+        let mut child = execute_bash_program(
             &ctx,
             working_dir,
-            package_path,
-            &manifest,
+            script,
+            protected_mode,
             secrets,
             params,
             other_env_vars,
             &import_paths,
         )
         .await?;
+
+        forward_output(&mut child, Channel::Program, &opts.output_sender);
 
         let code = wait_for_process(ctx.clone(), &cancel_token, child).await;
         // `wait_for_process` returns -1 on both cancellation and IO error;
@@ -204,9 +207,6 @@ async fn inner_execute_local_app(
         }
         Ok(code)
     } else {
-        // we put Uv in to protected mode when there's no caching configured/enabled.
-        let protected_mode = opts.cache_dir.is_none();
-
         let uv = Uv::new(opts.cache_dir, protected_mode).await?;
         let env_vars = make_env_vars(
             &ctx,
@@ -227,23 +227,7 @@ async fn inner_execute_local_app(
         }
 
         let mut child = uv.venv(&working_dir, &env_vars).await?;
-
-        // Drain the logs to the output channel.
-        let stdout = child.stdout.take().expect("no stdout");
-        tokio::spawn(drain_output(
-            FD::Stdout,
-            Channel::Setup,
-            opts.output_sender.clone(),
-            BufReader::new(stdout),
-        ));
-
-        let stderr = child.stderr.take().expect("no stderr");
-        tokio::spawn(drain_output(
-            FD::Stderr,
-            Channel::Setup,
-            opts.output_sender.clone(),
-            BufReader::new(stderr),
-        ));
+        forward_output(&mut child, Channel::Setup, &opts.output_sender);
 
         // Wait for venv to finish up.
         let res = wait_for_process(ctx.clone(), &cancel_token, child).await;
@@ -333,23 +317,7 @@ async fn inner_execute_local_app(
         }
 
         let mut child = uv.run(&working_dir, &program_path, &env_vars).await?;
-
-        // Drain the logs to the output channel.
-        let stdout = child.stdout.take().expect("no stdout");
-        tokio::spawn(drain_output(
-            FD::Stdout,
-            Channel::Program,
-            opts.output_sender.clone(),
-            BufReader::new(stdout),
-        ));
-
-        let stderr = child.stderr.take().expect("no stderr");
-        tokio::spawn(drain_output(
-            FD::Stderr,
-            Channel::Program,
-            opts.output_sender.clone(),
-            BufReader::new(stderr),
-        ));
+        forward_output(&mut child, Channel::Program, &opts.output_sender);
 
         let code = wait_for_process(ctx.clone(), &cancel_token, child).await;
         if cancel_token.is_cancelled() {
@@ -473,8 +441,8 @@ impl App for LocalApp {
 async fn execute_bash_program(
     ctx: &tower_telemetry::Context,
     cwd: PathBuf,
-    package_path: PathBuf,
-    manifest: &Manifest,
+    script: PathBuf,
+    protected_mode: bool,
     secrets: HashMap<String, String>,
     params: HashMap<String, String>,
     other_env_vars: HashMap<String, String>,
@@ -483,26 +451,39 @@ async fn execute_bash_program(
     let bash_path = find_bash().await?;
     debug!(ctx: &ctx, "using bash at {:?}", bash_path);
 
-    debug!(ctx: &ctx, " - bash script {}", manifest.invoke);
+    debug!(ctx: &ctx, " - bash script {:?}", script);
 
-    let child = Command::new(bash_path)
-        .current_dir(&cwd)
-        .arg(package_path.join(manifest.invoke.clone()))
+    let env_vars = tower_uv::normalize_env_vars(&make_env_vars(
+        &ctx,
+        &cwd,
+        &secrets,
+        &params,
+        &other_env_vars,
+        import_paths,
+    ));
+
+    let mut cmd = Command::new(bash_path);
+    cmd.current_dir(&cwd)
+        .arg(script)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .envs(make_env_vars(
-            &ctx,
-            &cwd,
-            &secrets,
-            &params,
-            &other_env_vars,
-            import_paths,
-        ))
-        .kill_on_drop(true)
-        .spawn()?;
+        .kill_on_drop(true);
 
-    Ok(child)
+    // Its own process group lets cancellation (`killpg`) reach everything the script starts.
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+
+    if protected_mode {
+        cmd.env_clear();
+    }
+
+    // After env_clear, so protected mode keeps these.
+    cmd.envs(env_vars);
+
+    Ok(cmd.spawn()?)
 }
 
 fn make_env_var_key(src: &str) -> String {
@@ -608,23 +589,27 @@ async fn run_setup_child(
     output_sender: &OutputSender,
     mut child: Child,
 ) -> i32 {
+    forward_output(&mut child, Channel::Setup, output_sender);
+    wait_for_process(ctx.clone(), cancel_token, child).await
+}
+
+/// Sends the child's stdout and stderr lines to `output` on `channel` until the pipes close.
+fn forward_output(child: &mut Child, channel: Channel, output: &OutputSender) {
     let stdout = child.stdout.take().expect("no stdout");
     tokio::spawn(drain_output(
         FD::Stdout,
-        Channel::Setup,
-        output_sender.clone(),
+        channel,
+        output.clone(),
         BufReader::new(stdout),
     ));
 
     let stderr = child.stderr.take().expect("no stderr");
     tokio::spawn(drain_output(
         FD::Stderr,
-        Channel::Setup,
-        output_sender.clone(),
+        channel,
+        output.clone(),
         BufReader::new(stderr),
     ));
-
-    wait_for_process(ctx.clone(), cancel_token, child).await
 }
 
 async fn wait_for_process(

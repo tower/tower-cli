@@ -144,19 +144,7 @@ impl Package {
             });
         }
 
-        // Shell scripts (.sh) are executed relative to package_path, while Python
-        // scripts are executed relative to the app working directory. Check the
-        // path that matches the runtime's actual execution behavior.
-        let resolved_path = if manifest.invoke.ends_with(".sh") {
-            package_path.join(&manifest.invoke)
-        } else {
-            let working_dir = if manifest.version == Some(1) {
-                package_path.to_path_buf()
-            } else {
-                package_path.join(&manifest.app_dir_name)
-            };
-            working_dir.join(&manifest.invoke)
-        };
+        let resolved_path = Self::resolve_invoke_path(manifest, package_path);
 
         if !resolved_path.exists() {
             return Err(Error::MissingScript {
@@ -175,6 +163,30 @@ impl Package {
         }
 
         Ok(())
+    }
+
+    /// The directory an app runs in: the package root for v1 packages, the app directory
+    /// otherwise.
+    pub fn working_dir(manifest: &Manifest, package_path: &Path) -> PathBuf {
+        if manifest.version == Some(1) {
+            package_path.to_path_buf()
+        } else {
+            package_path.join(&manifest.app_dir_name)
+        }
+    }
+
+    /// Where the manifest's invoke script lives under `package_path`. Scripts resolve from the
+    /// working directory, where the packager puts them. Shell scripts fall back to the package
+    /// root, where the runtime used to look for them.
+    pub fn resolve_invoke_path(manifest: &Manifest, package_path: &Path) -> PathBuf {
+        let in_working_dir = Self::working_dir(manifest, package_path).join(&manifest.invoke);
+        if manifest.invoke.ends_with(".sh") && !in_working_dir.exists() {
+            let in_root = package_path.join(&manifest.invoke);
+            if in_root.exists() {
+                return in_root;
+            }
+        }
+        in_working_dir
     }
 
     // build creates a new package from a PackageSpec. PackageSpec is typically composed of fields
@@ -653,26 +665,40 @@ mod test {
     }
 
     #[test]
-    fn test_validate_invoke_script_shell_resolves_from_package_root() {
+    fn test_validate_invoke_script_shell_resolves_from_app_dir() {
         let dir = TempDir::new().unwrap();
         let app_dir = dir.path().join("app");
         std::fs::create_dir_all(&app_dir).unwrap();
-        // Shell script placed at package root level (not inside app/)
-        std::fs::write(dir.path().join("run.sh"), "#!/bin/bash").unwrap();
+        // The packager puts every app file, shell scripts included, under app/.
+        std::fs::write(app_dir.join("run.sh"), "#!/bin/bash").unwrap();
         let manifest = make_manifest("./run.sh", None);
-        // Should resolve from package_path for .sh files
         assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+        assert_eq!(
+            Package::resolve_invoke_path(&manifest, dir.path()),
+            app_dir.join("./run.sh")
+        );
     }
 
     #[test]
-    fn test_validate_invoke_script_shell_not_in_app_dir() {
+    fn test_validate_invoke_script_shell_falls_back_to_package_root() {
         let dir = TempDir::new().unwrap();
         let app_dir = dir.path().join("app");
         std::fs::create_dir_all(&app_dir).unwrap();
-        // Shell script placed inside app/ but runtime looks at package root
-        std::fs::write(app_dir.join("run.sh"), "#!/bin/bash").unwrap();
+        std::fs::write(dir.path().join("run.sh"), "#!/bin/bash").unwrap();
         let manifest = make_manifest("./run.sh", None);
-        // Should fail because runtime looks at package_path.join(invoke), not working_dir
+        assert!(Package::validate_invoke_script(&manifest, dir.path()).is_ok());
+        assert_eq!(
+            Package::resolve_invoke_path(&manifest, dir.path()),
+            dir.path().join("./run.sh")
+        );
+    }
+
+    #[test]
+    fn test_validate_invoke_script_python_does_not_fall_back_to_package_root() {
+        let dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join("app")).unwrap();
+        std::fs::write(dir.path().join("main.py"), "print('hi')").unwrap();
+        let manifest = make_manifest("./main.py", None);
         let err = Package::validate_invoke_script(&manifest, dir.path()).unwrap_err();
         assert!(matches!(err, Error::MissingScript { .. }));
     }
