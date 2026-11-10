@@ -516,6 +516,55 @@ async fn test_running_bun_app() {
 
 #[cfg(unix)]
 #[tokio::test]
+async fn test_running_bun_app_with_import_paths() {
+    if !bun_available() {
+        return;
+    }
+    debug!("Running 10-bun-import-paths");
+
+    let dir = get_example_app_dir("10-bun-import-paths");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: None,
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    let mut program = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        if let tower_runtime::Channel::Program = output.channel {
+            program.push(output.line);
+        }
+    }
+
+    // main.ts imports the shared module by name, and the shared module gets the app's pinned
+    // `ms`. Without the app's node_modules on NODE_PATH, bun would auto-install the latest.
+    assert!(
+        program.contains(&"hello from lib, one minute is 1m (ms 2.1.2)".to_string()),
+        "expected output from the shared module; got {:?}",
+        program
+    );
+
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Exited,
+        "App should have exited cleanly, got {:?}",
+        status
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
 async fn test_running_bun_app_installs_into_the_cache_dir() {
     if !bun_available() {
         return;

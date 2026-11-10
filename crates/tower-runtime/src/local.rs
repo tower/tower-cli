@@ -183,7 +183,7 @@ async fn inner_execute_local_app(
         .collect();
 
     if !import_paths.is_empty() {
-        debug!(ctx: &ctx, "adding import paths to PYTHONPATH: {:?}", import_paths);
+        debug!(ctx: &ctx, "adding import paths to the module search path: {:?}", import_paths);
     }
 
     // We insert these checks for cancellation along the way to see if the process was
@@ -218,7 +218,7 @@ async fn inner_execute_local_app(
         Ok(code)
     } else if runtime == Runtime::Bun {
         let script = working_dir.join(&manifest.invoke);
-        let env_vars = make_env_vars(
+        let mut env_vars = make_env_vars(
             &ctx,
             &working_dir,
             &secrets,
@@ -226,6 +226,18 @@ async fn inner_execute_local_app(
             &other_env_vars,
             &import_paths,
         );
+        if !import_paths.is_empty() {
+            // Shared code lives under modules/, outside the app directory, so it reaches the
+            // app's packages through NODE_PATH as well.
+            extend_search_path(
+                &mut env_vars,
+                "NODE_PATH",
+                import_paths
+                    .iter()
+                    .cloned()
+                    .chain([working_dir.join("node_modules")]),
+            );
+        }
         execute_bun_app(
             &ctx,
             &cancel_token,
@@ -661,25 +673,37 @@ fn make_env_vars(
     let added_keys = res.keys().map(|s| &**s).collect::<Vec<&str>>().join(", ");
     debug!(ctx: &ctx, "added keys {}", &added_keys);
 
-    let mut path_entries: Vec<PathBuf> = res
-        .remove("PYTHONPATH")
+    extend_search_path(
+        &mut res,
+        "PYTHONPATH",
+        import_paths.iter().cloned().chain([cwd.clone()]),
+    );
+
+    res.insert("PYTHONUNBUFFERED".to_string(), "x".to_string());
+
+    res
+}
+
+/// Appends `extra` to the path list in `env_vars[key]`, after any entries already there.
+fn extend_search_path(
+    env_vars: &mut HashMap<String, String>,
+    key: &str,
+    extra: impl IntoIterator<Item = PathBuf>,
+) {
+    let mut entries: Vec<PathBuf> = env_vars
+        .remove(key)
         .as_deref()
         .map(env::split_paths)
         .into_iter()
         .flatten()
         .collect();
-    path_entries.extend(import_paths.iter().cloned());
-    path_entries.push(cwd.clone());
+    entries.extend(extra);
 
-    let pythonpath = env::join_paths(&path_entries)
+    let joined = env::join_paths(&entries)
         .unwrap()
         .to_string_lossy()
         .to_string();
-    res.insert("PYTHONPATH".to_string(), pythonpath);
-
-    res.insert("PYTHONUNBUFFERED".to_string(), "x".to_string());
-
-    res
+    env_vars.insert(key.to_string(), joined);
 }
 
 #[cfg(unix)]

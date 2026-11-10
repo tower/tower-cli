@@ -188,13 +188,6 @@ impl Towerfile {
             });
         }
 
-        // import_paths are wired into PYTHONPATH only.
-        if !self.app.import_paths.is_empty() {
-            return Err(Error::InvalidTowerfile {
-                message: "import_paths are not supported with runtime \"bun\"".to_string(),
-            });
-        }
-
         Ok(())
     }
 
@@ -730,7 +723,7 @@ mod test {
     }
 
     #[test]
-    fn test_bun_runtime_rejects_import_paths() {
+    fn test_bun_runtime_accepts_import_paths() {
         let toml = r#"
             [app]
             name = "test"
@@ -739,8 +732,8 @@ mod test {
             import_paths = ["../shared"]
         "#;
 
-        let err = crate::Towerfile::from_toml(toml).unwrap_err();
-        assert!(err.to_string().contains("import_paths"), "was: {}", err);
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.import_paths, vec![PathBuf::from("../shared")]);
     }
 
     #[test]
