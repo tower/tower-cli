@@ -82,6 +82,8 @@ uv init
 
 Creates `pyproject.toml`, `main.py`, `README.md`. Keep `pyproject.toml` minimal — `[project]` metadata and dependencies only. No `[build-system]`, `[tool.hatchling]`, or similar. Skip if a `pyproject.toml` already exists.
 
+For a JavaScript or TypeScript app, run `bun init -y` instead, which creates `package.json` and `index.ts`. Skip it if a `package.json` already exists. Without a `pyproject.toml`, `tower_file_generate` reads `package.json` and sets `runtime = "bun"`.
+
 ### 1. Towerfile
 
 ```

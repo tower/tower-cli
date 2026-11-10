@@ -5,7 +5,7 @@ pub use core::{
     build_package, compute_sha256_bytes, compute_sha256_package, normalize_path, BuiltPackage,
     Entry, Manifest, PackageInputs, Runtime, CURRENT_PACKAGE_VERSION,
 };
-pub use towerfile::{App, Parameter, Towerfile, RUNTIMES, RUN_SIZES};
+pub use towerfile::{is_bun_script, App, Parameter, Towerfile, RUNTIMES, RUN_SIZES};
 
 #[cfg(feature = "native")]
 mod error;

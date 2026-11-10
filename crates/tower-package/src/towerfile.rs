@@ -15,6 +15,13 @@ pub const RUNTIMES: [&str; 2] = ["python", "bun"];
 /// Script extensions the bun runtime accepts.
 const BUN_SCRIPT_EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
+/// Whether the bun runtime can run `script`, judged by its extension.
+pub fn is_bun_script(script: &str) -> bool {
+    script
+        .rsplit_once('.')
+        .is_some_and(|(_, ext)| BUN_SCRIPT_EXTENSIONS.contains(&ext))
+}
+
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
     #[serde(default)]
@@ -175,10 +182,7 @@ impl Towerfile {
 
     fn validate_bun_app(&self) -> Result<(), Error> {
         let script = self.app.script.as_str();
-        let is_js = script
-            .rsplit_once('.')
-            .is_some_and(|(_, ext)| BUN_SCRIPT_EXTENSIONS.contains(&ext));
-        if !is_js {
+        if !is_bun_script(script) {
             return Err(Error::InvalidTowerfile {
                 message: format!(
                     "runtime \"bun\" needs a JavaScript or TypeScript script (.{}), but script is {:?}",

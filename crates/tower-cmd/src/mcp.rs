@@ -1144,21 +1144,18 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Generate Towerfile from pyproject.toml (first step). Don't add build systems to pyproject.toml. Optional: working_directory."
+        description = "Generate Towerfile from pyproject.toml, or from package.json for a bun app (first step). Don't add build systems to pyproject.toml. Optional: working_directory."
     )]
     async fn tower_file_generate(
         &self,
         Parameters(request): Parameters<GenerateTowerfileRequest>,
     ) -> Result<CallToolResult, McpError> {
         let working_dir = Self::resolve_working_directory(&request.common);
-        let pyproject_path = working_dir.join("pyproject.toml");
-        let content = match TowerfileGenerator::from_pyproject(
-            Some(pyproject_path.to_str().unwrap()),
-            request.script_path.as_deref(),
-        ) {
-            Ok(content) => content,
-            Err(e) => return Self::error_result("Failed to generate Towerfile", e),
-        };
+        let content =
+            match TowerfileGenerator::from_dir(&working_dir, request.script_path.as_deref()) {
+                Ok(content) => content,
+                Err(e) => return Self::error_result("Failed to generate Towerfile", e),
+            };
 
         let towerfile_path = working_dir.join("Towerfile");
         match std::fs::write(&towerfile_path, &content) {
@@ -1196,6 +1193,11 @@ All tools accept optional working_directory parameter to specify which project t
    DO NOT add [build-system], [tool.hatchling], [tool.setuptools] or similar
    Skip this step if project with pyproject.toml already exists
 
+   JAVASCRIPT OR TYPESCRIPT PROJECT (if creating new):
+   Use 'bun init -y' in project directory to create package.json and index.ts
+   Skip this step if project with package.json already exists
+   tower_file_generate then writes a Towerfile with runtime = "bun"
+
 1. TOWERFILE (required for all Tower operations):
    tower_file_generate → tower_file_update → tower_file_add/edit/remove_parameter → tower_file_validate
    CRITICAL: Always use tower_file_update or tower_file_add/edit/remove_parameter to modify
@@ -1223,8 +1225,8 @@ All tools accept optional working_directory parameter to specify which project t
    tower_secrets_create, tower_secrets_list - store credentials, API keys, database passwords
 
 TYPICAL WORKFLOW:
-1. Check if pyproject.toml exists (or create with uv init)
-2. tower_file_generate - creates Towerfile from pyproject.toml
+1. Check if pyproject.toml or package.json exists (or create with uv init / bun init -y)
+2. tower_file_generate - creates Towerfile from pyproject.toml or package.json
 3. tower_run_local - test locally (can access tower secrets)
 4. tower_apps_create - create app in Tower cloud
 5. tower_deploy - deploy code to Tower
@@ -1336,7 +1338,7 @@ Rules:
 - MCP tools are the authoritative Tower interface (not wrappers)
 - Use tower_file_update/add/edit/remove_parameter to modify Towerfiles (never edit TOML directly)
 - DO NOT add hatchling/setuptools to pyproject.toml - Tower handles deployment
-- Tower apps need: pyproject.toml (deps only), Python code, Towerfile
+- Tower apps need: pyproject.toml (deps only), Python code, Towerfile; or, for bun apps, package.json, JavaScript or TypeScript code, Towerfile
 - Pass run parameters as a JSON object {\"key\": \"value\"}, not as CLI flags
 - There is no --param or --params flag
 
