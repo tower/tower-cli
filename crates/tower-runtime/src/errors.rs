@@ -53,6 +53,12 @@ pub enum Error {
     #[snafu(display("bash could not be found"))]
     MissingBash,
 
+    #[snafu(display("bun could not be found"))]
+    MissingBun,
+
+    #[snafu(display("unsupported runtime {runtime:?}"))]
+    UnsupportedRuntime { runtime: String },
+
     #[snafu(display("failed to create a virtual environment"))]
     VirtualEnvCreationFailed,
 

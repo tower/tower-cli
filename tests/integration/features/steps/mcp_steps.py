@@ -235,6 +235,21 @@ version = "0.1.0"
         f.write('print("Hello from test project")\n')
 
 
+@given("I have a package.json file with project metadata")
+def step_create_package_json(context):
+    package_json_content = """{
+  "name": "@acme/test-bun-project",
+  "description": "A test bun project for Towerfile generation",
+  "module": "index.ts",
+  "type": "module"
+}
+"""
+    with open("package.json", "w") as f:
+        f.write(package_json_content)
+    with open("index.ts", "w") as f:
+        f.write('console.log("Hello from test bun project");\n')
+
+
 @step("I call {tool_name} via MCP")
 @async_run_until_complete
 async def step_call_mcp_tool(context, tool_name):
@@ -392,6 +407,22 @@ def step_check_towerfile_metadata(context):
     assert (
         found_metadata
     ), f"Towerfile should contain project name and description, got: {context.mcp_response.get('content', [])}"
+
+
+@step("the Towerfile should run index.ts with bun")
+def step_check_bun_towerfile(context):
+    """Verify the Towerfile generated from package.json runs its module with bun."""
+    assert hasattr(context, "mcp_response"), "No MCP response was recorded"
+
+    found_bun_towerfile = has_text_content(
+        context.mcp_response,
+        lambda text: 'name = "test-bun-project"' in text
+        and 'script = "./index.ts"' in text
+        and 'runtime = "bun"' in text,
+    )
+    assert (
+        found_bun_towerfile
+    ), f"Towerfile should run index.ts with bun, got: {context.mcp_response.get('content', [])}"
 
 
 @step("the MCP server should remain responsive")
