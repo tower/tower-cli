@@ -11,7 +11,7 @@ use tokio::{
 use tokio_stream::*;
 
 use tokio_tar::Archive;
-use tower_package::{Manifest, Package, PackageSpec, Towerfile};
+use tower_package::{Manifest, Package, PackageSpec, Runtime, Towerfile};
 use tower_telemetry::debug;
 
 const TRIVIAL_TOWERFILE: &str = "[app]\nname = \"test\"\nscript = \"main.py\"\n";
@@ -62,6 +62,8 @@ async fn it_creates_package() {
     let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
     assert!(json.get("run_size").is_none());
     assert_eq!(Manifest::from_json(manifest).unwrap().run_size, None);
+    // Without a declared runtime the manifest stays as it was, and the runtime follows the script.
+    assert!(json.get("runtime").is_none());
 }
 
 #[tokio::test]
@@ -368,6 +370,12 @@ async fn it_excludes_various_content_that_should_not_be_there() {
     )
     .await;
     create_test_file(tmp_dir.to_path_buf(), ".git/some-file", "").await;
+    create_test_file(
+        tmp_dir.to_path_buf(),
+        "node_modules/ms/index.js",
+        "module.exports = {}",
+    )
+    .await;
 
     let spec = PackageSpec {
         base_dir: tmp_dir.to_path_buf(),
@@ -392,6 +400,12 @@ async fn it_excludes_various_content_that_should_not_be_there() {
     assert!(
         !files.contains_key("main.py.pyc"),
         "files {:?} contained a .pyc",
+        files
+    );
+    assert!(files.contains_key("app/main.py"), "files {:?}", files);
+    assert!(
+        !files.contains_key("app/node_modules/ms/index.js"),
+        "files {:?} contained node_modules",
         files
     );
 }
@@ -643,5 +657,35 @@ async fn it_preserves_run_size_in_the_manifest_and_towerfile() {
     assert_eq!(
         Manifest::from_json(manifest).unwrap().run_size.as_deref(),
         Some("basic.large")
+    );
+}
+
+#[tokio::test]
+async fn it_copies_a_declared_runtime_into_the_manifest() {
+    // The deploy handler reads runtime from MANIFEST to pick the runner image.
+    let tmp_dir = TmpDir::new("example")
+        .await
+        .expect("Failed to create temp dir");
+
+    let towerfile = "[app]\nname = \"test\"\nscript = \"main.ts\"\nruntime = \"bun\"\n";
+    create_test_file(tmp_dir.to_path_buf(), "Towerfile", towerfile).await;
+    create_test_file(tmp_dir.to_path_buf(), "main.ts", "console.log('hi')").await;
+
+    let spec = PackageSpec {
+        base_dir: tmp_dir.to_path_buf(),
+        towerfile_path: tmp_dir.to_path_buf().join("Towerfile").to_path_buf(),
+        file_globs: vec!["*.ts".to_string()],
+        import_paths: vec![],
+    };
+
+    let package = Package::build(spec).await.expect("Failed to build package");
+    let files = read_package_files(package).await;
+
+    let manifest = files.get("MANIFEST").expect("package was missing MANIFEST");
+    let json: serde_json::Value = serde_json::from_str(manifest).unwrap();
+    assert_eq!(json["runtime"], "bun");
+    assert_eq!(
+        Manifest::from_json(manifest).unwrap().resolve_runtime(),
+        Some(Runtime::Bun)
     );
 }

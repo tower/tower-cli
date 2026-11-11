@@ -83,6 +83,8 @@ struct UpdateTowerfileRequest {
     /// Compute size for each run: one of basic.xsmall, basic.small,
     /// basic.medium, basic.large. Omit to let Tower apply its default.
     run_size: Option<String>,
+    /// What starts the script: python or bun. Omit for Python.
+    runtime: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1023,7 +1025,7 @@ impl TowerService {
     }
 
     #[tool(
-        description = "Update Towerfile config (app name, script, description, source, run_size). Use this instead of editing TOML. Optional: working_directory."
+        description = "Update Towerfile config (app name, script, description, source, run_size, runtime). Use this instead of editing TOML. Optional: working_directory."
     )]
     async fn tower_file_update(
         &self,
@@ -1044,6 +1046,9 @@ impl TowerService {
             }
             if let Some(run_size) = request.run_size {
                 tf.app.run_size = Some(run_size);
+            }
+            if let Some(runtime) = request.runtime {
+                tf.app.runtime = Some(runtime);
             }
             Ok("Towerfile updated".into())
         })

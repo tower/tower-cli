@@ -1,4 +1,4 @@
-use crate::core::Error;
+use crate::core::{Error, Runtime};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -7,6 +7,13 @@ use std::path::PathBuf;
 /// the Towerfile omits it, the server applies its own default, so this list
 /// deliberately has no default of its own.
 pub const RUN_SIZES: [&str; 4] = ["basic.xsmall", "basic.small", "basic.medium", "basic.large"];
+
+/// Runtimes accepted by `[app] runtime`. Without it an app runs with Python, except legacy
+/// `.sh` scripts, which still run with bash.
+pub const RUNTIMES: [&str; 2] = ["python", "bun"];
+
+/// Script extensions the bun runtime accepts.
+const BUN_SCRIPT_EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
@@ -51,6 +58,12 @@ pub struct App {
     /// serializing), leaving the server to apply its default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_size: Option<String>,
+
+    /// What starts the script, e.g. "bun". `None` means the Towerfile didn't
+    /// set one (and the key is omitted when serializing), so the runtime
+    /// follows the script's extension.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -79,6 +92,7 @@ impl Towerfile {
                 description: None,
                 import_paths: vec![],
                 run_size: None,
+                runtime: None,
             },
         }
     }
@@ -138,6 +152,47 @@ impl Towerfile {
                     ),
                 });
             }
+        }
+
+        if let Some(runtime) = &self.app.runtime {
+            match Runtime::from_name(runtime) {
+                None => {
+                    return Err(Error::InvalidTowerfile {
+                        message: format!(
+                            "runtime {:?} is not a valid runtime (expected one of: {})",
+                            runtime,
+                            RUNTIMES.join(", ")
+                        ),
+                    });
+                }
+                Some(Runtime::Bun) => self.validate_bun_app()?,
+                Some(_) => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_bun_app(&self) -> Result<(), Error> {
+        let script = self.app.script.as_str();
+        let is_js = script
+            .rsplit_once('.')
+            .is_some_and(|(_, ext)| BUN_SCRIPT_EXTENSIONS.contains(&ext));
+        if !is_js {
+            return Err(Error::InvalidTowerfile {
+                message: format!(
+                    "runtime \"bun\" needs a JavaScript or TypeScript script (.{}), but script is {:?}",
+                    BUN_SCRIPT_EXTENSIONS.join(", ."),
+                    script
+                ),
+            });
+        }
+
+        // import_paths are wired into PYTHONPATH only.
+        if !self.app.import_paths.is_empty() {
+            return Err(Error::InvalidTowerfile {
+                message: "import_paths are not supported with runtime \"bun\"".to_string(),
+            });
         }
 
         Ok(())
@@ -593,6 +648,111 @@ mod test {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
 
         drop(tempfile);
+    }
+
+    fn towerfile_with_runtime(script: &str, runtime: &str) -> String {
+        format!(
+            r#"
+            [app]
+            name = "test"
+            script = "{}"
+            runtime = "{}"
+        "#,
+            script, runtime
+        )
+    }
+
+    #[test]
+    fn test_runtime_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.runtime, None);
+
+        // An unset runtime must not be written into the user's Towerfile, so it
+        // keeps following the script's extension.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("runtime"));
+    }
+
+    #[test]
+    fn test_runtime_accepts_every_known_runtime() {
+        for (runtime, script) in [("python", "./task.py"), ("bun", "./task.ts")] {
+            let towerfile =
+                crate::Towerfile::from_toml(&towerfile_with_runtime(script, runtime)).unwrap();
+            assert_eq!(towerfile.app.runtime.as_deref(), Some(runtime));
+        }
+        // Every advertised name is one the runtime can start.
+        for name in crate::RUNTIMES {
+            assert!(
+                crate::Runtime::from_name(name).is_some(),
+                "{:?} doesn't parse",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_runtime_rejects_unknown_runtime() {
+        // bash can't be declared: `.sh` scripts keep running with bash only by extension.
+        for bad in ["bash", "node", "Bun", "uv", ""] {
+            let err =
+                crate::Towerfile::from_toml(&towerfile_with_runtime("./task.ts", bad)).unwrap_err();
+            let message = err.to_string();
+            assert!(message.contains("python, bun"), "was: {}", message);
+        }
+    }
+
+    #[test]
+    fn test_bun_runtime_requires_a_javascript_or_typescript_script() {
+        for script in [
+            "./task.ts",
+            "./task.tsx",
+            "./src/task.mjs",
+            "./task.cjs",
+            "task.js",
+        ] {
+            assert!(
+                crate::Towerfile::from_toml(&towerfile_with_runtime(script, "bun")).is_ok(),
+                "expected {:?} to be accepted",
+                script
+            );
+        }
+        for script in ["./task.py", "./task.sh", "./task", "./task.ts.bak"] {
+            let err =
+                crate::Towerfile::from_toml(&towerfile_with_runtime(script, "bun")).unwrap_err();
+            assert!(err.to_string().contains(".ts"), "was: {}", err);
+        }
+    }
+
+    #[test]
+    fn test_bun_runtime_rejects_import_paths() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./task.ts"
+            runtime = "bun"
+            import_paths = ["../shared"]
+        "#;
+
+        let err = crate::Towerfile::from_toml(toml).unwrap_err();
+        assert!(err.to_string().contains("import_paths"), "was: {}", err);
+    }
+
+    #[test]
+    fn test_runtime_survives_read_modify_write() {
+        let mut towerfile =
+            crate::Towerfile::from_toml(&towerfile_with_runtime("./task.ts", "bun")).unwrap();
+        towerfile.app.description = Some("edited".to_string());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+
+        assert_eq!(reparsed.app.runtime.as_deref(), Some("bun"));
     }
 
     #[test]

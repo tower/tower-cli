@@ -29,7 +29,7 @@ use nix::{
 
 use tokio_util::sync::CancellationToken;
 
-use tower_package::{Manifest, Package};
+use tower_package::{Manifest, Runtime};
 use tower_telemetry::debug;
 use tower_uv::Uv;
 
@@ -132,6 +132,14 @@ async fn find_bash() -> Result<PathBuf, Error> {
     }
 }
 
+async fn find_bun() -> Result<PathBuf, Error> {
+    if let Some(path) = find_executable_in_path("bun").await {
+        Ok(path)
+    } else {
+        Err(Error::MissingBun)
+    }
+}
+
 /// Run the app to completion, returning the child's exit code on success or an
 /// `Error` for any platform failure. Cancellation is reported as `Ok(-1)` to
 /// preserve the historical `Status::Crashed { code: -1 }` semantic.
@@ -158,6 +166,11 @@ async fn inner_execute_local_app(
     debug!(ctx: &ctx, " - working directory: {:?}", &working_dir);
 
     let manifest = &package.manifest;
+    let runtime = manifest
+        .resolve_runtime()
+        .ok_or_else(|| Error::UnsupportedRuntime {
+            runtime: manifest.runtime.clone().unwrap_or_default(),
+        })?;
     let secrets = opts.secrets;
     let params = opts.parameters;
     let other_env_vars = opts.env_vars;
@@ -182,7 +195,7 @@ async fn inner_execute_local_app(
         return Err(Error::Cancelled);
     }
 
-    if is_bash_package(&package) {
+    if runtime == Runtime::Bash {
         let child = execute_bash_program(
             &ctx,
             working_dir,
@@ -203,6 +216,26 @@ async fn inner_execute_local_app(
             return Err(Error::Cancelled);
         }
         Ok(code)
+    } else if runtime == Runtime::Bun {
+        let script = working_dir.join(&manifest.invoke);
+        let env_vars = make_env_vars(
+            &ctx,
+            &working_dir,
+            &secrets,
+            &params,
+            &other_env_vars,
+            &import_paths,
+        );
+        execute_bun_app(
+            &ctx,
+            &cancel_token,
+            &opts.output_sender,
+            working_dir,
+            script,
+            opts.cache_dir,
+            env_vars,
+        )
+        .await
     } else {
         // we put Uv in to protected mode when there's no caching configured/enabled.
         let protected_mode = opts.cache_dir.is_none();
@@ -505,6 +538,90 @@ async fn execute_bash_program(
     Ok(child)
 }
 
+/// Runs a bun app: `bun install` when the app has a package.json, then `bun run` on its script.
+/// Returns the exit code of whichever step ends the run.
+async fn execute_bun_app(
+    ctx: &tower_telemetry::Context,
+    cancel_token: &CancellationToken,
+    output_sender: &OutputSender,
+    cwd: PathBuf,
+    script: PathBuf,
+    cache_dir: Option<PathBuf>,
+    env_vars: HashMap<String, String>,
+) -> Result<i32, Error> {
+    let bun_path = find_bun().await?;
+    debug!(ctx: &ctx, "using bun at {:?}", bun_path);
+
+    let protected_mode = cache_dir.is_none();
+    let mut env_vars = tower_uv::normalize_env_vars(&env_vars);
+    if let Some(dir) = &cache_dir {
+        env_vars.insert(
+            "BUN_INSTALL_CACHE_DIR".to_string(),
+            dir.join("bun").to_string_lossy().to_string(),
+        );
+    }
+
+    if cwd.join("package.json").exists() {
+        let mut cmd = bun_command(&bun_path, &cwd, &env_vars, protected_mode);
+        cmd.arg("install").arg("--no-progress");
+        // With a lockfile, install exactly what it pins rather than re-resolving.
+        if cwd.join("bun.lock").exists() || cwd.join("bun.lockb").exists() {
+            cmd.arg("--frozen-lockfile");
+        }
+
+        let code = run_setup_child(ctx, cancel_token, output_sender, cmd.spawn()?).await;
+        if cancel_token.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+        if code != 0 {
+            // A failed install is a crash with bun's exit code, like a failed `uv sync`.
+            return Ok(code);
+        }
+    }
+
+    if cancel_token.is_cancelled() {
+        return Err(Error::Cancelled);
+    }
+
+    debug!(ctx: &ctx, " - bun script {:?}", script);
+
+    let mut cmd = bun_command(&bun_path, &cwd, &env_vars, protected_mode);
+    let mut child = cmd.arg("run").arg(&script).spawn()?;
+    forward_output(&mut child, Channel::Program, output_sender);
+
+    let code = wait_for_process(ctx.clone(), cancel_token, child).await;
+    if cancel_token.is_cancelled() {
+        return Err(Error::Cancelled);
+    }
+    Ok(code)
+}
+
+fn bun_command(
+    bun_path: &PathBuf,
+    cwd: &PathBuf,
+    env_vars: &HashMap<String, String>,
+    protected_mode: bool,
+) -> Command {
+    let mut cmd = Command::new(bun_path);
+    cmd.current_dir(cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+
+    if protected_mode {
+        cmd.env_clear();
+    }
+    cmd.envs(env_vars);
+
+    cmd
+}
+
 fn make_env_var_key(src: &str) -> String {
     // TODO: We have this special case defined for dltHub, and I'm not sure that we want to...
     if src.starts_with("dlt.") {
@@ -627,6 +744,25 @@ async fn run_setup_child(
     wait_for_process(ctx.clone(), cancel_token, child).await
 }
 
+/// Sends the child's stdout and stderr lines to `output` on `channel` until the pipes close.
+fn forward_output(child: &mut Child, channel: Channel, output: &OutputSender) {
+    let stdout = child.stdout.take().expect("no stdout");
+    tokio::spawn(drain_output(
+        FD::Stdout,
+        channel,
+        output.clone(),
+        BufReader::new(stdout),
+    ));
+
+    let stderr = child.stderr.take().expect("no stderr");
+    tokio::spawn(drain_output(
+        FD::Stderr,
+        channel,
+        output.clone(),
+        BufReader::new(stderr),
+    ));
+}
+
 async fn wait_for_process(
     ctx: tower_telemetry::Context,
     cancel_token: &CancellationToken,
@@ -674,8 +810,4 @@ async fn drain_output<R: AsyncRead + Unpin>(
             time: chrono::Utc::now(),
         });
     }
-}
-
-fn is_bash_package(package: &Package) -> bool {
-    return package.manifest.invoke.ends_with(".sh");
 }

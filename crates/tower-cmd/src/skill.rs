@@ -192,6 +192,8 @@ Always use `tower_file_update` or `tower_file_add/edit/remove_parameter` to modi
 
 To give an app more compute, set `run_size` via `tower_file_update`: one of `basic.xsmall`, `basic.small`, `basic.medium` (the default), `basic.large`. It is versioned with the code, and self-hosted runners ignore it.
 
+To run JavaScript or TypeScript, set `runtime` to `bun` via `tower_file_update` and point `script` at a `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` or `.cjs` file. Dependencies come from `package.json` (and `bun.lock`). Leave `runtime` unset for Python apps.
+
 ### 2. Local development (preferred)
 
 ```

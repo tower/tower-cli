@@ -58,7 +58,9 @@ impl From<install::Error> for Error {
     }
 }
 
-fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, String> {
+/// Adds the host variables a child process needs (PATH, HOME, temp dirs, TZ, LANG, ...) to
+/// `env_vars`. Use it for any app process, since protected mode clears everything else.
+pub fn normalize_env_vars(env_vars: &HashMap<String, String>) -> HashMap<String, String> {
     // we copy this locally so we can mutate the results.
     let mut env_vars = env_vars.clone();
 
