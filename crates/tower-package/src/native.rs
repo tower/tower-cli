@@ -85,6 +85,7 @@ impl Package {
                 parameters: vec![],
                 schedule: None,
                 run_size: None,
+                runtime: None,
                 import_paths: vec![],
                 app_dir_name: "app".to_string(),
                 modules_dir_name: "modules".to_string(),
@@ -450,6 +451,11 @@ impl FileResolver {
             return true;
         }
 
+        // Or in installed JavaScript dependencies, which bun installs at run time.
+        if is_in_dir(p, "node_modules") {
+            return true;
+        }
+
         false
     }
 
@@ -574,6 +580,7 @@ mod test {
             parameters: vec![],
             schedule: None,
             run_size: None,
+            runtime: None,
             import_paths: vec![],
             app_dir_name: "app".to_string(),
             modules_dir_name: "modules".to_string(),

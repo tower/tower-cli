@@ -63,6 +63,15 @@ pub enum Error {
     #[snafu(display("No [project] section found in pyproject.toml"))]
     MissingProjectSection,
 
+    #[snafu(display("package.json not found at {}", path))]
+    PackageJsonNotFound { path: String },
+
+    #[snafu(display("Failed to parse package.json: {}", source))]
+    InvalidPackageJson { source: serde_json::Error },
+
+    #[snafu(display("No pyproject.toml or package.json found in {}", dir))]
+    ProjectFileNotFound { dir: String },
+
     // File I/O errors
     #[snafu(display("File I/O error: {}", source))]
     IoError { source: std::io::Error },

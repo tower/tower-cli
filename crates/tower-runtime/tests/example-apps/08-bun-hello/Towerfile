@@ -1,0 +1,4 @@
+[app]
+name = "08-bun-hello"
+script = "./main.ts"
+runtime = "bun"

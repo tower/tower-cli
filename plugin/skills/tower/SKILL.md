@@ -82,6 +82,8 @@ uv init
 
 Creates `pyproject.toml`, `main.py`, `README.md`. Keep `pyproject.toml` minimal — `[project]` metadata and dependencies only. No `[build-system]`, `[tool.hatchling]`, or similar. Skip if a `pyproject.toml` already exists.
 
+For a JavaScript or TypeScript app, run `bun init -y` instead, which creates `package.json` and `index.ts`. Skip it if a `package.json` already exists. Without a `pyproject.toml`, `tower_file_generate` reads `package.json` and sets `runtime = "bun"`.
+
 ### 1. Towerfile
 
 ```
@@ -91,6 +93,8 @@ tower_file_generate → tower_file_update → tower_file_add/edit/remove_paramet
 Always use `tower_file_update` or `tower_file_add/edit/remove_parameter` to modify. Never edit the TOML directly.
 
 To give an app more compute, set `run_size` via `tower_file_update`: one of `basic.xsmall`, `basic.small`, `basic.medium` (the default), `basic.large`. It is versioned with the code, and self-hosted runners ignore it.
+
+To run JavaScript or TypeScript, set `runtime` to `bun` via `tower_file_update` and point `script` at a `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` or `.cjs` file. Dependencies come from `package.json` (and `bun.lock`). Leave `runtime` unset for Python apps.
 
 ### 2. Local development (preferred)
 

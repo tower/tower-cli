@@ -76,6 +76,12 @@ Feature: MCP App Management
     Then I should receive a valid TOML Towerfile
     And the Towerfile should contain the project name and description
 
+  Scenario: Generate Towerfile from package.json
+    Given I have a package.json file with project metadata
+    When I call tower_file_generate via MCP
+    Then I should receive a valid TOML Towerfile
+    And the Towerfile should run index.ts with bun
+
   Scenario: List schedules when none exist
     When I call tower_schedules_list via MCP
     Then I should receive a response with empty schedules data

@@ -1,0 +1,7 @@
+{
+  "name": "10-bun-import-paths",
+  "private": true,
+  "dependencies": {
+    "ms": "2.1.2"
+  }
+}

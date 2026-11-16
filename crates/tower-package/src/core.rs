@@ -77,6 +77,12 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_size: Option<String>,
 
+    /// The runtime the Towerfile declared, e.g. "bun". `None` means it didn't declare one and
+    /// the runtime follows the script; see `resolve_runtime`. A string rather than `Runtime`,
+    /// so a manifest naming a runtime this version doesn't know still parses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<String>,
+
     #[serde(default)]
     pub import_paths: Vec<String>,
 
@@ -93,6 +99,46 @@ pub struct Manifest {
 impl Manifest {
     pub fn from_json(data: &str) -> Result<Self, Error> {
         Ok(serde_json::from_str(data)?)
+    }
+
+    /// The runtime that starts this app: the declared one, or else the one its script implies.
+    /// `None` when the manifest declares a runtime this version doesn't know.
+    pub fn resolve_runtime(&self) -> Option<Runtime> {
+        match &self.runtime {
+            Some(name) => Runtime::from_name(name),
+            None => Some(Runtime::infer(&self.invoke)),
+        }
+    }
+}
+
+/// How an app's script is started.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Runtime {
+    /// `uv run`, after installing dependencies from pyproject.toml or requirements.txt.
+    Python,
+    /// `bash`, for `.sh` scripts. Only inferred: a Towerfile can't declare it.
+    Bash,
+    /// `bun run`, after `bun install` when there's a package.json.
+    Bun,
+}
+
+impl Runtime {
+    /// Parses a runtime name as written in a Towerfile or MANIFEST; see `RUNTIMES`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "python" => Some(Runtime::Python),
+            "bun" => Some(Runtime::Bun),
+            _ => None,
+        }
+    }
+
+    /// The runtime for a script that doesn't declare one: bash for `.sh`, Python otherwise.
+    pub fn infer(script: &str) -> Self {
+        if script.ends_with(".sh") {
+            Runtime::Bash
+        } else {
+            Runtime::Python
+        }
     }
 }
 
@@ -111,7 +157,8 @@ pub struct PackageInputs {
     // module_files have archive_name already rooted under "modules/".
     pub module_files: Vec<Entry>,
 
-    // towerfile_bytes is the sole source of invoke, parameters, run_size, and import_paths.
+    // towerfile_bytes is the sole source of invoke, parameters, run_size, runtime, and
+    // import_paths.
     pub towerfile_bytes: Vec<u8>,
 }
 
@@ -158,6 +205,7 @@ pub fn build_package(inputs: PackageInputs) -> Result<BuiltPackage, Error> {
         parameters: towerfile.parameters,
         schedule: None,
         run_size: towerfile.app.run_size,
+        runtime: towerfile.app.runtime,
         import_paths,
         app_dir_name: "app".to_string(),
         modules_dir_name: "modules".to_string(),
@@ -319,5 +367,62 @@ import_paths = ["../shared", "libs/inner", "./weird/"]
             towerfile_bytes: b"not = = toml".to_vec(),
         });
         assert!(matches!(result, Err(Error::InvalidTowerfile { .. })));
+    }
+
+    fn manifest_for(invoke: &str, runtime: Option<&str>) -> Manifest {
+        Manifest {
+            version: Some(CURRENT_PACKAGE_VERSION),
+            invoke: invoke.to_string(),
+            parameters: vec![],
+            schedule: None,
+            run_size: None,
+            runtime: runtime.map(str::to_string),
+            import_paths: vec![],
+            app_dir_name: "app".to_string(),
+            modules_dir_name: "modules".to_string(),
+            checksum: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_resolve_runtime_infers_from_the_script_when_undeclared() {
+        assert_eq!(
+            manifest_for("./task.py", None).resolve_runtime(),
+            Some(Runtime::Python)
+        );
+        assert_eq!(
+            manifest_for("./task.sh", None).resolve_runtime(),
+            Some(Runtime::Bash)
+        );
+        // Bun is never inferred: a .ts script without a runtime still goes to Python, as before.
+        assert_eq!(
+            manifest_for("./task.ts", None).resolve_runtime(),
+            Some(Runtime::Python)
+        );
+    }
+
+    #[test]
+    fn test_resolve_runtime_prefers_the_declared_runtime() {
+        assert_eq!(
+            manifest_for("./task.ts", Some("bun")).resolve_runtime(),
+            Some(Runtime::Bun)
+        );
+        assert_eq!(
+            manifest_for("./task.sh", Some("bash")).resolve_runtime(),
+            None
+        );
+        assert_eq!(
+            manifest_for("./task.ts", Some("deno")).resolve_runtime(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_manifest_with_unknown_runtime_still_parses() {
+        let manifest = Manifest::from_json(
+            r#"{"version":3,"invoke":"main.ts","schedule":null,"runtime":"deno"}"#,
+        )
+        .unwrap();
+        assert_eq!(manifest.runtime.as_deref(), Some("deno"));
     }
 }
