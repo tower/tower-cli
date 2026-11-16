@@ -1,0 +1,7 @@
+[app]
+name = "10-bun-import-paths"
+script = "./main.ts"
+runtime = "bun"
+import_paths = [
+    "./lib",
+]

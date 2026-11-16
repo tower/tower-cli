@@ -431,3 +431,220 @@ async fn test_running_app_with_multiple_import_paths() {
         status
     );
 }
+
+/// The bun runtime runs bun from PATH. CI installs it; elsewhere the bun tests skip without it.
+#[cfg(unix)]
+fn bun_available() -> bool {
+    let found = std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join("bun").is_file()))
+        .unwrap_or(false);
+    if !found {
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "bun must be on PATH in CI"
+        );
+        eprintln!("skipping: bun is not on PATH");
+    }
+    found
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn test_running_bun_app() {
+    if !bun_available() {
+        return;
+    }
+    debug!("Running 08-bun-hello");
+
+    // Protected mode must keep this out of the app's environment.
+    std::env::set_var("BUN_TEST_PARENT_VARIABLE", "should not reach the app");
+
+    let dir = get_example_app_dir("08-bun-hello");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let mut parameters = HashMap::new();
+    parameters.insert("GREETING".to_string(), "hello from a parameter".to_string());
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters,
+        env_vars: HashMap::new(),
+        // No cache dir means protected mode.
+        cache_dir: None,
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    let mut setup = Vec::new();
+    let mut program = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        match output.channel {
+            tower_runtime::Channel::Setup => setup.push(output.line),
+            tower_runtime::Channel::Program => program.push(output.line),
+        }
+    }
+
+    assert!(
+        !setup.is_empty(),
+        "bun install should report on the setup channel"
+    );
+    // The dependency resolved, so `bun install` ran before the script.
+    assert!(
+        program.contains(&"One minute is 1m".to_string()),
+        "expected the app's output; got {:?}",
+        program
+    );
+    assert!(program.contains(&"The greeting is: hello from a parameter".to_string()));
+    assert!(
+        program.contains(&"The parent variable is: unset".to_string()),
+        "protected mode should not pass the host environment through"
+    );
+
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Exited,
+        "App should have exited cleanly, got {:?}",
+        status
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn test_running_bun_app_with_import_paths() {
+    if !bun_available() {
+        return;
+    }
+    debug!("Running 10-bun-import-paths");
+
+    let dir = get_example_app_dir("10-bun-import-paths");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: None,
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    let mut program = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        if let tower_runtime::Channel::Program = output.channel {
+            program.push(output.line);
+        }
+    }
+
+    // main.ts imports the shared module by name, and the shared module gets the app's pinned
+    // `ms`. Without the app's node_modules on NODE_PATH, bun would auto-install the latest.
+    assert!(
+        program.contains(&"hello from lib, one minute is 1m (ms 2.1.2)".to_string()),
+        "expected output from the shared module; got {:?}",
+        program
+    );
+
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Exited,
+        "App should have exited cleanly, got {:?}",
+        status
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn test_running_bun_app_installs_into_the_cache_dir() {
+    if !bun_available() {
+        return;
+    }
+
+    let dir = get_example_app_dir("08-bun-hello");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+    let cache_dir = tmpdir::TmpDir::new("tower-bun-cache")
+        .await
+        .expect("Failed to create cache dir");
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: Some(cache_dir.to_path_buf()),
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+    while receiver.recv().await.is_some() {}
+
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        status == Status::Exited,
+        "App should have exited cleanly, got {:?}",
+        status
+    );
+    assert!(
+        cache_dir.to_path_buf().join("bun").is_dir(),
+        "bun install should use the runtime's cache dir"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn test_abort_on_bun_install_failure() {
+    if !bun_available() {
+        return;
+    }
+    // package.json no longer matches bun.lock, so a frozen install fails.
+    let dir = get_example_app_dir("09-bun-stale-lockfile");
+    let package = build_package_from_dir(&dir).await;
+    let (sender, mut receiver) = unbounded_channel();
+
+    let opts = StartOptions {
+        ctx: tower_telemetry::Context::new("runner-id".to_string()),
+        package,
+        output_sender: sender,
+        cwd: None,
+        environment: "local".to_string(),
+        secrets: HashMap::new(),
+        parameters: HashMap::new(),
+        env_vars: HashMap::new(),
+        cache_dir: Some(config::default_cache_dir()),
+    };
+
+    let app = LocalApp::start(opts).await.expect("Failed to start app");
+
+    let mut program = Vec::new();
+    while let Some(output) = receiver.recv().await {
+        if matches!(output.channel, tower_runtime::Channel::Program) {
+            program.push(output.line);
+        }
+    }
+
+    assert!(
+        program.is_empty(),
+        "the script should not run: {:?}",
+        program
+    );
+    let status = app.status().await.expect("Failed to get app status");
+    assert!(
+        matches!(status, Status::Crashed { code } if code != 0),
+        "a failed install should crash the app, got {:?}",
+        status
+    );
+}

@@ -35,6 +35,13 @@ jobs:
         with:
           save-if: ${{ github.ref_name == 'main' }}
 
+      # The bun runtime tests run bun from PATH. They're unix-only, like the runtime's bun support.
+      - name: Set up bun
+        if: runner.os == 'Linux'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
       - name: Compile tests
         run: >
           cargo test --all-features --no-run

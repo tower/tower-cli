@@ -235,6 +235,21 @@ version = "0.1.0"
         f.write('print("Hello from test project")\n')
 
 
+@given("I have a package.json file with project metadata")
+def step_create_package_json(context):
+    package_json_content = """{
+  "name": "@acme/test-bun-project",
+  "description": "A test bun project for Towerfile generation",
+  "module": "index.ts",
+  "type": "module"
+}
+"""
+    with open("package.json", "w") as f:
+        f.write(package_json_content)
+    with open("index.ts", "w") as f:
+        f.write('console.log("Hello from test bun project");\n')
+
+
 @step("I call {tool_name} via MCP")
 @async_run_until_complete
 async def step_call_mcp_tool(context, tool_name):
@@ -247,6 +262,26 @@ async def step_call_mcp_tool_with_unique_app_name(context, tool_name, app_name):
     await call_mcp_tool(
         context, tool_name, {"name": unique_app_name(context, app_name, force_new=True)}
     )
+
+
+@step('I call tower_file_update with run_size "{run_size}"')
+@async_run_until_complete
+async def step_update_run_size(context, run_size):
+    await call_mcp_tool(context, "tower_file_update", {"run_size": run_size})
+
+
+@step('I call tower_file_update with description "{description}"')
+@async_run_until_complete
+async def step_update_description(context, description):
+    await call_mcp_tool(context, "tower_file_update", {"description": description})
+
+
+@then('the Towerfile on disk should contain run_size "{run_size}"')
+def step_check_towerfile_run_size(context, run_size):
+    contents = Path("Towerfile").read_text()
+    assert (
+        f'run_size = "{run_size}"' in contents
+    ), f"Towerfile should keep run_size {run_size!r}, got: {contents}"
 
 
 @step("I should receive a response")
@@ -372,6 +407,22 @@ def step_check_towerfile_metadata(context):
     assert (
         found_metadata
     ), f"Towerfile should contain project name and description, got: {context.mcp_response.get('content', [])}"
+
+
+@step("the Towerfile should run index.ts with bun")
+def step_check_bun_towerfile(context):
+    """Verify the Towerfile generated from package.json runs its module with bun."""
+    assert hasattr(context, "mcp_response"), "No MCP response was recorded"
+
+    found_bun_towerfile = has_text_content(
+        context.mcp_response,
+        lambda text: 'name = "test-bun-project"' in text
+        and 'script = "./index.ts"' in text
+        and 'runtime = "bun"' in text,
+    )
+    assert (
+        found_bun_towerfile
+    ), f"Towerfile should run index.ts with bun, got: {context.mcp_response.get('content', [])}"
 
 
 @step("the MCP server should remain responsive")

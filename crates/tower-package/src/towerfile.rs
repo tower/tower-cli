@@ -1,6 +1,26 @@
-use crate::core::Error;
+use crate::core::{Error, Runtime};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// Compute sizes accepted by `[app] run_size`. Managed runners apply the size;
+/// self-hosted runners ignore it and use their own configured resources. When
+/// the Towerfile omits it, the server applies its own default, so this list
+/// deliberately has no default of its own.
+pub const RUN_SIZES: [&str; 4] = ["basic.xsmall", "basic.small", "basic.medium", "basic.large"];
+
+/// Runtimes accepted by `[app] runtime`. Without it an app runs with Python, except legacy
+/// `.sh` scripts, which still run with bash.
+pub const RUNTIMES: [&str; 2] = ["python", "bun"];
+
+/// Script extensions the bun runtime accepts.
+const BUN_SCRIPT_EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+
+/// Whether the bun runtime can run `script`, judged by its extension.
+pub fn is_bun_script(script: &str) -> bool {
+    script
+        .rsplit_once('.')
+        .is_some_and(|(_, ext)| BUN_SCRIPT_EXTENSIONS.contains(&ext))
+}
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Parameter {
@@ -39,6 +59,18 @@ pub struct App {
 
     #[serde(default)]
     pub import_paths: Vec<PathBuf>,
+
+    /// Compute size every run of this app gets, e.g. "basic.medium". `None`
+    /// means the Towerfile didn't set one (and the key is omitted when
+    /// serializing), leaving the server to apply its default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_size: Option<String>,
+
+    /// What starts the script, e.g. "bun". `None` means the Towerfile didn't
+    /// set one (and the key is omitted when serializing), so the runtime
+    /// follows the script's extension.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -66,6 +98,8 @@ impl Towerfile {
                 schedule: String::from("0 0 * * *"),
                 description: None,
                 import_paths: vec![],
+                run_size: None,
+                runtime: None,
             },
         }
     }
@@ -74,20 +108,27 @@ impl Towerfile {
     /// the base_dir field always needs to be set after parsing.
     pub fn from_toml(toml: &str) -> Result<Self, Error> {
         let towerfile: Towerfile = toml::from_str(toml)?;
+        towerfile.validate()?;
+        Ok(towerfile)
+    }
 
-        if towerfile.app.name.is_empty() {
+    /// validate checks the semantic rules that TOML parsing alone can't enforce.
+    /// It runs both when a Towerfile is read and before one is written back, so a
+    /// mutation can't leave an invalid file on disk.
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.app.name.is_empty() {
             return Err(Error::MissingRequiredAppField {
                 field: "name".to_string(),
             });
         }
 
-        if towerfile.app.script.is_empty() {
+        if self.app.script.is_empty() {
             return Err(Error::MissingRequiredAppField {
                 field: "script".to_string(),
             });
         }
 
-        for import_path in &towerfile.app.import_paths {
+        for import_path in &self.app.import_paths {
             let as_str = import_path.to_string_lossy();
             if as_str.is_empty() {
                 return Err(Error::InvalidTowerfile {
@@ -106,7 +147,52 @@ impl Towerfile {
             }
         }
 
-        Ok(towerfile)
+        if let Some(run_size) = &self.app.run_size {
+            // The server rejects unknown sizes at deploy time. Catching it here
+            // means the user finds out before the upload rather than after.
+            if !RUN_SIZES.contains(&run_size.as_str()) {
+                return Err(Error::InvalidTowerfile {
+                    message: format!(
+                        "run_size {:?} is not a valid size (expected one of: {})",
+                        run_size,
+                        RUN_SIZES.join(", ")
+                    ),
+                });
+            }
+        }
+
+        if let Some(runtime) = &self.app.runtime {
+            match Runtime::from_name(runtime) {
+                None => {
+                    return Err(Error::InvalidTowerfile {
+                        message: format!(
+                            "runtime {:?} is not a valid runtime (expected one of: {})",
+                            runtime,
+                            RUNTIMES.join(", ")
+                        ),
+                    });
+                }
+                Some(Runtime::Bun) => self.validate_bun_app()?,
+                Some(_) => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_bun_app(&self) -> Result<(), Error> {
+        let script = self.app.script.as_str();
+        if !is_bun_script(script) {
+            return Err(Error::InvalidTowerfile {
+                message: format!(
+                    "runtime \"bun\" needs a JavaScript or TypeScript script (.{}), but script is {:?}",
+                    BUN_SCRIPT_EXTENSIONS.join(", ."),
+                    script
+                ),
+            });
+        }
+
+        Ok(())
     }
 
     /// set_parameter upserts a parameter by lookup name. If a parameter with the given name
@@ -160,6 +246,8 @@ impl Towerfile {
     /// save writes the Towerfile as TOML to the specified path, defaulting to current dir
     pub fn save(&self, path: Option<&std::path::Path>) -> Result<(), crate::error::Error> {
         use crate::error::Error as OuterError;
+
+        self.validate()?;
 
         let target_path = path.unwrap_or_else(|| std::path::Path::new("Towerfile"));
         let serialized =
@@ -434,6 +522,234 @@ mod test {
 
         let serialized = toml::to_string_pretty(&towerfile).unwrap();
         assert!(serialized.contains(r#"description = "My app""#));
+    }
+
+    #[test]
+    fn test_run_size_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.run_size, None);
+
+        // An unset run_size must not be written into the user's Towerfile, so
+        // the server keeps applying its own default.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("run_size"));
+    }
+
+    #[test]
+    fn test_run_size_accepts_every_known_size() {
+        for size in crate::RUN_SIZES {
+            let toml = format!(
+                r#"
+                [app]
+                name = "test"
+                script = "./script.py"
+                run_size = "{}"
+            "#,
+                size
+            );
+
+            let towerfile = crate::Towerfile::from_toml(&toml).unwrap();
+            assert_eq!(towerfile.app.run_size.as_deref(), Some(size));
+        }
+    }
+
+    #[test]
+    fn test_run_size_rejects_unknown_size() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            run_size = "basic.enormous"
+        "#;
+
+        let err = crate::Towerfile::from_toml(toml).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("basic.enormous"), "was: {}", message);
+        assert!(message.contains("basic.medium"), "was: {}", message);
+    }
+
+    #[test]
+    fn test_run_size_is_case_and_prefix_sensitive() {
+        // The size names are matched exactly; near misses must not slip through
+        // to the server.
+        for bad in ["medium", "basic.Medium", "BASIC.MEDIUM", " basic.medium"] {
+            let toml = format!(
+                r#"
+                [app]
+                name = "test"
+                script = "./script.py"
+                run_size = "{}"
+            "#,
+                bad
+            );
+
+            assert!(
+                crate::Towerfile::from_toml(&toml).is_err(),
+                "expected {:?} to be rejected",
+                bad
+            );
+        }
+    }
+
+    #[test]
+    fn test_run_size_survives_read_modify_write() {
+        // Regression: every MCP write round-trips the Towerfile through this
+        // struct, so a field that isn't modelled is silently dropped from the
+        // user's file. Editing an unrelated field must leave run_size intact.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            run_size = "basic.large"
+        "#;
+
+        let mut towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        towerfile.app.description = Some("edited".to_string());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+
+        assert_eq!(reparsed.app.run_size.as_deref(), Some("basic.large"));
+        assert_eq!(reparsed.app.description.as_deref(), Some("edited"));
+    }
+
+    #[test]
+    fn test_save_refuses_to_persist_an_invalid_run_size() {
+        // MCP edits mutate the struct and write it straight back, so save() has
+        // to hold the mutation to the same rules as a read. Otherwise a bad
+        // value lands on disk and the user only finds out on the next read.
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+            run_size = "basic.small"
+        "#;
+
+        let mut towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        towerfile.app.run_size = Some("basic.enormous".to_string());
+
+        let tempfile =
+            TestFile::new("Towerfile-save-invalid").expect("Failed to create temporary file");
+        let path = PathBuf::from("Towerfile-save-invalid");
+
+        let err = towerfile.save(Some(&path)).unwrap_err();
+        assert!(err.to_string().contains("basic.enormous"), "was: {}", err);
+
+        // The file must be untouched, not half-written.
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
+
+        drop(tempfile);
+    }
+
+    fn towerfile_with_runtime(script: &str, runtime: &str) -> String {
+        format!(
+            r#"
+            [app]
+            name = "test"
+            script = "{}"
+            runtime = "{}"
+        "#,
+            script, runtime
+        )
+    }
+
+    #[test]
+    fn test_runtime_absent_when_not_set() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./script.py"
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.runtime, None);
+
+        // An unset runtime must not be written into the user's Towerfile, so it
+        // keeps following the script's extension.
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        assert!(!serialized.contains("runtime"));
+    }
+
+    #[test]
+    fn test_runtime_accepts_every_known_runtime() {
+        for (runtime, script) in [("python", "./task.py"), ("bun", "./task.ts")] {
+            let towerfile =
+                crate::Towerfile::from_toml(&towerfile_with_runtime(script, runtime)).unwrap();
+            assert_eq!(towerfile.app.runtime.as_deref(), Some(runtime));
+        }
+        // Every advertised name is one the runtime can start.
+        for name in crate::RUNTIMES {
+            assert!(
+                crate::Runtime::from_name(name).is_some(),
+                "{:?} doesn't parse",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_runtime_rejects_unknown_runtime() {
+        // bash can't be declared: `.sh` scripts keep running with bash only by extension.
+        for bad in ["bash", "node", "Bun", "uv", ""] {
+            let err =
+                crate::Towerfile::from_toml(&towerfile_with_runtime("./task.ts", bad)).unwrap_err();
+            let message = err.to_string();
+            assert!(message.contains("python, bun"), "was: {}", message);
+        }
+    }
+
+    #[test]
+    fn test_bun_runtime_requires_a_javascript_or_typescript_script() {
+        for script in [
+            "./task.ts",
+            "./task.tsx",
+            "./src/task.mjs",
+            "./task.cjs",
+            "task.js",
+        ] {
+            assert!(
+                crate::Towerfile::from_toml(&towerfile_with_runtime(script, "bun")).is_ok(),
+                "expected {:?} to be accepted",
+                script
+            );
+        }
+        for script in ["./task.py", "./task.sh", "./task", "./task.ts.bak"] {
+            let err =
+                crate::Towerfile::from_toml(&towerfile_with_runtime(script, "bun")).unwrap_err();
+            assert!(err.to_string().contains(".ts"), "was: {}", err);
+        }
+    }
+
+    #[test]
+    fn test_bun_runtime_accepts_import_paths() {
+        let toml = r#"
+            [app]
+            name = "test"
+            script = "./task.ts"
+            runtime = "bun"
+            import_paths = ["../shared"]
+        "#;
+
+        let towerfile = crate::Towerfile::from_toml(toml).unwrap();
+        assert_eq!(towerfile.app.import_paths, vec![PathBuf::from("../shared")]);
+    }
+
+    #[test]
+    fn test_runtime_survives_read_modify_write() {
+        let mut towerfile =
+            crate::Towerfile::from_toml(&towerfile_with_runtime("./task.ts", "bun")).unwrap();
+        towerfile.app.description = Some("edited".to_string());
+
+        let serialized = toml::to_string_pretty(&towerfile).unwrap();
+        let reparsed = crate::Towerfile::from_toml(&serialized).unwrap();
+
+        assert_eq!(reparsed.app.runtime.as_deref(), Some("bun"));
     }
 
     #[test]

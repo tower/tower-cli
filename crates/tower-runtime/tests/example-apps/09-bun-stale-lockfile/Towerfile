@@ -1,0 +1,4 @@
+[app]
+name = "09-bun-stale-lockfile"
+script = "./main.ts"
+runtime = "bun"
