@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "nirmalpatel008",
+      "id": 47351157,
+      "comment_id": 6949386344,
+      "created_at": "2026-11-17T13:26:45Z",
+      "repoId": 881834656,
+      "pullRequestNo": 381
+    }
+  ]
 }
