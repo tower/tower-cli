@@ -41,6 +41,7 @@ from .exceptions import PyArrowFilterMigrationError
 from .tower_api_client.models import CatalogCredentials
 from .utils.tables import (
     make_table_name,
+    namespace_of,
     namespace_or_default,
 )
 
@@ -689,13 +690,13 @@ class TableReference:
             >>> table.insert(new_data)
         """
 
-        namespace = namespace_or_default(self._namespace)
-        table_name = make_table_name(self._name, namespace)
+        table_name = make_table_name(self._name, self._namespace)
         catalog = self._ensure_catalog_mode("read-write")
 
-        # We need to create the relevant namespace if it's missing from the
-        # resolved namespace.
-        catalog.create_namespace_if_not_exists(namespace)
+        # We need to create the relevant namespace if it's missing. Take it from
+        # the resolved table name, because a qualified name like "sales.orders"
+        # lives in "sales", not in the default namespace.
+        catalog.create_namespace_if_not_exists(namespace_of(table_name))
 
         # Now that we're certain the namespace exists, we can create the
         # underlying table. This will return an error if something went wrong
@@ -753,13 +754,13 @@ class TableReference:
             >>> table = tables("my_table", namespace="my_namespace").create_if_not_exists(schema)
         """
 
-        namespace = namespace_or_default(self._namespace)
-        table_name = make_table_name(self._name, namespace)
+        table_name = make_table_name(self._name, self._namespace)
         catalog = self._ensure_catalog_mode("read-write")
 
-        # We need to create the relevant namespace if it's missing from the
-        # resolved namespace.
-        catalog.create_namespace_if_not_exists(namespace)
+        # We need to create the relevant namespace if it's missing. Take it from
+        # the resolved table name, because a qualified name like "sales.orders"
+        # lives in "sales", not in the default namespace.
+        catalog.create_namespace_if_not_exists(namespace_of(table_name))
 
         # We have the catalog, so let's attempt to create the table. It should
         # not return an error and instead just return the table if it already

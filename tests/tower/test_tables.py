@@ -1454,3 +1454,28 @@ def test_drop_with_catalog_errors(in_memory_catalog):
         with pytest.raises(RuntimeError, match="Catalog connection failed"):
             ref.drop()
         mock_drop.assert_called_once()
+
+
+@pytest.mark.parametrize("method", ["create", "create_if_not_exists"])
+def test_create_with_qualified_name_creates_its_namespace(in_memory_catalog, method):
+    """A qualified name like "sales.orders" lives in the "sales" namespace, so
+    that is the namespace to create, not the default one."""
+    schema = pa.schema([pa.field("id", pa.int64())])
+
+    ref = tower.tables("sales.orders", catalog=in_memory_catalog)
+    table = getattr(ref, method)(schema)
+
+    assert table._table.name() == ("sales", "orders")
+    assert in_memory_catalog.list_namespaces() == [("sales",)]
+    assert tower.tables("orders", catalog=in_memory_catalog, namespace="sales").load()
+
+
+@pytest.mark.parametrize("method", ["create", "create_if_not_exists"])
+def test_create_with_qualified_name_in_nested_namespace(in_memory_catalog, method):
+    schema = pa.schema([pa.field("id", pa.int64())])
+
+    ref = tower.tables("analytics.sales.orders", catalog=in_memory_catalog)
+    table = getattr(ref, method)(schema)
+
+    assert table._table.name() == ("analytics", "sales", "orders")
+    assert ("analytics", "sales") in in_memory_catalog.list_namespaces(("analytics",))
